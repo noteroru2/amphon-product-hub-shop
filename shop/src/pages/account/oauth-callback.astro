@@ -2,16 +2,16 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import '../../styles/auth.css'
 ---
-<BaseLayout title="กำลังเชื่อมบัญชี | AMPHON SHOP" description="ดำเนินการเข้าสู่ระบบหรือเชื่อมบัญชี Google" canonicalPath="/account/oauth-callback/" robots="noindex,nofollow">
+<BaseLayout title="กำลังเข้าสู่ระบบ | AMPHON SHOP" description="กำลังตรวจสอบการเข้าสู่ระบบด้วย Google" canonicalPath="/account/oauth-callback/" robots="noindex,nofollow">
   <section class="auth-shell">
     <div class="auth-container">
       <div class="auth-card">
-        <div class="eyebrow">GOOGLE AUTH</div>
-        <h1>กำลังดำเนินการ</h1>
-        <p class="auth-copy">กำลังตรวจสอบการเข้าสู่ระบบกับ Google กรุณารอสักครู่</p>
+        <div class="eyebrow">เข้าสู่ระบบด้วย Google</div>
+        <h1>กำลังตรวจสอบบัญชี</h1>
+        <p class="auth-copy">กรุณารอสักครู่ ระบบกำลังยืนยันการเข้าสู่ระบบและจะพาคุณไปหน้าถัดไปโดยอัตโนมัติ</p>
         <div id="oauth-message" class="auth-message info">กำลังตรวจสอบบัญชี...</div>
         <div id="oauth-actions" class="auth-actions" hidden>
-          <a class="button button-primary button-wide" href="/account/login/">กลับไปเข้าสู่ระบบ</a>
+          <a class="button button-primary button-wide" href="/account/login/">ลองเข้าสู่ระบบอีกครั้ง</a>
           <a class="button button-secondary button-wide" href="/account/">บัญชีของฉัน</a>
         </div>
       </div>
@@ -35,10 +35,10 @@ import '../../styles/auth.css'
   } else {
     void getCustomerUser().then((user) => {
       if (!user) {
-        fail('ไม่พบเซสชันหลังกลับจาก Google กรุณาลองเข้าสู่ระบบใหม่')
+        fail('ไม่สามารถยืนยันการเข้าสู่ระบบได้ กรุณาลองเข้าสู่ระบบด้วย Google อีกครั้ง')
         return
       }
-      message.textContent = pending.mode === 'link' ? 'เชื่อมบัญชี Google สำเร็จ' : 'เข้าสู่ระบบด้วย Google สำเร็จ'
+      message.textContent = pending.mode === 'link' ? 'เชื่อม Google กับบัญชีเรียบร้อยแล้ว' : 'เข้าสู่ระบบด้วย Google สำเร็จ'
       message.className = 'auth-message success'
       const next = pending.next
       clearPendingCustomerOAuth()
