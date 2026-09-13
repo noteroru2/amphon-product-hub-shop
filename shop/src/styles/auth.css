@@ -1,13 +1,14 @@
 .auth-shell { min-height:68vh; padding:48px 0 64px; }
 .auth-container { width:min(560px, calc(100% - 28px)); margin:0 auto; }
+.auth-container.account-wide { width:min(900px, calc(100% - 28px)); }
 .auth-card { padding:28px; background:#fff; border:1px solid var(--line); border-radius:20px; box-shadow:0 12px 36px rgba(0,0,0,.05); }
 .auth-card h1 { font-size:clamp(1.8rem,4vw,2.6rem); margin-bottom:10px; }
 .auth-copy { color:var(--muted); line-height:1.7; margin-bottom:22px; }
 .auth-form { display:grid; gap:14px; }
 .auth-field { display:grid; gap:7px; }
 .auth-field span { font-size:.88rem; font-weight:800; }
-.auth-field input { width:100%; min-height:46px; border:1px solid #dcdcdc; border-radius:12px; padding:0 13px; background:#fff; color:var(--ink); }
-.auth-field input:focus { outline:2px solid rgba(242,106,33,.18); border-color:var(--brand); }
+.auth-field input, .auth-field select { width:100%; min-height:46px; border:1px solid #dcdcdc; border-radius:12px; padding:0 13px; background:#fff; color:var(--ink); }
+.auth-field input:focus, .auth-field select:focus { outline:2px solid rgba(242,106,33,.18); border-color:var(--brand); }
 .auth-actions { display:grid; gap:10px; margin-top:4px; }
 .auth-links { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; font-size:.88rem; }
 .auth-message { margin:14px 0 0; border-radius:12px; padding:12px 14px; font-size:.9rem; line-height:1.6; }
@@ -35,6 +36,34 @@
 .auth-google-compact { width:auto; min-width:150px; white-space:nowrap; }
 .account-link { display:inline-flex; align-items:center; white-space:nowrap; font-weight:800; font-size:.88rem; }
 .header-actions { display:flex; align-items:center; gap:12px; }
+.account-section { padding:24px 0; border-top:1px solid var(--line); }
+.account-section:first-of-type { border-top:0; padding-top:4px; }
+.account-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.account-section-heading h2 { margin:2px 0 0; font-size:1.25rem; }
+.account-kicker { display:block; color:var(--brand); font-size:.7rem; font-weight:900; letter-spacing:.08em; }
+.account-section-note { color:var(--muted); font-size:.82rem; line-height:1.55; }
+.account-address-note { margin:-6px 0 14px; }
+.account-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.account-span-2 { grid-column:1 / -1; }
+.account-form-submit { justify-self:start; min-width:190px; }
+.account-small-button { min-height:38px; padding:8px 12px; font-size:.82rem; }
+.address-list { display:grid; gap:12px; }
+.address-card { border:1px solid var(--line); border-radius:14px; padding:16px; background:#fff; }
+.address-card.is-default { border-color:#f5c8ad; background:#fffaf7; }
+.address-card-top { display:flex; justify-content:space-between; gap:12px; }
+.address-card-top strong { font-size:1rem; }
+.address-default-badge { display:inline-flex; margin-left:8px; padding:3px 8px; border-radius:999px; background:#fff0e7; color:#a84d17; font-size:.7rem; font-weight:900; vertical-align:middle; }
+.address-recipient { margin:6px 0 0; color:var(--muted); font-size:.85rem; }
+.address-body { margin:12px 0 0; line-height:1.65; font-size:.9rem; }
+.address-card-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.address-delete-button { color:#8d2020; }
+.address-empty { padding:20px; border:1px dashed #d8d8d8; border-radius:14px; text-align:center; color:var(--muted); font-size:.88rem; }
+.address-form { margin-top:16px; padding:18px; border:1px solid #e5e5e5; border-radius:14px; background:#fafafa; }
+.address-form[hidden] { display:none; }
+.address-default-check { display:flex; align-items:center; gap:8px; margin:16px 0; font-size:.88rem; font-weight:800; }
+.address-default-check input { width:18px; height:18px; }
+.address-form-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.account-footer-actions { grid-template-columns:1fr 1fr; margin-top:20px; }
 @media (max-width:720px) {
   .auth-shell { padding:28px 0 44px; }
   .auth-card { padding:20px; }
@@ -42,4 +71,11 @@
   .account-link { font-size:.8rem; }
   .auth-provider-box { align-items:flex-start; flex-direction:column; }
   .auth-google-compact { width:100%; }
+  .account-section-heading { align-items:stretch; flex-direction:column; }
+  .account-form-grid { grid-template-columns:1fr; }
+  .account-span-2 { grid-column:auto; }
+  .account-form-submit { width:100%; }
+  .address-form { padding:14px; }
+  .address-card-actions .button { flex:1 1 auto; }
+  .account-footer-actions { grid-template-columns:1fr; }
 }
