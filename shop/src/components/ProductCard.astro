@@ -11,17 +11,18 @@ const cover = [...product.images].sort((a, b) => Number(b.isCover) - Number(a.is
     {cover?.url ? (
       <img src={cover.url} alt={`${product.title} มือสอง`} loading="lazy" decoding="async" />
     ) : (
-      <span class="product-placeholder">ยังไม่มีรูปสินค้า</span>
+      <span class="product-placeholder">ยังไม่มีรูป</span>
     )}
   </div>
   <div class="product-body">
     <span class:list={['badge', product.availability === 'reserved' && 'badge-reserved']}>
-      {product.availability === 'reserved' ? 'ติดจอง' : 'พร้อมจำหน่าย'}
+      {product.availability === 'reserved' ? 'มีคนจองแล้ว' : 'พร้อมขาย'}
     </span>
     <h3 class="product-title">{product.title}</h3>
     <div class="product-meta">
       {[product.brand, product.model, product.conditionPercent ? `สภาพ ${product.conditionPercent}%` : null].filter(Boolean).join(' • ')}
     </div>
     <div class="product-price">{formatPrice(product.price)}</div>
+    <span class="product-card-cta">ดูรูปและรายละเอียด →</span>
   </div>
 </a>
