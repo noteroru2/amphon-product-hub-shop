@@ -13,15 +13,19 @@ const seller = (document?.seller || {}) as Record<string, any>
 const customer = (document?.customer || {}) as Record<string, any>
 const totals = (document?.totals || {}) as Record<string, any>
 const items = Array.isArray(document?.items) ? document!.items as Array<Record<string, any>> : []
+const documentTypeLabel: Record<string,string> = {
+  RECEIPT:'ใบเสร็จรับเงิน', TAX_INVOICE:'ใบกำกับภาษี', INVOICE:'ใบแจ้งหนี้', CREDIT_NOTE:'ใบลดหนี้',
+}
+const documentLabel = document ? (documentTypeLabel[String(document.type || '').toUpperCase()] || 'เอกสารการสั่งซื้อ') : 'เอกสารการสั่งซื้อ'
 ---
-<BaseLayout title={document ? `${document.number} | AMPHON SHOP` : 'เอกสาร | AMPHON SHOP'} description="เอกสารคำสั่งซื้อ" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
+<BaseLayout title={document ? `${document.number} | AMPHON SHOP` : 'เอกสารการสั่งซื้อ | AMPHON SHOP'} description="ดูเอกสารและยอดของรายการสั่งซื้อจาก AMPHON SHOP" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
   <section class="section"><div class="container narrow-container">
-    {document ? <article class="panel order-panel"><div class="eyebrow">{document.type}</div><h1>{document.number}</h1><p class="microcopy">ออกเมื่อ {new Date(document.issuedAt).toLocaleString('th-TH')}</p>
-      <div class="order-status-grid"><div><span>ผู้ขาย</span><strong>{seller.name || seller.legalName || 'AMPHON TRADING'}</strong><small>{seller.taxId ? `Tax ID ${seller.taxId}` : ''}</small></div><div><span>ผู้ซื้อ</span><strong>{customer.name || '-'}</strong><small>{customer.taxId ? `Tax ID ${customer.taxId}` : ''}</small></div></div>
-      <div class="order-items">{items.map((item) => <div><span>{item.title || item.sku}<small>{item.sku || ''}</small></span><strong>{formatPrice(Number(item.unitPrice || item.unit_price || 0))}</strong></div>)}</div>
+    {document ? <article class="panel order-panel"><div class="eyebrow">{documentLabel}</div><h1>{document.number}</h1><p class="microcopy">ออกเมื่อ {new Date(document.issuedAt).toLocaleString('th-TH')}</p>
+      <div class="order-status-grid"><div><span>ผู้ขาย</span><strong>{seller.name || seller.legalName || 'AMPHON TRADING'}</strong><small>{seller.taxId ? `เลขประจำตัวผู้เสียภาษี ${seller.taxId}` : ''}</small></div><div><span>ผู้ซื้อ</span><strong>{customer.name || '-'}</strong><small>{customer.taxId ? `เลขประจำตัวผู้เสียภาษี ${customer.taxId}` : ''}</small></div></div>
+      <div class="order-items">{items.map((item) => <div><span>{item.title || item.sku}<small>{item.sku ? `รหัสสินค้า ${item.sku}` : ''}</small></span><strong>{formatPrice(Number(item.unitPrice || item.unit_price || 0))}</strong></div>)}</div>
       <div class="order-money"><div><span>ค่าสินค้า</span><strong>{formatPrice(Number(totals.subtotal || 0))}</strong></div><div><span>ค่าจัดส่ง</span><strong>{formatPrice(Number(totals.shippingAmount || totals.shipping_amount || 0))}</strong></div><div class="grand"><span>รวม</span><strong>{formatPrice(Number(totals.total || 0))}</strong></div></div>
-      {!document.eTaxIntegrated && <p class="microcopy">เอกสารนี้เป็น snapshot จากระบบร้าน และไม่ได้แสดงว่าเชื่อม e-Tax Invoice/e-Receipt อัตโนมัติ</p>}
-      <button class="button button-secondary" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
-    </article> : <div class="empty"><h1>ไม่พบเอกสาร</h1><p>ลิงก์ไม่ถูกต้องหรือเอกสารถูกยกเลิก</p></div>}
+      {!document.eTaxIntegrated && <div class="notice">เอกสารนี้เป็นเอกสารจากร้านสำหรับรายการสั่งซื้อ และไม่ใช่ e-Tax Invoice/e-Receipt</div>}
+      <div class="hero-actions"><button class="button button-primary" onclick="window.print()">พิมพ์ / บันทึก PDF</button><a class="button button-secondary" href="/account/orders/">กลับไปที่รายการสั่งซื้อ</a></div>
+    </article> : <div class="empty"><h1>{Astro.response.status === 503 ? 'ไม่สามารถโหลดเอกสารได้' : 'ไม่พบเอกสาร'}</h1><p>{Astro.response.status === 503 ? 'กรุณาลองเปิดหน้านี้อีกครั้งในภายหลัง' : 'ลิงก์อาจไม่ถูกต้อง เอกสารถูกยกเลิก หรือไม่มีรายการนี้'}</p><a class="button button-primary" href="/account/orders/">กลับไปที่รายการสั่งซื้อ</a></div>}
   </div></section>
 </BaseLayout>
