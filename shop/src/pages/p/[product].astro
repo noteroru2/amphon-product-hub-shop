@@ -140,8 +140,8 @@ const conditionLabel = product ? (() => {
 const availabilityLabel = product?.availability === 'out_of_stock'
   ? 'ขายแล้ว'
   : product?.availability === 'reserved'
-    ? 'ติดจอง'
-    : 'พร้อมจำหน่าย'
+    ? 'มีคนจองแล้ว'
+    : 'พร้อมขาย'
 
 const lineUrl = import.meta.env.PUBLIC_LINE_URL?.trim() || ''
 const phone = import.meta.env.PUBLIC_PHONE?.trim() || ''
@@ -202,107 +202,113 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
           <div class="price-large">{formatPrice(product.price)}</div>
 
           <div class="trust-summary-grid" aria-label="สรุปข้อมูลสินค้า">
-            <div><span>สภาพสินค้า</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูรายละเอียด'}</strong></div>
-            <div><span>รูปสินค้า</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
-            <div><span>ประกัน</span><strong>{warrantyDate || 'ไม่ระบุ'}</strong></div>
-            <div><span>อัปเดต</span><strong>{updatedDate || 'ล่าสุด'}</strong></div>
+            <div><span>สภาพ</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูด้านล่าง'}</strong></div>
+            <div><span>รูปจริง</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
+            <div><span>ประกัน</span><strong>{warrantyDate || 'ยังไม่ระบุ'}</strong></div>
+            <div><span>อัปเดตล่าสุด</span><strong>{updatedDate || 'ล่าสุด'}</strong></div>
+          </div>
+
+          <div class="chips product-quick-links" aria-label="ไปยังข้อมูลสำคัญของสินค้า">
+            <a class="button button-secondary" href="#condition">ดูสภาพ</a>
+            <a class="button button-secondary" href="#specs">ดูสเปก</a>
+            <a class="button button-secondary" href="#shipping">ส่ง / คืนสินค้า</a>
           </div>
 
           {product.availability === 'available' && (
             <div class="purchase-actions" aria-label="ช่องทางสั่งซื้อสินค้า">
               {settings?.purchaseEnabled ? (
                 <>
-                  <button id="add-to-cart" class="button button-primary button-wide" type="button" data-sku={product.sku}>เพิ่มลงตะกร้า</button>
-                  <a class="button button-secondary button-wide" href="/cart/">ดูตะกร้า / สั่งซื้อ</a>
-                  <p id="cart-message" class="microcopy">ระบบจะตรวจสอบสถานะสินค้าอีกครั้งก่อนยืนยันคำสั่งซื้อ</p>
+                  <button id="add-to-cart" class="button button-primary button-wide" type="button" data-sku={product.sku}>ใส่ตะกร้า</button>
+                  <a class="button button-secondary button-wide" href="/cart/">ไปที่ตะกร้า</a>
+                  <p id="cart-message" class="microcopy">ก่อนยืนยัน ร้านจะเช็กว่าสินค้ายังว่างให้อีกครั้ง</p>
                 </>
               ) : (
                 <>
-                  {lineUrl && <a class="button button-primary button-wide" href={lineUrl} rel="nofollow noopener" target="_blank">สอบถาม / สั่งซื้อทาง LINE</a>}
-                  {phoneHref && <a class="button button-secondary button-wide" href={phoneHref}>โทรสอบถามสินค้า</a>}
-                  <p class="microcopy">ยังไม่เปิดสั่งซื้อออนไลน์ กรุณาแจ้งรหัสสินค้า <strong>{product.sku}</strong> ให้ร้านตรวจสอบก่อนชำระเงิน</p>
+                  {lineUrl && <a class="button button-primary button-wide" href={lineUrl} rel="nofollow noopener" target="_blank">ถามร้านทาง LINE</a>}
+                  {phoneHref && <a class="button button-secondary button-wide" href={phoneHref}>โทรถามร้าน</a>}
+                  <p class="microcopy">ถ้าสนใจ แจ้งรหัสสินค้า <strong>{product.sku}</strong> ให้ร้านเช็กสถานะให้ได้ครับ</p>
                 </>
               )}
             </div>
           )}
 
-          {product.availability === 'reserved' && <div class="notice"><strong>สินค้าชิ้นนี้ติดจอง</strong><br />ยังไม่สามารถสั่งซื้อได้ในขณะนี้ กรุณารอการอัปเดตสถานะหรือสอบถามร้าน</div>}
-          {product.availability === 'out_of_stock' && <div class="notice"><strong>สินค้านี้ขายแล้ว</strong><br />ดูสินค้ารุ่นเดียวกันหรือรุ่นใกล้เคียงที่ยังพร้อมจำหน่ายด้านล่างได้</div>}
+          {product.availability === 'reserved' && <div class="notice"><strong>มีลูกค้าจองชิ้นนี้ไว้แล้ว</strong><br />ตอนนี้ยังกดสั่งไม่ได้ หากหลุดจองสถานะจะอัปเดตบนหน้านี้ครับ</div>}
+          {product.availability === 'out_of_stock' && <div class="notice"><strong>ชิ้นนี้ขายแล้วครับ</strong><br />ลองดูรุ่นใกล้เคียงที่ยังพร้อมขายด้านล่างได้เลย</div>}
 
-          {publishedDate && <p class="muted product-date">อัปเดตรายการขาย {publishedDate}</p>}
+          {publishedDate && <p class="muted product-date">ลงขายเมื่อ {publishedDate}</p>}
         </aside>
       </div>
 
-      <section class="section trust-section">
+      <section id="condition" class="section trust-section">
         <div class="container">
           <div class="section-head">
-            <div><div class="eyebrow">ข้อมูลสินค้าจริง</div><h2>สภาพและข้อมูลของสินค้าชิ้นนี้</h2></div>
-            <p class="muted trust-intro">ตรวจสอบรูป สเปก ตำหนิ อุปกรณ์ และข้อมูลประกันของสินค้าชิ้นนี้ก่อนตัดสินใจสั่งซื้อ</p>
+            <div><div class="eyebrow">ดูเครื่องให้ครบ</div><h2>ของชิ้นนี้เป็นยังไงบ้าง</h2></div>
+            <p class="muted trust-intro">รวมสภาพ รอยใช้งาน ของที่ได้ และประกันไว้ตรงนี้ จะได้ตัดสินใจก่อนซื้อแบบไม่ต้องเดา</p>
           </div>
           <div class="trust-grid">
             <article class="panel trust-card">
-              <h3>สภาพและตำหนิ</h3>
-              {product.conditionPercent !== null && product.conditionPercent !== undefined && <p><strong>สภาพสินค้า:</strong> {product.conditionPercent}%</p>}
+              <h3>สภาพเครื่องและรอยใช้งาน</h3>
+              {product.conditionPercent !== null && product.conditionPercent !== undefined && <p><strong>สภาพโดยรวม:</strong> {product.conditionPercent}%</p>}
               {product.defects
-                ? <div class="defect-box"><strong>ตำหนิที่ระบุ</strong><p>{product.defects}</p></div>
-                : <p class="muted">ยังไม่มีรายละเอียดตำหนิเพิ่มเติม กรุณาดูรูปสินค้าจริงประกอบก่อนสั่งซื้อ</p>}
-              {defectImages.length > 0 && <p class="evidence-note">มีรูปตำหนิ {defectImages.length} รูปในแกลเลอรี</p>}
+                ? <div class="defect-box"><strong>จุดที่ร้านระบุไว้</strong><p>{product.defects}</p></div>
+                : <p class="muted">ยังไม่ได้ลงรายละเอียดรอยเพิ่มเติม ลองดูรูปจริงทุกมุมประกอบก่อนตัดสินใจ</p>}
+              {defectImages.length > 0 && <p class="evidence-note">มีรูปตำหนิให้ดู {defectImages.length} รูปในแกลเลอรี</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>ข้อมูลการตรวจสินค้า</h3>
+              <h3>ร้านเช็กอะไรไว้บ้าง</h3>
               {groups.condition.length ? <dl class="compact-specs">
                 {groups.condition.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
-              </dl> : <p class="muted">ยังไม่มีผลตรวจเพิ่มเติมที่แสดงในหน้านี้</p>}
+              </dl> : <p class="muted">ยังไม่มีผลเช็กเพิ่มเติมบนหน้าเว็บ ถ้าอยากให้เช็กจุดไหนก่อนซื้อ ทักร้านได้ครับ</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>อุปกรณ์ที่ให้มา</h3>
+              <h3>ของที่ได้ไปด้วย</h3>
               {groups.accessories.length ? <dl class="compact-specs">
                 {groups.accessories.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
-              </dl> : <p class="muted">ยังไม่ได้ระบุอุปกรณ์เพิ่มเติม กรุณาสอบถามร้านก่อนสั่งซื้อ</p>}
-              {accessoryImages.length > 0 && <p class="evidence-note">มีรูปอุปกรณ์ {accessoryImages.length} รูปในแกลเลอรี</p>}
+              </dl> : <p class="muted">ยังไม่ได้ลงรายการอุปกรณ์เพิ่มเติม ถ้าส่วนนี้สำคัญกับคุณ ทักร้านให้ยืนยันก่อนสั่งได้ครับ</p>}
+              {accessoryImages.length > 0 && <p class="evidence-note">มีรูปอุปกรณ์ให้ดู {accessoryImages.length} รูปในแกลเลอรี</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>ประกัน</h3>
-              <p>{warrantyDate ? <>ข้อมูลประกันถึง <strong>{warrantyDate}</strong></> : 'ยังไม่ได้ระบุวันสิ้นสุดประกันสำหรับสินค้าชิ้นนี้'}</p>
+              <h3>ประกันเหลือไหม</h3>
+              <p>{warrantyDate ? <>มีข้อมูลประกันถึง <strong>{warrantyDate}</strong></> : 'รายการนี้ยังไม่ได้ระบุวันหมดประกัน'}</p>
               {warrantyImages.length > 0 && <p class="evidence-note">มีรูปหลักฐานประกัน {warrantyImages.length} รูป</p>}
-              {settings?.warrantyPolicyUrl && <a class="inline-link" href={settings.warrantyPolicyUrl}>อ่านเงื่อนไขประกันของร้าน</a>}
+              {settings?.warrantyPolicyUrl && <a class="inline-link" href={settings.warrantyPolicyUrl}>ดูเงื่อนไขประกันของร้าน</a>}
             </article>
 
-            <article class="panel trust-card">
-              <h3>การจัดส่งและการคืนสินค้า</h3>
+            <article id="shipping" class="panel trust-card">
+              <h3>จัดส่ง / คืนสินค้า</h3>
               {settings?.shipping.enabled ? (
                 <p>
                   จัดส่งภายใน {settings.shipping.country || settings.countryCode}
-                  {settings.shipping.rate !== null ? <> • ค่าจัดส่ง {settings.shipping.rate === 0 ? '0 บาท' : formatPrice(settings.shipping.rate)}</> : null}
-                  {settings.shipping.transitMinDays !== null && settings.shipping.transitMaxDays !== null ? <> • ระยะขนส่งประมาณ {settings.shipping.transitMinDays}–{settings.shipping.transitMaxDays} วัน</> : null}
+                  {settings.shipping.rate !== null ? <> • ค่าส่ง {settings.shipping.rate === 0 ? 'ฟรี' : formatPrice(settings.shipping.rate)}</> : null}
+                  {settings.shipping.transitMinDays !== null && settings.shipping.transitMaxDays !== null ? <> • ใช้เวลาประมาณ {settings.shipping.transitMinDays}–{settings.shipping.transitMaxDays} วัน</> : null}
                 </p>
-              ) : <p class="muted">กรุณาสอบถามร้านเพื่อยืนยันค่าจัดส่งก่อนสั่งซื้อ</p>}
+              ) : <p class="muted">ทักร้านเพื่อเช็กค่าจัดส่งได้ก่อนกดสั่งครับ</p>}
               {settings?.returns.enabled ? (
                 <p>
                   {settings.returns.category === 'FINITE' && settings.returns.days !== null ? `คืนสินค้าได้ตามเงื่อนไขภายใน ${settings.returns.days} วัน` : settings.returns.category === 'NOT_PERMITTED' ? 'สินค้ารายการนี้ไม่อยู่ในเงื่อนไขรับคืน' : settings.returns.category === 'UNLIMITED' ? 'การคืนสินค้าเป็นไปตามเงื่อนไขของร้าน' : 'การคืนสินค้าเป็นไปตามเงื่อนไขของร้าน'}
                 </p>
-              ) : <p class="muted">กรุณาอ่านหรือสอบถามเงื่อนไขการคืนสินค้าก่อนสั่งซื้อ</p>}
+              ) : <p class="muted">ถ้าต้องการทราบเงื่อนไขคืนสินค้า ทักร้านให้ยืนยันก่อนสั่งได้ครับ</p>}
               <div class="policy-links">
-                {settings?.shipping.policyUrl && <a class="inline-link" href={settings.shipping.policyUrl}>รายละเอียดการจัดส่ง</a>}
-                {settings?.returns.policyUrl && <a class="inline-link" href={settings.returns.policyUrl}>รายละเอียดการคืนสินค้า</a>}
+                {settings?.shipping.policyUrl && <a class="inline-link" href={settings.shipping.policyUrl}>ดูรายละเอียดการจัดส่ง</a>}
+                {settings?.returns.policyUrl && <a class="inline-link" href={settings.returns.policyUrl}>ดูเงื่อนไขการคืนสินค้า</a>}
               </div>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section">
+      <section id="specs" class="section">
         <div class="container">
           <div class="panel spec-panel">
-            <div class="section-head"><div><div class="eyebrow">ข้อมูลสินค้า</div><h2>รายละเอียดและสเปก</h2></div></div>
+            <div class="section-head"><div><div class="eyebrow">สเปกเครื่อง</div><h2>รายละเอียดที่ควรรู้</h2></div></div>
             {groups.core.length ? (
               <dl class="spec-list">
                 {groups.core.map(([key, value]) => <div class="spec-row"><dt>{key}</dt><dd>{value}</dd></div>)}
               </dl>
-            ) : <p class="muted">ยังไม่มีรายละเอียดสเปกเพิ่มเติม</p>}
+            ) : <p class="muted">ยังไม่ได้ลงสเปกเพิ่มเติมสำหรับชิ้นนี้</p>}
           </div>
         </div>
       </section>
@@ -310,10 +316,10 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       <section class="section disclosure-section">
         <div class="container">
           <div class="panel disclosure-panel">
-            <h2>ก่อนสั่งซื้อสินค้ามือสอง</h2>
-            <p>สินค้ามือสองแต่ละชิ้นมีสภาพและอุปกรณ์ต่างกัน ควรดูข้อมูล รูป และตำหนิของสินค้าชิ้นนี้ให้ครบ หากมีจุดใดไม่ชัดเจนสามารถสอบถามร้านก่อนชำระเงินได้</p>
+            <h2>ชอบเครื่องนี้? เช็กอีกนิดก่อนกดสั่ง</h2>
+            <p>ของมือสองแต่ละชิ้นไม่เหมือนกัน ลองดูรูปทุกมุม อ่านตำหนิ เช็กของที่ได้และประกันให้ครบ ถ้ามีจุดไหนยังไม่ชัด ทักร้านถามก่อนได้ครับ</p>
             <div class="disclosure-points">
-              <span>ตรวจรหัสสินค้า</span><span>ดูรูปตำหนิ</span><span>เช็กอุปกรณ์</span><span>ดูข้อมูลประกัน</span><span>ยืนยันสถานะก่อนชำระ</span>
+              <span>ดูรูปทุกมุม</span><span>อ่านตำหนิ</span><span>เช็กของที่ได้</span><span>ดูประกัน</span><span>สงสัยตรงไหนถามร้าน</span>
             </div>
           </div>
         </div>
@@ -322,7 +328,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       {relatedProducts.length > 0 && <section class="section related-section">
         <div class="container">
           <div class="section-head">
-            <div><div class="eyebrow">สินค้าใกล้เคียง</div><h2>{product.availability === 'out_of_stock' ? 'สินค้าที่มีจำหน่ายแทนชิ้นนี้' : 'สินค้าใกล้เคียงที่มีจำหน่าย'}</h2></div>
+            <div><div class="eyebrow">เผื่ออยากเทียบ</div><h2>{product.availability === 'out_of_stock' ? 'ถ้าชิ้นนี้ขายแล้ว ลองดูตัวเหล่านี้' : 'ถ้ากำลังเทียบ ลองดูตัวเหล่านี้'}</h2></div>
           </div>
           <div class="product-grid">
             {relatedProducts.map((item) => (
@@ -331,7 +337,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
                   {item.images[0]?.url ? <img src={item.images[0].url} alt={`${item.title} มือสอง`} loading="lazy" decoding="async" /> : <span class="product-placeholder">ยังไม่มีรูป</span>}
                 </div>
                 <div class="product-body">
-                  <span class="badge">พร้อมจำหน่าย</span>
+                  <span class="badge">พร้อมขาย</span>
                   <h3 class="product-title">{item.title}</h3>
                   <div class="product-meta">รหัสสินค้า {item.sku}</div>
                   <div class="product-price">{formatPrice(item.price)}</div>
@@ -343,7 +349,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       </section>}
     </>
   ) : (
-    <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'กำลังโหลดข้อมูลสินค้า' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ไม่สามารถโหลดข้อมูลสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'สินค้าอาจขายแล้ว ยกเลิกรายการ หรือไม่มีอยู่ในร้านแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
+    <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'กำลังโหลดข้อมูลสินค้า' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ตอนนี้โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งได้ครับ' : 'สินค้านี้อาจขายแล้ว ถูกยกเลิก หรือไม่มีรายการอยู่บนร้านแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
   )}
 </BaseLayout>
 
@@ -354,8 +360,8 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
   button?.addEventListener('click', () => {
     const sku = button.dataset.sku || ''
     const cart = addCartSku(sku)
-    if (message) message.textContent = `เพิ่มสินค้าลงตะกร้าแล้ว · ตะกร้ามี ${cart.length} รายการ`
-    button.textContent = 'เพิ่มลงตะกร้าแล้ว'
-    window.setTimeout(() => { button.textContent = 'เพิ่มลงตะกร้า' }, 1400)
+    if (message) message.textContent = `ใส่ตะกร้าแล้ว · ตอนนี้มี ${cart.length} รายการ`
+    button.textContent = 'ใส่ตะกร้าแล้ว'
+    window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า' }, 1400)
   })
 </script>
