@@ -2,13 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import '../../styles/auth.css'
 ---
-<BaseLayout title="บัญชีของฉัน | AMPHON SHOP" description="จัดการการเข้าสู่ระบบ AMPHON SHOP" canonicalPath="/account/" robots="noindex,nofollow">
+<BaseLayout title="บัญชีของฉัน | AMPHON SHOP" description="จัดการบัญชี ข้อมูลติดต่อ และที่อยู่จัดส่ง AMPHON SHOP" canonicalPath="/account/" robots="noindex,nofollow">
   <section class="auth-shell">
-    <div class="auth-container">
+    <div class="auth-container account-wide">
       <div class="auth-card">
         <div class="eyebrow">MY ACCOUNT</div>
         <h1>บัญชีของฉัน</h1>
-        <p class="auth-copy">ใช้บัญชีเดียวสำหรับการสั่งซื้อและติดตามข้อมูลลูกค้าใน AMPHON SHOP</p>
+        <p class="auth-copy">จัดการบัญชี ข้อมูลติดต่อ และสมุดที่อยู่สำหรับการสั่งซื้อใน AMPHON SHOP</p>
         <div id="account-loading" class="auth-message info">กำลังตรวจสอบสถานะบัญชี...</div>
         <div id="account-guest" hidden>
           <div class="auth-actions">
@@ -16,24 +16,74 @@ import '../../styles/auth.css'
             <a class="button button-secondary button-wide" href="/account/signup/">สมัครสมาชิก</a>
           </div>
         </div>
+
         <div id="account-user" hidden>
-          <div class="auth-status">
-            <div class="auth-status-row"><span>อีเมล</span><strong id="account-email">-</strong></div>
-            <div class="auth-status-row"><span>สถานะ</span><strong id="account-verified">-</strong></div>
-            <div class="auth-status-row"><span>วิธีเข้าสู่ระบบ</span><strong id="account-providers">-</strong></div>
-          </div>
-          <div id="account-link-message" class="auth-message" hidden></div>
-          <div id="account-google-box" class="auth-provider-box">
-            <div>
-              <strong id="account-google-title">Google</strong>
-              <p id="account-google-copy">เชื่อม Google เพื่อใช้เข้าสู่บัญชีนี้ได้อีกทาง</p>
+          <section class="account-section">
+            <div class="account-section-heading">
+              <div><span class="account-kicker">ACCOUNT</span><h2>ข้อมูลบัญชี</h2></div>
             </div>
-            <button id="account-link-google" class="button button-secondary auth-google-button auth-google-compact" type="button">
-              <span class="auth-google-mark" aria-hidden="true">G</span>
-              <span>เชื่อม Google</span>
-            </button>
-          </div>
-          <div class="auth-actions">
+            <div class="auth-status">
+              <div class="auth-status-row"><span>อีเมล</span><strong id="account-email">-</strong></div>
+              <div class="auth-status-row"><span>สถานะ</span><strong id="account-verified">-</strong></div>
+              <div class="auth-status-row"><span>วิธีเข้าสู่ระบบ</span><strong id="account-providers">-</strong></div>
+            </div>
+            <div id="account-link-message" class="auth-message" hidden></div>
+            <div id="account-google-box" class="auth-provider-box">
+              <div>
+                <strong id="account-google-title">Google</strong>
+                <p id="account-google-copy">เชื่อม Google เพื่อใช้เข้าสู่บัญชีนี้ได้อีกทาง</p>
+              </div>
+              <button id="account-link-google" class="button button-secondary auth-google-button auth-google-compact" type="button">
+                <span class="auth-google-mark" aria-hidden="true">G</span><span>เชื่อม Google</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="account-section">
+            <div class="account-section-heading">
+              <div><span class="account-kicker">PROFILE</span><h2>ข้อมูลติดต่อ</h2></div>
+              <span class="account-section-note">ใช้สำหรับติดต่อเรื่องคำสั่งซื้อ</span>
+            </div>
+            <form id="profile-form" class="auth-form account-form-grid">
+              <label class="auth-field"><span>ชื่อที่ใช้ติดต่อ</span><input id="profile-name" name="displayName" autocomplete="name" required minlength="2" maxlength="120" /></label>
+              <label class="auth-field"><span>เบอร์โทรศัพท์</span><input id="profile-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" minlength="8" maxlength="30" placeholder="เช่น 0812345678" /></label>
+              <button id="profile-submit" class="button button-primary auth-button account-form-submit" type="submit">บันทึกข้อมูลติดต่อ</button>
+            </form>
+            <div id="profile-message" class="auth-message" hidden></div>
+          </section>
+
+          <section class="account-section">
+            <div class="account-section-heading">
+              <div><span class="account-kicker">ADDRESS BOOK</span><h2>ที่อยู่จัดส่ง</h2></div>
+              <button id="address-new" class="button button-secondary account-small-button" type="button">+ เพิ่มที่อยู่</button>
+            </div>
+            <p class="account-section-note account-address-note">บันทึกได้หลายที่อยู่ และเลือกหนึ่งรายการเป็นที่อยู่เริ่มต้น ข้อมูลนี้ยังไม่ถูกบังคับใช้ใน Checkout จนถึง SHOP-8.5</p>
+            <div id="address-message" class="auth-message" hidden></div>
+            <div id="address-list" class="address-list"></div>
+            <div id="address-empty" class="address-empty" hidden>ยังไม่มีที่อยู่จัดส่ง กด “เพิ่มที่อยู่” เพื่อบันทึกที่อยู่แรก</div>
+
+            <form id="address-form" class="address-form" hidden>
+              <input id="address-id" type="hidden" />
+              <div class="account-form-grid">
+                <label class="auth-field"><span>ชื่อเรียกที่อยู่</span><input id="address-label" maxlength="60" value="บ้าน" placeholder="บ้าน / ที่ทำงาน" required /></label>
+                <label class="auth-field"><span>ชื่อผู้รับ</span><input id="address-recipient" autocomplete="name" minlength="2" maxlength="120" required /></label>
+                <label class="auth-field"><span>เบอร์โทรผู้รับ</span><input id="address-phone" type="tel" inputmode="tel" autocomplete="tel" minlength="8" maxlength="30" required /></label>
+                <label class="auth-field account-span-2"><span>บ้านเลขที่ / หมู่ / อาคาร / ถนน</span><input id="address-line1" autocomplete="address-line1" maxlength="250" required /></label>
+                <label class="auth-field account-span-2"><span>รายละเอียดเพิ่มเติม (ถ้ามี)</span><input id="address-line2" autocomplete="address-line2" maxlength="250" /></label>
+                <label class="auth-field"><span>แขวง / ตำบล</span><input id="address-subdistrict" autocomplete="address-level3" maxlength="120" required /></label>
+                <label class="auth-field"><span>เขต / อำเภอ</span><input id="address-district" autocomplete="address-level2" maxlength="120" required /></label>
+                <label class="auth-field"><span>จังหวัด</span><select id="address-province" autocomplete="address-level1" required><option value="">เลือกจังหวัด</option></select></label>
+                <label class="auth-field"><span>รหัสไปรษณีย์</span><input id="address-postal" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required /></label>
+              </div>
+              <label class="address-default-check"><input id="address-default" type="checkbox" /> <span>ตั้งเป็นที่อยู่เริ่มต้น</span></label>
+              <div class="address-form-actions">
+                <button id="address-submit" class="button button-primary auth-button" type="submit">บันทึกที่อยู่</button>
+                <button id="address-cancel" class="button button-secondary" type="button">ยกเลิก</button>
+              </div>
+            </form>
+          </section>
+
+          <div class="auth-actions account-footer-actions">
             <a class="button button-secondary button-wide" href="/cart/">กลับไปตะกร้า</a>
             <button id="account-signout" class="button button-secondary button-wide auth-button" type="button">ออกจากระบบ</button>
           </div>
@@ -44,6 +94,10 @@ import '../../styles/auth.css'
 </BaseLayout>
 <script>
   import { consumeCustomerAuthRedirect, customerHasIdentity, friendlyAuthError, getCustomerUser, linkGoogleIdentity, signOutCustomer } from '../../lib/customer-auth'
+  import { createCustomerAddress, deleteCustomerAddress, friendlyCustomerDataError, getCustomerProfile, listCustomerAddresses, setCustomerDefaultAddress, updateCustomerAddress, updateCustomerProfile, type CustomerAddress, type CustomerProfile } from '../../lib/customer-account'
+
+  const provinces = ['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี']
+
   const loading = document.getElementById('account-loading') as HTMLElement
   const guest = document.getElementById('account-guest') as HTMLElement
   const userBox = document.getElementById('account-user') as HTMLElement
@@ -55,9 +109,148 @@ import '../../styles/auth.css'
   const googleCopy = document.getElementById('account-google-copy') as HTMLElement
   const googleButton = document.getElementById('account-link-google') as HTMLButtonElement
   const linkMessage = document.getElementById('account-link-message') as HTMLElement
-  const show = (text:string, tone:'error'|'success'|'info') => { linkMessage.textContent = text; linkMessage.className = `auth-message ${tone}`; linkMessage.hidden = false }
+  const profileForm = document.getElementById('profile-form') as HTMLFormElement
+  const profileName = document.getElementById('profile-name') as HTMLInputElement
+  const profilePhone = document.getElementById('profile-phone') as HTMLInputElement
+  const profileSubmit = document.getElementById('profile-submit') as HTMLButtonElement
+  const profileMessage = document.getElementById('profile-message') as HTMLElement
+  const addressForm = document.getElementById('address-form') as HTMLFormElement
+  const addressList = document.getElementById('address-list') as HTMLElement
+  const addressEmpty = document.getElementById('address-empty') as HTMLElement
+  const addressMessage = document.getElementById('address-message') as HTMLElement
+  const addressSubmit = document.getElementById('address-submit') as HTMLButtonElement
+  const provinceSelect = document.getElementById('address-province') as HTMLSelectElement
+  let profile: CustomerProfile | null = null
+  let addresses: CustomerAddress[] = []
+
+  for (const province of provinces) {
+    const option = document.createElement('option')
+    option.value = province
+    option.textContent = province
+    provinceSelect.append(option)
+  }
+
+  const showMessage = (target:HTMLElement, text:string, tone:'error'|'success'|'info') => {
+    target.textContent = text
+    target.className = `auth-message ${tone}`
+    target.hidden = false
+  }
+  const hideMessage = (target:HTMLElement) => { target.hidden = true }
+  const normalizePhone = (value:string) => value.replace(/[^0-9+]/g, '')
+
+  function resetAddressForm() {
+    addressForm.reset()
+    ;(document.getElementById('address-id') as HTMLInputElement).value = ''
+    ;(document.getElementById('address-label') as HTMLInputElement).value = 'บ้าน'
+    addressSubmit.textContent = 'บันทึกที่อยู่'
+  }
+
+  function openAddressForm(address?: CustomerAddress) {
+    hideMessage(addressMessage)
+    resetAddressForm()
+    if (address) {
+      ;(document.getElementById('address-id') as HTMLInputElement).value = address.id
+      ;(document.getElementById('address-label') as HTMLInputElement).value = address.label
+      ;(document.getElementById('address-recipient') as HTMLInputElement).value = address.recipient_name
+      ;(document.getElementById('address-phone') as HTMLInputElement).value = address.phone
+      ;(document.getElementById('address-line1') as HTMLInputElement).value = address.address_line1
+      ;(document.getElementById('address-line2') as HTMLInputElement).value = address.address_line2 || ''
+      ;(document.getElementById('address-subdistrict') as HTMLInputElement).value = address.subdistrict
+      ;(document.getElementById('address-district') as HTMLInputElement).value = address.district
+      provinceSelect.value = address.province
+      ;(document.getElementById('address-postal') as HTMLInputElement).value = address.postal_code
+      ;(document.getElementById('address-default') as HTMLInputElement).checked = address.is_default
+      addressSubmit.textContent = 'บันทึกการแก้ไข'
+    } else if (addresses.length === 0) {
+      ;(document.getElementById('address-default') as HTMLInputElement).checked = true
+    }
+    addressForm.hidden = false
+    addressForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  function renderAddresses() {
+    addressList.replaceChildren()
+    addressEmpty.hidden = addresses.length !== 0
+    for (const address of addresses) {
+      const card = document.createElement('article')
+      card.className = `address-card${address.is_default ? ' is-default' : ''}`
+      const top = document.createElement('div')
+      top.className = 'address-card-top'
+      const titleWrap = document.createElement('div')
+      const title = document.createElement('strong')
+      title.textContent = address.label
+      titleWrap.append(title)
+      if (address.is_default) {
+        const badge = document.createElement('span')
+        badge.className = 'address-default-badge'
+        badge.textContent = 'ค่าเริ่มต้น'
+        titleWrap.append(badge)
+      }
+      const recipient = document.createElement('p')
+      recipient.className = 'address-recipient'
+      recipient.textContent = `${address.recipient_name} · ${address.phone}`
+      titleWrap.append(recipient)
+      top.append(titleWrap)
+      card.append(top)
+      const body = document.createElement('p')
+      body.className = 'address-body'
+      body.textContent = [address.address_line1, address.address_line2, `${address.subdistrict} ${address.district}`, `${address.province} ${address.postal_code}`].filter(Boolean).join(' ')
+      card.append(body)
+      const actions = document.createElement('div')
+      actions.className = 'address-card-actions'
+      const edit = document.createElement('button')
+      edit.type = 'button'; edit.className = 'button button-secondary account-small-button'; edit.textContent = 'แก้ไข'
+      edit.addEventListener('click', () => openAddressForm(address))
+      actions.append(edit)
+      if (!address.is_default) {
+        const makeDefault = document.createElement('button')
+        makeDefault.type = 'button'; makeDefault.className = 'button button-secondary account-small-button'; makeDefault.textContent = 'ตั้งเป็นค่าเริ่มต้น'
+        makeDefault.addEventListener('click', async () => {
+          makeDefault.disabled = true
+          try {
+            await setCustomerDefaultAddress(address.id)
+            await refreshAddresses()
+            showMessage(addressMessage, 'ตั้งที่อยู่เริ่มต้นแล้ว', 'success')
+          } catch (error) { showMessage(addressMessage, friendlyCustomerDataError(error), 'error') }
+          finally { makeDefault.disabled = false }
+        })
+        actions.append(makeDefault)
+      }
+      const remove = document.createElement('button')
+      remove.type = 'button'; remove.className = 'button button-secondary account-small-button address-delete-button'; remove.textContent = 'ลบ'
+      remove.addEventListener('click', async () => {
+        if (!confirm(`ลบที่อยู่ “${address.label}” ใช่หรือไม่?`)) return
+        remove.disabled = true
+        try {
+          await deleteCustomerAddress(address.id)
+          await refreshAddresses()
+          showMessage(addressMessage, 'ลบที่อยู่แล้ว', 'success')
+        } catch (error) { showMessage(addressMessage, friendlyCustomerDataError(error), 'error') }
+        finally { remove.disabled = false }
+      })
+      actions.append(remove)
+      card.append(actions)
+      addressList.append(card)
+    }
+  }
+
+  async function refreshAddresses() {
+    addresses = await listCustomerAddresses()
+    renderAddresses()
+  }
+
+  async function loadCustomerData() {
+    const [loadedProfile, loadedAddresses] = await Promise.all([getCustomerProfile(), listCustomerAddresses()])
+    profile = loadedProfile
+    addresses = loadedAddresses
+    if (!profile) throw new Error('CUSTOMER_PROFILE_NOT_FOUND')
+    profileName.value = profile.display_name || ''
+    profilePhone.value = profile.phone || ''
+    renderAddresses()
+  }
+
   consumeCustomerAuthRedirect()
-  void getCustomerUser().then((user) => {
+  void getCustomerUser().then(async (user) => {
     loading.hidden = true
     if (!user) { guest.hidden = false; return }
     emailTarget.textContent = user.email || '-'
@@ -72,19 +265,73 @@ import '../../styles/auth.css'
       googleBox.classList.add('is-linked')
     }
     userBox.hidden = false
+    try { await loadCustomerData() }
+    catch (error) { showMessage(profileMessage, friendlyCustomerDataError(error), 'error') }
   }).catch(() => { loading.hidden = true; guest.hidden = false })
+
   googleButton.addEventListener('click', async () => {
-    linkMessage.hidden = true
+    hideMessage(linkMessage)
     googleButton.disabled = true
     googleButton.querySelector('span:last-child')!.textContent = 'กำลังไป Google...'
-    try {
-      await linkGoogleIdentity('/account/')
-    } catch (error) {
-      show(friendlyAuthError(error), 'error')
+    try { await linkGoogleIdentity('/account/') }
+    catch (error) {
+      showMessage(linkMessage, friendlyAuthError(error), 'error')
       googleButton.disabled = false
       googleButton.querySelector('span:last-child')!.textContent = 'เชื่อม Google'
     }
   })
+
+  profileForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    hideMessage(profileMessage)
+    if (!profile) { showMessage(profileMessage, 'ไม่พบโปรไฟล์ลูกค้า กรุณาเข้าสู่ระบบใหม่', 'error'); return }
+    const name = profileName.value.trim()
+    const phone = normalizePhone(profilePhone.value)
+    if (name.length < 2) { showMessage(profileMessage, 'กรุณากรอกชื่อที่ใช้ติดต่ออย่างน้อย 2 ตัวอักษร', 'error'); return }
+    if (phone && (phone.length < 8 || phone.length > 15)) { showMessage(profileMessage, 'กรุณาตรวจสอบเบอร์โทรศัพท์', 'error'); return }
+    profileSubmit.disabled = true; profileSubmit.textContent = 'กำลังบันทึก...'
+    try {
+      profile = await updateCustomerProfile(profile.id, { display_name: name, phone: phone || null })
+      showMessage(profileMessage, 'บันทึกข้อมูลติดต่อแล้ว', 'success')
+    } catch (error) { showMessage(profileMessage, friendlyCustomerDataError(error), 'error') }
+    finally { profileSubmit.disabled = false; profileSubmit.textContent = 'บันทึกข้อมูลติดต่อ' }
+  })
+
+  document.getElementById('address-new')?.addEventListener('click', () => openAddressForm())
+  document.getElementById('address-cancel')?.addEventListener('click', () => { resetAddressForm(); addressForm.hidden = true })
+
+  addressForm.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    hideMessage(addressMessage)
+    if (!profile) { showMessage(addressMessage, 'ไม่พบโปรไฟล์ลูกค้า กรุณาเข้าสู่ระบบใหม่', 'error'); return }
+    const addressId = (document.getElementById('address-id') as HTMLInputElement).value
+    const phone = normalizePhone((document.getElementById('address-phone') as HTMLInputElement).value)
+    const postal = (document.getElementById('address-postal') as HTMLInputElement).value.trim()
+    if (phone.length < 8 || phone.length > 15) { showMessage(addressMessage, 'กรุณาตรวจสอบเบอร์โทรผู้รับ', 'error'); return }
+    if (!/^\d{5}$/.test(postal)) { showMessage(addressMessage, 'รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก', 'error'); return }
+    const input = {
+      label: (document.getElementById('address-label') as HTMLInputElement).value,
+      recipient_name: (document.getElementById('address-recipient') as HTMLInputElement).value,
+      phone,
+      address_line1: (document.getElementById('address-line1') as HTMLInputElement).value,
+      address_line2: (document.getElementById('address-line2') as HTMLInputElement).value,
+      subdistrict: (document.getElementById('address-subdistrict') as HTMLInputElement).value,
+      district: (document.getElementById('address-district') as HTMLInputElement).value,
+      province: provinceSelect.value,
+      postal_code: postal,
+      make_default: (document.getElementById('address-default') as HTMLInputElement).checked,
+    }
+    addressSubmit.disabled = true; addressSubmit.textContent = 'กำลังบันทึก...'
+    try {
+      if (addressId) await updateCustomerAddress(addressId, input)
+      else await createCustomerAddress(profile.id, input)
+      await refreshAddresses()
+      resetAddressForm(); addressForm.hidden = true
+      showMessage(addressMessage, addressId ? 'แก้ไขที่อยู่แล้ว' : 'เพิ่มที่อยู่แล้ว', 'success')
+    } catch (error) { showMessage(addressMessage, friendlyCustomerDataError(error), 'error') }
+    finally { addressSubmit.disabled = false; addressSubmit.textContent = 'บันทึกที่อยู่' }
+  })
+
   document.getElementById('account-signout')?.addEventListener('click', async () => {
     await signOutCustomer().catch(() => undefined)
     location.href = '/account/login/'
