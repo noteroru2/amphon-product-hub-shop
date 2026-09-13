@@ -2,6 +2,7 @@
 import { indexCategories } from '../config/catalog'
 import { absoluteUrl } from '../lib/seo'
 import '../styles/global.css'
+import '../styles/auth.css'
 
 interface Props {
   title: string
@@ -64,7 +65,10 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
             <a href={`/${category.slug}/`}>{category.navName}</a>
           ))}
         </nav>
-        <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
+        <div class="header-actions">
+          <a class="account-link" href="/account/" aria-label="บัญชีลูกค้า">บัญชี</a>
+          <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
+        </div>
       </div>
     </header>
     <main>
