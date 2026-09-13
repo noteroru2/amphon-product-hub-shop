@@ -44,7 +44,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
             {settings?.checkout?.termsUrl && <p class="microcopy">การสั่งซื้อถือว่าคุณยอมรับ <a class="inline-link" href={settings.checkout.termsUrl}>เงื่อนไข Checkout</a></p>}
             {turnstileEnabled && <div class="checkout-security"><div class="cf-turnstile" data-sitekey={settings?.checkout?.turnstileSiteKey || ''} data-action="checkout" data-theme="auto"></div><small>ระบบตรวจสอบความปลอดภัยก่อนล็อกสต๊อก</small></div>}
             <div id="checkout-error"></div>
-            <button id="checkout-submit" class="button button-primary button-wide" type="submit">สร้างคำสั่งซื้อและล็อกสินค้า</button>
+            <button id="checkout-submit" class="button button-primary button-wide" type="submit" disabled>กำลังตรวจสอบสมาชิก...</button>
             <p class="microcopy">ระบบจะล็อก SKU ในฐานข้อมูลทันทีเมื่อสร้าง Order สำเร็จ และปล่อยสต๊อกอัตโนมัติหากหมดเวลาชำระ</p>
           </form>
         )}
@@ -63,7 +63,14 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
 {turnstileEnabled && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
 <script>
   import { clearCart, readCartSkus } from '../../lib/cart'
-  import { attachCustomerCheckoutIdentity, friendlyCheckoutIdentityError, loadCheckoutMemberState, type CheckoutMemberState } from '../../lib/checkout-member'
+  import {
+    attachCustomerCheckoutIdentity,
+    friendlyCheckoutIdentityError,
+    getMemberCheckoutRequired,
+    loadCheckoutMemberState,
+    prepareMemberCheckoutIntent,
+    type CheckoutMemberState,
+  } from '../../lib/checkout-member'
   import type { CustomerAddress } from '../../lib/customer-account'
 
   const form = document.getElementById('checkout-form') as HTMLFormElement | null
@@ -82,7 +89,9 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   const api = form?.dataset.api || itemsTarget?.dataset.api || ''
   const skus = readCartSkus()
   let cartValid = false
-  let memberReady = true
+  let memberPolicyLoaded = false
+  let memberCheckoutRequired = true
+  let memberReady = false
   let memberState: CheckoutMemberState | null = null
   let selectedAddressId: string | null = null
   let submitting = false
@@ -90,7 +99,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   const money = (value: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(value)
   const esc = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] || c))
   const input = (name: string) => form?.elements.namedItem(name) as HTMLInputElement | null
-  const deliveryMethod = () => (form?.elements.namedItem('deliveryMethod') as RadioNodeList | null)?.value || 'SHIPPING'
+  const deliveryMethod = () => ((form?.elements.namedItem('deliveryMethod') as RadioNodeList | null)?.value || 'SHIPPING') as 'SHIPPING' | 'PICKUP'
 
   function setMemberMessage(text: string, error = false) {
     if (!memberMessage) return
@@ -105,7 +114,8 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
 
   function refreshSubmitState() {
     if (!submit || submitting) return
-    submit.disabled = !cartValid || !memberReady
+    submit.disabled = !cartValid || !memberPolicyLoaded || !memberReady
+    submit.textContent = memberPolicyLoaded ? 'สร้างคำสั่งซื้อและล็อกสินค้า' : 'กำลังตรวจสอบสมาชิก...'
   }
 
   function displayAddress(address: CustomerAddress) {
@@ -130,20 +140,36 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     const state = memberState
     const profile = state?.profile
     const delivery = deliveryMethod()
-    memberReady = true
+    memberReady = false
     setMemberMessage('')
+
+    if (!memberPolicyLoaded) {
+      refreshSubmitState()
+      return
+    }
 
     if (!state?.authenticated) {
       selectedAddressId = null
       memberAddressWrap && (memberAddressWrap.hidden = true)
       setReadOnly(['customerName','customerPhone','customerEmail','addressLine','subdistrict','district','province','postalCode'], false)
+      if (memberCheckoutRequired) {
+        setMemberMessage('Checkout ต้องเข้าสู่ระบบสมาชิกก่อนสร้างคำสั่งซื้อ ตะกร้าจะยังอยู่หลัง Login', true)
+        memberReady = false
+      } else {
+        memberReady = true
+      }
       refreshSubmitState()
       return
     }
 
     if (!profile) {
-      memberReady = false
       setMemberMessage('บัญชีนี้ยังไม่มี Customer Profile ที่พร้อมใช้งาน กรุณาเปิดหน้าบัญชีของฉันก่อน Checkout', true)
+      refreshSubmitState()
+      return
+    }
+
+    if (!profile.email_verified_at || !profile.email) {
+      setMemberMessage('กรุณายืนยันอีเมลของสมาชิกก่อน Checkout', true)
       refreshSubmitState()
       return
     }
@@ -159,13 +185,13 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
         || null
       if (!address) {
         selectedAddressId = null
-        memberReady = false
         setMemberMessage('สมาชิกต้องมีที่อยู่ที่บันทึกไว้ก่อนใช้ Checkout แบบจัดส่ง กรุณาเพิ่มที่อยู่ใน “บัญชีของฉัน”', true)
         setReadOnly(['customerName','customerPhone','addressLine','subdistrict','district','province','postalCode'], false)
       } else {
         fillSavedAddress(address)
         if (memberAddressSelect) memberAddressSelect.value = address.id
         setReadOnly(['customerName','customerPhone','addressLine','subdistrict','district','province','postalCode'], true)
+        memberReady = true
       }
     } else {
       selectedAddressId = null
@@ -176,8 +202,9 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       if (input('customerPhone')) input('customerPhone')!.value = phone
       setReadOnly(['customerName','customerPhone'], true)
       if (name.length < 2 || phone.replace(/\D/g, '').length < 8) {
-        memberReady = false
         setMemberMessage('กรุณาบันทึกชื่อและเบอร์โทรใน “บัญชีของฉัน” ก่อนเลือกรับสินค้าที่ร้าน', true)
+      } else {
+        memberReady = true
       }
     }
     refreshSubmitState()
@@ -186,16 +213,25 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   async function hydrateMemberCheckout() {
     if (!memberPanel) return
     try {
-      memberState = await loadCheckoutMemberState()
+      const [policyRequired, state] = await Promise.all([
+        getMemberCheckoutRequired(),
+        loadCheckoutMemberState(),
+      ])
+      memberCheckoutRequired = policyRequired
+      memberPolicyLoaded = true
+      memberState = state
       memberPanel.hidden = false
-      if (!memberState.authenticated) {
+
+      if (!state.authenticated) {
         memberPanel.className = 'checkout-member-panel is-guest'
-        memberPanel.innerHTML = `<strong>Checkout แบบ Guest ยังใช้งานได้</strong><p>เข้าสู่ระบบเพื่อเติมข้อมูลและที่อยู่จากบัญชีอัตโนมัติ ตะกร้าจะยังอยู่หลัง Login</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
+        memberPanel.innerHTML = memberCheckoutRequired
+          ? `<strong>ต้องเข้าสู่ระบบสมาชิกก่อน Checkout</strong><p>เข้าสู่ระบบหรือสมัครสมาชิกก่อนสร้างคำสั่งซื้อ ตะกร้าจะยังอยู่ครบหลัง Login / Google</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
+          : `<strong>Checkout แบบ Guest ยังใช้งานได้</strong><p>เข้าสู่ระบบเพื่อเติมข้อมูลและที่อยู่จากบัญชีอัตโนมัติ ตะกร้าจะยังอยู่หลัง Login</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
         applyMemberDelivery()
         return
       }
 
-      if (!memberState.profile) {
+      if (!state.profile) {
         memberPanel.className = 'checkout-member-panel is-error'
         memberPanel.innerHTML = `<strong>บัญชีสมาชิกยังไม่พร้อม Checkout</strong><p>กรุณาเปิดหน้าบัญชีของฉันและบันทึกข้อมูลติดต่อก่อน</p><div class="checkout-member-actions"><a class="inline-link" href="/account/">บัญชีของฉัน</a></div>`
         applyMemberDelivery()
@@ -203,25 +239,32 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       }
 
       memberPanel.className = 'checkout-member-panel is-member'
-      memberPanel.innerHTML = `<strong>กำลัง Checkout ด้วยบัญชีสมาชิก</strong><p>${esc(memberState.profile.email || '')} · Order ที่สร้างสำเร็จจะถูกผูกกับบัญชีนี้ ตะกร้ายังคงอยู่ข้าม Login/Google redirect</p>`
+      memberPanel.innerHTML = memberCheckoutRequired
+        ? `<strong>Checkout สมาชิกได้รับการยืนยัน</strong><p>${esc(state.profile.email || '')} · Order จะถูกผูกกับบัญชีนี้และบันทึก snapshot จากข้อมูลสมาชิกโดยอัตโนมัติ</p>`
+        : `<strong>กำลัง Checkout ด้วยบัญชีสมาชิก</strong><p>${esc(state.profile.email || '')} · Order ที่สร้างสำเร็จจะถูกผูกกับบัญชีนี้ ตะกร้ายังคงอยู่ข้าม Login/Google redirect</p>`
       if (memberAddressSelect) {
-        memberAddressSelect.innerHTML = memberState.addresses.map((address) => `<option value="${esc(address.id)}">${esc(address.label)}${address.is_default ? ' · ค่าเริ่มต้น' : ''} — ${esc(displayAddress(address))}</option>`).join('')
-        if (memberState.defaultAddress) memberAddressSelect.value = memberState.defaultAddress.id
+        memberAddressSelect.innerHTML = state.addresses.map((address) => `<option value="${esc(address.id)}">${esc(address.label)}${address.is_default ? ' · ค่าเริ่มต้น' : ''} — ${esc(displayAddress(address))}</option>`).join('')
+        if (state.defaultAddress) memberAddressSelect.value = state.defaultAddress.id
       }
       applyMemberDelivery()
     } catch (error) {
       memberState = null
-      memberReady = true
+      memberPolicyLoaded = false
+      memberReady = false
       memberPanel.hidden = false
       memberPanel.className = 'checkout-member-panel is-error'
-      memberPanel.innerHTML = `<strong>โหลดข้อมูลสมาชิกไม่สำเร็จ</strong><p>${esc(error instanceof Error ? error.message : String(error))}</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบใหม่</a></div>`
+      memberPanel.innerHTML = `<strong>ตรวจสอบนโยบายสมาชิกไม่สำเร็จ</strong><p>เพื่อความปลอดภัย ระบบยังไม่อนุญาตให้สร้างคำสั่งซื้อ กรุณารีโหลดหน้า หรือลองเข้าสู่ระบบใหม่</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบใหม่</a></div>`
+      setMemberMessage(error instanceof Error ? error.message : String(error), true)
       refreshSubmitState()
     }
   }
 
   memberAddressSelect?.addEventListener('change', () => {
     const address = memberState?.addresses.find((item) => item.id === memberAddressSelect.value)
-    if (address) fillSavedAddress(address)
+    if (address) {
+      fillSavedAddress(address)
+      applyMemberDelivery()
+    }
   })
 
   async function loadSummary() {
@@ -255,24 +298,38 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault()
-    if (!api || !cartValid || !memberReady || !submit) return
+    if (!api || !cartValid || !memberPolicyLoaded || !memberReady || !submit) return
     errorTarget && (errorTarget.innerHTML = '')
     submitting = true
-    submit.disabled = true; submit.textContent = 'กำลังล็อกสินค้า...'
+    submit.disabled = true
     const data = new FormData(form)
     const keyName = 'amphon_checkout_idempotency'
     let idempotencyKey = sessionStorage.getItem(keyName)
     if (!idempotencyKey) { idempotencyKey = crypto.randomUUID(); sessionStorage.setItem(keyName, idempotencyKey) }
     const payload = Object.fromEntries(data.entries()) as Record<string, string>
     const turnstileToken = String(data.get('cf-turnstile-response') || '')
+
     try {
-      const response = await fetch(`${api}/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...payload, skus, idempotencyKey, turnstileToken }) })
+      if (memberCheckoutRequired) {
+        if (!memberState?.authenticated || !memberState.profile) throw new Error('AUTH_REQUIRED')
+        submit.textContent = 'กำลังยืนยันสมาชิก...'
+        const delivery = deliveryMethod()
+        const addressId = delivery === 'SHIPPING' ? selectedAddressId : null
+        await prepareMemberCheckoutIntent(idempotencyKey, delivery, addressId)
+      }
+
+      submit.textContent = 'กำลังล็อกสินค้า...'
+      const response = await fetch(`${api}/checkout`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...payload, skus, idempotencyKey, turnstileToken }),
+      })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || `Checkout ไม่สำเร็จ (${response.status})`)
       const token = result.order?.publicToken
       if (!token) throw new Error('ระบบไม่ได้รับ Order token')
 
-      if (memberState?.authenticated && memberState.profile) {
+      if (!memberCheckoutRequired && memberState?.authenticated && memberState.profile) {
         submit.textContent = 'กำลังผูกคำสั่งซื้อกับบัญชี...'
         const addressId = deliveryMethod() === 'SHIPPING' ? selectedAddressId : null
         try {
@@ -286,7 +343,11 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       if (result.checkoutUrl) { location.href = String(result.checkoutUrl); return }
       location.href = `/order/${encodeURIComponent(token)}/`
     } catch (error) {
-      if (errorTarget) errorTarget.innerHTML = `<div class="notice">${esc(error instanceof Error ? error.message : String(error))}</div>`
+      const friendly = friendlyCheckoutIdentityError(error)
+      if ((error instanceof Error ? error.message : String(error)).toLowerCase().includes('checkout_intent_already_owned')) {
+        sessionStorage.removeItem(keyName)
+      }
+      if (errorTarget) errorTarget.innerHTML = `<div class="notice">${esc(friendly)}</div>`
       ;(window as any).turnstile?.reset?.()
       submitting = false
       submit.textContent = 'สร้างคำสั่งซื้อและล็อกสินค้า'
