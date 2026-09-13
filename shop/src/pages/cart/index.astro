@@ -2,15 +2,15 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { getStoreSettings } from '../../lib/store-api'
 let checkoutEnabled = false
-try { checkoutEnabled = Boolean((await getStoreSettings())?.purchaseEnabled) } catch { /* client will show API error */ }
+try { checkoutEnabled = Boolean((await getStoreSettings())?.purchaseEnabled) } catch { /* client will show a friendly error */ }
 const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '') || ''
 ---
-<BaseLayout title="ตะกร้าสินค้า | AMPHON SHOP" description="ตรวจสอบสินค้าในตะกร้าก่อน Checkout" canonicalPath="/cart/" robots="noindex,follow">
+<BaseLayout title="ตะกร้าสินค้า | AMPHON SHOP" description="ตรวจสอบสินค้าในตะกร้าก่อนยืนยันคำสั่งซื้อ" canonicalPath="/cart/" robots="noindex,follow">
   <section class="section checkout-shell">
     <div class="container narrow-container">
-      <div class="section-head"><div><div class="eyebrow">CART</div><h1 class="checkout-title">ตะกร้าสินค้า</h1></div><a class="button button-secondary" href="/">เลือกสินค้าเพิ่ม</a></div>
+      <div class="section-head"><div><div class="eyebrow">ตะกร้าสินค้า</div><h1 class="checkout-title">ตรวจสอบสินค้าก่อนสั่งซื้อ</h1></div><a class="button button-secondary" href="/">เลือกสินค้าเพิ่ม</a></div>
       <div id="cart-app" class="panel cart-panel" data-api={apiBase} data-checkout={checkoutEnabled ? '1' : '0'}>
-        <p class="muted">กำลังตรวจสอบสินค้าในตะกร้า...</p>
+        <p class="muted">กำลังตรวจสอบสถานะสินค้า...</p>
       </div>
     </div>
   </section>
@@ -28,10 +28,10 @@ const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '
     const render = async () => {
       const skus = readCartSkus()
       if (!skus.length) {
-        app.innerHTML = '<div class="empty"><h2>ตะกร้ายังว่าง</h2><p>เลือกสินค้ามือสองที่ต้องการ แล้วกลับมาชำระเงินได้ที่นี่</p><a class="button button-primary" href="/">เลือกสินค้า</a></div>'
+        app.innerHTML = '<div class="empty"><h2>ตะกร้ายังว่าง</h2><p>เลือกสินค้าที่ต้องการ แล้วกลับมาตรวจสอบก่อนสั่งซื้อได้ที่นี่</p><a class="button button-primary" href="/">เลือกสินค้า</a></div>'
         return
       }
-      if (!api) { app.innerHTML = '<div class="notice">Store API ยังไม่พร้อมใช้งาน</div>'; return }
+      if (!api) { app.innerHTML = '<div class="notice">ไม่สามารถโหลดตะกร้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</div>'; return }
       const products = await Promise.all(skus.map(async (sku) => {
         const response = await fetch(`${api}/products/${encodeURIComponent(sku)}`, { headers: { accept: 'application/json' } })
         if (!response.ok) return { sku, missing: true }
@@ -40,17 +40,17 @@ const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '
       const available = products.filter((item: any) => !item.missing && item.availability === 'available')
       const total = available.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0)
       app.innerHTML = `<div class="cart-list">${products.map((item: any) => item.missing ? `
-        <div class="cart-row unavailable"><div><strong>${escapeHtml(item.sku)}</strong><small>ไม่พบสินค้าหรือหยุดเผยแพร่แล้ว</small></div><button data-remove="${escapeHtml(item.sku)}">ลบ</button></div>` : `
+        <div class="cart-row unavailable"><div><strong>${escapeHtml(item.sku)}</strong><small>สินค้ารายการนี้ไม่พร้อมจำหน่ายแล้ว</small></div><button data-remove="${escapeHtml(item.sku)}">ลบ</button></div>` : `
         <div class="cart-row ${item.availability !== 'available' ? 'unavailable' : ''}">
           <div class="cart-thumb">${item.images?.[0]?.url ? `<img src="${escapeHtml(item.images[0].url)}" alt="">` : '<span>IMG</span>'}</div>
-          <div class="cart-copy"><strong>${escapeHtml(item.title)}</strong><small>SKU ${escapeHtml(item.sku)} · ${item.availability === 'available' ? 'พร้อมสั่งซื้อ' : item.availability === 'reserved' ? 'ติดจอง' : 'ขายแล้ว'}</small></div>
+          <div class="cart-copy"><strong>${escapeHtml(item.title)}</strong><small>รหัสสินค้า ${escapeHtml(item.sku)} · ${item.availability === 'available' ? 'พร้อมสั่งซื้อ' : item.availability === 'reserved' ? 'ติดจอง' : 'ขายแล้ว'}</small></div>
           <div class="cart-price">${money(Number(item.price || 0))}</div><button class="cart-remove" data-remove="${escapeHtml(item.sku)}">ลบ</button>
         </div>`).join('')}</div>
-        <div class="cart-summary"><div><span>รวมสินค้าที่พร้อมสั่งซื้อ</span><strong>${money(total)}</strong></div><small>ค่าจัดส่งจะคำนวณในหน้า Checkout</small></div>
-        ${products.some((item: any) => item.missing || item.availability !== 'available') ? '<div class="notice">มีสินค้าบางรายการไม่พร้อมซื้อ กรุณาลบรายการดังกล่าวก่อน Checkout</div>' : ''}
-        ${checkoutEnabled && available.length === products.length ? '<a class="button button-primary button-wide" href="/checkout/">ไปหน้า Checkout</a>' : '<div class="notice">Checkout ออนไลน์ยังไม่พร้อมสำหรับตะกร้านี้</div>'}`
+        <div class="cart-summary"><div><span>รวมสินค้าที่พร้อมสั่งซื้อ</span><strong>${money(total)}</strong></div><small>ค่าจัดส่งจะแสดงก่อนยืนยันคำสั่งซื้อ</small></div>
+        ${products.some((item: any) => item.missing || item.availability !== 'available') ? '<div class="notice">มีสินค้าบางรายการไม่พร้อมสั่งซื้อ กรุณาลบรายการดังกล่าวก่อนดำเนินการต่อ</div>' : ''}
+        ${checkoutEnabled && available.length === products.length ? '<a class="button button-primary button-wide" href="/checkout/">ดำเนินการสั่งซื้อ</a>' : '<div class="notice">ยังไม่สามารถดำเนินการสั่งซื้อจากตะกร้านี้ได้ กรุณาตรวจสอบรายการสินค้าอีกครั้ง</div>'}`
       app.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { removeCartSku((button as HTMLElement).dataset.remove || ''); void render() }))
     }
-    void render().catch(() => { app.innerHTML = '<div class="notice">ตรวจสอบตะกร้าไม่สำเร็จ กรุณาลองใหม่</div>' })
+    void render().catch(() => { app.innerHTML = '<div class="notice">ตรวจสอบตะกร้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</div>' })
   }
 </script>
