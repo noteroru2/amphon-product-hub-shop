@@ -1,0 +1,33 @@
+.auth-shell { min-height:68vh; padding:48px 0 64px; }
+.auth-container { width:min(560px, calc(100% - 28px)); margin:0 auto; }
+.auth-card { padding:28px; background:#fff; border:1px solid var(--line); border-radius:20px; box-shadow:0 12px 36px rgba(0,0,0,.05); }
+.auth-card h1 { font-size:clamp(1.8rem,4vw,2.6rem); margin-bottom:10px; }
+.auth-copy { color:var(--muted); line-height:1.7; margin-bottom:22px; }
+.auth-form { display:grid; gap:14px; }
+.auth-field { display:grid; gap:7px; }
+.auth-field span { font-size:.88rem; font-weight:800; }
+.auth-field input { width:100%; min-height:46px; border:1px solid #dcdcdc; border-radius:12px; padding:0 13px; background:#fff; color:var(--ink); }
+.auth-field input:focus { outline:2px solid rgba(242,106,33,.18); border-color:var(--brand); }
+.auth-actions { display:grid; gap:10px; margin-top:4px; }
+.auth-links { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:18px; font-size:.88rem; }
+.auth-message { margin:14px 0 0; border-radius:12px; padding:12px 14px; font-size:.9rem; line-height:1.6; }
+.auth-message[hidden] { display:none; }
+.auth-message.error { background:#fff0f0; color:#8d2020; border:1px solid #ffd3d3; }
+.auth-message.success { background:#edf9f0; color:#246a37; border:1px solid #d0edd8; }
+.auth-message.info { background:#fff7ee; color:#7b451d; border:1px solid #ffe1c4; }
+.auth-status { display:grid; gap:12px; margin:18px 0; }
+.auth-status-row { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid var(--line); }
+.auth-status-row:last-child { border-bottom:0; }
+.auth-status-row span { color:var(--muted); }
+.auth-status-row strong { text-align:right; overflow-wrap:anywhere; }
+.auth-security-note { margin-top:18px; font-size:.8rem; line-height:1.6; color:var(--muted); }
+.auth-button { border:0; cursor:pointer; }
+.auth-button:disabled { opacity:.6; cursor:wait; }
+.account-link { display:inline-flex; align-items:center; white-space:nowrap; font-weight:800; font-size:.88rem; }
+.header-actions { display:flex; align-items:center; gap:12px; }
+@media (max-width:720px) {
+  .auth-shell { padding:28px 0 44px; }
+  .auth-card { padding:20px; }
+  .header-actions { gap:8px; }
+  .account-link { font-size:.8rem; }
+}
