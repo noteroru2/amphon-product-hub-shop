@@ -8,9 +8,13 @@ if (!warranty && Astro.response.status !== 503) Astro.response.status = 404
 Astro.response.headers.set('Cache-Control', 'no-store')
 Astro.response.headers.set('Referrer-Policy', 'no-referrer')
 Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+const warrantyStatusLabel: Record<string,string> = {
+  ACTIVE:'ใช้งานได้', EXPIRED:'หมดอายุ', CANCELLED:'ยกเลิก', VOID:'ยกเลิก', CLAIMED:'มีการใช้สิทธิ์แล้ว',
+}
+const warrantyStatus = warranty ? (warrantyStatusLabel[String(warranty.status || '').toUpperCase()] || 'ตรวจสอบสถานะกับร้าน') : ''
 ---
-<BaseLayout title={warranty ? `${warranty.certificateNumber} | AMPHON SHOP` : 'ใบรับประกัน | AMPHON SHOP'} description="ข้อมูลการรับประกันสินค้า" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
+<BaseLayout title={warranty ? `${warranty.certificateNumber} | AMPHON SHOP` : 'ใบรับประกัน | AMPHON SHOP'} description="ดูข้อมูลระยะเวลาและเงื่อนไขการรับประกันสินค้า" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
   <section class="section"><div class="container narrow-container">
-    {warranty ? <article class="panel order-panel"><div class="eyebrow">WARRANTY CERTIFICATE</div><h1>{warranty.certificateNumber}</h1><div class="order-status-grid"><div><span>สินค้า</span><strong>{warranty.title}</strong><small>SKU {warranty.sku}</small></div><div><span>สถานะ</span><strong>{warranty.status}</strong><small>{warranty.warrantyDays} วัน</small></div></div><div class="notice">เริ่ม {new Date(warranty.startsAt).toLocaleDateString('th-TH')} — ถึง {new Date(warranty.endsAt).toLocaleDateString('th-TH')}</div>{warranty.terms && <div class="payment-box"><h2>เงื่อนไขประกัน</h2><p>{warranty.terms}</p></div>}<button class="button button-secondary" onclick="window.print()">พิมพ์ / บันทึก PDF</button></article> : <div class="empty"><h1>ไม่พบใบรับประกัน</h1><p>ลิงก์ไม่ถูกต้องหรือไม่มีข้อมูลประกันนี้</p></div>}
+    {warranty ? <article class="panel order-panel"><div class="eyebrow">ใบรับประกันสินค้า</div><h1>{warranty.certificateNumber}</h1><div class="order-status-grid"><div><span>สินค้า</span><strong>{warranty.title}</strong><small>รหัสสินค้า {warranty.sku}</small></div><div><span>สถานะประกัน</span><strong>{warrantyStatus}</strong><small>ระยะประกัน {warranty.warrantyDays} วัน</small></div></div><div class="notice">เริ่ม {new Date(warranty.startsAt).toLocaleDateString('th-TH')} — ถึง {new Date(warranty.endsAt).toLocaleDateString('th-TH')}</div>{warranty.terms && <div class="payment-box"><h2>เงื่อนไขการรับประกัน</h2><p>{warranty.terms}</p></div>}<div class="hero-actions"><button class="button button-primary" onclick="window.print()">พิมพ์ / บันทึก PDF</button><a class="button button-secondary" href="/account/orders/">กลับไปที่รายการสั่งซื้อ</a></div></article> : <div class="empty"><h1>{Astro.response.status === 503 ? 'ไม่สามารถโหลดข้อมูลประกันได้' : 'ไม่พบใบรับประกัน'}</h1><p>{Astro.response.status === 503 ? 'กรุณาลองเปิดหน้านี้อีกครั้งในภายหลัง' : 'ลิงก์อาจไม่ถูกต้อง หรือไม่มีข้อมูลประกันรายการนี้'}</p><a class="button button-primary" href="/account/orders/">กลับไปที่รายการสั่งซื้อ</a></div>}
   </div></section>
 </BaseLayout>
