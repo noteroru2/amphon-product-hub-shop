@@ -47,6 +47,10 @@ function authConfig() {
   return { url, key }
 }
 
+export function getCustomerAuthConfig() {
+  return authConfig()
+}
+
 function headers(accessToken?: string) {
   const { key } = authConfig()
   const result: Record<string, string> = {
