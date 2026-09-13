@@ -1,4 +1,4 @@
-AMPHON SHOP-8.5 MEMBER CHECKOUT FOUNDATION
+AMPHON SHOP-8.5 MEMBER CHECKOUT
 phase=SHOP-8.5
-commit_marker=2026-09-13T21:06+07:00
-member_checkout_activation=staged
+activated_at=2026-09-13T21:06+07:00
+member_checkout_activation=active
