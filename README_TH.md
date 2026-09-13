@@ -1,20 +1,12 @@
-# SHOP-6.2 Isolated Provider E2E Route Repair v20
+# AMPHON Product Hub + SHOP
 
-ชุดนี้เป็น surgical hotfix สำหรับ repo ปัจจุบัน จึงไม่วางทับไฟล์ source ทั้งไฟล์ที่ Codex แก้ภายหลัง SHOP-6.2/6.3
+Current production baseline is developed from the `main` branch of this repository.
 
-## วิธีใช้
+- Product Hub: https://hub.amphon.co.th
+- Shop: https://shop.amphon.co.th
 
-1. แตก ZIP แล้ววางไฟล์ทั้งหมดที่ root ของ `amphon-product-hub-shop6-1` เดิม
-2. รัน `APPLY-SHOP62-ROUTE-FIX.bat`
-3. ต้องได้ `SHOP-6.2 ROUTE FIX VERIFY: PASS`
-4. จากนั้นรัน `SHOP62-PROVIDER-E2E.bat`
+## Mobile Product Hub
 
-ตัว patcher สำรองไฟล์ที่แก้เป็น `*.shop62-routefix.bak`
+The Product Hub is installable as a Progressive Web App (PWA). On supported Android browsers the Hub can show a native install prompt. On iPhone/iPad, open the Hub in Safari and choose Share → Add to Home Screen.
 
-## Safety
-
-- ไม่แตะ migration หรือ remote DB schema
-- ไม่ deploy production Worker
-- ไม่แก้ production Stripe webhook
-- ไม่เปลี่ยน `purchase_enabled`
-- Provider E2E ยังคงรับเฉพาะ Stripe `sk_test_...`
+The installed Hub opens in standalone mode from the Home Screen and continues using the existing authenticated Product Hub workflow.
