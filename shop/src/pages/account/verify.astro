@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import '../../styles/auth.css'
+---
+<BaseLayout title="ยืนยันอีเมล | AMPHON SHOP" description="ยืนยันอีเมลสำหรับบัญชี AMPHON SHOP" canonicalPath="/account/verify/" robots="noindex,nofollow">
+  <section class="auth-shell">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="eyebrow">VERIFY EMAIL</div>
+        <h1>ยืนยันอีเมล</h1>
+        <p class="auth-copy">กำลังตรวจสอบลิงก์ยืนยันบัญชีของคุณ</p>
+        <div id="verify-message" class="auth-message info">กำลังยืนยันอีเมล...</div>
+        <div id="verify-actions" class="auth-actions" hidden>
+          <a id="verify-next" class="button button-primary button-wide" href="/account/">ไปต่อ</a>
+          <a class="button button-secondary button-wide" href="/account/login/">เข้าสู่ระบบ</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { consumeCustomerAuthRedirect, friendlyAuthError, getCustomerUser, safeNextPath } from '../../lib/customer-auth'
+  const message = document.getElementById('verify-message') as HTMLElement
+  const actions = document.getElementById('verify-actions') as HTMLElement
+  const nextLink = document.getElementById('verify-next') as HTMLAnchorElement
+  const next = safeNextPath(new URLSearchParams(location.search).get('next'))
+  nextLink.href = next
+  void (async () => {
+    try {
+      const result = consumeCustomerAuthRedirect()
+      if (result.error) throw new Error(result.error)
+      const user = await getCustomerUser()
+      if (!user?.email_confirmed_at) throw new Error('ยังไม่พบการยืนยันอีเมล กรุณาเปิดลิงก์ล่าสุดจากอีเมลอีกครั้ง')
+      message.textContent = 'ยืนยันอีเมลสำเร็จแล้ว คุณสามารถใช้งานบัญชีได้ทันที'
+      message.className = 'auth-message success'
+    } catch (error) {
+      message.textContent = friendlyAuthError(error)
+      message.className = 'auth-message error'
+    } finally {
+      actions.hidden = false
+    }
+  })()
+</script>
