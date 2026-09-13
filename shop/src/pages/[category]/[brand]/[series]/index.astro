@@ -1,5 +1,6 @@
 ---
 import EvergreenPageView from '../../../../components/EvergreenPage.astro'
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import { getCategoryBySlug } from '../../../../config/catalog'
 import { listEvergreenPages, listStoreProducts, resolveEvergreenPage, type EvergreenPage, type StoreProduct } from '../../../../lib/store-api'
 
@@ -27,6 +28,7 @@ try {
 } catch (error) { console.error('SHOP2_SERIES_PAGE', categorySlug, brandSlug, seriesSlug, error); Astro.response.status = 503 }
 if (!page && Astro.response.status !== 503) Astro.response.status = 404
 if (page) Astro.response.headers.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600')
+const unavailable = Astro.response.status === 503
 ---
 {page && category ? (
   <EvergreenPageView page={page} products={products} children={children} trail={[
@@ -36,5 +38,16 @@ if (page) Astro.response.headers.set('Cache-Control', 'public, s-maxage=120, sta
     { name: page.series?.name || seriesSlug, path: page.canonicalPath, link: false },
   ]} />
 ) : (
-  <html lang="th"><head><meta name="robots" content="noindex" /><title>{Astro.response.status === 503 ? 'ระบบกำลังเชื่อมต่อ' : 'ไม่พบหน้า'}</title></head><body></body></html>
+  <BaseLayout
+    title={unavailable ? 'กำลังโหลดข้อมูลสินค้า | AMPHON SHOP' : 'ไม่พบหน้าสินค้า | AMPHON SHOP'}
+    description={unavailable ? 'ไม่สามารถโหลดข้อมูลสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ไม่พบหน้าสินค้าที่ต้องการ'}
+    canonicalPath={Astro.url.pathname}
+    robots="noindex,follow"
+  >
+    <section class="section"><div class="container"><div class="empty">
+      <h1 class="not-found-title">{unavailable ? 'กำลังโหลดข้อมูลสินค้า' : 'ไม่พบหน้าสินค้าที่ต้องการ'}</h1>
+      <p>{unavailable ? 'ไม่สามารถโหลดข้อมูลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'หน้านี้อาจถูกย้าย เปลี่ยนชื่อ หรือยังไม่มีข้อมูลสำหรับแสดง'}</p>
+      <div class="hero-actions"><a class="button button-primary" href={category ? `/${category.slug}/` : '/'}>{category ? `กลับไปดู ${category.name}` : 'กลับหน้าร้าน'}</a><a class="button button-secondary" href="/">ดูสินค้าทั้งหมด</a></div>
+    </div></div></section>
+  </BaseLayout>
 )}
