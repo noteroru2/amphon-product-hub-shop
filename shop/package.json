@@ -23,7 +23,8 @@
     "verify:shop82": "node scripts/verify-shop82.mjs",
     "verify:shop83": "node scripts/verify-shop83.mjs",
     "verify:shop84": "node scripts/verify-shop84.mjs",
-    "verify:shop85": "node scripts/verify-shop85.mjs"
+    "verify:shop85": "node scripts/verify-shop85.mjs",
+    "verify:shop86": "node scripts/verify-shop86.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.1",
