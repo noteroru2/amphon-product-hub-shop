@@ -1,0 +1,52 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import '../../styles/auth.css'
+---
+<BaseLayout title="บัญชีของฉัน | AMPHON SHOP" description="จัดการการเข้าสู่ระบบ AMPHON SHOP" canonicalPath="/account/" robots="noindex,nofollow">
+  <section class="auth-shell">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="eyebrow">MY ACCOUNT</div>
+        <h1>บัญชีของฉัน</h1>
+        <p class="auth-copy">ใช้บัญชีเดียวสำหรับการสั่งซื้อและติดตามข้อมูลลูกค้าใน AMPHON SHOP</p>
+        <div id="account-loading" class="auth-message info">กำลังตรวจสอบสถานะบัญชี...</div>
+        <div id="account-guest" hidden>
+          <div class="auth-actions">
+            <a class="button button-primary button-wide" href="/account/login/">เข้าสู่ระบบ</a>
+            <a class="button button-secondary button-wide" href="/account/signup/">สมัครสมาชิก</a>
+          </div>
+        </div>
+        <div id="account-user" hidden>
+          <div class="auth-status">
+            <div class="auth-status-row"><span>อีเมล</span><strong id="account-email">-</strong></div>
+            <div class="auth-status-row"><span>สถานะ</span><strong id="account-verified">-</strong></div>
+          </div>
+          <div class="auth-actions">
+            <a class="button button-secondary button-wide" href="/cart/">กลับไปตะกร้า</a>
+            <button id="account-signout" class="button button-secondary button-wide auth-button" type="button">ออกจากระบบ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { consumeCustomerAuthRedirect, getCustomerUser, signOutCustomer } from '../../lib/customer-auth'
+  const loading = document.getElementById('account-loading') as HTMLElement
+  const guest = document.getElementById('account-guest') as HTMLElement
+  const userBox = document.getElementById('account-user') as HTMLElement
+  const emailTarget = document.getElementById('account-email') as HTMLElement
+  const verifiedTarget = document.getElementById('account-verified') as HTMLElement
+  consumeCustomerAuthRedirect()
+  void getCustomerUser().then((user) => {
+    loading.hidden = true
+    if (!user) { guest.hidden = false; return }
+    emailTarget.textContent = user.email || '-'
+    verifiedTarget.textContent = user.email_confirmed_at ? 'ยืนยันอีเมลแล้ว' : 'รอยืนยันอีเมล'
+    userBox.hidden = false
+  }).catch(() => { loading.hidden = true; guest.hidden = false })
+  document.getElementById('account-signout')?.addEventListener('click', async () => {
+    await signOutCustomer().catch(() => undefined)
+    location.href = '/account/login/'
+  })
+</script>
