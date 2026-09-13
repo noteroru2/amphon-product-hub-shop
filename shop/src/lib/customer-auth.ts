@@ -1,9 +1,18 @@
+export interface CustomerAuthIdentity {
+  id?: string
+  identity_id?: string
+  provider: string
+  email?: string | null
+  identity_data?: Record<string, unknown>
+}
+
 export interface CustomerAuthUser {
   id: string
   email?: string | null
   email_confirmed_at?: string | null
   user_metadata?: Record<string, unknown>
   app_metadata?: Record<string, unknown>
+  identities?: CustomerAuthIdentity[] | null
 }
 
 export interface CustomerAuthSession {
@@ -22,9 +31,12 @@ type AuthResponse = CustomerAuthSession & {
   error_description?: string
   msg?: string
   message?: string
+  url?: string | null
 }
 
 const SESSION_KEY = 'amphon_shop_customer_auth_v1'
+const OAUTH_NEXT_KEY = 'amphon_shop_customer_oauth_next_v1'
+const OAUTH_MODE_KEY = 'amphon_shop_customer_oauth_mode_v1'
 const DEFAULT_SUPABASE_URL = 'https://mfpdtlxwdbxitgfzdape.supabase.co'
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-'
 
@@ -167,6 +179,65 @@ export async function signInCustomer(email: string, password: string) {
   return session
 }
 
+function setPendingOAuth(mode: 'signin' | 'link', nextPath: string) {
+  try {
+    sessionStorage.setItem(OAUTH_MODE_KEY, mode)
+    sessionStorage.setItem(OAUTH_NEXT_KEY, safeNextPath(nextPath))
+  } catch {
+    // OAuth still works even when sessionStorage is unavailable; callback falls back to /account/.
+  }
+}
+
+export function readPendingCustomerOAuth() {
+  try {
+    return {
+      mode: sessionStorage.getItem(OAUTH_MODE_KEY) === 'link' ? 'link' as const : 'signin' as const,
+      next: safeNextPath(sessionStorage.getItem(OAUTH_NEXT_KEY)),
+    }
+  } catch {
+    return { mode: 'signin' as const, next: '/account/' }
+  }
+}
+
+export function clearPendingCustomerOAuth() {
+  try {
+    sessionStorage.removeItem(OAUTH_MODE_KEY)
+    sessionStorage.removeItem(OAUTH_NEXT_KEY)
+  } catch {
+    // Ignore storage restrictions.
+  }
+}
+
+function googleCallbackUrl() {
+  return new URL('/account/oauth-callback/', location.origin).toString()
+}
+
+export function startGoogleSignIn(nextPath = '/account/') {
+  const { url } = authConfig()
+  setPendingOAuth('signin', nextPath)
+  const authorize = new URL(`${url}/auth/v1/authorize`)
+  authorize.searchParams.set('provider', 'google')
+  authorize.searchParams.set('redirect_to', googleCallbackUrl())
+  location.assign(authorize.toString())
+}
+
+export async function linkGoogleIdentity(nextPath = '/account/') {
+  const session = await getValidCustomerSession()
+  if (!session) throw new Error('กรุณาเข้าสู่ระบบก่อนเชื่อมบัญชี Google')
+  setPendingOAuth('link', nextPath)
+  const redirect = encodeURIComponent(googleCallbackUrl())
+  const data = await authFetch(`/user/identities/authorize?provider=google&redirect_to=${redirect}`, {
+    method: 'GET',
+    headers: headers(session.access_token),
+  })
+  if (!data.url) throw new Error('ไม่สามารถเริ่มการเชื่อมบัญชี Google ได้')
+  location.assign(data.url)
+}
+
+export function customerHasIdentity(user: CustomerAuthUser | null | undefined, provider: string) {
+  return Boolean(user?.identities?.some((identity) => identity.provider === provider))
+}
+
 export async function signOutCustomer() {
   const session = readCustomerSession()
   try {
@@ -221,7 +292,7 @@ export function consumeCustomerAuthRedirect() {
     expires_at: expiresAt,
     token_type: hash.get('token_type') || 'bearer',
   })
-  history.replaceState({}, document.title, `${location.pathname}${location.search}`)
+  history.replaceState({}, document.title, location.pathname)
   return { session, type, error: null }
 }
 
@@ -243,6 +314,9 @@ export function friendlyAuthError(error: unknown) {
   if (text.includes('email not confirmed')) return 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ'
   if (text.includes('user already registered')) return 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบ'
   if (text.includes('password should be')) return 'รหัสผ่านยังไม่ผ่านเงื่อนไขความปลอดภัย'
+  if (text.includes('provider is not enabled') || text.includes('unsupported provider')) return 'ยังไม่ได้เปิดใช้งาน Google Sign-In ในระบบ กรุณาติดต่อร้าน'
+  if (text.includes('manual linking') || text.includes('identity linking')) return 'ระบบเชื่อมบัญชี Google ยังไม่ได้เปิดใช้งาน กรุณาติดต่อร้าน'
+  if (text.includes('identity is already linked') || text.includes('already been linked')) return 'บัญชี Google นี้ถูกเชื่อมกับบัญชีอื่นแล้ว'
   if (text.includes('rate limit') || text.includes('too many')) return 'ส่งคำขอถี่เกินไป กรุณารอสักครู่แล้วลองใหม่'
   if (text.includes('expired') || text.includes('invalid token')) return 'ลิงก์หมดอายุหรือใช้ไม่ได้ กรุณาขอลิงก์ใหม่'
   return raw || 'เกิดข้อผิดพลาด กรุณาลองใหม่'
