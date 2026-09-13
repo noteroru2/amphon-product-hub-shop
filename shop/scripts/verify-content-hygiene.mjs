@@ -63,7 +63,8 @@ for (const [name, source] of customerFacing) {
 
 const required = [
   ['home product intent', files.home.includes('สินค้าไอทีมือสองออนไลน์')],
-  ['category customer copy', files.category.includes('เลือกดูสินค้าจากรายการที่ร้านเปิดขาย')],
+  ['home human storefront copy', files.home.includes('เลือกของมือสองไม่ควรต้องเดา') && files.home.includes('กำลังหาอะไรอยู่?')],
+  ['category human guidance', files.category.includes('เลือกของที่เหมาะกับคุณ') && files.category.includes('ก่อนซื้อ ลองดู 3 จุดนี้')],
   ['evergreen customer eyebrow', files.evergreen.includes('เลือกซื้อสินค้ามือสอง')],
   ['evergreen live-stock heading', files.evergreen.includes('สินค้าที่พร้อมจำหน่าย')],
   ['evergreen natural empty state', files.evergreen.includes('หน้านี้จะแสดงรายการเมื่อมีสินค้าเข้ามาใหม่')],
