@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "check": "astro check",
-    "build": "astro check && astro build",
+    "build": "node scripts/verify-content-hygiene.mjs && astro check && astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy",
     "verify:foundation": "node scripts/verify-foundation.mjs",
     "verify:shop2": "node scripts/verify-shop2.mjs",
     "verify:shop3": "node scripts/verify-shop3.mjs",
