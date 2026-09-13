@@ -1,0 +1,12 @@
+AMPHON SHOP-6.1 SHOP DEPLOY HOTFIX V12
+
+Fixes:
+1. RESUME-SHOP-DEPLOY.bat now calls CHECK-INSTALLER.ps1 with -Path.
+2. CHECK-INSTALLER.ps1 also accepts -Target as an alias for backward compatibility.
+3. No Supabase, Worker API, Stripe, or Product Hub state is changed by this hotfix itself.
+
+Usage:
+- Extract this hotfix over the existing amphon-product-hub-shop6-1 folder.
+- Replace files when prompted.
+- Keep deployment/install.config.ps1 from the existing installation.
+- Run RESUME-SHOP-DEPLOY.bat.

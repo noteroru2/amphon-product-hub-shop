@@ -1,0 +1,21 @@
+name = "amphon-product-images"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "amphon-product-images"
+
+[vars]
+SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "YOUR_PUBLISHABLE_KEY"
+ALLOWED_ORIGINS = "http://localhost:5173,https://app.amphon.co.th"
+
+# Required secrets (set with `wrangler secret put`, never commit values):
+#   wrangler secret put SUPABASE_SECRET_KEY
+#   wrangler secret put TURNSTILE_SECRET_KEY
+#   wrangler secret put STRIPE_SECRET_KEY
+#   wrangler secret put STRIPE_WEBHOOK_SECRET
+
+[triggers]
+crons = ["*/5 * * * *"]

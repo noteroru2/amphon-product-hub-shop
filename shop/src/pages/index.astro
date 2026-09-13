@@ -1,0 +1,80 @@
+---
+import ProductCard from '../components/ProductCard.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { indexCategories } from '../config/catalog'
+import { listStoreProducts, type StoreProduct } from '../lib/store-api'
+import { absoluteUrl } from '../lib/seo'
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+
+let products: StoreProduct[] = []
+let apiError = false
+try {
+  const result = await listStoreProducts({ limit: 12 })
+  products = result.products
+} catch (error) {
+  apiError = true
+  console.error('SHOP_HOME_STORE_API', error)
+}
+
+const title = 'สินค้าไอทีมือสองออนไลน์ | AMPHON TRADING'
+const description = 'เลือกซื้อโน้ตบุ๊ก iPhone คอมพิวเตอร์ กล้อง จอคอม และสินค้าไอทีมือสองจากสินค้าจริง พร้อมดูราคา สเปก สภาพและรูปก่อนซื้อ'
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'AMPHON SHOP',
+    url: absoluteUrl('/'),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'OnlineStore',
+    name: 'AMPHON TRADING',
+    url: absoluteUrl('/'),
+  },
+]
+---
+<BaseLayout title={title} description={description} canonicalPath="/" jsonLd={schema}>
+  <section class="hero">
+    <div class="container">
+      <div class="eyebrow">AMPHON SHOP • USED IT STORE</div>
+      <h1>สินค้าไอทีมือสองออนไลน์<br />ดูเครื่องจริงก่อนตัดสินใจ</h1>
+      <p class="lead">สินค้าบนเว็บเชื่อมจาก AMPHON Product Hub โดยตรง จึงใช้ราคา สเปก รูป สภาพ และสถานะสต๊อกจากข้อมูลสินค้าจริงของร้าน</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="/notebooks/">ดูโน้ตบุ๊กมือสอง</a>
+        <a class="button button-secondary" href="/iphones/">ดู iPhone มือสอง</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div><div class="eyebrow">SHOP BY CATEGORY</div><h2>เลือกตามประเภทสินค้า</h2></div>
+      </div>
+      <div class="category-grid">
+        {indexCategories.map((category) => (
+          <a class="category-card" href={`/${category.slug}/`}>
+            <strong>{category.name}</strong>
+            <span>ดูสินค้า →</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div><div class="eyebrow">LATEST STOCK</div><h2>สินค้าที่ลงขายล่าสุด</h2></div>
+      </div>
+      {products.length ? (
+        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+      ) : (
+        <div class="empty">
+          {apiError ? 'กำลังเชื่อมต่อคลังสินค้าของ AMPHON โปรดลองอีกครั้งภายหลัง' : 'ยังไม่มีสินค้าที่เผยแพร่บนเว็บไซต์'}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

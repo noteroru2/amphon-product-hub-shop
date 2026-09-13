@@ -1,0 +1,15 @@
+SHOP-6.1 SHOP DEPLOY HOTFIX V10
+
+Fixes:
+- Shop deploy now targets the concrete Astro build output: ./dist/_worker.js/index.js
+- Deploy gate asserts dist/_worker.js/index.js exists before Wrangler runs.
+- Runtime custom-domain routes in wrangler.jsonc are preserved; only main is replaced.
+- Astro Sessions disabled because this storefront does not use Astro.session.
+- Full installer and RESUME-FROM-BUILD both use the same deploy contract.
+
+Static checks:
+- wrangler.jsonc parses as JSON: PASS
+- astro.config.mjs contains session: false: PASS
+- RESUME-FROM-BUILD contains built Worker existence gate: PASS
+- INSTALL-ALL contains built Worker existence gate: PASS
+- Legacy package main @astrojs/cloudflare/entrypoints/server absent from shop/wrangler.jsonc: PASS

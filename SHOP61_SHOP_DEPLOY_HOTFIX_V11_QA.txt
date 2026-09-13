@@ -1,0 +1,25 @@
+SHOP-6.1 SHOP DEPLOY HOTFIX V11 QA
+
+Root cause fixed:
+- Astro 7 / @astrojs/cloudflare requires wrangler.jsonc main = @astrojs/cloudflare/entrypoints/server during astro check/build.
+- The previous v10 changed main to dist/_worker.js/index.js before the file existed, so the Cloudflare Vite plugin failed during build.
+- On the target Windows host, wrangler deploy with an explicit config path did not resolve the package entrypoint reliably.
+
+V11 strategy:
+- Keep source shop/wrangler.jsonc build-safe with @astrojs/cloudflare/entrypoints/server.
+- Build first.
+- Assert dist/_worker.js/index.js exists.
+- Create a temporary .wrangler.deploy.generated.json copy with main = ./dist/_worker.js/index.js.
+- Deploy using the temporary config, then delete it.
+- Restore custom domain route from deployment/install.config.ps1 in resume mode.
+- Add RESUME-SHOP-DEPLOY.bat so DB, Worker, Stripe, Product Hub build, and SHOP-1..6 verifiers are not repeated.
+
+Static QA:
+- Source wrangler JSON parse: PASS
+- Source main package entrypoint: PASS
+- Transient deploy config logic present: PASS
+- Custom-domain route restoration present: PASS
+- Resume Shop-only launcher present: PASS
+- Installer future-path patched: PASS
+- Resume-from-build future-path patched: PASS
+- ASCII PowerShell resume script: PASS

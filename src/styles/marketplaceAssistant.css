@@ -1,0 +1,315 @@
+.marketplace-assistant-launch {
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: #1e3a8a;
+  padding: 11px 13px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.marketplace-assistant-launch > span {
+  display: grid;
+  gap: 2px;
+}
+.marketplace-assistant-launch strong {
+  font-size: 13px;
+}
+.marketplace-assistant-launch small {
+  font-size: 9px;
+  color: #475569;
+  line-height: 1.4;
+}
+.marketplace-assistant-backdrop {
+  z-index: 270;
+}
+.marketplace-assistant-sheet {
+  width: min(100%, 720px);
+  max-height: 96dvh;
+  overflow: auto;
+  background: #f8fafc;
+  border-radius: 24px 24px 0 0;
+  padding: 18px 14px calc(22px + env(safe-area-inset-bottom));
+}
+.marketplace-readiness {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.marketplace-readiness.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+.marketplace-readiness.blocked {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+}
+.marketplace-readiness > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.marketplace-readiness svg {
+  width: 20px;
+}
+.marketplace-readiness span {
+  display: grid;
+  gap: 2px;
+}
+.marketplace-readiness strong {
+  font-size: 12px;
+}
+.marketplace-readiness small {
+  font-size: 8px;
+}
+.marketplace-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 10px;
+}
+.marketplace-cover {
+  position: relative;
+  width: 112px;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.marketplace-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.marketplace-cover span {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 7px;
+  font-size: 8px;
+  font-weight: 900;
+}
+.marketplace-fields {
+  padding: 0;
+  overflow: hidden;
+  gap: 0;
+}
+.marketplace-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+.marketplace-field:last-child {
+  border-bottom: 0;
+}
+.marketplace-field > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.marketplace-field span {
+  font-size: 8px;
+  color: #64748b;
+  font-weight: 800;
+}
+.marketplace-field strong {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.marketplace-field small {
+  font-size: 8px;
+  color: #64748b;
+}
+.marketplace-field button {
+  min-width: 82px;
+  min-height: 42px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 900;
+}
+.marketplace-field button svg {
+  width: 15px;
+}
+.marketplace-description {
+  margin: 0;
+  padding: 12px;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #f8fafc;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font:
+    11px/1.7 Inter,
+    "Noto Sans Thai",
+    system-ui,
+    sans-serif;
+  color: #334155;
+}
+.marketplace-inline-info {
+  display: flex;
+  grid-template-columns: none;
+  align-items: flex-start;
+}
+.marketplace-inline-info > svg {
+  width: 19px;
+  color: #2563eb;
+  flex: 0 0 auto;
+}
+.marketplace-inline-info > div {
+  display: grid;
+  gap: 3px;
+}
+.marketplace-inline-info strong {
+  font-size: 10px;
+}
+.marketplace-inline-info span {
+  font-size: 9px;
+  line-height: 1.6;
+  color: #475569;
+}
+.marketplace-checklist {
+  display: grid;
+  gap: 5px;
+}
+.marketplace-checklist > div {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  border-radius: 11px;
+  padding: 8px;
+  background: #f8fafc;
+}
+.marketplace-checklist > div > span {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 10px;
+  font-weight: 900;
+}
+.marketplace-checklist > div.warning > span {
+  background: #fef3c7;
+  color: #92400e;
+}
+.marketplace-checklist > div > div {
+  display: grid;
+  gap: 1px;
+}
+.marketplace-checklist strong {
+  font-size: 9px;
+}
+.marketplace-checklist small {
+  font-size: 7px;
+  color: #64748b;
+}
+.marketplace-checklist b {
+  font-size: 7px;
+  color: #64748b;
+}
+.marketplace-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.marketplace-actions button,
+.marketplace-actions a {
+  min-height: 48px;
+  border: 1px solid #dbe1ea;
+  background: #fff;
+  color: #334155;
+  border-radius: 13px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  font-size: 9px;
+  font-weight: 900;
+}
+.marketplace-actions a {
+  grid-column: 1/-1;
+  background: #1877f2;
+  border-color: #1877f2;
+  color: #fff;
+  min-height: 54px;
+}
+.marketplace-actions a.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.marketplace-actions .shop-unpublished {
+  grid-column: 1/-1;
+}
+.marketplace-actions .marketplace-confirm-posted {
+  grid-column: 1/-1;
+  min-height: 52px;
+  border-color: #166534;
+  background: #166534;
+  color: #fff;
+}
+.marketplace-assistant-sheet .sales-package-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+@media (min-width: 700px) {
+  .marketplace-assistant-sheet {
+    border-radius: 24px;
+    margin-bottom: 18px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+@media (max-width: 560px) {
+  .marketplace-assistant-sheet {
+    height: 96dvh;
+  }
+  .marketplace-actions {
+    grid-template-columns: 1fr;
+  }
+  .marketplace-actions a {
+    grid-column: 1;
+  }
+  .marketplace-field {
+    align-items: flex-start;
+  }
+  .marketplace-field button {
+    min-height: 46px;
+  }
+  .marketplace-cover {
+    width: 96px;
+  }
+}

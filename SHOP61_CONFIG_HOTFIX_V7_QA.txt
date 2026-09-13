@@ -1,0 +1,8 @@
+SHOP-6.1 CONFIG HOTFIX v7 QA
+
+PASS - required config values are Trim() normalized before use
+PASS - trailing/leading CR/LF from copy/paste no longer blocks resume
+PASS - embedded CR/LF is still rejected
+PASS - install.config.ps1 is not bundled in the hotfix payload
+PASS - v6 Worker JSON/secrets/resume fixes retained
+PASS - v5 database/view-order/UUID fixes retained

@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { getStoreDocument, type StoreDocument } from '../../../lib/store-api'
+import { formatPrice } from '../../../lib/seo'
+const token = Astro.params.token || ''
+let document: StoreDocument | null = null
+try { document = await getStoreDocument(token) } catch (error) { console.error('SHOP6_DOCUMENT', error); Astro.response.status = 503 }
+if (!document && Astro.response.status !== 503) Astro.response.status = 404
+Astro.response.headers.set('Cache-Control', 'no-store')
+Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+const seller = (document?.seller || {}) as Record<string, any>
+const customer = (document?.customer || {}) as Record<string, any>
+const totals = (document?.totals || {}) as Record<string, any>
+const items = Array.isArray(document?.items) ? document!.items as Array<Record<string, any>> : []
+---
+<BaseLayout title={document ? `${document.number} | AMPHON SHOP` : 'เอกสาร | AMPHON SHOP'} description="เอกสารคำสั่งซื้อ" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
+  <section class="section"><div class="container narrow-container">
+    {document ? <article class="panel order-panel"><div class="eyebrow">{document.type}</div><h1>{document.number}</h1><p class="microcopy">ออกเมื่อ {new Date(document.issuedAt).toLocaleString('th-TH')}</p>
+      <div class="order-status-grid"><div><span>ผู้ขาย</span><strong>{seller.name || seller.legalName || 'AMPHON TRADING'}</strong><small>{seller.taxId ? `Tax ID ${seller.taxId}` : ''}</small></div><div><span>ผู้ซื้อ</span><strong>{customer.name || '-'}</strong><small>{customer.taxId ? `Tax ID ${customer.taxId}` : ''}</small></div></div>
+      <div class="order-items">{items.map((item) => <div><span>{item.title || item.sku}<small>{item.sku || ''}</small></span><strong>{formatPrice(Number(item.unitPrice || item.unit_price || 0))}</strong></div>)}</div>
+      <div class="order-money"><div><span>ค่าสินค้า</span><strong>{formatPrice(Number(totals.subtotal || 0))}</strong></div><div><span>ค่าจัดส่ง</span><strong>{formatPrice(Number(totals.shippingAmount || totals.shipping_amount || 0))}</strong></div><div class="grand"><span>รวม</span><strong>{formatPrice(Number(totals.total || 0))}</strong></div></div>
+      {!document.eTaxIntegrated && <p class="microcopy">เอกสารนี้เป็น snapshot จากระบบร้าน และไม่ได้แสดงว่าเชื่อม e-Tax Invoice/e-Receipt อัตโนมัติ</p>}
+      <button class="button button-secondary" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+    </article> : <div class="empty"><h1>ไม่พบเอกสาร</h1><p>ลิงก์ไม่ถูกต้องหรือเอกสารถูกยกเลิก</p></div>}
+  </div></section>
+</BaseLayout>

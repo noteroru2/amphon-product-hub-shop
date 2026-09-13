@@ -1,0 +1,261 @@
+.sales-channel-tracker {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 20px;
+  padding: 13px;
+  display: grid;
+  gap: 10px;
+}
+.sales-channel-tracker > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sales-channel-tracker > header > div {
+  display: grid;
+  gap: 2px;
+}
+.sales-channel-tracker > header strong {
+  font-size: 13px;
+}
+.sales-channel-tracker > header small {
+  font-size: 8px;
+  color: #64748b;
+}
+.sales-channel-tracker > header button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: #475569;
+  display: grid;
+  place-items: center;
+}
+.sales-channel-tracker > header svg {
+  width: 17px;
+}
+.channel-status-list {
+  display: grid;
+  gap: 7px;
+}
+.channel-status-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  padding: 11px;
+  display: grid;
+  gap: 8px;
+}
+.channel-status-card.status-published {
+  border-color: #bbf7d0;
+}
+.channel-status-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.channel-status-head > span {
+  font-size: 20px;
+}
+.channel-status-head > div {
+  display: grid;
+  gap: 1px;
+}
+.channel-status-head strong {
+  font-size: 10px;
+}
+.channel-status-head small {
+  font-size: 8px;
+  color: #64748b;
+}
+.channel-status-head > b {
+  color: #16a34a;
+}
+.channel-actor {
+  font-size: 8px;
+  color: #475569;
+  background: #f8fafc;
+  border-radius: 9px;
+  padding: 7px;
+}
+.channel-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.channel-card-actions button,
+.channel-card-actions a {
+  min-height: 40px;
+  border: 1px solid #dbe1ea;
+  border-radius: 11px;
+  background: #fff;
+  color: #334155;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-decoration: none;
+  font-size: 8px;
+  font-weight: 900;
+}
+.channel-card-actions svg {
+  width: 14px;
+}
+.channel-card-actions .channel-mark {
+  flex: 1;
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.channel-cleanup-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+  border-radius: 14px;
+  padding: 10px;
+}
+.channel-cleanup-alert svg {
+  width: 19px;
+  flex: 0 0 auto;
+}
+.channel-cleanup-alert > div {
+  display: grid;
+  gap: 2px;
+}
+.channel-cleanup-alert strong {
+  font-size: 10px;
+}
+.channel-cleanup-alert small {
+  font-size: 8px;
+}
+.channel-reserved-warning {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 12px;
+  padding: 9px;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.channel-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 80px;
+  color: #64748b;
+  font-size: 9px;
+}
+.channel-history {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 9px;
+}
+.channel-history summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 900;
+  color: #475569;
+}
+.channel-history summary svg {
+  width: 15px;
+}
+.channel-history > div {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+.channel-history > div > div {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px;
+}
+.channel-history p {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+}
+.channel-history strong {
+  font-size: 8px;
+}
+.channel-history small {
+  font-size: 7px;
+  color: #64748b;
+}
+.publication-confirm-backdrop {
+  z-index: 310;
+}
+.publication-confirm-sheet {
+  width: min(100%, 520px);
+  background: #f8fafc;
+  border-radius: 24px 24px 0 0;
+  padding: 18px 16px calc(22px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 13px;
+}
+.publication-confirm-sheet .modal-head small {
+  font-size: 8px;
+  color: #64748b;
+}
+.publication-confirm-note {
+  font-size: 8px;
+  line-height: 1.6;
+  color: #475569;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 9px;
+}
+.publication-confirm-sheet .primary-wide svg {
+  width: 18px;
+}
+.sales-channel-confirm {
+  min-height: 46px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 900;
+}
+.sales-channel-confirm svg {
+  width: 16px;
+}
+@media (max-width: 560px) {
+  .channel-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .channel-card-actions .channel-mark {
+    grid-column: 1/-1;
+    min-height: 46px;
+  }
+  .publication-confirm-sheet {
+    min-height: 52dvh;
+  }
+}
+@media (min-width: 700px) {
+  .channel-status-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .publication-confirm-sheet {
+    border-radius: 24px;
+    margin-bottom: 18px;
+  }
+}

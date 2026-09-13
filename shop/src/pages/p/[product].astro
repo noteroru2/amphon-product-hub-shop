@@ -1,0 +1,361 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
+import {
+  absoluteUrl,
+  extractSkuFromProductSegment,
+  formatPrice,
+  formatThaiDate,
+  productDescription,
+  productPath,
+  productSegment,
+} from '../../lib/seo'
+import { groupPublicSpecs, imageRoleLabel, productEvidence } from '../../lib/product-trust'
+import {
+  buildMerchantOrganizationSchema,
+  buildProductMerchantSchema,
+  merchantAvailabilitySchema,
+  merchantItemConditionSchema,
+} from '../../lib/merchant-schema'
+
+const segment = Astro.params.product || ''
+const sku = extractSkuFromProductSegment(segment)
+if (!sku) return Astro.redirect('/404/', 302)
+
+let product: StoreProduct | null | undefined
+try {
+  product = await getStoreProduct(sku)
+} catch (error) {
+  console.error('SHOP_PRODUCT_STORE_API', sku, error)
+  Astro.response.status = 503
+}
+
+if (!product) {
+  if (Astro.response.status !== 503) Astro.response.status = 404
+}
+
+if (product && segment !== productSegment(product)) {
+  return Astro.redirect(productPath(product), 301)
+}
+
+let settings: StoreSettings | null = null
+if (product) {
+  try {
+    settings = await getStoreSettings()
+  } catch (error) {
+    console.error('SHOP3_STORE_SETTINGS', error)
+  }
+}
+
+let evergreenPages: EvergreenPage[] = []
+if (product?.categorySlug && product.catalogBrand?.slug) {
+  try {
+    const result = await listEvergreenPages({
+      category: product.categorySlug,
+      brand: product.catalogBrand.slug,
+      effectiveIndexPolicy: 'INDEX',
+      limit: 100,
+    })
+    evergreenPages = result.pages
+  } catch (error) {
+    console.error('SHOP2_PRODUCT_EVERGREEN_TRAIL', product.sku, error)
+  }
+}
+const brandPage = evergreenPages.find((item) => item.pageType === 'BRAND')
+const seriesPage = product?.catalogSeries?.slug
+  ? evergreenPages.find((item) => item.pageType === 'SERIES' && item.series?.slug === product?.catalogSeries?.slug)
+  : undefined
+const modelPage = product?.catalogModel?.slug
+  ? evergreenPages.find((item) => item.pageType === 'MODEL' && item.model?.slug === product?.catalogModel?.slug)
+  : undefined
+
+let relatedProducts: StoreProduct[] = []
+if (product) {
+  try {
+    const filters = product.catalogModel?.slug
+      ? { modelSlug: product.catalogModel.slug }
+      : product.catalogSeries?.slug
+        ? { seriesSlug: product.catalogSeries.slug }
+        : product.catalogBrand?.slug
+          ? { brandSlug: product.catalogBrand.slug }
+          : product.categorySlug
+            ? { categorySlug: product.categorySlug }
+            : { category: product.category }
+    const related = await listStoreProducts({ ...filters, availability: 'available', limit: 9 })
+    relatedProducts = related.products.filter((item) => item.sku !== product?.sku).slice(0, 6)
+  } catch (error) {
+    console.error('SHOP3_RELATED_PRODUCTS', product.sku, error)
+  }
+}
+
+if (product) Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=180')
+else Astro.response.headers.set('Cache-Control', 'no-store')
+
+const canonicalPath = product ? productPath(product) : Astro.url.pathname
+const title = product?.seoTitle?.trim() || (product ? `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING` : 'ไม่พบสินค้า | AMPHON SHOP')
+const description = product ? productDescription(product) : 'ไม่พบสินค้าที่ต้องการใน AMPHON SHOP'
+const robots = product && product.indexPolicy !== 'NOINDEX' && product.indexPolicy !== 'HOLD' && product.indexPolicy !== 'RETIRED'
+  ? 'index,follow,max-image-preview:large'
+  : 'noindex,follow'
+
+const groups = product ? groupPublicSpecs(product) : { core: [], condition: [], accessories: [] }
+const allSpecEntries = [...groups.core, ...groups.condition, ...groups.accessories]
+const publishedDate = product ? formatThaiDate(product.publishedAt) : null
+const updatedDate = product ? formatThaiDate(product.updatedAt) : null
+const warrantyDate = product ? formatThaiDate(product.warrantyUntil) : null
+const evidence = product ? productEvidence(product) : null
+const primaryImage = product?.images.find((image) => image.isCover)?.url || product?.images[0]?.url || null
+const defectImages = product?.images.filter((image) => image.role === 'defect') || []
+const accessoryImages = product?.images.filter((image) => image.role === 'accessories') || []
+const warrantyImages = product?.images.filter((image) => image.role === 'warranty') || []
+
+const breadcrumbItems = product ? [
+  { name: 'หน้าแรก', path: '/' },
+  ...(product.categorySlug && product.categoryName ? [{ name: product.categoryName, path: `/${product.categorySlug}/` }] : []),
+  ...(brandPage ? [{ name: brandPage.brand.name, path: brandPage.canonicalPath }] : []),
+  ...(seriesPage ? [{ name: seriesPage.series?.name || '', path: seriesPage.canonicalPath }] : []),
+  ...(modelPage ? [{ name: modelPage.model?.name || '', path: modelPage.canonicalPath }] : []),
+  { name: product.title, path: canonicalPath },
+].filter((item) => item.name) : []
+
+const schema = product ? [
+  buildMerchantOrganizationSchema(settings),
+  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: allSpecEntries }),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems.map((item, index) => ({
+      '@type': 'ListItem', position: index + 1, name: item.name, item: absoluteUrl(item.path),
+    })),
+  },
+] : undefined
+
+const conditionLabel = product ? (() => {
+  const value = String(product.merchantItemCondition || 'USED').toUpperCase()
+  if (value === 'NEW') return 'สินค้าใหม่'
+  if (value === 'REFURBISHED') return 'สินค้าปรับสภาพ'
+  return 'สินค้ามือสอง'
+})() : ''
+
+const availabilityLabel = product?.availability === 'out_of_stock'
+  ? 'ขายแล้ว'
+  : product?.availability === 'reserved'
+    ? 'ติดจอง'
+    : 'พร้อมจำหน่าย'
+
+const lineUrl = import.meta.env.PUBLIC_LINE_URL?.trim() || ''
+const phone = import.meta.env.PUBLIC_PHONE?.trim() || ''
+const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonicalPath={canonicalPath}
+  robots={robots}
+  jsonLd={schema}
+  ogImage={primaryImage}
+  ogType={product ? 'product' : 'website'}
+  productMeta={product ? {
+    price: product.price,
+    currency: settings?.currency || 'THB',
+    availability: merchantAvailabilitySchema(product),
+    condition: merchantItemConditionSchema(product),
+  } : null}
+>
+  {product ? (
+    <>
+      <div class="container breadcrumbs">
+        <ol>
+          {breadcrumbItems.map((item, index) => <li>{index < breadcrumbItems.length - 1 ? <a href={item.path}>{item.name}</a> : item.name}</li>)}
+        </ol>
+      </div>
+
+      <div class="container product-detail">
+        <section class="gallery" aria-label={`รูปสินค้าจริง ${product.title}`}>
+          {product.images.length ? product.images.map((image, index) => (
+            <figure class:list={['product-photo', index === 0 && 'main-photo']}>
+              <img
+                src={image.url}
+                alt={`${product.title} ${imageRoleLabel(image.role)}${index === 0 ? '' : ` รูปที่ ${index + 1}`}`}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+              />
+              <figcaption>{imageRoleLabel(image.role)}</figcaption>
+            </figure>
+          )) : <div class="gallery-placeholder main-photo">ยังไม่มีรูปสินค้า</div>}
+        </section>
+
+        <aside class="panel buy-panel">
+          <div class="status-row">
+            <span class:list={['badge', product.availability !== 'available' && 'badge-reserved']}>{availabilityLabel}</span>
+            <span class="trust-pill">{conditionLabel}</span>
+          </div>
+          <h1 class="product-h1">{product.title}</h1>
+          <div class="muted">SKU: {product.sku}</div>
+
+          {(modelPage || seriesPage || brandPage) && <div class="chips taxonomy-links">
+            {modelPage && <a class="button button-secondary" href={modelPage.canonicalPath}>ดูสินค้ารุ่น {modelPage.model?.name}</a>}
+            {!modelPage && seriesPage && <a class="button button-secondary" href={seriesPage.canonicalPath}>ดูซีรีส์ {seriesPage.series?.name}</a>}
+            {!modelPage && !seriesPage && brandPage && <a class="button button-secondary" href={brandPage.canonicalPath}>ดู {brandPage.brand.name} มือสอง</a>}
+          </div>}
+
+          <div class="price-large">{formatPrice(product.price)}</div>
+
+          <div class="trust-summary-grid" aria-label="สรุปข้อมูลสินค้า">
+            <div><span>สภาพที่บันทึก</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูรายละเอียด'}</strong></div>
+            <div><span>รูปสินค้า</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
+            <div><span>ประกัน</span><strong>{warrantyDate || 'ไม่ระบุ'}</strong></div>
+            <div><span>อัปเดต</span><strong>{updatedDate || 'ล่าสุด'}</strong></div>
+          </div>
+
+          {product.availability === 'available' && (
+            <div class="purchase-actions" aria-label="ช่องทางสั่งซื้อสินค้า">
+              {settings?.purchaseEnabled ? (
+                <>
+                  <button id="add-to-cart" class="button button-primary button-wide" type="button" data-sku={product.sku}>เพิ่มลงตะกร้า</button>
+                  <a class="button button-secondary button-wide" href="/cart/">ดูตะกร้า / ชำระเงิน</a>
+                  <p id="cart-message" class="microcopy">ระบบจะตรวจสต๊อกและล็อก SKU แบบ atomic อีกครั้งตอน Checkout</p>
+                </>
+              ) : (
+                <>
+                  {lineUrl && <a class="button button-primary button-wide" href={lineUrl} rel="nofollow noopener" target="_blank">สอบถาม / สั่งซื้อทาง LINE</a>}
+                  {phoneHref && <a class="button button-secondary button-wide" href={phoneHref}>โทรสอบถามสินค้า</a>}
+                  <p class="microcopy">Checkout ออนไลน์ยังไม่เปิด กรุณาแจ้ง SKU <strong>{product.sku}</strong> ให้ร้านตรวจสอบสถานะก่อนชำระเงิน</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {product.availability === 'reserved' && <div class="notice"><strong>สินค้าชิ้นนี้ติดจอง</strong><br />ระบบแสดงหน้าเดิมเพื่อคงข้อมูลสินค้า แต่ยังไม่ควรชำระเงินจนกว่าร้านจะยืนยันสถานะอีกครั้ง</div>}
+          {product.availability === 'out_of_stock' && <div class="notice"><strong>สินค้านี้ขายแล้ว</strong><br />หน้านี้เก็บข้อมูลของ SKU เดิมไว้เป็นข้อมูลอ้างอิง ดูสินค้ารุ่นเดียวกันหรือรุ่นใกล้เคียงที่มีจำหน่ายด้านล่างได้</div>}
+
+          {publishedDate && <p class="muted product-date">เผยแพร่สินค้า {publishedDate}</p>}
+        </aside>
+      </div>
+
+      <section class="section trust-section">
+        <div class="container">
+          <div class="section-head">
+            <div><div class="eyebrow">USED PRODUCT TRUST</div><h2>ข้อมูลสภาพจริงของ SKU นี้</h2></div>
+            <p class="muted trust-intro">ข้อมูลนี้ดึงจากรายการสินค้าชิ้นเดียวใน AMPHON Product Hub เพื่อช่วยให้ตรวจรูป สเปก ตำหนิ และประกันก่อนตัดสินใจ</p>
+          </div>
+          <div class="trust-grid">
+            <article class="panel trust-card">
+              <h3>สภาพและตำหนิ</h3>
+              {product.conditionPercent !== null && product.conditionPercent !== undefined && <p><strong>สภาพที่บันทึก:</strong> {product.conditionPercent}%</p>}
+              {product.defects
+                ? <div class="defect-box"><strong>ตำหนิที่แจ้งไว้</strong><p>{product.defects}</p></div>
+                : <p class="muted">ยังไม่มีข้อความตำหนิเพิ่มเติมในข้อมูลสาธารณะ กรุณาดูรูปจริงประกอบก่อนสั่งซื้อ</p>}
+              {defectImages.length > 0 && <p class="evidence-note">มีรูปที่ระบุบทบาท “ตำหนิ” {defectImages.length} รูปในแกลเลอรี</p>}
+            </article>
+
+            <article class="panel trust-card">
+              <h3>ข้อมูลการตรวจที่บันทึก</h3>
+              {groups.condition.length ? <dl class="compact-specs">
+                {groups.condition.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
+              </dl> : <p class="muted">ยังไม่มีรายการผลตรวจแยกเป็นช่องข้อมูลสาธารณะสำหรับสินค้านี้</p>}
+            </article>
+
+            <article class="panel trust-card">
+              <h3>อุปกรณ์ที่ระบุ</h3>
+              {groups.accessories.length ? <dl class="compact-specs">
+                {groups.accessories.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
+              </dl> : <p class="muted">ยังไม่มีรายการอุปกรณ์แยกเป็นช่องข้อมูลสาธารณะ โปรดสอบถามร้านก่อนสั่งซื้อ</p>}
+              {accessoryImages.length > 0 && <p class="evidence-note">มีรูปอุปกรณ์ {accessoryImages.length} รูปในแกลเลอรี</p>}
+            </article>
+
+            <article class="panel trust-card">
+              <h3>ประกันและหลักฐาน</h3>
+              <p>{warrantyDate ? <>ข้อมูลประกันถึง <strong>{warrantyDate}</strong></> : 'ยังไม่ได้ระบุวันสิ้นสุดประกันในข้อมูลสาธารณะ'}</p>
+              {warrantyImages.length > 0 && <p class="evidence-note">มีรูปหลักฐานประกัน {warrantyImages.length} รูป</p>}
+              {settings?.warrantyPolicyUrl && <a class="inline-link" href={settings.warrantyPolicyUrl}>อ่านเงื่อนไขประกันของร้าน</a>}
+            </article>
+
+            <article class="panel trust-card">
+              <h3>การจัดส่งและการคืนสินค้า</h3>
+              {settings?.shipping.enabled ? (
+                <p>
+                  จัดส่งภายใน {settings.shipping.country || settings.countryCode}
+                  {settings.shipping.rate !== null ? <> • ค่าจัดส่ง {settings.shipping.rate === 0 ? '0 บาท' : formatPrice(settings.shipping.rate)}</> : null}
+                  {settings.shipping.transitMinDays !== null && settings.shipping.transitMaxDays !== null ? <> • ระยะขนส่งประมาณ {settings.shipping.transitMinDays}–{settings.shipping.transitMaxDays} วัน</> : null}
+                </p>
+              ) : <p class="muted">ยังไม่ได้เผยแพร่รายละเอียดค่าจัดส่งแบบมาตรฐานในระบบ กรุณายืนยันกับร้านก่อนสั่งซื้อ</p>}
+              {settings?.returns.enabled ? (
+                <p>
+                  {settings.returns.category === 'FINITE' && settings.returns.days !== null ? `นโยบายคืนสินค้าที่ตั้งไว้: ภายใน ${settings.returns.days} วัน` : settings.returns.category === 'NOT_PERMITTED' ? 'นโยบายที่ตั้งไว้: ไม่รับคืนสินค้า' : settings.returns.category === 'UNLIMITED' ? 'นโยบายที่ตั้งไว้: ไม่จำกัดช่วงเวลาคืน' : 'มีนโยบายคืนสินค้าที่ร้านกำหนด'}
+                </p>
+              ) : <p class="muted">ยังไม่ได้เปิดข้อมูลนโยบายคืนสินค้าแบบโครงสร้างในระบบ</p>}
+              <div class="policy-links">
+                {settings?.shipping.policyUrl && <a class="inline-link" href={settings.shipping.policyUrl}>รายละเอียดการจัดส่ง</a>}
+                {settings?.returns.policyUrl && <a class="inline-link" href={settings.returns.policyUrl}>รายละเอียดการคืนสินค้า</a>}
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <div class="panel spec-panel">
+            <div class="section-head"><div><div class="eyebrow">SPECIFICATIONS</div><h2>รายละเอียดและสเปก</h2></div></div>
+            {groups.core.length ? (
+              <dl class="spec-list">
+                {groups.core.map(([key, value]) => <div class="spec-row"><dt>{key}</dt><dd>{value}</dd></div>)}
+              </dl>
+            ) : <p class="muted">ยังไม่มีรายละเอียดสเปกเพิ่มเติม</p>}
+          </div>
+        </div>
+      </section>
+
+      <section class="section disclosure-section">
+        <div class="container">
+          <div class="panel disclosure-panel">
+            <h2>ก่อนสั่งซื้อสินค้ามือสอง</h2>
+            <p>สินค้ามือสองแต่ละ SKU มีสภาพและอุปกรณ์ต่างกัน ให้ยึดข้อมูล รูป และตำหนิของหน้านี้เป็นหลัก หากข้อมูลจุดใดไม่ชัดเจนควรสอบถามร้านและยืนยันสถานะสินค้าก่อนชำระเงิน</p>
+            <div class="disclosure-points">
+              <span>ตรวจ SKU ให้ตรง</span><span>ดูรูปตำหนิ</span><span>เช็กอุปกรณ์</span><span>ยืนยันประกัน</span><span>ยืนยันสถานะก่อนชำระ</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {relatedProducts.length > 0 && <section class="section related-section">
+        <div class="container">
+          <div class="section-head">
+            <div><div class="eyebrow">RELATED STOCK</div><h2>{product.availability === 'out_of_stock' ? 'สินค้าที่มีจำหน่ายแทนชิ้นนี้' : 'สินค้าใกล้เคียงที่มีจำหน่าย'}</h2></div>
+          </div>
+          <div class="product-grid">
+            {relatedProducts.map((item) => (
+              <a class="product-card" href={productPath(item)}>
+                <div class="product-image">
+                  {item.images[0]?.url ? <img src={item.images[0].url} alt={`${item.title} มือสอง`} loading="lazy" decoding="async" /> : <span class="product-placeholder">ยังไม่มีรูป</span>}
+                </div>
+                <div class="product-body">
+                  <span class="badge">พร้อมจำหน่าย</span>
+                  <h3 class="product-title">{item.title}</h3>
+                  <div class="product-meta">SKU {item.sku}</div>
+                  <div class="product-price">{formatPrice(item.price)}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>}
+    </>
+  ) : (
+    <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'คลังสินค้ากำลังเชื่อมต่อ' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ระบบ Store API ไม่พร้อมใช้งานชั่วคราว' : 'สินค้าอาจถูกยกเลิกการเผยแพร่หรือไม่มีอยู่ในระบบแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
+  )}
+</BaseLayout>
+
+<script>
+  import { addCartSku } from '../../lib/cart'
+  const button = document.getElementById('add-to-cart') as HTMLButtonElement | null
+  const message = document.getElementById('cart-message')
+  button?.addEventListener('click', () => {
+    const sku = button.dataset.sku || ''
+    const cart = addCartSku(sku)
+    if (message) message.textContent = `เพิ่ม ${sku} ลงตะกร้าแล้ว · ตะกร้ามี ${cart.length} รายการ`
+    button.textContent = 'เพิ่มลงตะกร้าแล้ว'
+    window.setTimeout(() => { button.textContent = 'เพิ่มลงตะกร้า' }, 1400)
+  })
+</script>

@@ -1,0 +1,33 @@
+SHOP-6.1 SHOP DEPLOY HOTFIX V14 QA
+
+ROOT CAUSE
+- Wrangler 4.131.1 requires `routes` to be a JSON array (`Route[]`).
+- V13 patched the Astro-generated Wrangler config through Windows PowerShell object serialization.
+- With exactly one route, the deploy-only JSON could be emitted as a single object:
+  "routes": { "pattern": "shop.amphon.co.th", "custom_domain": true }
+- Wrangler correctly rejected that shape before deployment.
+
+FIX
+- Added deployment/PATCH-SHOP-WRANGLER.cjs.
+- Route/config mutation is now performed by Node + JSON.parse/JSON.stringify, not PowerShell ConvertTo-Json.
+- Legacy/single-object `routes` values are normalized to an array.
+- The shop custom domain is de-duplicated and appended as:
+  "routes": [ { "pattern": "shop.amphon.co.th", "custom_domain": true } ]
+- The patcher reads the file back and fails fast unless `routes` is an array.
+- The same route-safe patcher is used by INSTALL-ALL, RESUME-FROM-BUILD and RESUME-SHOP-DEPLOY.
+- Astro-generated dist/server/wrangler.json remains the deployment source of truth; the installer modifies only a same-directory copy.
+
+SAFETY
+- Supabase migration is untouched.
+- API Worker / R2 is untouched.
+- Stripe webhook is untouched.
+- Product Hub build is untouched by RESUME-SHOP-DEPLOY.
+- purchase_enabled remains false.
+
+STATIC QA
+- PATCH-SHOP-WRANGLER.cjs node --check: PASS
+- One-route JSON serialization test produces Route[]: PASS
+- Custom-domain de-duplication test: PASS
+- No PowerShell existingRoutes/Add-Member route serialization remains in deployment scripts: PASS
+- Generated deploy config still stays inside dist/server: PASS
+- ZIP integrity: PASS

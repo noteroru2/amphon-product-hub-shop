@@ -1,0 +1,14 @@
+SHOP-6.1 WORKER HOTFIX V6 QA
+
+resume switch: PASS
+JSON worker config: PASS
+explicit worker config: PASS
+JSON secrets file: PASS
+no dotenv worker secret file: PASS
+legacy TOML removed: PASS
+resume BAT exists: PASS
+database v5 fix retained: PASS
+required config newline guard: PASS
+
+Primary fix: Worker config and secrets use JSON; Wrangler receives explicit --config.
+Resume path: RESUME-FROM-CLOUDFLARE.bat skips already-passed DB migration and npm install.

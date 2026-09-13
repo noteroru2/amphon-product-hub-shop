@@ -1,0 +1,21 @@
+{
+    "name":  "amphon-product-images",
+    "main":  "src/index.ts",
+    "compatibility_date":  "2026-09-12",
+    "r2_buckets":  [
+                       {
+                           "binding":  "IMAGES",
+                           "bucket_name":  "amphon-product-images"
+                       }
+                   ],
+    "vars":  {
+                 "SUPABASE_URL":  "https://mfpdtlxwdbxitgfzdape.supabase.co",
+                 "SUPABASE_PUBLISHABLE_KEY":  "sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-",
+                 "ALLOWED_ORIGINS":  "http://localhost:5173,https://app.amphon.co.th,https://hub.amphon.co.th,https://shop.amphon.co.th"
+             },
+    "triggers":  {
+                     "crons":  [
+                                   "*/5 * * * *"
+                               ]
+                 }
+}

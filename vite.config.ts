@@ -1,0 +1,41 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['icon-192.png', 'icon-512.png'],
+      manifest: {
+        name: 'AMPHON Product Hub',
+        short_name: 'AMPHON Hub',
+        description: 'Mobile-first product and inventory hub for AMPHON TRADING',
+        theme_color: '#111827',
+        background_color: '#f8fafc',
+        display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        orientation: 'portrait-primary',
+        icons: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      },
+      workbox: {
+        navigateFallback: '/index.html',
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'product-images',
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 7 }
+            }
+          }
+        ]
+      }
+    })
+  ]
+})

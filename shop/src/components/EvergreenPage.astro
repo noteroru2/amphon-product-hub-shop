@@ -1,0 +1,130 @@
+---
+import ProductCard from './ProductCard.astro'
+import BaseLayout from '../layouts/BaseLayout.astro'
+import type { EvergreenPage, StoreProduct } from '../lib/store-api'
+import { absoluteUrl, productPath } from '../lib/seo'
+
+interface TrailItem { name: string; path: string; link: boolean }
+interface Props {
+  page: EvergreenPage
+  products: StoreProduct[]
+  children?: EvergreenPage[]
+  related?: EvergreenPage[]
+  trail: TrailItem[]
+}
+
+const { page, products, children = [], related = [], trail } = Astro.props
+const robots = page.effectiveIndexPolicy === 'INDEX'
+  ? 'index,follow,max-image-preview:large'
+  : 'noindex,follow'
+const title = page.seoTitle || `${page.seoH1 || page.brand.name} | AMPHON TRADING`
+const description = page.seoDescription || page.introContent?.slice(0, 165) || `สินค้าไอทีมือสอง ${page.brand.name} จาก AMPHON TRADING`
+const h1 = page.seoH1 || page.model?.name || page.series?.name || `${page.brand.name} มือสอง`
+const intro = page.introContent || ''
+const editorialParagraphs = (page.editorialContent || '').split(/\n\s*\n/).map((value) => value.trim()).filter(Boolean)
+const itemList = products.slice(0, 24).map((product, index) => ({
+  '@type': 'ListItem',
+  position: index + 1,
+  url: absoluteUrl(productPath(product)),
+  name: product.title,
+}))
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: h1,
+    description,
+    url: absoluteUrl(page.canonicalPath),
+    mainEntity: itemList.length ? { '@type': 'ItemList', itemListElement: itemList } : undefined,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((item, index) => ({
+      '@type': 'ListItem', position: index + 1, name: item.name, item: absoluteUrl(item.path),
+    })),
+  },
+]
+---
+<BaseLayout title={title} description={description} canonicalPath={page.canonicalPath} robots={robots} jsonLd={schema}>
+  <div class="container breadcrumbs">
+    <ol>
+      {trail.map((item) => <li>{item.link ? <a href={item.path}>{item.name}</a> : item.name}</li>)}
+    </ol>
+  </div>
+
+  <section class="hero evergreen-hero">
+    <div class="container">
+      <div class="eyebrow">EVERGREEN USED IT CATALOG</div>
+      <h1>{h1}</h1>
+      {intro && <p class="lead">{intro}</p>}
+      <div class="chips">
+        <span class="button button-secondary">มีขายตอนนี้ {page.currentStockCount} ชิ้น</span>
+        {page.historicalListingCount > 0 && <span class="button button-secondary">ข้อมูลสินค้าที่เคยลง {page.historicalListingCount} ชิ้น</span>}
+      </div>
+    </div>
+  </section>
+
+  {children.length > 0 && (
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><div><h2>{page.pageType === 'BRAND' ? 'ซีรีส์ที่เกี่ยวข้อง' : 'รุ่นในซีรีส์นี้'}</h2><p class="muted">เฉพาะหน้าที่ผ่าน SEO Release Gate และเปิด Index แล้ว</p></div></div>
+        <div class="category-grid">
+          {children.map((child) => (
+            <a class="category-card" href={child.canonicalPath}>
+              <strong>{child.model?.name || child.series?.name || child.brand.name}</strong>
+              <span>{child.currentStockCount > 0 ? `มีสินค้า ${child.currentStockCount} ชิ้น →` : 'ดูข้อมูลรุ่น →'}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div><h2>สินค้าที่มีจำหน่ายตอนนี้</h2><p class="muted">ดึงจากสต๊อกจริงของ AMPHON Product Hub</p></div>
+      </div>
+      {products.length ? (
+        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+      ) : (
+        <div class="empty">
+          <strong>ขณะนี้ยังไม่มีสินค้ารุ่นนี้พร้อมจำหน่าย</strong>
+          <p style="margin:10px 0 0">หน้านี้เป็นข้อมูลรุ่นแบบ Evergreen และจะอัปเดตรายการอัตโนมัติเมื่อมีสินค้าเข้าสต๊อกและถูก Publish</p>
+        </div>
+      )}
+    </div>
+  </section>
+
+  {editorialParagraphs.length > 0 && (
+    <section class="section">
+      <div class="container"><div class="panel editorial-panel">
+        <h2>ข้อมูลสำหรับเลือกซื้อ</h2>
+        {editorialParagraphs.map((paragraph) => <p>{paragraph}</p>)}
+      </div></div>
+    </section>
+  )}
+
+  {page.faq.length > 0 && (
+    <section class="section">
+      <div class="container"><div class="panel editorial-panel">
+        <h2>คำถามที่พบบ่อย</h2>
+        <div class="faq-list">
+          {page.faq.map((item) => <details><summary>{item.question}</summary><p>{item.answer}</p></details>)}
+        </div>
+      </div></div>
+    </section>
+  )}
+
+  {related.length > 0 && (
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><div><h2>รุ่นใกล้เคียง</h2></div></div>
+        <div class="category-grid">
+          {related.map((item) => <a class="category-card" href={item.canonicalPath}><strong>{item.model?.name || item.series?.name || item.brand.name}</strong><span>ดูสินค้าและข้อมูล →</span></a>)}
+        </div>
+      </div>
+    </section>
+  )}
+</BaseLayout>

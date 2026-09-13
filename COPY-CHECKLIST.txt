@@ -1,0 +1,36 @@
+AMPHON MOVE CHECKLIST
+=====================
+
+COPY / KEEP:
+- Entire current project source tree
+- deployment/install.config.ps1
+- root .env (public frontend config only)
+- shop/.env (public shop config only)
+- .git directory if you want exact branch/history/uncommitted state
+- package-lock.json files if present
+- supabase/migrations/*
+- SHOP62/SHOP63/SHOP64 scripts and reports
+
+DO NOT COPY / REBUILD:
+- node_modules
+- dist
+- .astro
+- build caches
+
+DO NOT PUT IN ZIP:
+- Supabase DB password
+- sb_secret_* values
+- Stripe sk_live_* / sk_test_* values
+- Stripe whsec_* webhook secret
+- Turnstile secret key
+- Wrangler OAuth credential cache
+- Supabase CLI access-token cache
+
+NEW LAPTOP:
+1) Install Node 24.14.1
+2) Extract transfer ZIP
+3) SETUP-NEW-LAPTOP.bat
+4) VERIFY-NEW-LAPTOP.bat
+5) npx supabase@latest login (when remote access is needed)
+6) npx wrangler login (when remote access is needed)
+7) Keep purchase_enabled=false until intentionally resuming SHOP-6.4

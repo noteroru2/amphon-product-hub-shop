@@ -1,0 +1,42 @@
+---
+import EvergreenPageView from '../../../../../components/EvergreenPage.astro'
+import { getCategoryBySlug } from '../../../../../config/catalog'
+import { listEvergreenPages, listStoreProducts, resolveEvergreenPage, type EvergreenPage, type StoreProduct } from '../../../../../lib/store-api'
+
+const categorySlug = Astro.params.category || ''
+const brandSlug = Astro.params.brand || ''
+const seriesSlug = Astro.params.series || ''
+const modelSlug = Astro.params.model || ''
+const category = getCategoryBySlug(categorySlug)
+if (!category) Astro.response.status = 404
+
+let page: EvergreenPage | null = null
+let products: StoreProduct[] = []
+let related: EvergreenPage[] = []
+try {
+  if (category) {
+    page = await resolveEvergreenPage({ category: categorySlug, brand: brandSlug, series: seriesSlug, model: modelSlug })
+    if (page) {
+      const [productResult, relatedResult] = await Promise.all([
+        listStoreProducts({ categorySlug, brandSlug, seriesSlug, modelSlug, limit: 48 }),
+        listEvergreenPages({ pageType: 'MODEL', category: categorySlug, brand: brandSlug, series: seriesSlug, effectiveIndexPolicy: 'INDEX', limit: 12 }),
+      ])
+      products = productResult.products
+      related = relatedResult.pages.filter((candidate) => candidate.entityId !== page?.entityId).slice(0, 8)
+    }
+  }
+} catch (error) { console.error('SHOP2_MODEL_PAGE', categorySlug, brandSlug, seriesSlug, modelSlug, error); Astro.response.status = 503 }
+if (!page && Astro.response.status !== 503) Astro.response.status = 404
+if (page) Astro.response.headers.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600')
+---
+{page && category ? (
+  <EvergreenPageView page={page} products={products} related={related} trail={[
+    { name: 'หน้าแรก', path: '/', link: true },
+    { name: category.name, path: `/${category.slug}/`, link: true },
+    { name: page.brand.name, path: `/${category.slug}/${page.brand.slug}/`, link: page.effectiveIndexPolicy === 'INDEX' },
+    { name: page.series?.name || seriesSlug, path: `/${category.slug}/${page.brand.slug}/${page.series?.slug || seriesSlug}/`, link: page.effectiveIndexPolicy === 'INDEX' },
+    { name: page.model?.name || modelSlug, path: page.canonicalPath, link: false },
+  ]} />
+) : (
+  <html lang="th"><head><meta name="robots" content="noindex" /><title>{Astro.response.status === 503 ? 'ระบบกำลังเชื่อมต่อ' : 'ไม่พบหน้า'}</title></head><body></body></html>
+)}

@@ -1,0 +1,32 @@
+{
+  "name": "amphon-shop",
+  "private": true,
+  "version": "0.6.2",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "check": "astro check",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "verify:foundation": "node scripts/verify-foundation.mjs",
+    "verify:shop2": "node scripts/verify-shop2.mjs",
+    "verify:shop3": "node scripts/verify-shop3.mjs",
+    "verify:shop4": "node scripts/verify-shop4.mjs",
+    "verify:shop5": "node scripts/verify-shop5.mjs",
+    "verify:shop6": "node scripts/verify-shop6.mjs",
+    "verify:production-closeout": "node scripts/verify-production-closeout.mjs",
+    "acceptance:live": "node scripts/live-acceptance.mjs",
+    "verify:shop62": "node scripts/verify-shop62.mjs",
+    "verify:shop64": "node scripts/verify-shop64.mjs"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.3.1",
+    "astro": "^7.3.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.131.0"
+  }
+}

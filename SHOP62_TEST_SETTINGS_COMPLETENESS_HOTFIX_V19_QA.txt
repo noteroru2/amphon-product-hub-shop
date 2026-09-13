@@ -1,0 +1,30 @@
+SHOP-6.2 TEST SETTINGS COMPLETENESS HOTFIX V19 - QA
+
+Verdict: STATIC PASS / LIVE DB CONTRACT RETEST REQUIRED
+
+Root cause fixed:
+- create_commerce_test_order() enabled shipping/returns for private SHOP-6.2 test checkout
+- v18 did not populate all fields required by production CHECK constraints
+- v19 adds a forward-only migration; applied v16/v17 migrations are not rewritten or repaired
+
+Static regression:
+- SHOP-1 foundation: PASS
+- SHOP-2: PASS
+- SHOP-3: PASS
+- SHOP-4: PASS
+- SHOP-5: PASS
+- SHOP-6: PASS
+- SHOP-6.1 closeout static: PASS
+- SHOP-6.2 verify: PASS
+- Required SHOP-6.2 files: 10/10
+- Temporary shipping completeness fixture: PASS
+- Temporary return completeness fixture: PASS
+- Original settings restore coverage: PASS
+- purchase_enabled production default/closed guard: retained
+
+Forward migration:
+- 20260912113000_amphon_shop62_test_settings_completeness.sql
+- Expected next action: SHOP62-DB-UPGRADE-TEST.bat
+- Expected DB push: only 20260912113000 if prior logs match
+
+No migration repair/reset is required.

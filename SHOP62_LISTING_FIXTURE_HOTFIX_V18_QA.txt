@@ -1,0 +1,25 @@
+SHOP-6.2 LISTING FIXTURE HOTFIX v18 - QA
+
+Root cause:
+- Website publication trigger product_publications_ensure_commerce_listing creates the one-to-one commerce listing synchronously.
+- Previous contract/provider fixtures inserted a second commerce_listings row for the same product_id.
+- This violated commerce_listings_product_id_key.
+
+Fix:
+- Contract SQL UPDATEs the publication-created listing and asserts it exists.
+- Provider E2E PATCHes the publication-created listing and requires exactly one returned row.
+- verify:shop62 rejects regression to duplicate INSERT/POST fixture behavior.
+- No database migration required; schema behavior is correct.
+- purchase_enabled remains false.
+
+QA:
+SHOP-1 foundation: PASS
+SHOP-2: PASS
+SHOP-3: PASS
+SHOP-4: PASS
+SHOP-5: PASS
+SHOP-6: PASS
+SHOP-6.1 production closeout static: PASS
+SHOP-6.2 static: PASS
+Provider E2E Node syntax: PASS
+Duplicate-listing regression guard: PASS

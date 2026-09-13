@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { getStoreWarranty, type StoreWarranty } from '../../../lib/store-api'
+const token = Astro.params.token || ''
+let warranty: StoreWarranty | null = null
+try { warranty = await getStoreWarranty(token) } catch (error) { console.error('SHOP6_WARRANTY', error); Astro.response.status = 503 }
+if (!warranty && Astro.response.status !== 503) Astro.response.status = 404
+Astro.response.headers.set('Cache-Control', 'no-store')
+Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+---
+<BaseLayout title={warranty ? `${warranty.certificateNumber} | AMPHON SHOP` : 'ใบรับประกัน | AMPHON SHOP'} description="ข้อมูลการรับประกันสินค้า" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
+  <section class="section"><div class="container narrow-container">
+    {warranty ? <article class="panel order-panel"><div class="eyebrow">WARRANTY CERTIFICATE</div><h1>{warranty.certificateNumber}</h1><div class="order-status-grid"><div><span>สินค้า</span><strong>{warranty.title}</strong><small>SKU {warranty.sku}</small></div><div><span>สถานะ</span><strong>{warranty.status}</strong><small>{warranty.warrantyDays} วัน</small></div></div><div class="notice">เริ่ม {new Date(warranty.startsAt).toLocaleDateString('th-TH')} — ถึง {new Date(warranty.endsAt).toLocaleDateString('th-TH')}</div>{warranty.terms && <div class="payment-box"><h2>เงื่อนไขประกัน</h2><p>{warranty.terms}</p></div>}<button class="button button-secondary" onclick="window.print()">พิมพ์ / บันทึก PDF</button></article> : <div class="empty"><h1>ไม่พบใบรับประกัน</h1><p>ลิงก์ไม่ถูกต้องหรือไม่มีข้อมูลประกันนี้</p></div>}
+  </div></section>
+</BaseLayout>

@@ -1,0 +1,81 @@
+---
+import ProductCard from '../../components/ProductCard.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getCategoryBySlug } from '../../config/catalog'
+import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
+import { absoluteUrl } from '../../lib/seo'
+
+const category = getCategoryBySlug(Astro.params.category)
+if (!category) {
+  return Astro.redirect('/404/', 302)
+}
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+
+let products: StoreProduct[] = []
+let brands: EvergreenPage[] = []
+let apiError = false
+try {
+  const [productResult, brandResult] = await Promise.all([
+    listStoreProducts({
+      category: category.sourceCategory,
+      subtype: category.sourceSubtype,
+      q: category.query,
+      limit: 48,
+    }),
+    listEvergreenPages({ pageType: 'BRAND', category: category.slug, effectiveIndexPolicy: 'INDEX', limit: 100 }),
+  ])
+  products = productResult.products
+  brands = brandResult.pages
+} catch (error) {
+  apiError = true
+  console.error('SHOP_CATEGORY_STORE_API', category.key, error)
+}
+
+const robots = category.indexPolicy === 'INDEX'
+  ? 'index,follow,max-image-preview:large'
+  : 'noindex,follow'
+const canonicalPath = `/${category.slug}/`
+const breadcrumbs = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'หน้าแรก', item: absoluteUrl('/') },
+    { '@type': 'ListItem', position: 2, name: category.name, item: absoluteUrl(canonicalPath) },
+  ],
+}
+---
+<BaseLayout title={category.title} description={category.description} canonicalPath={canonicalPath} robots={robots} jsonLd={breadcrumbs}>
+  <div class="container breadcrumbs">
+    <ol><li><a href="/">หน้าแรก</a></li><li>{category.name}</li></ol>
+  </div>
+  <section class="hero">
+    <div class="container">
+      <div class="eyebrow">USED IT • REAL STOCK</div>
+      <h1>{category.h1}</h1>
+      <p class="lead">ดูรายการที่ร้านเผยแพร่ขายจริง พร้อมราคา รูป สเปก สภาพ และสถานะล่าสุดจากระบบสต๊อก AMPHON</p>
+    </div>
+  </section>
+  {brands.length > 0 && (
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><div><h2>เลือกตามแบรนด์</h2><p class="muted">เฉพาะ Brand Page ที่ผ่าน SEO Release Gate</p></div></div>
+        <div class="category-grid">
+          {brands.map((brand) => <a class="category-card" href={brand.canonicalPath}><strong>{brand.brand.name}</strong><span>{brand.currentStockCount > 0 ? `มีสินค้า ${brand.currentStockCount} ชิ้น →` : 'ดูข้อมูลแบรนด์ →'}</span></a>)}
+        </div>
+      </div>
+    </section>
+  )}
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div><h2>สินค้าที่มีในหมวดนี้</h2><p class="muted">พบ {products.length} รายการในหน้าปัจจุบัน</p></div>
+      </div>
+      {products.length ? (
+        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+      ) : (
+        <div class="empty">{apiError ? 'ไม่สามารถโหลดสต๊อกได้ในขณะนี้' : 'ยังไม่มีสินค้าที่เผยแพร่ในหมวดนี้'}</div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

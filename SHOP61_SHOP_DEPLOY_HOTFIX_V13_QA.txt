@@ -1,0 +1,33 @@
+SHOP-6.1 SHOP DEPLOY HOTFIX V13 QA
+
+ROOT CAUSE
+- Astro 7 + @astrojs/cloudflare 14 no longer emits the legacy dist/_worker.js/index.js worker layout.
+- The production build emits dist/server/entry.mjs and dist/server/wrangler.json.
+- v10-v12 used the legacy _worker.js path after build, so the resume gate failed even though astro build completed successfully.
+
+FIX
+- Keep source shop/wrangler.jsonc main = @astrojs/cloudflare/entrypoints/server for Astro build.
+- After build, assert dist/server/entry.mjs exists.
+- Assert dist/server/wrangler.json exists.
+- Parse the generated config and verify its main resolves to a real file.
+- Preserve Astro-generated assets/bindings and relative paths.
+- Add shop custom-domain route to a deploy-only copy in the same dist/server directory.
+- Deploy with wrangler --config dist/server/wrangler.deploy.json.
+- Remove deploy-only copy after deploy.
+
+AFFECTED INSTALLERS
+- deployment/INSTALL-ALL.ps1
+- deployment/RESUME-FROM-BUILD.ps1
+- deployment/RESUME-SHOP-DEPLOY.ps1
+
+SAFETY
+- Supabase migration is untouched.
+- API Worker/R2/Stripe webhook are untouched.
+- purchase_enabled remains false.
+- Source wrangler.jsonc remains build-safe.
+
+STATIC QA
+- No deployment script references dist/_worker.js: PASS
+- Source wrangler main is unified adapter entrypoint: PASS
+- Generated dist/server entry/config gates present: PASS
+- Custom-domain patch occurs only on generated same-directory deploy copy: PASS

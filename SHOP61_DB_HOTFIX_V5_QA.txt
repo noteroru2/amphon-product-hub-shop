@@ -1,0 +1,10 @@
+SHOP-6.1 DATABASE HOTFIX V5 QA: PASS
+no max(uuid) regression: PASS
+SHOP5 store settings append-only: PASS
+SHOP6 store settings preserve updated_at before SHOP5 fields: PASS
+SHOP6 stripe fields append after SHOP5 fields: PASS
+order admin legacy prefix: PASS
+listing editor warranty appended: PASS
+full setup equals migration: PASS
+installer v5 view safety gate: PASS
+installer ASCII safe: PASS

@@ -1,0 +1,37 @@
+AMPHON SHOP — SHOP-6.1 QA RESULTS
+Date: 2026-09-12 (Asia/Bangkok)
+
+REGRESSION
+SHOP-1 FOUNDATION: PASS
+SHOP-2: PASS
+SHOP-3: PASS
+SHOP-4: PASS
+SHOP-5: PASS
+SHOP-6: PASS
+SHOP-6.1 CLOSEOUT: PASS (static)
+
+STATIC QA
+TypeScript / TSX / Astro frontmatter syntax: PASS (49 units)
+JSON config parse: PASS
+Node .mjs syntax: PASS
+SQL structural scan: PASS
+Secret scan: PASS — 0 findings
+Artifact hygiene: PASS — no node_modules/dist/.astro/.wrangler
+
+DEPENDENCY-RESOLVED BUILD
+npm install: TIMEOUT in current execution environment
+astro check: NOT RUN (dependency install unavailable)
+astro build: NOT RUN (dependency install unavailable)
+Any partial node_modules/package-lock from the attempt was removed.
+
+PRODUCTION ACCEPTANCE
+Supabase target DB acceptance: REQUIRED / NOT RUN
+Cloudflare Worker live smoke: REQUIRED / NOT RUN
+Stripe Card E2E: REQUIRED / NOT RUN
+Stripe PromptPay async E2E: REQUIRED / NOT RUN
+Duplicate webhook: REQUIRED / NOT RUN
+Amount/currency mismatch rejection: REQUIRED / NOT RUN
+Expiry/refund/shipping/pickup/document/warranty E2E: REQUIRED / NOT RUN
+
+FINAL RELEASE STATE
+LOCAL_STATIC_PASS / PRODUCTION_GATE_CLOSED

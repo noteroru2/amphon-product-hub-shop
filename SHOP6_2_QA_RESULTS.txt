@@ -1,0 +1,40 @@
+AMPHON SHOP-6.2 QA RESULTS — v17
+================================
+
+Verdict: STATIC_PACKAGE_PASS / DB_FORWARD_HOTFIX_REQUIRED / PROVIDER_INTERACTION_REQUIRED
+
+PASS  SHOP-6.2 static verifier
+PASS  Required SHOP-6.2 files 9/9
+PASS  Provider activation gate present
+PASS  Rollback-safe DB contract test present
+PASS  Isolated AT-TST-* checkout harness present
+PASS  Refund -> RETURNED + warranty void guardrail present
+PASS  Public purchase forced closed by migration
+PASS  Canonical SHOP-6.2 SQL == base SHOP-6.2 migration SQL
+PASS  Forward token-hash portability migration present
+PASS  Token hashing uses pg_catalog.sha256(bytea), not extension-schema digest()
+PASS  Provider Node script syntax check
+PASS  verify-shop62 Node syntax check
+PASS  SHOP-1 -> SHOP-6.2 static regression
+PASS  PowerShell/BAT ASCII compatibility audit
+PASS  SQL dollar-quote delimiter sanity
+PASS  Secret-like literal scan: 0 findings
+
+TARGET DATABASE STATUS EXPECTED BEFORE v17 RUN
+- 20260912000000 applied
+- 20260912090000 applied
+- 20260912103000 pending
+
+NOT EXECUTED IN PACKAGING ENVIRONMENT
+- Target Supabase forward migration 20260912103000
+- Rollback-safe contract query after forward migration
+- Cloudflare temporary Worker deployment
+- Stripe TEST hosted Checkout/provider webhook/refund flow
+
+Run order on target Windows machine:
+1. Place v17 hotfix over the existing SHOP-6.2 folder.
+2. Run SHOP62-DB-UPGRADE-TEST.bat again.
+3. Confirm DB contract + readiness + verify:shop62 all PASS.
+4. Configure intended Commerce settings; keep purchase_enabled=false.
+5. Run SHOP62-PROVIDER-E2E.bat.
+6. Explicitly activate purchase_enabled only after provider acceptance.

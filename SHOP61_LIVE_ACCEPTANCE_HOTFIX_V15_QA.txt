@@ -1,0 +1,27 @@
+AMPHON SHOP-6.1 - LIVE ACCEPTANCE HOTFIX V15
+
+Purpose
+- Preserve successful amphon-shop Cloudflare deployment.
+- Do not redeploy DB, API Worker, Stripe webhook, Product Hub, or Shop.
+- Retry the newly attached custom domain before declaring live smoke failure.
+- Surface fetch cause codes/messages (for example ENOTFOUND / TLS / connection errors).
+
+Changes
+- shop/scripts/live-acceptance.mjs
+  * Store API health/settings remain fail-fast.
+  * Shop robots/sitemap retry up to 20 attempts, 15 seconds apart by default.
+  * Better fetch error diagnostics.
+- RESUME-LIVE-ACCEPTANCE.bat
+- deployment/RESUME-LIVE-ACCEPTANCE.ps1
+  * Runs only Step 7 live acceptance.
+
+Expected previous state
+- Cloudflare deploy: PASS
+- Custom domain attached: shop.amphon.co.th
+- Live smoke immediately after deploy: transient fetch failure for robots/sitemap
+
+Safety
+- No database mutation.
+- No Cloudflare deployment.
+- No Stripe webhook creation.
+- No purchase_enabled change.

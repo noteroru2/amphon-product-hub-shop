@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "amphon-product-hub",
+  "compatibility_date": "2026-09-13",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "none",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "hub.amphon.co.th",
+      "custom_domain": true
+    }
+  ]
+}

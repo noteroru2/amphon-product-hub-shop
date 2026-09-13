@@ -1,0 +1,17 @@
+SHOP-6.1 WORKER HOTFIX V8 QA
+
+Verdict: PASS (static closeout)
+
+Fixes:
+- Deletes legacy workers/r2-upload/wrangler.toml BEFORE the first Wrangler command.
+- Deletes a legacy root wrangler.toml if present.
+- Generates workers/r2-upload/wrangler.jsonc before `wrangler whoami`.
+- Validates generated JSON before any Wrangler command.
+- Keeps deploy on explicit --config wrangler.jsonc and JSON --secrets-file.
+- Resume mode still skips Supabase migration and dependency installation.
+
+Static checks:
+- INSTALL-ALL.ps1 ASCII-safe: PASS
+- Brace/parenthesis balance: PASS
+- Legacy cleanup occurs before wrangler whoami: PASS
+- JSON config validation occurs before wrangler whoami: PASS

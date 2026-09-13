@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getStoreSettings, type StoreSettings } from '../../lib/store-api'
+let settings: StoreSettings | null = null
+try { settings = await getStoreSettings() } catch { /* render disabled shell */ }
+const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '') || ''
+const enabled = Boolean(settings?.purchaseEnabled && settings?.checkout?.enabled)
+const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && settings?.checkout?.turnstileSiteKey)
+---
+<BaseLayout title="Checkout | AMPHON SHOP" description="ยืนยันข้อมูลจัดส่งและสร้างคำสั่งซื้อ" canonicalPath="/checkout/" robots="noindex,nofollow">
+  <section class="section checkout-shell">
+    <div class="container checkout-grid">
+      <div>
+        <div class="eyebrow">SECURE CHECKOUT</div><h1 class="checkout-title">ยืนยันคำสั่งซื้อ</h1>
+        {!enabled ? <div class="notice">Checkout ออนไลน์ยังไม่เปิดใช้งาน กรุณากลับไปติดต่อร้านจากหน้าสินค้า</div> : (
+          <form id="checkout-form" class="panel checkout-form" data-api={apiBase}>
+            <h2>ข้อมูลผู้สั่งซื้อ</h2>
+            <div class="checkout-fields two"><label><span>ชื่อผู้รับ *</span><input name="customerName" required maxlength="120" autocomplete="name" /></label><label><span>เบอร์โทร *</span><input name="customerPhone" required maxlength="30" inputmode="tel" autocomplete="tel" /></label></div>
+            <label><span>อีเมล</span><input name="customerEmail" type="email" maxlength="180" autocomplete="email" /></label>
+            <h2>วิธีรับสินค้า</h2>
+            <div class="checkout-choice-row">
+              <label><input type="radio" name="deliveryMethod" value="SHIPPING" checked /> จัดส่ง</label>
+              {settings?.checkout?.pickupEnabled && <label><input type="radio" name="deliveryMethod" value="PICKUP" /> รับที่ร้าน</label>}
+            </div>
+            <div id="shipping-fields">
+              <label><span>ที่อยู่ *</span><input name="addressLine" maxlength="250" autocomplete="street-address" /></label>
+              <div class="checkout-fields two"><label><span>ตำบล/แขวง</span><input name="subdistrict" maxlength="120" /></label><label><span>อำเภอ/เขต *</span><input name="district" maxlength="120" /></label></div>
+              <div class="checkout-fields two"><label><span>จังหวัด *</span><input name="province" maxlength="120" /></label><label><span>รหัสไปรษณีย์ *</span><input name="postalCode" maxlength="20" inputmode="numeric" autocomplete="postal-code" /></label></div>
+            </div>
+            <h2>วิธีชำระเงิน</h2>
+            <div class="checkout-choice-row">
+              {settings?.checkout?.stripeEnabled && <label><input type="radio" name="paymentMethod" value="STRIPE" checked /> ชำระออนไลน์ {settings?.checkout?.promptPayEnabled ? '(บัตร / PromptPay)' : '(บัตร)'}</label>}
+              {settings?.checkout?.bankTransferEnabled && <label><input type="radio" name="paymentMethod" value="BANK_TRANSFER" checked={!settings?.checkout?.stripeEnabled} /> โอนเงินผ่านธนาคาร</label>}
+              {settings?.checkout?.payAtStoreEnabled && <label><input type="radio" name="paymentMethod" value="PAY_AT_STORE" /> ชำระที่ร้าน</label>}
+            </div>
+            <details class="panel-soft"><summary>ต้องการใบเสร็จ / ใบกำกับ</summary><label class="toggle-field"><span>ขอเอกสารในชื่อผู้ซื้อ</span><input type="checkbox" name="invoiceRequested" value="true" id="invoice-requested" /></label><div id="invoice-fields" hidden><label><span>ชื่อ / บริษัท</span><input name="invoiceName" maxlength="180" /></label><div class="checkout-fields two"><label><span>เลขประจำตัวผู้เสียภาษี</span><input name="invoiceTaxId" maxlength="20" /></label><label><span>สาขา</span><input name="invoiceBranchCode" maxlength="20" /></label></div><label><span>ที่อยู่ออกเอกสาร</span><input name="invoiceAddress" maxlength="500" /></label><label><span>อีเมลรับเอกสาร</span><input name="invoiceEmail" type="email" maxlength="180" /></label></div></details>
+            <label><span>หมายเหตุ</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+            {settings?.checkout?.termsUrl && <p class="microcopy">การสั่งซื้อถือว่าคุณยอมรับ <a class="inline-link" href={settings.checkout.termsUrl}>เงื่อนไข Checkout</a></p>}
+            {turnstileEnabled && <div class="checkout-security"><div class="cf-turnstile" data-sitekey={settings?.checkout?.turnstileSiteKey || ''} data-action="checkout" data-theme="auto"></div><small>ระบบตรวจสอบความปลอดภัยก่อนล็อกสต๊อก</small></div>}
+            <div id="checkout-error"></div>
+            <button id="checkout-submit" class="button button-primary button-wide" type="submit">สร้างคำสั่งซื้อและล็อกสินค้า</button>
+            <p class="microcopy">ระบบจะล็อก SKU ในฐานข้อมูลทันทีเมื่อสร้าง Order สำเร็จ และปล่อยสต๊อกอัตโนมัติหากหมดเวลาชำระ</p>
+          </form>
+        )}
+      </div>
+      <aside class="panel checkout-summary"><h2>สรุปสินค้า</h2><div id="checkout-items" data-api={apiBase} data-shipping={settings?.shipping.rate ?? 0}>กำลังโหลด...</div></aside>
+    </div>
+  </section>
+</BaseLayout>
+{turnstileEnabled && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+<script>
+  import { clearCart, readCartSkus } from '../../lib/cart'
+  const form = document.getElementById('checkout-form') as HTMLFormElement | null
+  const itemsTarget = document.getElementById('checkout-items') as HTMLElement | null
+  const shippingFields = document.getElementById('shipping-fields') as HTMLElement | null
+  const errorTarget = document.getElementById('checkout-error') as HTMLElement | null
+  const submit = document.getElementById('checkout-submit') as HTMLButtonElement | null
+  const invoiceRequested = document.getElementById('invoice-requested') as HTMLInputElement | null
+  const invoiceFields = document.getElementById('invoice-fields') as HTMLElement | null
+  invoiceRequested?.addEventListener('change', () => { if (invoiceFields) invoiceFields.hidden = !invoiceRequested.checked })
+  const api = form?.dataset.api || itemsTarget?.dataset.api || ''
+  const skus = readCartSkus()
+  let cartValid = false
+  const money = (value: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(value)
+  const esc = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] || c))
+  async function loadSummary() {
+    if (!itemsTarget) return
+    if (!skus.length) { itemsTarget.innerHTML = '<div class="notice">ตะกร้าว่าง</div>'; return }
+    const products = await Promise.all(skus.map(async (sku) => {
+      const response = await fetch(`${api}/products/${encodeURIComponent(sku)}`)
+      return response.ok ? (await response.json()).product : null
+    }))
+    cartValid = products.every((item) => item?.availability === 'available')
+    const subtotal = products.reduce((sum, item) => sum + Number(item?.price || 0), 0)
+    itemsTarget.innerHTML = `${products.map((item, i) => `<div class="checkout-item"><span>${esc(item?.title || skus[i])}</span><strong>${item ? money(Number(item.price || 0)) : 'ไม่พร้อมขาย'}</strong></div>`).join('')}<div class="checkout-total"><span>ยอดสินค้า</span><strong>${money(subtotal)}</strong></div><small>ค่าจัดส่งคิดตามวิธีรับสินค้าและค่าที่ร้านตั้งไว้</small>${cartValid ? '' : '<div class="notice">มีสินค้าที่ไม่พร้อมซื้อ กรุณากลับไปแก้ตะกร้า</div>'}`
+    if (submit) submit.disabled = !cartValid
+  }
+  function syncDelivery() {
+    const delivery = (form?.elements.namedItem('deliveryMethod') as RadioNodeList | null)?.value || 'SHIPPING'
+    if (shippingFields) shippingFields.hidden = delivery === 'PICKUP'
+    const payAtStore = form?.querySelector<HTMLInputElement>('input[name="paymentMethod"][value="PAY_AT_STORE"]')
+    if (payAtStore) payAtStore.disabled = delivery !== 'PICKUP'
+    if (payAtStore?.checked && delivery !== 'PICKUP') {
+      const fallback = form?.querySelector<HTMLInputElement>('input[name="paymentMethod"][value="STRIPE"]:not(:disabled), input[name="paymentMethod"][value="BANK_TRANSFER"]:not(:disabled)')
+      if (fallback) fallback.checked = true
+    }
+  }
+  form?.querySelectorAll('input[name="deliveryMethod"]').forEach((input) => input.addEventListener('change', syncDelivery))
+  syncDelivery()
+  void loadSummary().catch(() => { if (itemsTarget) itemsTarget.innerHTML = '<div class="notice">โหลดข้อมูลสินค้าไม่สำเร็จ</div>' })
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    if (!api || !cartValid || !submit) return
+    errorTarget && (errorTarget.innerHTML = '')
+    submit.disabled = true; submit.textContent = 'กำลังล็อกสินค้า...'
+    const data = new FormData(form)
+    const keyName = 'amphon_checkout_idempotency'
+    let idempotencyKey = sessionStorage.getItem(keyName)
+    if (!idempotencyKey) { idempotencyKey = crypto.randomUUID(); sessionStorage.setItem(keyName, idempotencyKey) }
+    const payload = Object.fromEntries(data.entries()) as Record<string, string>
+    const turnstileToken = String(data.get('cf-turnstile-response') || '')
+    try {
+      const response = await fetch(`${api}/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...payload, skus, idempotencyKey, turnstileToken }) })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || `Checkout ไม่สำเร็จ (${response.status})`)
+      const token = result.order?.publicToken
+      if (!token) throw new Error('ระบบไม่ได้รับ Order token')
+      clearCart(); sessionStorage.removeItem(keyName)
+      if (result.checkoutUrl) { location.href = String(result.checkoutUrl); return }
+      location.href = `/order/${encodeURIComponent(token)}/`
+    } catch (error) {
+      if (errorTarget) errorTarget.innerHTML = `<div class="notice">${esc(error instanceof Error ? error.message : String(error))}</div>`
+      ;(window as any).turnstile?.reset?.()
+      submit.disabled = false; submit.textContent = 'สร้างคำสั่งซื้อและล็อกสินค้า'
+    }
+  })
+</script>

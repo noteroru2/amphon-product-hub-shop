@@ -1,0 +1,13 @@
+node_modules
+dist
+.wrangler
+.env
+.env.local
+.DS_Store
+*.log
+
+*.tsbuildinfo
+workers/r2-upload/wrangler.toml
+workers/r2-upload/.dev.vars
+deployment/install.config.ps1
+supabase/.temp/

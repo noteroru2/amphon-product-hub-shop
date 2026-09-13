@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+Astro.response.status = 404
+---
+<BaseLayout title="ไม่พบหน้า | AMPHON SHOP" description="ไม่พบหน้าที่ต้องการ" robots="noindex,follow" canonicalPath="/404/">
+  <section class="section">
+    <div class="container">
+      <div class="empty">
+        <h1 style="font-size:2rem">ไม่พบหน้าที่ต้องการ</h1>
+        <p>URL นี้อาจถูกย้ายหรือไม่มีอยู่ใน AMPHON SHOP</p>
+        <a class="button button-primary" href="/">กลับหน้าร้าน</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

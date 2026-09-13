@@ -1,0 +1,19 @@
+---
+// Backward-compatibility bridge for Product Hub Batch 4.1 links.
+// Canonical SEO ownership lives at /p/{slug}-{sku}/.
+import { getStoreProduct } from '../../lib/store-api'
+import { productPath } from '../../lib/seo'
+
+const sku = String(Astro.params.sku || '').trim().toUpperCase()
+if (!sku) return Astro.redirect('/404/', 302)
+
+try {
+  const product = await getStoreProduct(sku)
+  if (!product) return Astro.redirect('/404/', 302)
+  return Astro.redirect(productPath(product), 301)
+} catch (error) {
+  console.error('SHOP_LEGACY_PRODUCT_REDIRECT', sku, error)
+  Astro.response.status = 503
+}
+---
+<!doctype html><html lang="th"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>AMPHON SHOP</title></head><body>Store API unavailable</body></html>

@@ -1,0 +1,22 @@
+# SHOP-6.1 — หลังติดตั้งก่อนเปิดขายจริง
+
+- [ ] Supabase `FULL_DATABASE_SETUP` applied
+- [ ] `SHOP61_DATABASE_ACCEPTANCE = PASS`
+- [ ] Product Hub `npm run build` PASS
+- [ ] Worker `npm run typecheck` PASS
+- [ ] Worker `/store/health` returns `ok=true`, version >= 6
+- [ ] R2 upload/delete works from Product Hub
+- [ ] Shop regression SHOP-1 → SHOP-6.1 PASS
+- [ ] `shop.amphon.co.th/robots.txt` and sitemap load
+- [ ] Commerce Admin has shipping + return data
+- [ ] Turnstile site key + Worker secret configured
+- [ ] Stripe is TEST mode until E2E passes
+- [ ] Card test: paid webhook changes reserved SKU → sold
+- [ ] PromptPay async test passes if enabled
+- [ ] Expired checkout releases SKU correctly
+- [ ] Duplicate webhook is idempotent
+- [ ] Full refund changes SKU → returned, never auto-published
+- [ ] Shipping tracking visible on token-only order page
+- [ ] Completed paid order creates receipt/invoice snapshot
+- [ ] Warranty record uses snapshotted per-SKU/default warranty
+- [ ] Only after all above: enable `purchase_enabled`

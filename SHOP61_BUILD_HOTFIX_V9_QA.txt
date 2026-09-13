@@ -1,0 +1,18 @@
+SHOP-6.1 BUILD HOTFIX v9
+
+Fixes:
+- verify-production-closeout.mjs no longer calls .trim() on undefined child-process output.
+- Windows nested npm verifier runs through cmd.exe, avoiding Node 24 spawnSync .cmd failures.
+- package artifact hygiene is opt-in via SHOP61_PACKAGE_HYGIENE=1 and no longer rejects node_modules/dist during a real production install.
+- RESUME-FROM-BUILD.bat resumes at Step 6 without redeploying Supabase, API Worker, or recreating Stripe webhook.
+
+Local checks:
+- npm run verify:production-closeout: PASS
+- Required hotfix files present: PASS
+- PowerShell/BAT files ASCII-safe: checked by packaging script
+
+Production state expected before using RESUME-FROM-BUILD.bat:
+- Supabase migration + acceptance: already PASS
+- Worker deploy: already PASS
+- Stripe webhook creation: already PASS
+- Frontend env generation: already completed
