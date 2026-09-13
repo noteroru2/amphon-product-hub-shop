@@ -51,15 +51,15 @@ const breadcrumbs = {
   </div>
   <section class="hero">
     <div class="container">
-      <div class="eyebrow">USED IT • REAL STOCK</div>
+      <div class="eyebrow">สินค้าพร้อมจำหน่าย</div>
       <h1>{category.h1}</h1>
-      <p class="lead">ดูรายการที่ร้านเผยแพร่ขายจริง พร้อมราคา รูป สเปก สภาพ และสถานะล่าสุดจากระบบสต๊อก AMPHON</p>
+      <p class="lead">เลือกดูสินค้าจากรายการที่ร้านเปิดขาย พร้อมราคา รูป สเปก สภาพ และสถานะล่าสุดก่อนตัดสินใจสั่งซื้อ</p>
     </div>
   </section>
   {brands.length > 0 && (
     <section class="section">
       <div class="container">
-        <div class="section-head"><div><h2>เลือกตามแบรนด์</h2><p class="muted">เฉพาะ Brand Page ที่ผ่าน SEO Release Gate</p></div></div>
+        <div class="section-head"><div><h2>เลือกตามแบรนด์</h2><p class="muted">ดูสินค้าและข้อมูลรุ่นแยกตามแบรนด์ได้ง่ายขึ้น</p></div></div>
         <div class="category-grid">
           {brands.map((brand) => <a class="category-card" href={brand.canonicalPath}><strong>{brand.brand.name}</strong><span>{brand.currentStockCount > 0 ? `มีสินค้า ${brand.currentStockCount} ชิ้น →` : 'ดูข้อมูลแบรนด์ →'}</span></a>)}
         </div>
@@ -69,12 +69,12 @@ const breadcrumbs = {
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div><h2>สินค้าที่มีในหมวดนี้</h2><p class="muted">พบ {products.length} รายการในหน้าปัจจุบัน</p></div>
+        <div><h2>สินค้าที่มีในหมวดนี้</h2><p class="muted">พบ {products.length} รายการ</p></div>
       </div>
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
-        <div class="empty">{apiError ? 'ไม่สามารถโหลดสต๊อกได้ในขณะนี้' : 'ยังไม่มีสินค้าที่เผยแพร่ในหมวดนี้'}</div>
+        <div class="empty">{apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ยังไม่มีสินค้าที่พร้อมจำหน่ายในหมวดนี้'}</div>
       )}
     </div>
   </section>
