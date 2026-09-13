@@ -18,7 +18,7 @@ try {
 }
 
 const title = 'สินค้าไอทีมือสองออนไลน์ | AMPHON TRADING'
-const description = 'เลือกซื้อโน้ตบุ๊ก iPhone คอมพิวเตอร์ กล้อง จอคอม และสินค้าไอทีมือสองจากสินค้าจริง พร้อมดูราคา สเปก สภาพและรูปก่อนซื้อ'
+const description = 'เลือกซื้อโน้ตบุ๊ก iPhone คอมพิวเตอร์ กล้อง จอคอม และสินค้าไอทีมือสอง พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะพร้อมจำหน่ายก่อนสั่งซื้อ'
 const schema = [
   {
     '@context': 'https://schema.org',
@@ -37,20 +37,21 @@ const schema = [
 <BaseLayout title={title} description={description} canonicalPath="/" jsonLd={schema}>
   <section class="hero">
     <div class="container">
-      <div class="eyebrow">AMPHON SHOP • USED IT STORE</div>
-      <h1>สินค้าไอทีมือสองออนไลน์<br />ดูเครื่องจริงก่อนตัดสินใจ</h1>
-      <p class="lead">สินค้าบนเว็บเชื่อมจาก AMPHON Product Hub โดยตรง จึงใช้ราคา สเปก รูป สภาพ และสถานะสต๊อกจากข้อมูลสินค้าจริงของร้าน</p>
+      <div class="eyebrow">AMPHON SHOP</div>
+      <h1>สินค้าไอทีมือสองออนไลน์<br />ดูข้อมูลจริงก่อนตัดสินใจ</h1>
+      <p class="lead">เลือกซื้อโน้ตบุ๊ก คอมพิวเตอร์ iPhone มือถือ กล้อง จอคอม และสินค้าไอที พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะพร้อมจำหน่ายก่อนสั่งซื้อ</p>
       <div class="hero-actions">
         <a class="button button-primary" href="/notebooks/">ดูโน้ตบุ๊กมือสอง</a>
         <a class="button button-secondary" href="/iphones/">ดู iPhone มือสอง</a>
       </div>
+      <p class="muted">สินค้าทุกชิ้นมีรหัสประจำเครื่อง ตรวจสอบสถานะก่อนยืนยันคำสั่งซื้อ และมีหน้าร้าน AMPHON TRADING</p>
     </div>
   </section>
 
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div><div class="eyebrow">SHOP BY CATEGORY</div><h2>เลือกตามประเภทสินค้า</h2></div>
+        <div><div class="eyebrow">หมวดสินค้า</div><h2>เลือกตามประเภทสินค้า</h2></div>
       </div>
       <div class="category-grid">
         {indexCategories.map((category) => (
@@ -66,13 +67,13 @@ const schema = [
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div><div class="eyebrow">LATEST STOCK</div><h2>สินค้าที่ลงขายล่าสุด</h2></div>
+        <div><div class="eyebrow">สินค้าเข้าใหม่</div><h2>สินค้าที่ลงขายล่าสุด</h2></div>
       </div>
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
         <div class="empty">
-          {apiError ? 'กำลังเชื่อมต่อคลังสินค้าของ AMPHON โปรดลองอีกครั้งภายหลัง' : 'ยังไม่มีสินค้าที่เผยแพร่บนเว็บไซต์'}
+          {apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ยังไม่มีสินค้าที่พร้อมจำหน่ายบนเว็บไซต์'}
         </div>
       )}
     </div>
