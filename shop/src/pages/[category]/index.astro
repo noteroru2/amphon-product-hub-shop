@@ -1,9 +1,10 @@
 ---
 import ProductCard from '../../components/ProductCard.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { getCategoryBySlug } from '../../config/catalog'
+import { catalogCategories, getCategoryBySlug } from '../../config/catalog'
+import { getCategorySeoContent } from '../../config/category-seo-content'
 import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
-import { absoluteUrl } from '../../lib/seo'
+import { absoluteUrl, productPath } from '../../lib/seo'
 
 const category = getCategoryBySlug(Astro.params.category)
 if (!category) {
@@ -18,9 +19,7 @@ let apiError = false
 try {
   const [productResult, brandResult] = await Promise.all([
     listStoreProducts({
-      category: category.sourceCategory,
-      subtype: category.sourceSubtype,
-      q: category.query,
+      categorySlug: category.slug,
       limit: 48,
     }),
     listEvergreenPages({ pageType: 'BRAND', category: category.slug, effectiveIndexPolicy: 'INDEX', limit: 100 }),
@@ -36,16 +35,37 @@ const robots = category.indexPolicy === 'INDEX'
   ? 'index,follow,max-image-preview:large'
   : 'noindex,follow'
 const canonicalPath = `/${category.slug}/`
-const breadcrumbs = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'หน้าแรก', item: absoluteUrl('/') },
-    { '@type': 'ListItem', position: 2, name: category.name, item: absoluteUrl(canonicalPath) },
-  ],
-}
+const seoContent = getCategorySeoContent(category.key)
+const relatedCategories = (seoContent?.relatedSlugs || [])
+  .map((slug) => catalogCategories.find((item) => item.slug === slug))
+  .filter((item): item is NonNullable<typeof item> => Boolean(item && item.indexPolicy === 'INDEX'))
+
+const itemList = products.slice(0, 24).map((product, index) => ({
+  '@type': 'ListItem',
+  position: index + 1,
+  url: absoluteUrl(productPath(product)),
+  name: product.title,
+}))
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: category.h1,
+    description: category.description,
+    url: absoluteUrl(canonicalPath),
+    mainEntity: itemList.length ? { '@type': 'ItemList', itemListElement: itemList } : undefined,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'หน้าแรก', item: absoluteUrl('/') },
+      { '@type': 'ListItem', position: 2, name: category.name, item: absoluteUrl(canonicalPath) },
+    ],
+  },
+]
 ---
-<BaseLayout title={category.title} description={category.description} canonicalPath={canonicalPath} robots={robots} jsonLd={breadcrumbs}>
+<BaseLayout title={category.title} description={category.description} canonicalPath={canonicalPath} robots={robots} jsonLd={schema}>
   <div class="container breadcrumbs">
     <ol><li><a href="/">หน้าแรก</a></li><li>{category.name}</li></ol>
   </div>
@@ -74,8 +94,37 @@ const breadcrumbs = {
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
-        <div class="empty">{apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ยังไม่มีสินค้าที่พร้อมจำหน่ายในหมวดนี้'}</div>
+        <div class="empty">{apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ขณะนี้ยังไม่มีสินค้าที่พร้อมจำหน่ายในหมวดนี้ สินค้ามือสองหมุนเวียนตามสต๊อกของร้าน'}</div>
       )}
     </div>
   </section>
+
+  {seoContent && (
+    <section class="section category-commercial-content">
+      <div class="container">
+        <article class="panel editorial-panel">
+          <div class="eyebrow">ข้อมูลก่อนเลือกซื้อ</div>
+          <h2>เลือกซื้อ{category.name}อย่างไรให้เหมาะกับการใช้งาน</h2>
+          <p>{seoContent.intro}</p>
+          <ul>
+            {seoContent.buyingPoints.map((point) => <li>{point}</li>)}
+          </ul>
+          <p>{seoContent.closing}</p>
+        </article>
+      </div>
+    </section>
+  )}
+
+  {relatedCategories.length > 0 && (
+    <section class="section category-related-links">
+      <div class="container">
+        <div class="section-head"><div><h2>หมวดสินค้าใกล้เคียง</h2><p class="muted">เลือกดูสินค้าไอทีมือสองประเภทอื่นที่เกี่ยวข้อง</p></div></div>
+        <div class="category-grid">
+          {relatedCategories.map((item) => (
+            <a class="category-card" href={`/${item.slug}/`}><strong>{item.name}</strong><span>ดูสินค้า →</span></a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
 </BaseLayout>
