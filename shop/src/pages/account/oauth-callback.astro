@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import '../../styles/auth.css'
+---
+<BaseLayout title="กำลังเชื่อมบัญชี | AMPHON SHOP" description="ดำเนินการเข้าสู่ระบบหรือเชื่อมบัญชี Google" canonicalPath="/account/oauth-callback/" robots="noindex,nofollow">
+  <section class="auth-shell">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="eyebrow">GOOGLE AUTH</div>
+        <h1>กำลังดำเนินการ</h1>
+        <p class="auth-copy">กำลังตรวจสอบการเข้าสู่ระบบกับ Google กรุณารอสักครู่</p>
+        <div id="oauth-message" class="auth-message info">กำลังตรวจสอบบัญชี...</div>
+        <div id="oauth-actions" class="auth-actions" hidden>
+          <a class="button button-primary button-wide" href="/account/login/">กลับไปเข้าสู่ระบบ</a>
+          <a class="button button-secondary button-wide" href="/account/">บัญชีของฉัน</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { clearPendingCustomerOAuth, consumeCustomerAuthRedirect, friendlyAuthError, getCustomerUser, readPendingCustomerOAuth } from '../../lib/customer-auth'
+  const message = document.getElementById('oauth-message') as HTMLElement
+  const actions = document.getElementById('oauth-actions') as HTMLElement
+  const pending = readPendingCustomerOAuth()
+  const result = consumeCustomerAuthRedirect()
+  const fail = (text:string) => {
+    message.textContent = text
+    message.className = 'auth-message error'
+    actions.hidden = false
+    clearPendingCustomerOAuth()
+  }
+  if (result.error) {
+    fail(friendlyAuthError(new Error(result.error)))
+  } else {
+    void getCustomerUser().then((user) => {
+      if (!user) {
+        fail('ไม่พบเซสชันหลังกลับจาก Google กรุณาลองเข้าสู่ระบบใหม่')
+        return
+      }
+      message.textContent = pending.mode === 'link' ? 'เชื่อมบัญชี Google สำเร็จ' : 'เข้าสู่ระบบด้วย Google สำเร็จ'
+      message.className = 'auth-message success'
+      const next = pending.next
+      clearPendingCustomerOAuth()
+      setTimeout(() => { location.replace(next) }, 450)
+    }).catch((error) => fail(friendlyAuthError(error)))
+  }
+</script>
