@@ -12,15 +12,21 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     <div class="container checkout-grid">
       <div>
         <div class="eyebrow">SECURE CHECKOUT</div><h1 class="checkout-title">ยืนยันคำสั่งซื้อ</h1>
+        <div id="checkout-member-panel" class="checkout-member-panel" hidden></div>
         {!enabled ? <div class="notice">Checkout ออนไลน์ยังไม่เปิดใช้งาน กรุณากลับไปติดต่อร้านจากหน้าสินค้า</div> : (
           <form id="checkout-form" class="panel checkout-form" data-api={apiBase}>
             <h2>ข้อมูลผู้สั่งซื้อ</h2>
             <div class="checkout-fields two"><label><span>ชื่อผู้รับ *</span><input name="customerName" required maxlength="120" autocomplete="name" /></label><label><span>เบอร์โทร *</span><input name="customerPhone" required maxlength="30" inputmode="tel" autocomplete="tel" /></label></div>
             <label><span>อีเมล</span><input name="customerEmail" type="email" maxlength="180" autocomplete="email" /></label>
+            <div id="checkout-member-message" class="checkout-member-message" hidden></div>
             <h2>วิธีรับสินค้า</h2>
             <div class="checkout-choice-row">
               <label><input type="radio" name="deliveryMethod" value="SHIPPING" checked /> จัดส่ง</label>
               {settings?.checkout?.pickupEnabled && <label><input type="radio" name="deliveryMethod" value="PICKUP" /> รับที่ร้าน</label>}
+            </div>
+            <div id="member-address-wrap" class="member-address-wrap" hidden>
+              <label><span>ที่อยู่ที่บันทึกไว้ *</span><select id="member-address-select"></select></label>
+              <a class="inline-link" href="/account/">จัดการข้อมูลและที่อยู่ในบัญชี</a>
             </div>
             <div id="shipping-fields">
               <label><span>ที่อยู่ *</span><input name="addressLine" maxlength="250" autocomplete="street-address" /></label>
@@ -47,9 +53,19 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     </div>
   </section>
 </BaseLayout>
+<style>
+  .checkout-member-panel,.checkout-member-message{margin:0 0 16px;padding:13px 15px;border:1px solid var(--line);border-radius:14px;line-height:1.65;background:#fff}
+  .checkout-member-panel.is-member{background:#f3fbf5;border-color:#d5ecd9}.checkout-member-panel.is-guest{background:#fff8f0;border-color:#f6dcc1}.checkout-member-panel.is-error,.checkout-member-message.is-error{background:#fff1f1;border-color:#f3caca;color:#8a2020}
+  .checkout-member-panel strong{display:block;margin-bottom:3px}.checkout-member-panel p,.checkout-member-message{font-size:.88rem}.checkout-member-panel p{margin:0}.checkout-member-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+  .member-address-wrap{margin:8px 0 18px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fafafa}.member-address-wrap label{display:grid;gap:7px}.member-address-wrap select{width:100%;min-height:46px;border:1px solid #dcdcdc;border-radius:12px;padding:0 12px;background:#fff}.member-address-wrap .inline-link{display:inline-block;margin-top:9px;font-size:.84rem}
+  .checkout-form input[readonly]{background:#f6f6f6;color:#555;cursor:not-allowed}
+</style>
 {turnstileEnabled && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
 <script>
   import { clearCart, readCartSkus } from '../../lib/cart'
+  import { attachCustomerCheckoutIdentity, friendlyCheckoutIdentityError, loadCheckoutMemberState, type CheckoutMemberState } from '../../lib/checkout-member'
+  import type { CustomerAddress } from '../../lib/customer-account'
+
   const form = document.getElementById('checkout-form') as HTMLFormElement | null
   const itemsTarget = document.getElementById('checkout-items') as HTMLElement | null
   const shippingFields = document.getElementById('shipping-fields') as HTMLElement | null
@@ -57,15 +73,160 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   const submit = document.getElementById('checkout-submit') as HTMLButtonElement | null
   const invoiceRequested = document.getElementById('invoice-requested') as HTMLInputElement | null
   const invoiceFields = document.getElementById('invoice-fields') as HTMLElement | null
+  const memberPanel = document.getElementById('checkout-member-panel') as HTMLElement | null
+  const memberMessage = document.getElementById('checkout-member-message') as HTMLElement | null
+  const memberAddressWrap = document.getElementById('member-address-wrap') as HTMLElement | null
+  const memberAddressSelect = document.getElementById('member-address-select') as HTMLSelectElement | null
   invoiceRequested?.addEventListener('change', () => { if (invoiceFields) invoiceFields.hidden = !invoiceRequested.checked })
+
   const api = form?.dataset.api || itemsTarget?.dataset.api || ''
   const skus = readCartSkus()
   let cartValid = false
+  let memberReady = true
+  let memberState: CheckoutMemberState | null = null
+  let selectedAddressId: string | null = null
+  let submitting = false
+
   const money = (value: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(value)
   const esc = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] || c))
+  const input = (name: string) => form?.elements.namedItem(name) as HTMLInputElement | null
+  const deliveryMethod = () => (form?.elements.namedItem('deliveryMethod') as RadioNodeList | null)?.value || 'SHIPPING'
+
+  function setMemberMessage(text: string, error = false) {
+    if (!memberMessage) return
+    memberMessage.textContent = text
+    memberMessage.className = `checkout-member-message${error ? ' is-error' : ''}`
+    memberMessage.hidden = !text
+  }
+
+  function setReadOnly(names: string[], value: boolean) {
+    names.forEach((name) => { const target = input(name); if (target) target.readOnly = value })
+  }
+
+  function refreshSubmitState() {
+    if (!submit || submitting) return
+    submit.disabled = !cartValid || !memberReady
+  }
+
+  function displayAddress(address: CustomerAddress) {
+    return [address.address_line1, address.address_line2, address.subdistrict, address.district, address.province, address.postal_code].filter(Boolean).join(' ')
+  }
+
+  function fillSavedAddress(address: CustomerAddress) {
+    selectedAddressId = address.id
+    const values: Record<string, string> = {
+      customerName: address.recipient_name,
+      customerPhone: address.phone,
+      addressLine: [address.address_line1, address.address_line2].filter(Boolean).join(' '),
+      subdistrict: address.subdistrict,
+      district: address.district,
+      province: address.province,
+      postalCode: address.postal_code,
+    }
+    for (const [name, value] of Object.entries(values)) { const target = input(name); if (target) target.value = value }
+  }
+
+  function applyMemberDelivery() {
+    const state = memberState
+    const profile = state?.profile
+    const delivery = deliveryMethod()
+    memberReady = true
+    setMemberMessage('')
+
+    if (!state?.authenticated) {
+      selectedAddressId = null
+      memberAddressWrap && (memberAddressWrap.hidden = true)
+      setReadOnly(['customerName','customerPhone','customerEmail','addressLine','subdistrict','district','province','postalCode'], false)
+      refreshSubmitState()
+      return
+    }
+
+    if (!profile) {
+      memberReady = false
+      setMemberMessage('บัญชีนี้ยังไม่มี Customer Profile ที่พร้อมใช้งาน กรุณาเปิดหน้าบัญชีของฉันก่อน Checkout', true)
+      refreshSubmitState()
+      return
+    }
+
+    const email = input('customerEmail')
+    if (email) { email.value = profile.email || ''; email.readOnly = true }
+
+    if (delivery === 'SHIPPING') {
+      if (memberAddressWrap) memberAddressWrap.hidden = false
+      const address = state.addresses.find((item) => item.id === memberAddressSelect?.value)
+        || state.defaultAddress
+        || state.addresses[0]
+        || null
+      if (!address) {
+        selectedAddressId = null
+        memberReady = false
+        setMemberMessage('สมาชิกต้องมีที่อยู่ที่บันทึกไว้ก่อนใช้ Checkout แบบจัดส่ง กรุณาเพิ่มที่อยู่ใน “บัญชีของฉัน”', true)
+        setReadOnly(['customerName','customerPhone','addressLine','subdistrict','district','province','postalCode'], false)
+      } else {
+        fillSavedAddress(address)
+        if (memberAddressSelect) memberAddressSelect.value = address.id
+        setReadOnly(['customerName','customerPhone','addressLine','subdistrict','district','province','postalCode'], true)
+      }
+    } else {
+      selectedAddressId = null
+      if (memberAddressWrap) memberAddressWrap.hidden = true
+      const name = String(profile.display_name || '').trim()
+      const phone = String(profile.phone || '').trim()
+      if (input('customerName')) input('customerName')!.value = name
+      if (input('customerPhone')) input('customerPhone')!.value = phone
+      setReadOnly(['customerName','customerPhone'], true)
+      if (name.length < 2 || phone.replace(/\D/g, '').length < 8) {
+        memberReady = false
+        setMemberMessage('กรุณาบันทึกชื่อและเบอร์โทรใน “บัญชีของฉัน” ก่อนเลือกรับสินค้าที่ร้าน', true)
+      }
+    }
+    refreshSubmitState()
+  }
+
+  async function hydrateMemberCheckout() {
+    if (!memberPanel) return
+    try {
+      memberState = await loadCheckoutMemberState()
+      memberPanel.hidden = false
+      if (!memberState.authenticated) {
+        memberPanel.className = 'checkout-member-panel is-guest'
+        memberPanel.innerHTML = `<strong>Checkout แบบ Guest ยังใช้งานได้</strong><p>เข้าสู่ระบบเพื่อเติมข้อมูลและที่อยู่จากบัญชีอัตโนมัติ ตะกร้าจะยังอยู่หลัง Login</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
+        applyMemberDelivery()
+        return
+      }
+
+      if (!memberState.profile) {
+        memberPanel.className = 'checkout-member-panel is-error'
+        memberPanel.innerHTML = `<strong>บัญชีสมาชิกยังไม่พร้อม Checkout</strong><p>กรุณาเปิดหน้าบัญชีของฉันและบันทึกข้อมูลติดต่อก่อน</p><div class="checkout-member-actions"><a class="inline-link" href="/account/">บัญชีของฉัน</a></div>`
+        applyMemberDelivery()
+        return
+      }
+
+      memberPanel.className = 'checkout-member-panel is-member'
+      memberPanel.innerHTML = `<strong>กำลัง Checkout ด้วยบัญชีสมาชิก</strong><p>${esc(memberState.profile.email || '')} · Order ที่สร้างสำเร็จจะถูกผูกกับบัญชีนี้ ตะกร้ายังคงอยู่ข้าม Login/Google redirect</p>`
+      if (memberAddressSelect) {
+        memberAddressSelect.innerHTML = memberState.addresses.map((address) => `<option value="${esc(address.id)}">${esc(address.label)}${address.is_default ? ' · ค่าเริ่มต้น' : ''} — ${esc(displayAddress(address))}</option>`).join('')
+        if (memberState.defaultAddress) memberAddressSelect.value = memberState.defaultAddress.id
+      }
+      applyMemberDelivery()
+    } catch (error) {
+      memberState = null
+      memberReady = true
+      memberPanel.hidden = false
+      memberPanel.className = 'checkout-member-panel is-error'
+      memberPanel.innerHTML = `<strong>โหลดข้อมูลสมาชิกไม่สำเร็จ</strong><p>${esc(error instanceof Error ? error.message : String(error))}</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบใหม่</a></div>`
+      refreshSubmitState()
+    }
+  }
+
+  memberAddressSelect?.addEventListener('change', () => {
+    const address = memberState?.addresses.find((item) => item.id === memberAddressSelect.value)
+    if (address) fillSavedAddress(address)
+  })
+
   async function loadSummary() {
     if (!itemsTarget) return
-    if (!skus.length) { itemsTarget.innerHTML = '<div class="notice">ตะกร้าว่าง</div>'; return }
+    if (!skus.length) { itemsTarget.innerHTML = '<div class="notice">ตะกร้าว่าง</div>'; cartValid = false; refreshSubmitState(); return }
     const products = await Promise.all(skus.map(async (sku) => {
       const response = await fetch(`${api}/products/${encodeURIComponent(sku)}`)
       return response.ok ? (await response.json()).product : null
@@ -73,10 +234,11 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     cartValid = products.every((item) => item?.availability === 'available')
     const subtotal = products.reduce((sum, item) => sum + Number(item?.price || 0), 0)
     itemsTarget.innerHTML = `${products.map((item, i) => `<div class="checkout-item"><span>${esc(item?.title || skus[i])}</span><strong>${item ? money(Number(item.price || 0)) : 'ไม่พร้อมขาย'}</strong></div>`).join('')}<div class="checkout-total"><span>ยอดสินค้า</span><strong>${money(subtotal)}</strong></div><small>ค่าจัดส่งคิดตามวิธีรับสินค้าและค่าที่ร้านตั้งไว้</small>${cartValid ? '' : '<div class="notice">มีสินค้าที่ไม่พร้อมซื้อ กรุณากลับไปแก้ตะกร้า</div>'}`
-    if (submit) submit.disabled = !cartValid
+    refreshSubmitState()
   }
+
   function syncDelivery() {
-    const delivery = (form?.elements.namedItem('deliveryMethod') as RadioNodeList | null)?.value || 'SHIPPING'
+    const delivery = deliveryMethod()
     if (shippingFields) shippingFields.hidden = delivery === 'PICKUP'
     const payAtStore = form?.querySelector<HTMLInputElement>('input[name="paymentMethod"][value="PAY_AT_STORE"]')
     if (payAtStore) payAtStore.disabled = delivery !== 'PICKUP'
@@ -84,14 +246,18 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       const fallback = form?.querySelector<HTMLInputElement>('input[name="paymentMethod"][value="STRIPE"]:not(:disabled), input[name="paymentMethod"][value="BANK_TRANSFER"]:not(:disabled)')
       if (fallback) fallback.checked = true
     }
+    applyMemberDelivery()
   }
-  form?.querySelectorAll('input[name="deliveryMethod"]').forEach((input) => input.addEventListener('change', syncDelivery))
+
+  form?.querySelectorAll('input[name="deliveryMethod"]').forEach((target) => target.addEventListener('change', syncDelivery))
   syncDelivery()
-  void loadSummary().catch(() => { if (itemsTarget) itemsTarget.innerHTML = '<div class="notice">โหลดข้อมูลสินค้าไม่สำเร็จ</div>' })
+  void Promise.all([loadSummary(), hydrateMemberCheckout()]).catch(() => undefined)
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault()
-    if (!api || !cartValid || !submit) return
+    if (!api || !cartValid || !memberReady || !submit) return
     errorTarget && (errorTarget.innerHTML = '')
+    submitting = true
     submit.disabled = true; submit.textContent = 'กำลังล็อกสินค้า...'
     const data = new FormData(form)
     const keyName = 'amphon_checkout_idempotency'
@@ -105,13 +271,26 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       if (!response.ok) throw new Error(result.error || `Checkout ไม่สำเร็จ (${response.status})`)
       const token = result.order?.publicToken
       if (!token) throw new Error('ระบบไม่ได้รับ Order token')
+
+      if (memberState?.authenticated && memberState.profile) {
+        submit.textContent = 'กำลังผูกคำสั่งซื้อกับบัญชี...'
+        const addressId = deliveryMethod() === 'SHIPPING' ? selectedAddressId : null
+        try {
+          await attachCustomerCheckoutIdentity(idempotencyKey, addressId)
+        } catch (identityError) {
+          throw new Error(`สร้าง Order แล้ว แต่ยังผูกกับบัญชีไม่สำเร็จ: ${friendlyCheckoutIdentityError(identityError)} กรุณากดปุ่มเดิมอีกครั้ง ระบบจะใช้ Order เดิมโดยไม่สร้างซ้ำ`)
+        }
+      }
+
       clearCart(); sessionStorage.removeItem(keyName)
       if (result.checkoutUrl) { location.href = String(result.checkoutUrl); return }
       location.href = `/order/${encodeURIComponent(token)}/`
     } catch (error) {
       if (errorTarget) errorTarget.innerHTML = `<div class="notice">${esc(error instanceof Error ? error.message : String(error))}</div>`
       ;(window as any).turnstile?.reset?.()
-      submit.disabled = false; submit.textContent = 'สร้างคำสั่งซื้อและล็อกสินค้า'
+      submitting = false
+      submit.textContent = 'สร้างคำสั่งซื้อและล็อกสินค้า'
+      refreshSubmitState()
     }
   })
 </script>
