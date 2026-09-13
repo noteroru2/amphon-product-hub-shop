@@ -18,7 +18,8 @@
     "verify:production-closeout": "node scripts/verify-production-closeout.mjs",
     "acceptance:live": "node scripts/live-acceptance.mjs",
     "verify:shop62": "node scripts/verify-shop62.mjs",
-    "verify:shop64": "node scripts/verify-shop64.mjs"
+    "verify:shop64": "node scripts/verify-shop64.mjs",
+    "verify:shop81": "node scripts/verify-shop81.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.1",
