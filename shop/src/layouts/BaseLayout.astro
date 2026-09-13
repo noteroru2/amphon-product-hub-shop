@@ -3,6 +3,7 @@ import { indexCategories } from '../config/catalog'
 import { absoluteUrl } from '../lib/seo'
 import '../styles/global.css'
 import '../styles/auth.css'
+import '../styles/mobile-first.css'
 
 interface Props {
   title: string
@@ -54,6 +55,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     {schemas.map((schema) => <script type="application/ld+json" set:html={JSON.stringify(schema)} />)}
   </head>
   <body>
+    <a class="skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
     <header class="site-header">
       <div class="container header-row">
         <a class="logo" href="/" aria-label="AMPHON SHOP หน้าแรก">
@@ -67,12 +69,12 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
         </nav>
         <div class="header-actions">
           <a class="account-link" href="/account/" aria-label="บัญชีของฉัน">บัญชี</a>
-          <a class="account-link" href="/account/orders/" aria-label="รายการสั่งซื้อของฉัน">รายการสั่งซื้อ</a>
+          <a class="account-link orders-link" href="/account/orders/" aria-label="รายการสั่งซื้อของฉัน">รายการสั่งซื้อ</a>
           <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
         </div>
       </div>
     </header>
-    <main>
+    <main id="main-content">
       <slot />
     </main>
     <footer class="site-footer">
