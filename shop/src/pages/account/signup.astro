@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import '../../styles/auth.css'
+---
+<BaseLayout title="สมัครสมาชิก | AMPHON SHOP" description="สมัครสมาชิก AMPHON SHOP ด้วยอีเมลและรหัสผ่าน" canonicalPath="/account/signup/" robots="noindex,nofollow">
+  <section class="auth-shell">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="eyebrow">CREATE ACCOUNT</div>
+        <h1>สมัครสมาชิก</h1>
+        <p class="auth-copy">สร้างบัญชีด้วยอีเมล จากนั้นกดยืนยันอีเมลก่อนเข้าใช้งาน</p>
+        <form id="signup-form" class="auth-form">
+          <label class="auth-field"><span>ชื่อที่ใช้ติดต่อ</span><input name="displayName" autocomplete="name" required minlength="2" maxlength="120" /></label>
+          <label class="auth-field"><span>อีเมล</span><input name="email" type="email" autocomplete="email" required maxlength="180" /></label>
+          <label class="auth-field"><span>รหัสผ่าน</span><input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" /></label>
+          <label class="auth-field"><span>ยืนยันรหัสผ่าน</span><input name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128" /></label>
+          <button id="signup-submit" class="button button-primary button-wide auth-button" type="submit">สมัครสมาชิก</button>
+        </form>
+        <div id="signup-message" class="auth-message" hidden></div>
+        <div class="auth-links"><a class="inline-link" href="/account/login/">มีบัญชีแล้ว? เข้าสู่ระบบ</a></div>
+        <p class="auth-security-note">รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร ระบบจะไม่แสดงรหัสผ่านของคุณให้ร้านเห็น</p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { friendlyAuthError, safeNextPath, signOutCustomer, signUpCustomer } from '../../lib/customer-auth'
+  const form = document.getElementById('signup-form') as HTMLFormElement
+  const submit = document.getElementById('signup-submit') as HTMLButtonElement
+  const message = document.getElementById('signup-message') as HTMLElement
+  const next = safeNextPath(new URLSearchParams(location.search).get('next'))
+  const show = (text:string, tone:'error'|'success'|'info') => { message.textContent = text; message.className = `auth-message ${tone}`; message.hidden = false }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    message.hidden = true
+    const data = new FormData(form)
+    const password = String(data.get('password') || '')
+    const confirmPassword = String(data.get('confirmPassword') || '')
+    if (password.length < 8) { show('กรุณาตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร', 'error'); return }
+    if (password !== confirmPassword) { show('รหัสผ่านทั้งสองช่องไม่ตรงกัน', 'error'); return }
+    submit.disabled = true; submit.textContent = 'กำลังสร้างบัญชี...'
+    try {
+      const verifyUrl = new URL('/account/verify/', location.origin)
+      verifyUrl.searchParams.set('next', next)
+      const result = await signUpCustomer({
+        email: String(data.get('email') || ''),
+        password,
+        displayName: String(data.get('displayName') || ''),
+        redirectTo: verifyUrl.toString(),
+      })
+      if (result.session) {
+        await signOutCustomer().catch(() => undefined)
+        show('บัญชีถูกสร้างแล้ว แต่ระบบยืนยันอีเมลของผู้ให้บริการยังไม่บังคับใช้งาน กรุณาติดต่อร้านก่อนเข้าสู่ระบบ', 'info')
+      } else {
+        form.reset()
+        show('สมัครสำเร็จ กรุณาเปิดอีเมลจาก AMPHON SHOP แล้วกดลิงก์ยืนยันอีเมล', 'success')
+      }
+    } catch (error) {
+      show(friendlyAuthError(error), 'error')
+    } finally {
+      submit.disabled = false; submit.textContent = 'สมัครสมาชิก'
+    }
+  })
+</script>
