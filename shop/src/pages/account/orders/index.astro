@@ -3,15 +3,15 @@ import BaseLayout from '../../../layouts/BaseLayout.astro'
 import '../../../styles/auth.css'
 import '../../../styles/accountOrders.css'
 ---
-<BaseLayout title="คำสั่งซื้อของฉัน | AMPHON SHOP" description="ดูประวัติคำสั่งซื้อ สถานะชำระเงิน การจัดส่ง เอกสาร และประกันของบัญชี AMPHON SHOP" canonicalPath="/account/orders/" robots="noindex,nofollow">
+<BaseLayout title="รายการสั่งซื้อของฉัน | AMPHON SHOP" description="ดูรายการสั่งซื้อ สถานะชำระเงิน การจัดส่ง เอกสาร และประกันของคุณใน AMPHON SHOP" canonicalPath="/account/orders/" robots="noindex,nofollow">
   <section class="orders-shell">
     <div class="container orders-container">
-      <div id="orders-loading" class="auth-message info">กำลังตรวจสอบบัญชีและโหลดคำสั่งซื้อ...</div>
+      <div id="orders-loading" class="auth-message info">กำลังโหลดรายการสั่งซื้อ...</div>
 
       <div id="orders-guest" class="auth-card orders-login-card" hidden>
-        <div class="eyebrow">MY ORDERS</div>
-        <h1>คำสั่งซื้อของฉัน</h1>
-        <p class="auth-copy">กรุณาเข้าสู่ระบบด้วยบัญชีที่ใช้สั่งซื้อเพื่อดูประวัติ Order ของคุณ</p>
+        <div class="eyebrow">รายการสั่งซื้อ</div>
+        <h1>รายการสั่งซื้อของฉัน</h1>
+        <p class="auth-copy">เข้าสู่ระบบด้วยบัญชีที่ใช้สั่งซื้อ เพื่อดูประวัติการซื้อ การชำระเงิน การจัดส่ง และประกัน</p>
         <div class="auth-actions">
           <a class="button button-primary button-wide" href="/account/login/?next=%2Faccount%2Forders%2F">เข้าสู่ระบบ</a>
           <a class="button button-secondary button-wide" href="/account/signup/?next=%2Faccount%2Forders%2F">สมัครสมาชิก</a>
@@ -21,9 +21,9 @@ import '../../../styles/accountOrders.css'
       <div id="orders-user" hidden>
         <div class="orders-head">
           <div>
-            <div class="eyebrow">MY ORDERS</div>
-            <h1>คำสั่งซื้อของฉัน</h1>
-            <p class="auth-copy">ประวัติคำสั่งซื้อจะอ้างอิงจากบัญชีสมาชิกที่ยืนยันแล้วเท่านั้น</p>
+            <div class="eyebrow">รายการสั่งซื้อ</div>
+            <h1>รายการสั่งซื้อของฉัน</h1>
+            <p class="auth-copy">ติดตามสถานะการชำระเงิน การจัดส่ง เอกสาร และประกันของรายการที่สั่งซื้อด้วยบัญชีนี้</p>
           </div>
           <div class="orders-head-actions">
             <a class="button button-secondary" href="/account/">บัญชีของฉัน</a>
@@ -32,12 +32,12 @@ import '../../../styles/accountOrders.css'
         </div>
 
         <div class="orders-summary">
-          <span>ทั้งหมด <strong id="orders-total">0</strong> Order</span>
+          <span>ทั้งหมด <strong id="orders-total">0</strong> รายการ</span>
           <span id="orders-email">-</span>
         </div>
         <div id="orders-message" class="auth-message orders-message" hidden></div>
         <div id="orders-list" class="orders-list"></div>
-        <div id="orders-empty" class="orders-empty" hidden>ยังไม่มีคำสั่งซื้อในบัญชีนี้ เมื่อสั่งซื้อสำเร็จ Order จะปรากฏที่นี่อัตโนมัติ</div>
+        <div id="orders-empty" class="orders-empty" hidden>ยังไม่มีรายการสั่งซื้อในบัญชีนี้ เมื่อสั่งซื้อสำเร็จ รายการจะปรากฏที่นี่</div>
         <div id="orders-load-more-wrap" class="orders-load-more" hidden>
           <button id="orders-load-more" class="button button-secondary" type="button">โหลดรายการเพิ่มเติม</button>
         </div>
@@ -81,6 +81,9 @@ import '../../../styles/accountOrders.css'
     UNFULFILLED:'รอดำเนินการ', PACKING:'กำลังแพ็ก', SHIPPED:'จัดส่งแล้ว', IN_TRANSIT:'อยู่ระหว่างขนส่ง',
     DELIVERED:'จัดส่งสำเร็จ', PICKUP_READY:'พร้อมรับที่ร้าน', PICKED_UP:'รับสินค้าแล้ว', CANCELLED:'ยกเลิก',
   }
+  const warrantyLabels: Record<string,string> = {
+    ACTIVE:'ใช้งานได้', EXPIRED:'หมดอายุ', CANCELLED:'ยกเลิก', VOID:'ยกเลิก', CLAIMED:'มีการใช้สิทธิ์แล้ว',
+  }
 
   const money = (value: unknown, currency = 'THB') => new Intl.NumberFormat('th-TH', {
     style:'currency', currency: String(currency || 'THB'), maximumFractionDigits: 0,
@@ -91,6 +94,7 @@ import '../../../styles/accountOrders.css'
   const esc = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;',
   }[c] || c))
+  const statusText = (labels:Record<string,string>, value:string, fallback='กำลังอัปเดตสถานะ') => labels[value] || fallback
   const showMessage = (text:string, tone:'error'|'success'|'info' = 'error') => {
     message.textContent = text
     message.className = `auth-message orders-message ${tone}`
@@ -117,14 +121,14 @@ import '../../../styles/accountOrders.css'
           <div class="order-history-total">${esc(money(order.total, order.currency))}</div>
         </div>
         <div class="order-status-row">
-          <span class="order-status-chip ${toneFor(order.orderStatus)}">${esc(orderLabels[order.orderStatus] || order.orderStatus)}</span>
-          <span class="order-status-chip ${toneFor(order.paymentStatus)}">${esc(paymentLabels[order.paymentStatus] || order.paymentStatus)}</span>
-          <span class="order-status-chip ${toneFor(order.fulfillmentStatus)}">${esc(fulfillmentLabels[order.fulfillmentStatus] || order.fulfillmentStatus)}</span>
+          <span class="order-status-chip ${toneFor(order.orderStatus)}">${esc(statusText(orderLabels, order.orderStatus))}</span>
+          <span class="order-status-chip ${toneFor(order.paymentStatus)}">${esc(statusText(paymentLabels, order.paymentStatus))}</span>
+          <span class="order-status-chip ${toneFor(order.fulfillmentStatus)}">${esc(statusText(fulfillmentLabels, order.fulfillmentStatus))}</span>
         </div>
         <div class="order-items-preview">${titles.length ? titles.map((title) => esc(title)).join(' · ') : `${Number(order.itemCount || 0)} รายการ`}</div>
         <div class="order-card-meta">
           <span>${order.deliveryMethod === 'PICKUP' ? 'รับที่ร้าน' : 'จัดส่ง'}</span>
-          ${order.trackingNumber ? `<span>Tracking ${esc(order.trackingNumber)}</span>` : ''}
+          ${order.trackingNumber ? `<span>เลขติดตาม ${esc(order.trackingNumber)}</span>` : ''}
           ${order.hasDocument ? '<span>มีเอกสาร</span>' : ''}
           ${Number(order.warrantyCount || 0) > 0 ? `<span>ประกัน ${Number(order.warrantyCount)} รายการ</span>` : ''}
         </div>
@@ -150,29 +154,29 @@ import '../../../styles/accountOrders.css'
     const warranties = Array.isArray(order.warranties) ? order.warranties : []
     detailContent.innerHTML = `
       <div class="order-detail-head">
-        <div><div class="eyebrow">ORDER DETAIL</div><h2>${esc(order.orderNumber)}</h2><div class="order-history-date">สร้างเมื่อ ${esc(dateTime(order.createdAt))}</div></div>
+        <div><div class="eyebrow">รายละเอียดคำสั่งซื้อ</div><h2>${esc(order.orderNumber)}</h2><div class="order-history-date">สั่งซื้อเมื่อ ${esc(dateTime(order.createdAt))}</div></div>
         <button id="order-detail-close" class="order-detail-close" type="button" aria-label="ปิดรายละเอียด">×</button>
       </div>
       <div class="order-detail-status">
-        <div><span>คำสั่งซื้อ</span><strong>${esc(orderLabels[order.orderStatus] || order.orderStatus)}</strong></div>
-        <div><span>การชำระเงิน</span><strong>${esc(paymentLabels[order.paymentStatus] || order.paymentStatus)}</strong></div>
-        <div><span>การจัดส่ง</span><strong>${esc(fulfillmentLabels[order.fulfillmentStatus] || order.fulfillmentStatus)}</strong></div>
+        <div><span>คำสั่งซื้อ</span><strong>${esc(statusText(orderLabels, order.orderStatus))}</strong></div>
+        <div><span>การชำระเงิน</span><strong>${esc(statusText(paymentLabels, order.paymentStatus))}</strong></div>
+        <div><span>การจัดส่ง</span><strong>${esc(statusText(fulfillmentLabels, order.fulfillmentStatus))}</strong></div>
       </div>
       <div class="order-detail-grid">
         <div>
           <section class="order-detail-section"><h3>สินค้า</h3><div class="order-detail-items">${items.map((item) => `
-            <div class="order-detail-item"><span>${esc(item.title)}<small>SKU ${esc(item.sku)}${Number(item.warrantyDays || 0) > 0 ? ` · ประกัน ${Number(item.warrantyDays)} วัน` : ''}</small></span><strong>${esc(money(item.unitPrice, order.currency))}</strong></div>`).join('') || '<div class="orders-empty">ไม่มีรายละเอียดสินค้า</div>'}</div></section>
+            <div class="order-detail-item"><span>${esc(item.title)}<small>รหัสสินค้า ${esc(item.sku)}${Number(item.warrantyDays || 0) > 0 ? ` · ประกัน ${Number(item.warrantyDays)} วัน` : ''}</small></span><strong>${esc(money(item.unitPrice, order.currency))}</strong></div>`).join('') || '<div class="orders-empty">ไม่มีรายละเอียดสินค้า</div>'}</div></section>
           <section class="order-detail-section"><h3>วิธีรับสินค้า</h3><div class="order-address">${esc(address || '-')}</div></section>
-          ${shipment ? `<section class="order-detail-section"><h3>การจัดส่ง</h3><div class="order-tracking"><strong>${esc(shipment.trackingNumber || 'ยังไม่มีเลขติดตาม')}</strong>${shipment.carrier ? `<span>${esc(shipment.carrier)}</span>` : ''}${shipment.trackingUrl ? `<br><a class="inline-link" href="${esc(shipment.trackingUrl)}" target="_blank" rel="noopener noreferrer">ติดตามพัสดุ</a>` : ''}</div></section>` : ''}
-          ${warranties.length ? `<section class="order-detail-section"><h3>ประกัน</h3><div class="order-warranty-list">${warranties.map((warranty) => `<div class="order-warranty-card"><strong>${esc(warranty.certificateNumber)}</strong><span>${esc(warranty.title)}</span><small>${esc(warranty.status)} · ถึง ${esc(dateTime(warranty.endsAt))}</small><a class="inline-link" href="/warranty/${esc(warranty.publicToken)}/">เปิดใบรับประกัน</a></div>`).join('')}</div></section>` : ''}
+          ${shipment ? `<section class="order-detail-section"><h3>การจัดส่ง</h3><div class="order-tracking"><strong>${esc(shipment.trackingNumber ? `เลขติดตาม ${shipment.trackingNumber}` : 'ยังไม่มีเลขติดตาม')}</strong>${shipment.carrier ? `<span>${esc(shipment.carrier)}</span>` : ''}${shipment.trackingUrl ? `<br><a class="inline-link" href="${esc(shipment.trackingUrl)}" target="_blank" rel="noopener noreferrer">ติดตามพัสดุ</a>` : ''}</div></section>` : ''}
+          ${warranties.length ? `<section class="order-detail-section"><h3>ประกัน</h3><div class="order-warranty-list">${warranties.map((warranty) => `<div class="order-warranty-card"><strong>${esc(warranty.certificateNumber)}</strong><span>${esc(warranty.title)}</span><small>${esc(statusText(warrantyLabels, warranty.status, 'ตรวจสอบสถานะกับร้าน'))} · ถึง ${esc(dateTime(warranty.endsAt))}</small><a class="inline-link" href="/warranty/${esc(warranty.publicToken)}/">เปิดใบรับประกัน</a></div>`).join('')}</div></section>` : ''}
         </div>
         <aside>
           <section class="order-detail-section"><h3>ยอดคำสั่งซื้อ</h3><div class="order-money-lines"><div><span>ค่าสินค้า</span><strong>${esc(money(order.subtotal, order.currency))}</strong></div><div><span>ค่าจัดส่ง</span><strong>${esc(money(order.shippingAmount, order.currency))}</strong></div><div class="grand"><span>รวม</span><strong>${esc(money(order.total, order.currency))}</strong></div></div></section>
-          <section class="order-detail-section"><h3>วันที่สำคัญ</h3><div class="order-address">${order.paidAt ? `ชำระ: ${esc(dateTime(order.paidAt))}<br>` : ''}${order.shippedAt ? `ส่ง: ${esc(dateTime(order.shippedAt))}<br>` : ''}${order.completedAt ? `สำเร็จ: ${esc(dateTime(order.completedAt))}` : ''}${!order.paidAt && !order.shippedAt && !order.completedAt ? `ล็อกสินค้าถึง ${esc(dateTime(order.reservationExpiresAt))}` : ''}</div></section>
+          <section class="order-detail-section"><h3>วันที่สำคัญ</h3><div class="order-address">${order.paidAt ? `ชำระเมื่อ ${esc(dateTime(order.paidAt))}<br>` : ''}${order.shippedAt ? `จัดส่งเมื่อ ${esc(dateTime(order.shippedAt))}<br>` : ''}${order.completedAt ? `เสร็จสิ้นเมื่อ ${esc(dateTime(order.completedAt))}` : ''}${!order.paidAt && !order.shippedAt && !order.completedAt ? `สงวนสินค้าไว้ถึง ${esc(dateTime(order.reservationExpiresAt))}` : ''}</div></section>
           <div class="order-detail-actions">
             ${order.paymentUrl ? `<a class="button button-primary" href="${esc(order.paymentUrl)}">ชำระเงินต่อ</a>` : ''}
             ${order.document ? `<a class="button button-secondary" href="/document/${esc(order.document.publicToken)}/">เปิดเอกสาร ${esc(order.document.number)}</a>` : ''}
-            <a class="button button-secondary" href="/order/${esc(order.publicToken)}/">เปิดหน้าสถานะ Order</a>
+            <a class="button button-secondary" href="/order/${esc(order.publicToken)}/">ดูสถานะคำสั่งซื้อ</a>
           </div>
         </aside>
       </div>`
@@ -184,7 +188,7 @@ import '../../../styles/accountOrders.css'
   async function openDetail(orderId:string) {
     if (!orderId) return
     detail.hidden = false
-    detailContent.innerHTML = '<div class="order-detail-loading">กำลังโหลดรายละเอียด Order...</div>'
+    detailContent.innerHTML = '<div class="order-detail-loading">กำลังโหลดรายละเอียดคำสั่งซื้อ...</div>'
     detail.scrollIntoView({ behavior:'smooth', block:'start' })
     try {
       const order = await getMyOrderDetail(orderId)
