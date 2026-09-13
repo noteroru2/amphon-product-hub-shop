@@ -191,7 +191,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
             <span class="trust-pill">{conditionLabel}</span>
           </div>
           <h1 class="product-h1">{product.title}</h1>
-          <div class="muted">SKU: {product.sku}</div>
+          <div class="muted">รหัสสินค้า: {product.sku}</div>
 
           {(modelPage || seriesPage || brandPage) && <div class="chips taxonomy-links">
             {modelPage && <a class="button button-secondary" href={modelPage.canonicalPath}>ดูสินค้ารุ่น {modelPage.model?.name}</a>}
@@ -202,7 +202,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
           <div class="price-large">{formatPrice(product.price)}</div>
 
           <div class="trust-summary-grid" aria-label="สรุปข้อมูลสินค้า">
-            <div><span>สภาพที่บันทึก</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูรายละเอียด'}</strong></div>
+            <div><span>สภาพสินค้า</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูรายละเอียด'}</strong></div>
             <div><span>รูปสินค้า</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
             <div><span>ประกัน</span><strong>{warrantyDate || 'ไม่ระบุ'}</strong></div>
             <div><span>อัปเดต</span><strong>{updatedDate || 'ล่าสุด'}</strong></div>
@@ -213,60 +213,60 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
               {settings?.purchaseEnabled ? (
                 <>
                   <button id="add-to-cart" class="button button-primary button-wide" type="button" data-sku={product.sku}>เพิ่มลงตะกร้า</button>
-                  <a class="button button-secondary button-wide" href="/cart/">ดูตะกร้า / ชำระเงิน</a>
-                  <p id="cart-message" class="microcopy">ระบบจะตรวจสต๊อกและล็อก SKU แบบ atomic อีกครั้งตอน Checkout</p>
+                  <a class="button button-secondary button-wide" href="/cart/">ดูตะกร้า / สั่งซื้อ</a>
+                  <p id="cart-message" class="microcopy">ระบบจะตรวจสอบสถานะสินค้าอีกครั้งก่อนยืนยันคำสั่งซื้อ</p>
                 </>
               ) : (
                 <>
                   {lineUrl && <a class="button button-primary button-wide" href={lineUrl} rel="nofollow noopener" target="_blank">สอบถาม / สั่งซื้อทาง LINE</a>}
                   {phoneHref && <a class="button button-secondary button-wide" href={phoneHref}>โทรสอบถามสินค้า</a>}
-                  <p class="microcopy">Checkout ออนไลน์ยังไม่เปิด กรุณาแจ้ง SKU <strong>{product.sku}</strong> ให้ร้านตรวจสอบสถานะก่อนชำระเงิน</p>
+                  <p class="microcopy">ยังไม่เปิดสั่งซื้อออนไลน์ กรุณาแจ้งรหัสสินค้า <strong>{product.sku}</strong> ให้ร้านตรวจสอบก่อนชำระเงิน</p>
                 </>
               )}
             </div>
           )}
 
-          {product.availability === 'reserved' && <div class="notice"><strong>สินค้าชิ้นนี้ติดจอง</strong><br />ระบบแสดงหน้าเดิมเพื่อคงข้อมูลสินค้า แต่ยังไม่ควรชำระเงินจนกว่าร้านจะยืนยันสถานะอีกครั้ง</div>}
-          {product.availability === 'out_of_stock' && <div class="notice"><strong>สินค้านี้ขายแล้ว</strong><br />หน้านี้เก็บข้อมูลของ SKU เดิมไว้เป็นข้อมูลอ้างอิง ดูสินค้ารุ่นเดียวกันหรือรุ่นใกล้เคียงที่มีจำหน่ายด้านล่างได้</div>}
+          {product.availability === 'reserved' && <div class="notice"><strong>สินค้าชิ้นนี้ติดจอง</strong><br />ยังไม่สามารถสั่งซื้อได้ในขณะนี้ กรุณารอการอัปเดตสถานะหรือสอบถามร้าน</div>}
+          {product.availability === 'out_of_stock' && <div class="notice"><strong>สินค้านี้ขายแล้ว</strong><br />ดูสินค้ารุ่นเดียวกันหรือรุ่นใกล้เคียงที่ยังพร้อมจำหน่ายด้านล่างได้</div>}
 
-          {publishedDate && <p class="muted product-date">เผยแพร่สินค้า {publishedDate}</p>}
+          {publishedDate && <p class="muted product-date">อัปเดตรายการขาย {publishedDate}</p>}
         </aside>
       </div>
 
       <section class="section trust-section">
         <div class="container">
           <div class="section-head">
-            <div><div class="eyebrow">USED PRODUCT TRUST</div><h2>ข้อมูลสภาพจริงของ SKU นี้</h2></div>
-            <p class="muted trust-intro">ข้อมูลนี้ดึงจากรายการสินค้าชิ้นเดียวใน AMPHON Product Hub เพื่อช่วยให้ตรวจรูป สเปก ตำหนิ และประกันก่อนตัดสินใจ</p>
+            <div><div class="eyebrow">ข้อมูลสินค้าจริง</div><h2>สภาพและข้อมูลของสินค้าชิ้นนี้</h2></div>
+            <p class="muted trust-intro">ตรวจสอบรูป สเปก ตำหนิ อุปกรณ์ และข้อมูลประกันของสินค้าชิ้นนี้ก่อนตัดสินใจสั่งซื้อ</p>
           </div>
           <div class="trust-grid">
             <article class="panel trust-card">
               <h3>สภาพและตำหนิ</h3>
-              {product.conditionPercent !== null && product.conditionPercent !== undefined && <p><strong>สภาพที่บันทึก:</strong> {product.conditionPercent}%</p>}
+              {product.conditionPercent !== null && product.conditionPercent !== undefined && <p><strong>สภาพสินค้า:</strong> {product.conditionPercent}%</p>}
               {product.defects
-                ? <div class="defect-box"><strong>ตำหนิที่แจ้งไว้</strong><p>{product.defects}</p></div>
-                : <p class="muted">ยังไม่มีข้อความตำหนิเพิ่มเติมในข้อมูลสาธารณะ กรุณาดูรูปจริงประกอบก่อนสั่งซื้อ</p>}
-              {defectImages.length > 0 && <p class="evidence-note">มีรูปที่ระบุบทบาท “ตำหนิ” {defectImages.length} รูปในแกลเลอรี</p>}
+                ? <div class="defect-box"><strong>ตำหนิที่ระบุ</strong><p>{product.defects}</p></div>
+                : <p class="muted">ยังไม่มีรายละเอียดตำหนิเพิ่มเติม กรุณาดูรูปสินค้าจริงประกอบก่อนสั่งซื้อ</p>}
+              {defectImages.length > 0 && <p class="evidence-note">มีรูปตำหนิ {defectImages.length} รูปในแกลเลอรี</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>ข้อมูลการตรวจที่บันทึก</h3>
+              <h3>ข้อมูลการตรวจสินค้า</h3>
               {groups.condition.length ? <dl class="compact-specs">
                 {groups.condition.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
-              </dl> : <p class="muted">ยังไม่มีรายการผลตรวจแยกเป็นช่องข้อมูลสาธารณะสำหรับสินค้านี้</p>}
+              </dl> : <p class="muted">ยังไม่มีผลตรวจเพิ่มเติมที่แสดงในหน้านี้</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>อุปกรณ์ที่ระบุ</h3>
+              <h3>อุปกรณ์ที่ให้มา</h3>
               {groups.accessories.length ? <dl class="compact-specs">
                 {groups.accessories.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
-              </dl> : <p class="muted">ยังไม่มีรายการอุปกรณ์แยกเป็นช่องข้อมูลสาธารณะ โปรดสอบถามร้านก่อนสั่งซื้อ</p>}
+              </dl> : <p class="muted">ยังไม่ได้ระบุอุปกรณ์เพิ่มเติม กรุณาสอบถามร้านก่อนสั่งซื้อ</p>}
               {accessoryImages.length > 0 && <p class="evidence-note">มีรูปอุปกรณ์ {accessoryImages.length} รูปในแกลเลอรี</p>}
             </article>
 
             <article class="panel trust-card">
-              <h3>ประกันและหลักฐาน</h3>
-              <p>{warrantyDate ? <>ข้อมูลประกันถึง <strong>{warrantyDate}</strong></> : 'ยังไม่ได้ระบุวันสิ้นสุดประกันในข้อมูลสาธารณะ'}</p>
+              <h3>ประกัน</h3>
+              <p>{warrantyDate ? <>ข้อมูลประกันถึง <strong>{warrantyDate}</strong></> : 'ยังไม่ได้ระบุวันสิ้นสุดประกันสำหรับสินค้าชิ้นนี้'}</p>
               {warrantyImages.length > 0 && <p class="evidence-note">มีรูปหลักฐานประกัน {warrantyImages.length} รูป</p>}
               {settings?.warrantyPolicyUrl && <a class="inline-link" href={settings.warrantyPolicyUrl}>อ่านเงื่อนไขประกันของร้าน</a>}
             </article>
@@ -279,12 +279,12 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
                   {settings.shipping.rate !== null ? <> • ค่าจัดส่ง {settings.shipping.rate === 0 ? '0 บาท' : formatPrice(settings.shipping.rate)}</> : null}
                   {settings.shipping.transitMinDays !== null && settings.shipping.transitMaxDays !== null ? <> • ระยะขนส่งประมาณ {settings.shipping.transitMinDays}–{settings.shipping.transitMaxDays} วัน</> : null}
                 </p>
-              ) : <p class="muted">ยังไม่ได้เผยแพร่รายละเอียดค่าจัดส่งแบบมาตรฐานในระบบ กรุณายืนยันกับร้านก่อนสั่งซื้อ</p>}
+              ) : <p class="muted">กรุณาสอบถามร้านเพื่อยืนยันค่าจัดส่งก่อนสั่งซื้อ</p>}
               {settings?.returns.enabled ? (
                 <p>
-                  {settings.returns.category === 'FINITE' && settings.returns.days !== null ? `นโยบายคืนสินค้าที่ตั้งไว้: ภายใน ${settings.returns.days} วัน` : settings.returns.category === 'NOT_PERMITTED' ? 'นโยบายที่ตั้งไว้: ไม่รับคืนสินค้า' : settings.returns.category === 'UNLIMITED' ? 'นโยบายที่ตั้งไว้: ไม่จำกัดช่วงเวลาคืน' : 'มีนโยบายคืนสินค้าที่ร้านกำหนด'}
+                  {settings.returns.category === 'FINITE' && settings.returns.days !== null ? `คืนสินค้าได้ตามเงื่อนไขภายใน ${settings.returns.days} วัน` : settings.returns.category === 'NOT_PERMITTED' ? 'สินค้ารายการนี้ไม่อยู่ในเงื่อนไขรับคืน' : settings.returns.category === 'UNLIMITED' ? 'การคืนสินค้าเป็นไปตามเงื่อนไขของร้าน' : 'การคืนสินค้าเป็นไปตามเงื่อนไขของร้าน'}
                 </p>
-              ) : <p class="muted">ยังไม่ได้เปิดข้อมูลนโยบายคืนสินค้าแบบโครงสร้างในระบบ</p>}
+              ) : <p class="muted">กรุณาอ่านหรือสอบถามเงื่อนไขการคืนสินค้าก่อนสั่งซื้อ</p>}
               <div class="policy-links">
                 {settings?.shipping.policyUrl && <a class="inline-link" href={settings.shipping.policyUrl}>รายละเอียดการจัดส่ง</a>}
                 {settings?.returns.policyUrl && <a class="inline-link" href={settings.returns.policyUrl}>รายละเอียดการคืนสินค้า</a>}
@@ -297,7 +297,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       <section class="section">
         <div class="container">
           <div class="panel spec-panel">
-            <div class="section-head"><div><div class="eyebrow">SPECIFICATIONS</div><h2>รายละเอียดและสเปก</h2></div></div>
+            <div class="section-head"><div><div class="eyebrow">ข้อมูลสินค้า</div><h2>รายละเอียดและสเปก</h2></div></div>
             {groups.core.length ? (
               <dl class="spec-list">
                 {groups.core.map(([key, value]) => <div class="spec-row"><dt>{key}</dt><dd>{value}</dd></div>)}
@@ -311,9 +311,9 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
         <div class="container">
           <div class="panel disclosure-panel">
             <h2>ก่อนสั่งซื้อสินค้ามือสอง</h2>
-            <p>สินค้ามือสองแต่ละ SKU มีสภาพและอุปกรณ์ต่างกัน ให้ยึดข้อมูล รูป และตำหนิของหน้านี้เป็นหลัก หากข้อมูลจุดใดไม่ชัดเจนควรสอบถามร้านและยืนยันสถานะสินค้าก่อนชำระเงิน</p>
+            <p>สินค้ามือสองแต่ละชิ้นมีสภาพและอุปกรณ์ต่างกัน ควรดูข้อมูล รูป และตำหนิของสินค้าชิ้นนี้ให้ครบ หากมีจุดใดไม่ชัดเจนสามารถสอบถามร้านก่อนชำระเงินได้</p>
             <div class="disclosure-points">
-              <span>ตรวจ SKU ให้ตรง</span><span>ดูรูปตำหนิ</span><span>เช็กอุปกรณ์</span><span>ยืนยันประกัน</span><span>ยืนยันสถานะก่อนชำระ</span>
+              <span>ตรวจรหัสสินค้า</span><span>ดูรูปตำหนิ</span><span>เช็กอุปกรณ์</span><span>ดูข้อมูลประกัน</span><span>ยืนยันสถานะก่อนชำระ</span>
             </div>
           </div>
         </div>
@@ -322,7 +322,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       {relatedProducts.length > 0 && <section class="section related-section">
         <div class="container">
           <div class="section-head">
-            <div><div class="eyebrow">RELATED STOCK</div><h2>{product.availability === 'out_of_stock' ? 'สินค้าที่มีจำหน่ายแทนชิ้นนี้' : 'สินค้าใกล้เคียงที่มีจำหน่าย'}</h2></div>
+            <div><div class="eyebrow">สินค้าใกล้เคียง</div><h2>{product.availability === 'out_of_stock' ? 'สินค้าที่มีจำหน่ายแทนชิ้นนี้' : 'สินค้าใกล้เคียงที่มีจำหน่าย'}</h2></div>
           </div>
           <div class="product-grid">
             {relatedProducts.map((item) => (
@@ -333,7 +333,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
                 <div class="product-body">
                   <span class="badge">พร้อมจำหน่าย</span>
                   <h3 class="product-title">{item.title}</h3>
-                  <div class="product-meta">SKU {item.sku}</div>
+                  <div class="product-meta">รหัสสินค้า {item.sku}</div>
                   <div class="product-price">{formatPrice(item.price)}</div>
                 </div>
               </a>
@@ -343,7 +343,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       </section>}
     </>
   ) : (
-    <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'คลังสินค้ากำลังเชื่อมต่อ' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ระบบ Store API ไม่พร้อมใช้งานชั่วคราว' : 'สินค้าอาจถูกยกเลิกการเผยแพร่หรือไม่มีอยู่ในระบบแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
+    <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'กำลังโหลดข้อมูลสินค้า' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ไม่สามารถโหลดข้อมูลสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'สินค้าอาจขายแล้ว ยกเลิกรายการ หรือไม่มีอยู่ในร้านแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
   )}
 </BaseLayout>
 
@@ -354,7 +354,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
   button?.addEventListener('click', () => {
     const sku = button.dataset.sku || ''
     const cart = addCartSku(sku)
-    if (message) message.textContent = `เพิ่ม ${sku} ลงตะกร้าแล้ว · ตะกร้ามี ${cart.length} รายการ`
+    if (message) message.textContent = `เพิ่มสินค้าลงตะกร้าแล้ว · ตะกร้ามี ${cart.length} รายการ`
     button.textContent = 'เพิ่มลงตะกร้าแล้ว'
     window.setTimeout(() => { button.textContent = 'เพิ่มลงตะกร้า' }, 1400)
   })
