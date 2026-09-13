@@ -7,13 +7,13 @@ const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '
 const enabled = Boolean(settings?.purchaseEnabled && settings?.checkout?.enabled)
 const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && settings?.checkout?.turnstileSiteKey)
 ---
-<BaseLayout title="Checkout | AMPHON SHOP" description="ยืนยันข้อมูลจัดส่งและสร้างคำสั่งซื้อ" canonicalPath="/checkout/" robots="noindex,nofollow">
+<BaseLayout title="ยืนยันคำสั่งซื้อ | AMPHON SHOP" description="ตรวจสอบข้อมูลจัดส่งและชำระเงินก่อนยืนยันคำสั่งซื้อ" canonicalPath="/checkout/" robots="noindex,nofollow">
   <section class="section checkout-shell">
     <div class="container checkout-grid">
       <div>
-        <div class="eyebrow">SECURE CHECKOUT</div><h1 class="checkout-title">ยืนยันคำสั่งซื้อ</h1>
+        <div class="eyebrow">สั่งซื้ออย่างปลอดภัย</div><h1 class="checkout-title">ยืนยันคำสั่งซื้อ</h1>
         <div id="checkout-member-panel" class="checkout-member-panel" hidden></div>
-        {!enabled ? <div class="notice">Checkout ออนไลน์ยังไม่เปิดใช้งาน กรุณากลับไปติดต่อร้านจากหน้าสินค้า</div> : (
+        {!enabled ? <div class="notice">ยังไม่สามารถสั่งซื้อออนไลน์ได้ในขณะนี้ กรุณาติดต่อร้านจากหน้าสินค้า</div> : (
           <form id="checkout-form" class="panel checkout-form" data-api={apiBase}>
             <h2>ข้อมูลผู้สั่งซื้อ</h2>
             <div class="checkout-fields two"><label><span>ชื่อผู้รับ *</span><input name="customerName" required maxlength="120" autocomplete="name" /></label><label><span>เบอร์โทร *</span><input name="customerPhone" required maxlength="30" inputmode="tel" autocomplete="tel" /></label></div>
@@ -25,8 +25,8 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
               {settings?.checkout?.pickupEnabled && <label><input type="radio" name="deliveryMethod" value="PICKUP" /> รับที่ร้าน</label>}
             </div>
             <div id="member-address-wrap" class="member-address-wrap" hidden>
-              <label><span>ที่อยู่ที่บันทึกไว้ *</span><select id="member-address-select"></select></label>
-              <a class="inline-link" href="/account/">จัดการข้อมูลและที่อยู่ในบัญชี</a>
+              <label><span>ที่อยู่จัดส่ง *</span><select id="member-address-select"></select></label>
+              <a class="inline-link" href="/account/">แก้ไขข้อมูลและที่อยู่ในบัญชี</a>
             </div>
             <div id="shipping-fields">
               <label><span>ที่อยู่ *</span><input name="addressLine" maxlength="250" autocomplete="street-address" /></label>
@@ -41,11 +41,11 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
             </div>
             <details class="panel-soft"><summary>ต้องการใบเสร็จ / ใบกำกับ</summary><label class="toggle-field"><span>ขอเอกสารในชื่อผู้ซื้อ</span><input type="checkbox" name="invoiceRequested" value="true" id="invoice-requested" /></label><div id="invoice-fields" hidden><label><span>ชื่อ / บริษัท</span><input name="invoiceName" maxlength="180" /></label><div class="checkout-fields two"><label><span>เลขประจำตัวผู้เสียภาษี</span><input name="invoiceTaxId" maxlength="20" /></label><label><span>สาขา</span><input name="invoiceBranchCode" maxlength="20" /></label></div><label><span>ที่อยู่ออกเอกสาร</span><input name="invoiceAddress" maxlength="500" /></label><label><span>อีเมลรับเอกสาร</span><input name="invoiceEmail" type="email" maxlength="180" /></label></div></details>
             <label><span>หมายเหตุ</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
-            {settings?.checkout?.termsUrl && <p class="microcopy">การสั่งซื้อถือว่าคุณยอมรับ <a class="inline-link" href={settings.checkout.termsUrl}>เงื่อนไข Checkout</a></p>}
-            {turnstileEnabled && <div class="checkout-security"><div class="cf-turnstile" data-sitekey={settings?.checkout?.turnstileSiteKey || ''} data-action="checkout" data-theme="auto"></div><small>ระบบตรวจสอบความปลอดภัยก่อนล็อกสต๊อก</small></div>}
+            {settings?.checkout?.termsUrl && <p class="microcopy">การสั่งซื้อถือว่าคุณยอมรับ <a class="inline-link" href={settings.checkout.termsUrl}>เงื่อนไขการสั่งซื้อ</a></p>}
+            {turnstileEnabled && <div class="checkout-security"><div class="cf-turnstile" data-sitekey={settings?.checkout?.turnstileSiteKey || ''} data-action="checkout" data-theme="auto"></div><small>ตรวจสอบความปลอดภัยก่อนยืนยันคำสั่งซื้อ</small></div>}
             <div id="checkout-error"></div>
             <button id="checkout-submit" class="button button-primary button-wide" type="submit" disabled>กำลังตรวจสอบสมาชิก...</button>
-            <p class="microcopy">ระบบจะล็อก SKU ในฐานข้อมูลทันทีเมื่อสร้าง Order สำเร็จ และปล่อยสต๊อกอัตโนมัติหากหมดเวลาชำระ</p>
+            <p class="microcopy">หลังยืนยันคำสั่งซื้อ สินค้าจะถูกสำรองไว้ตามเวลาที่กำหนดเพื่อรอการชำระเงิน</p>
           </form>
         )}
       </div>
@@ -115,7 +115,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   function refreshSubmitState() {
     if (!submit || submitting) return
     submit.disabled = !cartValid || !memberPolicyLoaded || !memberReady
-    submit.textContent = memberPolicyLoaded ? 'สร้างคำสั่งซื้อและล็อกสินค้า' : 'กำลังตรวจสอบสมาชิก...'
+    submit.textContent = memberPolicyLoaded ? 'ยืนยันคำสั่งซื้อ' : 'กำลังตรวจสอบสมาชิก...'
   }
 
   function displayAddress(address: CustomerAddress) {
@@ -153,7 +153,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       memberAddressWrap && (memberAddressWrap.hidden = true)
       setReadOnly(['customerName','customerPhone','customerEmail','addressLine','subdistrict','district','province','postalCode'], false)
       if (memberCheckoutRequired) {
-        setMemberMessage('Checkout ต้องเข้าสู่ระบบสมาชิกก่อนสร้างคำสั่งซื้อ ตะกร้าจะยังอยู่หลัง Login', true)
+        setMemberMessage('กรุณาเข้าสู่ระบบสมาชิกก่อนสั่งซื้อ ตะกร้าของคุณจะยังอยู่เหมือนเดิม', true)
         memberReady = false
       } else {
         memberReady = true
@@ -163,13 +163,13 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     }
 
     if (!profile) {
-      setMemberMessage('บัญชีนี้ยังไม่มี Customer Profile ที่พร้อมใช้งาน กรุณาเปิดหน้าบัญชีของฉันก่อน Checkout', true)
+      setMemberMessage('กรุณาบันทึกข้อมูลติดต่อใน “บัญชีของฉัน” ก่อนสั่งซื้อ', true)
       refreshSubmitState()
       return
     }
 
     if (!profile.email_verified_at || !profile.email) {
-      setMemberMessage('กรุณายืนยันอีเมลของสมาชิกก่อน Checkout', true)
+      setMemberMessage('กรุณายืนยันอีเมลก่อนสั่งซื้อ', true)
       refreshSubmitState()
       return
     }
@@ -185,7 +185,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
         || null
       if (!address) {
         selectedAddressId = null
-        setMemberMessage('สมาชิกต้องมีที่อยู่ที่บันทึกไว้ก่อนใช้ Checkout แบบจัดส่ง กรุณาเพิ่มที่อยู่ใน “บัญชีของฉัน”', true)
+        setMemberMessage('กรุณาเพิ่มที่อยู่จัดส่งใน “บัญชีของฉัน” ก่อนดำเนินการต่อ', true)
         setReadOnly(['customerName','customerPhone','addressLine','subdistrict','district','province','postalCode'], false)
       } else {
         fillSavedAddress(address)
@@ -225,23 +225,23 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       if (!state.authenticated) {
         memberPanel.className = 'checkout-member-panel is-guest'
         memberPanel.innerHTML = memberCheckoutRequired
-          ? `<strong>ต้องเข้าสู่ระบบสมาชิกก่อน Checkout</strong><p>เข้าสู่ระบบหรือสมัครสมาชิกก่อนสร้างคำสั่งซื้อ ตะกร้าจะยังอยู่ครบหลัง Login / Google</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
-          : `<strong>Checkout แบบ Guest ยังใช้งานได้</strong><p>เข้าสู่ระบบเพื่อเติมข้อมูลและที่อยู่จากบัญชีอัตโนมัติ ตะกร้าจะยังอยู่หลัง Login</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
+          ? `<strong>เข้าสู่ระบบก่อนสั่งซื้อ</strong><p>ใช้บัญชีสมาชิกเพื่อยืนยันข้อมูลผู้ซื้อและที่อยู่ ตะกร้าจะยังอยู่ครบหลังเข้าสู่ระบบด้วยอีเมลหรือ Google</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
+          : `<strong>สั่งซื้อได้โดยไม่ต้องเข้าสู่ระบบ</strong><p>หากเข้าสู่ระบบ ระบบจะเติมข้อมูลและที่อยู่ที่บันทึกไว้ให้โดยอัตโนมัติ</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบ</a><a class="inline-link" href="/account/signup/?next=%2Fcheckout%2F">สมัครสมาชิก</a></div>`
         applyMemberDelivery()
         return
       }
 
       if (!state.profile) {
         memberPanel.className = 'checkout-member-panel is-error'
-        memberPanel.innerHTML = `<strong>บัญชีสมาชิกยังไม่พร้อม Checkout</strong><p>กรุณาเปิดหน้าบัญชีของฉันและบันทึกข้อมูลติดต่อก่อน</p><div class="checkout-member-actions"><a class="inline-link" href="/account/">บัญชีของฉัน</a></div>`
+        memberPanel.innerHTML = `<strong>กรุณาเพิ่มข้อมูลติดต่อก่อนสั่งซื้อ</strong><p>เปิดหน้าบัญชีของฉัน แล้วบันทึกชื่อและเบอร์โทรให้เรียบร้อย</p><div class="checkout-member-actions"><a class="inline-link" href="/account/">ไปที่บัญชีของฉัน</a></div>`
         applyMemberDelivery()
         return
       }
 
       memberPanel.className = 'checkout-member-panel is-member'
       memberPanel.innerHTML = memberCheckoutRequired
-        ? `<strong>Checkout สมาชิกได้รับการยืนยัน</strong><p>${esc(state.profile.email || '')} · Order จะถูกผูกกับบัญชีนี้และบันทึก snapshot จากข้อมูลสมาชิกโดยอัตโนมัติ</p>`
-        : `<strong>กำลัง Checkout ด้วยบัญชีสมาชิก</strong><p>${esc(state.profile.email || '')} · Order ที่สร้างสำเร็จจะถูกผูกกับบัญชีนี้ ตะกร้ายังคงอยู่ข้าม Login/Google redirect</p>`
+        ? `<strong>พร้อมสั่งซื้อด้วยบัญชีนี้</strong><p>${esc(state.profile.email || '')} · ข้อมูลผู้ซื้อและที่อยู่จะถูกบันทึกไว้กับคำสั่งซื้อนี้</p>`
+        : `<strong>เข้าสู่ระบบแล้ว</strong><p>${esc(state.profile.email || '')} · ระบบจะใช้ข้อมูลที่บันทึกไว้เพื่อช่วยกรอกคำสั่งซื้อ</p>`
       if (memberAddressSelect) {
         memberAddressSelect.innerHTML = state.addresses.map((address) => `<option value="${esc(address.id)}">${esc(address.label)}${address.is_default ? ' · ค่าเริ่มต้น' : ''} — ${esc(displayAddress(address))}</option>`).join('')
         if (state.defaultAddress) memberAddressSelect.value = state.defaultAddress.id
@@ -253,7 +253,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       memberReady = false
       memberPanel.hidden = false
       memberPanel.className = 'checkout-member-panel is-error'
-      memberPanel.innerHTML = `<strong>ตรวจสอบนโยบายสมาชิกไม่สำเร็จ</strong><p>เพื่อความปลอดภัย ระบบยังไม่อนุญาตให้สร้างคำสั่งซื้อ กรุณารีโหลดหน้า หรือลองเข้าสู่ระบบใหม่</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบใหม่</a></div>`
+      memberPanel.innerHTML = `<strong>ไม่สามารถตรวจสอบสถานะสมาชิกได้</strong><p>กรุณารีโหลดหน้า หรือลองเข้าสู่ระบบใหม่ก่อนดำเนินการสั่งซื้อ</p><div class="checkout-member-actions"><a class="inline-link" href="/account/login/?next=%2Fcheckout%2F">เข้าสู่ระบบใหม่</a></div>`
       setMemberMessage(error instanceof Error ? error.message : String(error), true)
       refreshSubmitState()
     }
@@ -276,7 +276,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     }))
     cartValid = products.every((item) => item?.availability === 'available')
     const subtotal = products.reduce((sum, item) => sum + Number(item?.price || 0), 0)
-    itemsTarget.innerHTML = `${products.map((item, i) => `<div class="checkout-item"><span>${esc(item?.title || skus[i])}</span><strong>${item ? money(Number(item.price || 0)) : 'ไม่พร้อมขาย'}</strong></div>`).join('')}<div class="checkout-total"><span>ยอดสินค้า</span><strong>${money(subtotal)}</strong></div><small>ค่าจัดส่งคิดตามวิธีรับสินค้าและค่าที่ร้านตั้งไว้</small>${cartValid ? '' : '<div class="notice">มีสินค้าที่ไม่พร้อมซื้อ กรุณากลับไปแก้ตะกร้า</div>'}`
+    itemsTarget.innerHTML = `${products.map((item, i) => `<div class="checkout-item"><span>${esc(item?.title || skus[i])}</span><strong>${item ? money(Number(item.price || 0)) : 'ไม่พร้อมขาย'}</strong></div>`).join('')}<div class="checkout-total"><span>ยอดสินค้า</span><strong>${money(subtotal)}</strong></div><small>ค่าจัดส่งขึ้นอยู่กับวิธีรับสินค้า</small>${cartValid ? '' : '<div class="notice">มีสินค้าที่ไม่พร้อมสั่งซื้อ กรุณากลับไปตรวจสอบตะกร้า</div>'}`
     refreshSubmitState()
   }
 
@@ -312,30 +312,30 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
     try {
       if (memberCheckoutRequired) {
         if (!memberState?.authenticated || !memberState.profile) throw new Error('AUTH_REQUIRED')
-        submit.textContent = 'กำลังยืนยันสมาชิก...'
+        submit.textContent = 'กำลังยืนยันข้อมูลสมาชิก...'
         const delivery = deliveryMethod()
         const addressId = delivery === 'SHIPPING' ? selectedAddressId : null
         await prepareMemberCheckoutIntent(idempotencyKey, delivery, addressId)
       }
 
-      submit.textContent = 'กำลังล็อกสินค้า...'
+      submit.textContent = 'กำลังตรวจสอบสินค้า...'
       const response = await fetch(`${api}/checkout`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ ...payload, skus, idempotencyKey, turnstileToken }),
       })
       const result = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(result.error || `Checkout ไม่สำเร็จ (${response.status})`)
+      if (!response.ok) throw new Error(result.error || `ยืนยันคำสั่งซื้อไม่สำเร็จ (${response.status})`)
       const token = result.order?.publicToken
-      if (!token) throw new Error('ระบบไม่ได้รับ Order token')
+      if (!token) throw new Error('ไม่พบข้อมูลคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง')
 
       if (!memberCheckoutRequired && memberState?.authenticated && memberState.profile) {
-        submit.textContent = 'กำลังผูกคำสั่งซื้อกับบัญชี...'
+        submit.textContent = 'กำลังบันทึกคำสั่งซื้อในบัญชี...'
         const addressId = deliveryMethod() === 'SHIPPING' ? selectedAddressId : null
         try {
           await attachCustomerCheckoutIdentity(idempotencyKey, addressId)
         } catch (identityError) {
-          throw new Error(`สร้าง Order แล้ว แต่ยังผูกกับบัญชีไม่สำเร็จ: ${friendlyCheckoutIdentityError(identityError)} กรุณากดปุ่มเดิมอีกครั้ง ระบบจะใช้ Order เดิมโดยไม่สร้างซ้ำ`)
+          throw new Error(`สร้างคำสั่งซื้อแล้ว แต่ยังบันทึกในบัญชีไม่สำเร็จ: ${friendlyCheckoutIdentityError(identityError)} กรุณากดปุ่มเดิมอีกครั้ง ระบบจะใช้คำสั่งซื้อเดิม`)
         }
       }
 
@@ -350,7 +350,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       if (errorTarget) errorTarget.innerHTML = `<div class="notice">${esc(friendly)}</div>`
       ;(window as any).turnstile?.reset?.()
       submitting = false
-      submit.textContent = 'สร้างคำสั่งซื้อและล็อกสินค้า'
+      submit.textContent = 'ยืนยันคำสั่งซื้อ'
       refreshSubmitState()
     }
   })
