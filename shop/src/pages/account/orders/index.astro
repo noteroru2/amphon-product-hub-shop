@@ -1,0 +1,239 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import '../../../styles/auth.css'
+import '../../../styles/accountOrders.css'
+---
+<BaseLayout title="คำสั่งซื้อของฉัน | AMPHON SHOP" description="ดูประวัติคำสั่งซื้อ สถานะชำระเงิน การจัดส่ง เอกสาร และประกันของบัญชี AMPHON SHOP" canonicalPath="/account/orders/" robots="noindex,nofollow">
+  <section class="orders-shell">
+    <div class="container orders-container">
+      <div id="orders-loading" class="auth-message info">กำลังตรวจสอบบัญชีและโหลดคำสั่งซื้อ...</div>
+
+      <div id="orders-guest" class="auth-card orders-login-card" hidden>
+        <div class="eyebrow">MY ORDERS</div>
+        <h1>คำสั่งซื้อของฉัน</h1>
+        <p class="auth-copy">กรุณาเข้าสู่ระบบด้วยบัญชีที่ใช้สั่งซื้อเพื่อดูประวัติ Order ของคุณ</p>
+        <div class="auth-actions">
+          <a class="button button-primary button-wide" href="/account/login/?next=%2Faccount%2Forders%2F">เข้าสู่ระบบ</a>
+          <a class="button button-secondary button-wide" href="/account/signup/?next=%2Faccount%2Forders%2F">สมัครสมาชิก</a>
+        </div>
+      </div>
+
+      <div id="orders-user" hidden>
+        <div class="orders-head">
+          <div>
+            <div class="eyebrow">MY ORDERS</div>
+            <h1>คำสั่งซื้อของฉัน</h1>
+            <p class="auth-copy">ประวัติคำสั่งซื้อจะอ้างอิงจากบัญชีสมาชิกที่ยืนยันแล้วเท่านั้น</p>
+          </div>
+          <div class="orders-head-actions">
+            <a class="button button-secondary" href="/account/">บัญชีของฉัน</a>
+            <a class="button button-primary" href="/">เลือกซื้อสินค้า</a>
+          </div>
+        </div>
+
+        <div class="orders-summary">
+          <span>ทั้งหมด <strong id="orders-total">0</strong> Order</span>
+          <span id="orders-email">-</span>
+        </div>
+        <div id="orders-message" class="auth-message orders-message" hidden></div>
+        <div id="orders-list" class="orders-list"></div>
+        <div id="orders-empty" class="orders-empty" hidden>ยังไม่มีคำสั่งซื้อในบัญชีนี้ เมื่อสั่งซื้อสำเร็จ Order จะปรากฏที่นี่อัตโนมัติ</div>
+        <div id="orders-load-more-wrap" class="orders-load-more" hidden>
+          <button id="orders-load-more" class="button button-secondary" type="button">โหลดรายการเพิ่มเติม</button>
+        </div>
+
+        <section id="order-detail" class="order-detail" hidden aria-live="polite">
+          <div id="order-detail-content"></div>
+        </section>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { getCustomerUser } from '../../../lib/customer-auth'
+  import { friendlyCustomerOrderError, getMyOrderDetail, getMyOrders, type CustomerOrderDetail, type CustomerOrderSummary } from '../../../lib/customer-orders'
+
+  const loading = document.getElementById('orders-loading') as HTMLElement
+  const guest = document.getElementById('orders-guest') as HTMLElement
+  const userBox = document.getElementById('orders-user') as HTMLElement
+  const totalTarget = document.getElementById('orders-total') as HTMLElement
+  const emailTarget = document.getElementById('orders-email') as HTMLElement
+  const list = document.getElementById('orders-list') as HTMLElement
+  const empty = document.getElementById('orders-empty') as HTMLElement
+  const message = document.getElementById('orders-message') as HTMLElement
+  const loadMoreWrap = document.getElementById('orders-load-more-wrap') as HTMLElement
+  const loadMore = document.getElementById('orders-load-more') as HTMLButtonElement
+  const detail = document.getElementById('order-detail') as HTMLElement
+  const detailContent = document.getElementById('order-detail-content') as HTMLElement
+
+  let orders: CustomerOrderSummary[] = []
+  let hasMore = false
+  let loadingMore = false
+
+  const orderLabels: Record<string,string> = {
+    AWAITING_PAYMENT:'รอชำระเงิน', PAYMENT_REVIEW:'รอตรวจสอบการชำระ', PROCESSING:'กำลังเตรียมสินค้า',
+    SHIPPED:'จัดส่งแล้ว', COMPLETED:'สำเร็จ', CANCELLED:'ยกเลิก', EXPIRED:'หมดเวลาชำระ', REFUNDED:'คืนเงินแล้ว',
+  }
+  const paymentLabels: Record<string,string> = {
+    UNPAID:'ยังไม่ชำระ', REVIEW:'รอตรวจสอบ', PAID:'ชำระแล้ว', REFUND_PENDING:'กำลังคืนเงิน', REFUNDED:'คืนเงินแล้ว',
+  }
+  const fulfillmentLabels: Record<string,string> = {
+    UNFULFILLED:'รอดำเนินการ', PACKING:'กำลังแพ็ก', SHIPPED:'จัดส่งแล้ว', IN_TRANSIT:'อยู่ระหว่างขนส่ง',
+    DELIVERED:'จัดส่งสำเร็จ', PICKUP_READY:'พร้อมรับที่ร้าน', PICKED_UP:'รับสินค้าแล้ว', CANCELLED:'ยกเลิก',
+  }
+
+  const money = (value: unknown, currency = 'THB') => new Intl.NumberFormat('th-TH', {
+    style:'currency', currency: String(currency || 'THB'), maximumFractionDigits: 0,
+  }).format(Number(value || 0))
+  const dateTime = (value?: string | null) => value ? new Intl.DateTimeFormat('th-TH', {
+    dateStyle:'medium', timeStyle:'short',
+  }).format(new Date(value)) : '-'
+  const esc = (value: unknown) => String(value ?? '').replace(/[&<>'"]/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;',
+  }[c] || c))
+  const showMessage = (text:string, tone:'error'|'success'|'info' = 'error') => {
+    message.textContent = text
+    message.className = `auth-message orders-message ${tone}`
+    message.hidden = false
+  }
+  const hideMessage = () => { message.hidden = true }
+  const toneFor = (value:string) => {
+    if (['PAID','COMPLETED','DELIVERED','PICKED_UP'].includes(value)) return 'good'
+    if (['CANCELLED','EXPIRED','REFUNDED'].includes(value)) return 'bad'
+    return 'warn'
+  }
+
+  function renderOrders() {
+    totalTarget.textContent = String(orders.length)
+    list.replaceChildren()
+    empty.hidden = orders.length !== 0
+    for (const order of orders) {
+      const card = document.createElement('article')
+      card.className = 'order-history-card'
+      const titles = Array.isArray(order.itemTitles) ? order.itemTitles.filter(Boolean) : []
+      card.innerHTML = `
+        <div class="order-history-top">
+          <div><div class="order-history-number">${esc(order.orderNumber)}</div><div class="order-history-date">${esc(dateTime(order.createdAt))}</div></div>
+          <div class="order-history-total">${esc(money(order.total, order.currency))}</div>
+        </div>
+        <div class="order-status-row">
+          <span class="order-status-chip ${toneFor(order.orderStatus)}">${esc(orderLabels[order.orderStatus] || order.orderStatus)}</span>
+          <span class="order-status-chip ${toneFor(order.paymentStatus)}">${esc(paymentLabels[order.paymentStatus] || order.paymentStatus)}</span>
+          <span class="order-status-chip ${toneFor(order.fulfillmentStatus)}">${esc(fulfillmentLabels[order.fulfillmentStatus] || order.fulfillmentStatus)}</span>
+        </div>
+        <div class="order-items-preview">${titles.length ? titles.map((title) => esc(title)).join(' · ') : `${Number(order.itemCount || 0)} รายการ`}</div>
+        <div class="order-card-meta">
+          <span>${order.deliveryMethod === 'PICKUP' ? 'รับที่ร้าน' : 'จัดส่ง'}</span>
+          ${order.trackingNumber ? `<span>Tracking ${esc(order.trackingNumber)}</span>` : ''}
+          ${order.hasDocument ? '<span>มีเอกสาร</span>' : ''}
+          ${Number(order.warrantyCount || 0) > 0 ? `<span>ประกัน ${Number(order.warrantyCount)} รายการ</span>` : ''}
+        </div>
+        <div class="order-card-actions"><button class="button button-secondary order-detail-button" type="button" data-order-id="${esc(order.orderId)}">ดูรายละเอียด</button></div>`
+      list.append(card)
+    }
+    list.querySelectorAll<HTMLButtonElement>('.order-detail-button').forEach((button) => {
+      button.addEventListener('click', () => void openDetail(button.dataset.orderId || ''))
+    })
+    loadMoreWrap.hidden = !hasMore
+  }
+
+  function addressFromSnapshot(snapshot: Record<string, unknown> | null | undefined) {
+    if (!snapshot) return ''
+    return [snapshot.addressLine1, snapshot.addressLine2, snapshot.subdistrict, snapshot.district, snapshot.province, snapshot.postalCode]
+      .map((value) => String(value || '').trim()).filter(Boolean).join(' ')
+  }
+
+  function renderDetail(order: CustomerOrderDetail) {
+    const shipment = order.shipment || null
+    const address = order.deliveryMethod === 'PICKUP' ? 'รับสินค้าที่ร้าน' : addressFromSnapshot(order.shippingAddressSnapshot)
+    const items = Array.isArray(order.items) ? order.items : []
+    const warranties = Array.isArray(order.warranties) ? order.warranties : []
+    detailContent.innerHTML = `
+      <div class="order-detail-head">
+        <div><div class="eyebrow">ORDER DETAIL</div><h2>${esc(order.orderNumber)}</h2><div class="order-history-date">สร้างเมื่อ ${esc(dateTime(order.createdAt))}</div></div>
+        <button id="order-detail-close" class="order-detail-close" type="button" aria-label="ปิดรายละเอียด">×</button>
+      </div>
+      <div class="order-detail-status">
+        <div><span>คำสั่งซื้อ</span><strong>${esc(orderLabels[order.orderStatus] || order.orderStatus)}</strong></div>
+        <div><span>การชำระเงิน</span><strong>${esc(paymentLabels[order.paymentStatus] || order.paymentStatus)}</strong></div>
+        <div><span>การจัดส่ง</span><strong>${esc(fulfillmentLabels[order.fulfillmentStatus] || order.fulfillmentStatus)}</strong></div>
+      </div>
+      <div class="order-detail-grid">
+        <div>
+          <section class="order-detail-section"><h3>สินค้า</h3><div class="order-detail-items">${items.map((item) => `
+            <div class="order-detail-item"><span>${esc(item.title)}<small>SKU ${esc(item.sku)}${Number(item.warrantyDays || 0) > 0 ? ` · ประกัน ${Number(item.warrantyDays)} วัน` : ''}</small></span><strong>${esc(money(item.unitPrice, order.currency))}</strong></div>`).join('') || '<div class="orders-empty">ไม่มีรายละเอียดสินค้า</div>'}</div></section>
+          <section class="order-detail-section"><h3>วิธีรับสินค้า</h3><div class="order-address">${esc(address || '-')}</div></section>
+          ${shipment ? `<section class="order-detail-section"><h3>การจัดส่ง</h3><div class="order-tracking"><strong>${esc(shipment.trackingNumber || 'ยังไม่มีเลขติดตาม')}</strong>${shipment.carrier ? `<span>${esc(shipment.carrier)}</span>` : ''}${shipment.trackingUrl ? `<br><a class="inline-link" href="${esc(shipment.trackingUrl)}" target="_blank" rel="noopener noreferrer">ติดตามพัสดุ</a>` : ''}</div></section>` : ''}
+          ${warranties.length ? `<section class="order-detail-section"><h3>ประกัน</h3><div class="order-warranty-list">${warranties.map((warranty) => `<div class="order-warranty-card"><strong>${esc(warranty.certificateNumber)}</strong><span>${esc(warranty.title)}</span><small>${esc(warranty.status)} · ถึง ${esc(dateTime(warranty.endsAt))}</small><a class="inline-link" href="/warranty/${esc(warranty.publicToken)}/">เปิดใบรับประกัน</a></div>`).join('')}</div></section>` : ''}
+        </div>
+        <aside>
+          <section class="order-detail-section"><h3>ยอดคำสั่งซื้อ</h3><div class="order-money-lines"><div><span>ค่าสินค้า</span><strong>${esc(money(order.subtotal, order.currency))}</strong></div><div><span>ค่าจัดส่ง</span><strong>${esc(money(order.shippingAmount, order.currency))}</strong></div><div class="grand"><span>รวม</span><strong>${esc(money(order.total, order.currency))}</strong></div></div></section>
+          <section class="order-detail-section"><h3>วันที่สำคัญ</h3><div class="order-address">${order.paidAt ? `ชำระ: ${esc(dateTime(order.paidAt))}<br>` : ''}${order.shippedAt ? `ส่ง: ${esc(dateTime(order.shippedAt))}<br>` : ''}${order.completedAt ? `สำเร็จ: ${esc(dateTime(order.completedAt))}` : ''}${!order.paidAt && !order.shippedAt && !order.completedAt ? `ล็อกสินค้าถึง ${esc(dateTime(order.reservationExpiresAt))}` : ''}</div></section>
+          <div class="order-detail-actions">
+            ${order.paymentUrl ? `<a class="button button-primary" href="${esc(order.paymentUrl)}">ชำระเงินต่อ</a>` : ''}
+            ${order.document ? `<a class="button button-secondary" href="/document/${esc(order.document.publicToken)}/">เปิดเอกสาร ${esc(order.document.number)}</a>` : ''}
+            <a class="button button-secondary" href="/order/${esc(order.publicToken)}/">เปิดหน้าสถานะ Order</a>
+          </div>
+        </aside>
+      </div>`
+    detail.hidden = false
+    document.getElementById('order-detail-close')?.addEventListener('click', () => { detail.hidden = true })
+    detail.scrollIntoView({ behavior:'smooth', block:'start' })
+  }
+
+  async function openDetail(orderId:string) {
+    if (!orderId) return
+    detail.hidden = false
+    detailContent.innerHTML = '<div class="order-detail-loading">กำลังโหลดรายละเอียด Order...</div>'
+    detail.scrollIntoView({ behavior:'smooth', block:'start' })
+    try {
+      const order = await getMyOrderDetail(orderId)
+      renderDetail(order)
+    } catch (error) {
+      detailContent.innerHTML = `<div class="auth-message error">${esc(friendlyCustomerOrderError(error))}</div>`
+    }
+  }
+
+  async function loadOrders(append = false) {
+    if (loadingMore) return
+    loadingMore = true
+    hideMessage()
+    if (append) { loadMore.disabled = true; loadMore.textContent = 'กำลังโหลด...' }
+    try {
+      const result = await getMyOrders(20, append ? orders.length : 0)
+      orders = append ? [...orders, ...(result.orders || [])] : (result.orders || [])
+      hasMore = Boolean(result.pagination?.hasMore)
+      totalTarget.textContent = String(result.pagination?.total ?? orders.length)
+      renderOrders()
+      totalTarget.textContent = String(result.pagination?.total ?? orders.length)
+    } catch (error) {
+      showMessage(friendlyCustomerOrderError(error), 'error')
+    } finally {
+      loadingMore = false
+      loadMore.disabled = false
+      loadMore.textContent = 'โหลดรายการเพิ่มเติม'
+    }
+  }
+
+  loadMore.addEventListener('click', () => void loadOrders(true))
+
+  async function init() {
+    try {
+      const user = await getCustomerUser()
+      loading.hidden = true
+      if (!user) {
+        guest.hidden = false
+        return
+      }
+      userBox.hidden = false
+      emailTarget.textContent = user.email || 'บัญชีสมาชิก'
+      await loadOrders(false)
+    } catch (error) {
+      loading.hidden = true
+      guest.hidden = false
+      showMessage(friendlyCustomerOrderError(error), 'error')
+    }
+  }
+
+  void init()
+</script>
