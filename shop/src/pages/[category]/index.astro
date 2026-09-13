@@ -69,32 +69,45 @@ const schema = [
   <div class="container breadcrumbs">
     <ol><li><a href="/">หน้าแรก</a></li><li>{category.name}</li></ol>
   </div>
-  <section class="hero">
+
+  <section class="hero category-hero">
     <div class="container">
-      <div class="eyebrow">สินค้าพร้อมจำหน่าย</div>
+      <div class="eyebrow">เลือกของที่เหมาะกับคุณ</div>
       <h1>{category.h1}</h1>
-      <p class="lead">เลือกดูสินค้าจากรายการที่ร้านเปิดขาย พร้อมราคา รูป สเปก สภาพ และสถานะล่าสุดก่อนตัดสินใจสั่งซื้อ</p>
+      <p class="lead">{seoContent?.hero || 'ดูของที่มีอยู่จริงในร้าน พร้อมราคา รูป และรายละเอียดของแต่ละชิ้น เลือกตัวที่ตรงกับงานและงบได้เลย'}</p>
+      <div class="category-hero-status" aria-label="สถานะสินค้าหมวดนี้">
+        <span class="category-status-pill">{products.length > 0 ? `ตอนนี้มี ${products.length} รายการ` : 'ของหมวดนี้เข้าเป็นรอบ ๆ'}</span>
+        <span>ของมือสองเปลี่ยนเร็ว ถ้าเจอตัวที่ชอบแนะนำเปิดดูรายละเอียดไว้ก่อน</span>
+      </div>
     </div>
   </section>
+
   {brands.length > 0 && (
-    <section class="section">
+    <section class="section compact-section">
       <div class="container">
-        <div class="section-head"><div><h2>เลือกตามแบรนด์</h2><p class="muted">ดูสินค้าและข้อมูลรุ่นแยกตามแบรนด์ได้ง่ายขึ้น</p></div></div>
+        <div class="section-head human-section-head">
+          <div><div class="eyebrow">หาให้ไวขึ้น</div><h2>เลือกตามแบรนด์</h2><p class="muted">ถ้ามีแบรนด์ในใจอยู่แล้ว เริ่มจากตรงนี้ได้เลย</p></div>
+        </div>
         <div class="category-grid">
-          {brands.map((brand) => <a class="category-card" href={brand.canonicalPath}><strong>{brand.brand.name}</strong><span>{brand.currentStockCount > 0 ? `มีสินค้า ${brand.currentStockCount} ชิ้น →` : 'ดูข้อมูลแบรนด์ →'}</span></a>)}
+          {brands.map((brand) => <a class="category-card human-category-card" href={brand.canonicalPath}><strong>{brand.brand.name}</strong><span>{brand.currentStockCount > 0 ? `มีของ ${brand.currentStockCount} ชิ้น →` : 'ดูรุ่นของแบรนด์นี้ →'}</span></a>)}
         </div>
       </div>
     </section>
   )}
+
   <section class="section">
     <div class="container">
-      <div class="section-head">
-        <div><h2>สินค้าที่มีในหมวดนี้</h2><p class="muted">พบ {products.length} รายการ</p></div>
+      <div class="section-head human-section-head">
+        <div>
+          <div class="eyebrow">ของที่มีตอนนี้</div>
+          <h2>{products.length ? 'เลือกจากสินค้าที่พร้อมขาย' : 'ตอนนี้ยังไม่มีของในหมวดนี้'}</h2>
+          <p class="muted">{products.length ? `มี ${products.length} รายการ ลองกดดูรูปและรายละเอียดของแต่ละเครื่องได้เลย` : 'ของมือสองเข้าร้านไม่พร้อมกันทุกหมวด แวะกลับมาดูได้เรื่อย ๆ ครับ'}</p>
+        </div>
       </div>
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
-        <div class="empty">{apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ขณะนี้ยังไม่มีสินค้าที่พร้อมจำหน่ายในหมวดนี้ สินค้ามือสองหมุนเวียนตามสต๊อกของร้าน'}</div>
+        <div class="empty human-empty">{apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองรีเฟรชอีกครั้งในอีกสักครู่ครับ' : 'ยังไม่มีของพร้อมขายในหมวดนี้ตอนนี้ แต่หมวดนี้ยังเปิดไว้เพราะมีสินค้าเข้าหมุนเวียนเป็นระยะครับ'}</div>
       )}
     </div>
   </section>
@@ -102,14 +115,19 @@ const schema = [
   {seoContent && (
     <section class="section category-commercial-content">
       <div class="container">
-        <article class="panel editorial-panel">
-          <div class="eyebrow">ข้อมูลก่อนเลือกซื้อ</div>
-          <h2>เลือกซื้อ{category.name}อย่างไรให้เหมาะกับการใช้งาน</h2>
-          <p>{seoContent.intro}</p>
-          <ul>
-            {seoContent.buyingPoints.map((point) => <li>{point}</li>)}
-          </ul>
-          <p>{seoContent.closing}</p>
+        <article class="panel editorial-panel human-buying-guide">
+          <div class="eyebrow">เลือกให้ง่ายขึ้น</div>
+          <h2>ก่อนซื้อ ลองดู 3 จุดนี้</h2>
+          <p class="human-guide-intro">{seoContent.intro}</p>
+          <div class="buying-tip-grid">
+            {seoContent.buyingPoints.map((point, index) => (
+              <div class="buying-tip-card">
+                <span class="buying-tip-number">{index + 1}</span>
+                <p>{point}</p>
+              </div>
+            ))}
+          </div>
+          <p class="human-guide-closing">{seoContent.closing}</p>
         </article>
       </div>
     </section>
@@ -118,10 +136,10 @@ const schema = [
   {relatedCategories.length > 0 && (
     <section class="section category-related-links">
       <div class="container">
-        <div class="section-head"><div><h2>หมวดสินค้าใกล้เคียง</h2><p class="muted">เลือกดูสินค้าไอทีมือสองประเภทอื่นที่เกี่ยวข้อง</p></div></div>
+        <div class="section-head human-section-head"><div><div class="eyebrow">ยังเลือกไม่ลง?</div><h2>ลองดูหมวดใกล้เคียง</h2><p class="muted">บางทีของที่เหมาะกับงานอาจอยู่คนละหมวดกับที่คิดไว้</p></div></div>
         <div class="category-grid">
           {relatedCategories.map((item) => (
-            <a class="category-card" href={`/${item.slug}/`}><strong>{item.name}</strong><span>ดูสินค้า →</span></a>
+            <a class="category-card human-category-card" href={`/${item.slug}/`}><strong>{item.name}</strong><span>ลองดูต่อ →</span></a>
           ))}
         </div>
       </div>
