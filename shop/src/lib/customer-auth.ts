@@ -25,10 +25,12 @@ type AuthResponse = CustomerAuthSession & {
 }
 
 const SESSION_KEY = 'amphon_shop_customer_auth_v1'
+const DEFAULT_SUPABASE_URL = 'https://mfpdtlxwdbxitgfzdape.supabase.co'
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-'
 
 function authConfig() {
-  const url = String(import.meta.env.PUBLIC_SUPABASE_URL || '').trim().replace(/\/$/, '')
-  const key = String(import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY || '').trim()
+  const url = String(import.meta.env.PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL).trim().replace(/\/$/, '')
+  const key = String(import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY || DEFAULT_SUPABASE_PUBLISHABLE_KEY).trim()
   if (!url || !key) throw new Error('ระบบสมาชิกยังตั้งค่าไม่ครบ กรุณาติดต่อร้าน')
   return { url, key }
 }
