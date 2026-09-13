@@ -2,13 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import '../../styles/auth.css'
 ---
-<BaseLayout title="บัญชีของฉัน | AMPHON SHOP" description="จัดการบัญชี ข้อมูลติดต่อ และที่อยู่จัดส่ง AMPHON SHOP" canonicalPath="/account/" robots="noindex,nofollow">
+<BaseLayout title="บัญชีของฉัน | AMPHON SHOP" description="จัดการข้อมูลติดต่อ ที่อยู่จัดส่ง และรายการสั่งซื้อ AMPHON SHOP" canonicalPath="/account/" robots="noindex,nofollow">
   <section class="auth-shell">
     <div class="auth-container account-wide">
       <div class="auth-card">
-        <div class="eyebrow">MY ACCOUNT</div>
+        <div class="eyebrow">บัญชีสมาชิก</div>
         <h1>บัญชีของฉัน</h1>
-        <p class="auth-copy">จัดการบัญชี ข้อมูลติดต่อ และสมุดที่อยู่สำหรับการสั่งซื้อใน AMPHON SHOP</p>
+        <p class="auth-copy">จัดการข้อมูลติดต่อ ที่อยู่จัดส่ง วิธีเข้าสู่ระบบ และเข้าดูรายการสั่งซื้อของคุณได้จากหน้านี้</p>
         <div id="account-loading" class="auth-message info">กำลังตรวจสอบสถานะบัญชี...</div>
         <div id="account-guest" hidden>
           <div class="auth-actions">
@@ -20,7 +20,7 @@ import '../../styles/auth.css'
         <div id="account-user" hidden>
           <section class="account-section">
             <div class="account-section-heading">
-              <div><span class="account-kicker">ACCOUNT</span><h2>ข้อมูลบัญชี</h2></div>
+              <div><span class="account-kicker">บัญชี</span><h2>ข้อมูลบัญชี</h2></div>
             </div>
             <div class="auth-status">
               <div class="auth-status-row"><span>อีเมล</span><strong id="account-email">-</strong></div>
@@ -31,7 +31,7 @@ import '../../styles/auth.css'
             <div id="account-google-box" class="auth-provider-box">
               <div>
                 <strong id="account-google-title">Google</strong>
-                <p id="account-google-copy">เชื่อม Google เพื่อใช้เข้าสู่บัญชีนี้ได้อีกทาง</p>
+                <p id="account-google-copy">เชื่อม Google เพื่อให้เข้าสู่ระบบได้สะดวกขึ้น</p>
               </div>
               <button id="account-link-google" class="button button-secondary auth-google-button auth-google-compact" type="button">
                 <span class="auth-google-mark" aria-hidden="true">G</span><span>เชื่อม Google</span>
@@ -41,8 +41,8 @@ import '../../styles/auth.css'
 
           <section class="account-section">
             <div class="account-section-heading">
-              <div><span class="account-kicker">PROFILE</span><h2>ข้อมูลติดต่อ</h2></div>
-              <span class="account-section-note">ใช้สำหรับติดต่อเรื่องคำสั่งซื้อ</span>
+              <div><span class="account-kicker">ข้อมูลติดต่อ</span><h2>ชื่อและเบอร์โทร</h2></div>
+              <span class="account-section-note">ใช้สำหรับติดต่อเกี่ยวกับคำสั่งซื้อ</span>
             </div>
             <form id="profile-form" class="auth-form account-form-grid">
               <label class="auth-field"><span>ชื่อที่ใช้ติดต่อ</span><input id="profile-name" name="displayName" autocomplete="name" required minlength="2" maxlength="120" /></label>
@@ -54,10 +54,10 @@ import '../../styles/auth.css'
 
           <section class="account-section">
             <div class="account-section-heading">
-              <div><span class="account-kicker">ADDRESS BOOK</span><h2>ที่อยู่จัดส่ง</h2></div>
+              <div><span class="account-kicker">ที่อยู่จัดส่ง</span><h2>สมุดที่อยู่</h2></div>
               <button id="address-new" class="button button-secondary account-small-button" type="button">+ เพิ่มที่อยู่</button>
             </div>
-            <p class="account-section-note account-address-note">บันทึกได้หลายที่อยู่ และเลือกหนึ่งรายการเป็นที่อยู่เริ่มต้น ข้อมูลนี้ยังไม่ถูกบังคับใช้ใน Checkout จนถึง SHOP-8.5</p>
+            <p class="account-section-note account-address-note">บันทึกได้หลายที่อยู่ และเลือกหนึ่งรายการเป็นค่าเริ่มต้น ระบบจะใช้ที่อยู่ที่คุณเลือกเมื่อสั่งซื้อสินค้าออนไลน์</p>
             <div id="address-message" class="auth-message" hidden></div>
             <div id="address-list" class="address-list"></div>
             <div id="address-empty" class="address-empty" hidden>ยังไม่มีที่อยู่จัดส่ง กด “เพิ่มที่อยู่” เพื่อบันทึกที่อยู่แรก</div>
@@ -84,6 +84,7 @@ import '../../styles/auth.css'
           </section>
 
           <div class="auth-actions account-footer-actions">
+            <a class="button button-primary button-wide" href="/account/orders/">ดูรายการสั่งซื้อ</a>
             <a class="button button-secondary button-wide" href="/cart/">กลับไปตะกร้า</a>
             <button id="account-signout" class="button button-secondary button-wide auth-button" type="button">ออกจากระบบ</button>
           </div>
@@ -257,10 +258,10 @@ import '../../styles/auth.css'
     verifiedTarget.textContent = user.email_confirmed_at ? 'ยืนยันอีเมลแล้ว' : 'รอยืนยันอีเมล'
     const identities = user.identities || []
     const providers = [...new Set(identities.map((identity) => identity.provider))]
-    providersTarget.textContent = providers.map((provider) => provider === 'google' ? 'Google' : provider === 'email' ? 'Email / Password' : provider).join(' + ') || 'Email / Password'
+    providersTarget.textContent = providers.map((provider) => provider === 'google' ? 'Google' : provider === 'email' ? 'อีเมลและรหัสผ่าน' : provider).join(' + ') || 'อีเมลและรหัสผ่าน'
     if (customerHasIdentity(user, 'google')) {
-      googleTitle.textContent = 'Google เชื่อมแล้ว'
-      googleCopy.textContent = 'บัญชีนี้สามารถเข้าสู่ระบบด้วย Google ได้'
+      googleTitle.textContent = 'เชื่อม Google แล้ว'
+      googleCopy.textContent = 'คุณสามารถใช้ Google เพื่อเข้าสู่บัญชีนี้ได้'
       googleButton.hidden = true
       googleBox.classList.add('is-linked')
     }
@@ -272,7 +273,7 @@ import '../../styles/auth.css'
   googleButton.addEventListener('click', async () => {
     hideMessage(linkMessage)
     googleButton.disabled = true
-    googleButton.querySelector('span:last-child')!.textContent = 'กำลังไป Google...'
+    googleButton.querySelector('span:last-child')!.textContent = 'กำลังเปิด Google...'
     try { await linkGoogleIdentity('/account/') }
     catch (error) {
       showMessage(linkMessage, friendlyAuthError(error), 'error')
@@ -284,7 +285,7 @@ import '../../styles/auth.css'
   profileForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     hideMessage(profileMessage)
-    if (!profile) { showMessage(profileMessage, 'ไม่พบโปรไฟล์ลูกค้า กรุณาเข้าสู่ระบบใหม่', 'error'); return }
+    if (!profile) { showMessage(profileMessage, 'ไม่พบข้อมูลบัญชี กรุณาเข้าสู่ระบบใหม่', 'error'); return }
     const name = profileName.value.trim()
     const phone = normalizePhone(profilePhone.value)
     if (name.length < 2) { showMessage(profileMessage, 'กรุณากรอกชื่อที่ใช้ติดต่ออย่างน้อย 2 ตัวอักษร', 'error'); return }
@@ -303,7 +304,7 @@ import '../../styles/auth.css'
   addressForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     hideMessage(addressMessage)
-    if (!profile) { showMessage(addressMessage, 'ไม่พบโปรไฟล์ลูกค้า กรุณาเข้าสู่ระบบใหม่', 'error'); return }
+    if (!profile) { showMessage(addressMessage, 'ไม่พบข้อมูลบัญชี กรุณาเข้าสู่ระบบใหม่', 'error'); return }
     const addressId = (document.getElementById('address-id') as HTMLInputElement).value
     const phone = normalizePhone((document.getElementById('address-phone') as HTMLInputElement).value)
     const postal = (document.getElementById('address-postal') as HTMLInputElement).value.trim()
