@@ -1,0 +1,75 @@
+{
+  "phase": "SHOP-SEO-4.1",
+  "captured_at": "2026-09-13",
+  "site": "https://shop.amphon.co.th",
+  "gsc_property": "sc-domain:amphon.co.th",
+  "gsc_window": "last_28dT",
+  "connector_health": {
+    "property_clicks": 1171,
+    "property_impressions": 21572,
+    "property_ctr": 0.0543,
+    "property_average_position": 8.3258
+  },
+  "shop_performance": {
+    "page_rows": 0,
+    "query_page_rows": 0,
+    "status": "NO_SEARCH_ANALYTICS_ROWS_YET",
+    "note": "Zero Search Analytics rows does not mean zero indexed URLs. It means no shop.amphon.co.th performance rows were returned for this observation window."
+  },
+  "gsc_sitemaps": {
+    "shop_sitemap_row_found": false,
+    "shop_sitemap": "https://shop.amphon.co.th/sitemap.xml",
+    "known_domain_property_sitemap": "https://amphon.co.th/sitemap-index.xml",
+    "action": "SUBMIT_SHOP_SITEMAP_IN_GSC"
+  },
+  "index_surface": {
+    "homepage": 1,
+    "strategic_categories": 8,
+    "products": 2,
+    "evergreen": 0,
+    "total": 11
+  },
+  "index_categories": [
+    "notebooks",
+    "desktop-pcs",
+    "iphones",
+    "smartphones",
+    "tablets",
+    "monitors",
+    "cameras",
+    "gaming-consoles"
+  ],
+  "hold_categories": [
+    "macbooks",
+    "gaming-pcs",
+    "camera-lenses",
+    "graphics-cards",
+    "pc-components",
+    "accessories",
+    "other-it"
+  ],
+  "index_products": [
+    {
+      "sku": "AT-PC-2609-000002",
+      "title": "Apple MacBook Neo",
+      "path": "/p/apple-macbook-neo-at-pc-2609-000002/"
+    },
+    {
+      "sku": "AT-TB-2609-000003",
+      "title": "Apple iPad Gen11",
+      "path": "/p/apple-ipad-gen11-at-tb-2609-000003/"
+    }
+  ],
+  "observation_checkpoints": {
+    "day_7": "2026-09-20",
+    "day_14": "2026-09-27",
+    "day_28": "2026-10-11"
+  },
+  "freeze_contract": {
+    "promote_hold_categories": false,
+    "promote_evergreen_pages": false,
+    "change_strategic_canonical_paths": false,
+    "change_strategic_keyword_ownership": false,
+    "allow_critical_technical_fixes": true
+  }
+}
