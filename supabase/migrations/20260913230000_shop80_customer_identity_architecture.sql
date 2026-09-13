@@ -361,18 +361,15 @@ comment on column public.commerce_orders.shipping_address_snapshot is
 -- -----------------------------------------------------------------------------
 -- STAGED FEATURE FLAG
 -- -----------------------------------------------------------------------------
--- Keep FALSE in SHOP-8.0 so current guest checkout remains live and unchanged.
+-- The new NOT NULL + DEFAULT false column backfills existing rows safely on first apply.
+-- Deliberately do NOT issue UPDATE ... SET false here: re-running this migration after
+-- SHOP-8.5 must never disable an already-activated member checkout.
 
 alter table public.commerce_store_settings
   add column if not exists member_checkout_required boolean not null default false;
 
-update public.commerce_store_settings
-   set member_checkout_required = false
- where id = 1
-   and member_checkout_required is distinct from false;
-
 comment on column public.commerce_store_settings.member_checkout_required is
-'When true, Store API must require a verified authenticated customer before order creation. SHOP-8.0 leaves this false.';
+'When true, Store API must require a verified authenticated customer before order creation. SHOP-8.0 leaves this false on first install.';
 
 -- -----------------------------------------------------------------------------
 -- SERVICE ROLE ACCESS
