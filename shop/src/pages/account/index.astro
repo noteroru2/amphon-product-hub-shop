@@ -20,6 +20,18 @@ import '../../styles/auth.css'
           <div class="auth-status">
             <div class="auth-status-row"><span>อีเมล</span><strong id="account-email">-</strong></div>
             <div class="auth-status-row"><span>สถานะ</span><strong id="account-verified">-</strong></div>
+            <div class="auth-status-row"><span>วิธีเข้าสู่ระบบ</span><strong id="account-providers">-</strong></div>
+          </div>
+          <div id="account-link-message" class="auth-message" hidden></div>
+          <div id="account-google-box" class="auth-provider-box">
+            <div>
+              <strong id="account-google-title">Google</strong>
+              <p id="account-google-copy">เชื่อม Google เพื่อใช้เข้าสู่บัญชีนี้ได้อีกทาง</p>
+            </div>
+            <button id="account-link-google" class="button button-secondary auth-google-button auth-google-compact" type="button">
+              <span class="auth-google-mark" aria-hidden="true">G</span>
+              <span>เชื่อม Google</span>
+            </button>
           </div>
           <div class="auth-actions">
             <a class="button button-secondary button-wide" href="/cart/">กลับไปตะกร้า</a>
@@ -31,20 +43,48 @@ import '../../styles/auth.css'
   </section>
 </BaseLayout>
 <script>
-  import { consumeCustomerAuthRedirect, getCustomerUser, signOutCustomer } from '../../lib/customer-auth'
+  import { consumeCustomerAuthRedirect, customerHasIdentity, friendlyAuthError, getCustomerUser, linkGoogleIdentity, signOutCustomer } from '../../lib/customer-auth'
   const loading = document.getElementById('account-loading') as HTMLElement
   const guest = document.getElementById('account-guest') as HTMLElement
   const userBox = document.getElementById('account-user') as HTMLElement
   const emailTarget = document.getElementById('account-email') as HTMLElement
   const verifiedTarget = document.getElementById('account-verified') as HTMLElement
+  const providersTarget = document.getElementById('account-providers') as HTMLElement
+  const googleBox = document.getElementById('account-google-box') as HTMLElement
+  const googleTitle = document.getElementById('account-google-title') as HTMLElement
+  const googleCopy = document.getElementById('account-google-copy') as HTMLElement
+  const googleButton = document.getElementById('account-link-google') as HTMLButtonElement
+  const linkMessage = document.getElementById('account-link-message') as HTMLElement
+  const show = (text:string, tone:'error'|'success'|'info') => { linkMessage.textContent = text; linkMessage.className = `auth-message ${tone}`; linkMessage.hidden = false }
   consumeCustomerAuthRedirect()
   void getCustomerUser().then((user) => {
     loading.hidden = true
     if (!user) { guest.hidden = false; return }
     emailTarget.textContent = user.email || '-'
     verifiedTarget.textContent = user.email_confirmed_at ? 'ยืนยันอีเมลแล้ว' : 'รอยืนยันอีเมล'
+    const identities = user.identities || []
+    const providers = [...new Set(identities.map((identity) => identity.provider))]
+    providersTarget.textContent = providers.map((provider) => provider === 'google' ? 'Google' : provider === 'email' ? 'Email / Password' : provider).join(' + ') || 'Email / Password'
+    if (customerHasIdentity(user, 'google')) {
+      googleTitle.textContent = 'Google เชื่อมแล้ว'
+      googleCopy.textContent = 'บัญชีนี้สามารถเข้าสู่ระบบด้วย Google ได้'
+      googleButton.hidden = true
+      googleBox.classList.add('is-linked')
+    }
     userBox.hidden = false
   }).catch(() => { loading.hidden = true; guest.hidden = false })
+  googleButton.addEventListener('click', async () => {
+    linkMessage.hidden = true
+    googleButton.disabled = true
+    googleButton.querySelector('span:last-child')!.textContent = 'กำลังไป Google...'
+    try {
+      await linkGoogleIdentity('/account/')
+    } catch (error) {
+      show(friendlyAuthError(error), 'error')
+      googleButton.disabled = false
+      googleButton.querySelector('span:last-child')!.textContent = 'เชื่อม Google'
+    }
+  })
   document.getElementById('account-signout')?.addEventListener('click', async () => {
     await signOutCustomer().catch(() => undefined)
     location.href = '/account/login/'
