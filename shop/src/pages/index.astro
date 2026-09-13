@@ -33,54 +33,90 @@ const schema = [
     url: absoluteUrl('/'),
   },
 ]
+
+const categoryLooks: Record<string, { icon: string; note: string }> = {
+  notebooks: { icon: '💻', note: 'เรียน • ทำงาน • พกไปใช้ข้างนอก' },
+  'desktop-pcs': { icon: '🖥️', note: 'งานออฟฟิศ • อัปเกรด • เล่นเกม' },
+  iphones: { icon: '📱', note: 'ดูรุ่น ความจุ แบต และสภาพเครื่อง' },
+  smartphones: { icon: '📲', note: 'Android หลายงบ หลายสเปก' },
+  tablets: { icon: '✍️', note: 'เรียน • จดงาน • วาดรูป • ดูหนัง' },
+  monitors: { icon: '🖥', note: 'ทำงาน • เกม • ต่อเป็นจอเสริม' },
+  cameras: { icon: '📷', note: 'กล้องและอุปกรณ์ถ่ายภาพมือสอง' },
+  'gaming-consoles': { icon: '🎮', note: 'เครื่องเกม จอย และชุดพร้อมเล่น' },
+}
 ---
 <BaseLayout title={title} description={description} canonicalPath="/" jsonLd={schema}>
-  <section class="hero">
-    <div class="container">
-      <div class="eyebrow">AMPHON SHOP</div>
-      <h1>สินค้าไอทีมือสองออนไลน์<br />ดูข้อมูลจริงก่อนตัดสินใจ</h1>
-      <p class="lead">เลือกซื้อโน้ตบุ๊ก คอมพิวเตอร์ iPhone มือถือ กล้อง จอคอม และสินค้าไอที พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะพร้อมจำหน่ายก่อนสั่งซื้อ</p>
-      <div class="hero-actions">
-        <a class="button button-primary" href="/notebooks/">ดูโน้ตบุ๊กมือสอง</a>
-        <a class="button button-secondary" href="/iphones/">ดู iPhone มือสอง</a>
+  <section class="hero storefront-hero">
+    <div class="container storefront-hero-inner">
+      <div>
+        <div class="eyebrow">AMPHON SHOP</div>
+        <h1>สินค้าไอทีมือสองออนไลน์<br />ดูข้อมูลจริงก่อนตัดสินใจ</h1>
+        <p class="lead">เลือกของมือสองไม่ควรต้องเดาครับ ที่นี่เราแยกราคา สเปก สภาพ รูปจริง และตำหนิของแต่ละชิ้นไว้ให้ดูตรง ๆ เจอเครื่องที่ถูกใจก็กดดูรายละเอียดต่อได้เลย</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#shop-categories">เลือกหมวดสินค้า</a>
+          <a class="button button-secondary" href="#latest-products">ดูของที่เพิ่งลง</a>
+        </div>
       </div>
+      <aside class="storefront-hero-note" aria-label="วิธีเลือกสินค้า">
+        <span class="storefront-note-kicker">เลือกไม่ถูก เริ่มแบบนี้</span>
+        <strong>บอกตัวเองก่อนว่าจะเอาไปใช้ทำอะไร</strong>
+        <p>จากนั้นค่อยเทียบสเปก สภาพ และงบ จะเลือกง่ายกว่าดูแต่ชื่อรุ่นครับ</p>
+      </aside>
     </div>
   </section>
 
   <section class="home-trust-strip" aria-label="จุดเด่นของร้าน">
     <div class="container home-trust-grid">
-      <div class="home-trust-item"><span class="home-trust-icon">✓</span><span><strong>ข้อมูลสินค้าจริง</strong><span>ดูราคา สเปก สภาพ และรูปของสินค้าชิ้นนั้นก่อนสั่งซื้อ</span></span></div>
-      <div class="home-trust-item"><span class="home-trust-icon">◎</span><span><strong>มีหน้าร้านจริง</strong><span>AMPHON TRADING ดูแลสินค้าทั้งออนไลน์และหน้าร้าน</span></span></div>
-      <div class="home-trust-item"><span class="home-trust-icon">→</span><span><strong>สั่งซื้อได้ง่าย</strong><span>เลือกสินค้า เข้าสู่ระบบ เลือกที่อยู่ และชำระเงินตามขั้นตอน</span></span></div>
+      <div class="home-trust-item"><span class="home-trust-icon">👀</span><span><strong>เห็นของก่อนซื้อ</strong><span>รูป สเปก สภาพ และตำหนิของชิ้นนั้นดูได้จากหน้าสินค้า</span></span></div>
+      <div class="home-trust-item"><span class="home-trust-icon">🏪</span><span><strong>มีร้านให้ติดต่อจริง</strong><span>AMPHON TRADING ดูแลทั้งหน้าร้านและออนไลน์</span></span></div>
+      <div class="home-trust-item"><span class="home-trust-icon">🛒</span><span><strong>สั่งได้ตรงจากเว็บ</strong><span>เลือกของ เข้าสู่ระบบ เลือกที่อยู่ แล้วชำระเงินตามขั้นตอน</span></span></div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" id="shop-categories">
     <div class="container">
-      <div class="section-head">
-        <div><div class="eyebrow">หมวดสินค้า</div><h2>เลือกตามประเภทสินค้า</h2></div>
+      <div class="section-head human-section-head">
+        <div><div class="eyebrow">กำลังหาอะไรอยู่?</div><h2>เลือกตามของที่อยากได้</h2><p class="muted">กดเข้าหมวดแล้วค่อยไล่ดูของที่มีจริงตอนนี้ได้เลย</p></div>
       </div>
-      <div class="category-grid">
-        {indexCategories.map((category) => (
-          <a class="category-card" href={`/${category.slug}/`}>
-            <strong>{category.name}</strong>
-            <span>ดูสินค้า →</span>
-          </a>
-        ))}
+      <div class="category-grid storefront-category-grid">
+        {indexCategories.map((category) => {
+          const look = categoryLooks[category.slug] || { icon: '•', note: 'ดูสินค้าที่มีในหมวดนี้' }
+          return (
+            <a class="category-card storefront-category-card" href={`/${category.slug}/`}>
+              <span class="storefront-category-icon" aria-hidden="true">{look.icon}</span>
+              <strong>{category.name}</strong>
+              <span class="storefront-category-note">{look.note}</span>
+              <span class="storefront-category-link">เข้าไปดู →</span>
+            </a>
+          )
+        })}
       </div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section storefront-howto">
     <div class="container">
-      <div class="section-head">
-        <div><div class="eyebrow">สินค้าเข้าใหม่</div><h2>สินค้าที่ลงขายล่าสุด</h2></div>
+      <div class="section-head human-section-head">
+        <div><div class="eyebrow">ดูของมือสองให้สบายใจขึ้น</div><h2>ก่อนกดซื้อ ลองดู 3 อย่าง</h2></div>
+      </div>
+      <div class="storefront-step-grid">
+        <article class="storefront-step"><span>1</span><strong>ดูว่าเหมาะกับงานไหม</strong><p>ไม่ต้องซื้อสเปกแรงที่สุด เลือกให้พอกับสิ่งที่ใช้จริงจะคุ้มกว่า</p></article>
+        <article class="storefront-step"><span>2</span><strong>ซูมดูรูปกับตำหนิ</strong><p>ของมือสองสภาพต่างกันทุกชิ้น รูปจริงช่วยตัดสินใจได้มากกว่าชื่อรุ่น</p></article>
+        <article class="storefront-step"><span>3</span><strong>เช็กของที่ให้มาและประกัน</strong><p>กล่อง อะแดปเตอร์ อุปกรณ์ และประกันอาจไม่เหมือนกันในแต่ละรายการ</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="latest-products">
+    <div class="container">
+      <div class="section-head human-section-head">
+        <div><div class="eyebrow">ของเพิ่งลงร้าน</div><h2>มีอะไรใหม่ ลองดูก่อน</h2><p class="muted">ของมือสองเปลี่ยนตลอด เจอตัวถูกใจแนะนำเปิดดูรายละเอียดไว้ก่อนครับ</p></div>
       </div>
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
-        <div class="empty">
-          {apiError ? 'ไม่สามารถโหลดรายการสินค้าได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง' : 'ยังไม่มีสินค้าที่พร้อมจำหน่ายบนเว็บไซต์'}
+        <div class="empty human-empty">
+          {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองเข้ามาใหม่อีกครั้งในอีกสักครู่ครับ' : 'ตอนนี้ยังไม่มีของใหม่ลงหน้าเว็บ ลองแวะกลับมาดูอีกครั้งครับ'}
         </div>
       )}
     </div>
