@@ -18,7 +18,7 @@ const robots = page.effectiveIndexPolicy === 'INDEX'
   ? 'index,follow,max-image-preview:large'
   : 'noindex,follow'
 const title = page.seoTitle || `${page.seoH1 || page.brand.name} | AMPHON TRADING`
-const description = page.seoDescription || page.introContent?.slice(0, 165) || `สินค้าไอทีมือสอง ${page.brand.name} จาก AMPHON TRADING`
+const description = page.seoDescription || page.introContent?.slice(0, 165) || `เลือกดูสินค้าไอทีมือสอง ${page.brand.name} พร้อมราคา สเปก สภาพ และรูปสินค้าจาก AMPHON TRADING`
 const h1 = page.seoH1 || page.model?.name || page.series?.name || `${page.brand.name} มือสอง`
 const intro = page.introContent || ''
 const editorialParagraphs = (page.editorialContent || '').split(/\n\s*\n/).map((value) => value.trim()).filter(Boolean)
@@ -55,12 +55,12 @@ const schema = [
 
   <section class="hero evergreen-hero">
     <div class="container">
-      <div class="eyebrow">EVERGREEN USED IT CATALOG</div>
+      <div class="eyebrow">เลือกซื้อสินค้ามือสอง</div>
       <h1>{h1}</h1>
       {intro && <p class="lead">{intro}</p>}
-      <div class="chips">
-        <span class="button button-secondary">มีขายตอนนี้ {page.currentStockCount} ชิ้น</span>
-        {page.historicalListingCount > 0 && <span class="button button-secondary">ข้อมูลสินค้าที่เคยลง {page.historicalListingCount} ชิ้น</span>}
+      <div class="chips" aria-label="สถานะสินค้าในหน้านี้">
+        <span class="button button-secondary">พร้อมจำหน่าย {page.currentStockCount} ชิ้น</span>
+        {page.historicalListingCount > 0 && <span class="button button-secondary">เคยมีรายการขาย {page.historicalListingCount} ชิ้น</span>}
       </div>
     </div>
   </section>
@@ -68,12 +68,12 @@ const schema = [
   {children.length > 0 && (
     <section class="section">
       <div class="container">
-        <div class="section-head"><div><h2>{page.pageType === 'BRAND' ? 'ซีรีส์ที่เกี่ยวข้อง' : 'รุ่นในซีรีส์นี้'}</h2><p class="muted">เฉพาะหน้าที่ผ่าน SEO Release Gate และเปิด Index แล้ว</p></div></div>
+        <div class="section-head"><div><h2>{page.pageType === 'BRAND' ? 'เลือกตามซีรีส์' : 'รุ่นในซีรีส์นี้'}</h2><p class="muted">เลือกดูรุ่นที่เกี่ยวข้องเพื่อเทียบสินค้า ราคา และสภาพได้ง่ายขึ้น</p></div></div>
         <div class="category-grid">
           {children.map((child) => (
             <a class="category-card" href={child.canonicalPath}>
               <strong>{child.model?.name || child.series?.name || child.brand.name}</strong>
-              <span>{child.currentStockCount > 0 ? `มีสินค้า ${child.currentStockCount} ชิ้น →` : 'ดูข้อมูลรุ่น →'}</span>
+              <span>{child.currentStockCount > 0 ? `พร้อมจำหน่าย ${child.currentStockCount} ชิ้น →` : 'ดูข้อมูลรุ่น →'}</span>
             </a>
           ))}
         </div>
@@ -84,14 +84,14 @@ const schema = [
   <section class="section">
     <div class="container">
       <div class="section-head">
-        <div><h2>สินค้าที่มีจำหน่ายตอนนี้</h2><p class="muted">ดึงจากสต๊อกจริงของ AMPHON Product Hub</p></div>
+        <div><h2>สินค้าที่พร้อมจำหน่าย</h2><p class="muted">ดูราคา สภาพ และรูปของสินค้าที่ร้านเปิดขายอยู่ในขณะนี้</p></div>
       </div>
       {products.length ? (
         <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
       ) : (
         <div class="empty">
           <strong>ขณะนี้ยังไม่มีสินค้ารุ่นนี้พร้อมจำหน่าย</strong>
-          <p style="margin:10px 0 0">หน้านี้เป็นข้อมูลรุ่นแบบ Evergreen และจะอัปเดตรายการอัตโนมัติเมื่อมีสินค้าเข้าสต๊อกและถูก Publish</p>
+          <p style="margin:10px 0 0">สามารถดูซีรีส์ รุ่นใกล้เคียง หรือกลับไปเลือกสินค้าหมวดเดียวกันได้ และหน้านี้จะแสดงรายการเมื่อมีสินค้าเข้ามาใหม่</p>
         </div>
       )}
     </div>
@@ -120,7 +120,7 @@ const schema = [
   {related.length > 0 && (
     <section class="section">
       <div class="container">
-        <div class="section-head"><div><h2>รุ่นใกล้เคียง</h2></div></div>
+        <div class="section-head"><div><h2>รุ่นใกล้เคียง</h2><p class="muted">เปรียบเทียบตัวเลือกอื่นในกลุ่มเดียวกันก่อนตัดสินใจ</p></div></div>
         <div class="category-grid">
           {related.map((item) => <a class="category-card" href={item.canonicalPath}><strong>{item.model?.name || item.series?.name || item.brand.name}</strong><span>ดูสินค้าและข้อมูล →</span></a>)}
         </div>
