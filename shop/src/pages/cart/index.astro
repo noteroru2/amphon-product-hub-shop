@@ -42,7 +42,7 @@ const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '
       app.innerHTML = `<div class="cart-list">${products.map((item: any) => item.missing ? `
         <div class="cart-row unavailable"><div><strong>${escapeHtml(item.sku)}</strong><small>สินค้ารายการนี้ไม่พร้อมจำหน่ายแล้ว</small></div><button data-remove="${escapeHtml(item.sku)}">ลบ</button></div>` : `
         <div class="cart-row ${item.availability !== 'available' ? 'unavailable' : ''}">
-          <div class="cart-thumb">${item.images?.[0]?.url ? `<img src="${escapeHtml(item.images[0].url)}" alt="">` : '<span>IMG</span>'}</div>
+          <div class="cart-thumb">${item.images?.[0]?.url ? `<img src="${escapeHtml(item.images[0].url)}" alt="">` : '<span>ไม่มีรูป</span>'}</div>
           <div class="cart-copy"><strong>${escapeHtml(item.title)}</strong><small>รหัสสินค้า ${escapeHtml(item.sku)} · ${item.availability === 'available' ? 'พร้อมสั่งซื้อ' : item.availability === 'reserved' ? 'ติดจอง' : 'ขายแล้ว'}</small></div>
           <div class="cart-price">${money(Number(item.price || 0))}</div><button class="cart-remove" data-remove="${escapeHtml(item.sku)}">ลบ</button>
         </div>`).join('')}</div>
