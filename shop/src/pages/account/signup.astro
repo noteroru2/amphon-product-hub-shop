@@ -2,13 +2,18 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import '../../styles/auth.css'
 ---
-<BaseLayout title="สมัครสมาชิก | AMPHON SHOP" description="สมัครสมาชิก AMPHON SHOP ด้วยอีเมลและรหัสผ่าน" canonicalPath="/account/signup/" robots="noindex,nofollow">
+<BaseLayout title="สมัครสมาชิก | AMPHON SHOP" description="สมัครสมาชิก AMPHON SHOP ด้วย Google หรืออีเมลและรหัสผ่าน" canonicalPath="/account/signup/" robots="noindex,nofollow">
   <section class="auth-shell">
     <div class="auth-container">
       <div class="auth-card">
         <div class="eyebrow">CREATE ACCOUNT</div>
         <h1>สมัครสมาชิก</h1>
-        <p class="auth-copy">สร้างบัญชีด้วยอีเมล จากนั้นกดยืนยันอีเมลก่อนเข้าใช้งาน</p>
+        <p class="auth-copy">สมัครด้วย Google ได้ทันที หรือสร้างบัญชีด้วยอีเมลและยืนยันอีเมลก่อนเข้าใช้งาน</p>
+        <button id="google-signup" class="button button-secondary button-wide auth-google-button" type="button" aria-label="สมัครหรือเข้าสู่ระบบด้วย Google">
+          <span class="auth-google-mark" aria-hidden="true">G</span>
+          <span>ดำเนินการต่อด้วย Google</span>
+        </button>
+        <div class="auth-divider"><span>หรือ</span></div>
         <form id="signup-form" class="auth-form">
           <label class="auth-field"><span>ชื่อที่ใช้ติดต่อ</span><input name="displayName" autocomplete="name" required minlength="2" maxlength="120" /></label>
           <label class="auth-field"><span>อีเมล</span><input name="email" type="email" autocomplete="email" required maxlength="180" /></label>
@@ -18,18 +23,29 @@ import '../../styles/auth.css'
         </form>
         <div id="signup-message" class="auth-message" hidden></div>
         <div class="auth-links"><a class="inline-link" href="/account/login/">มีบัญชีแล้ว? เข้าสู่ระบบ</a></div>
-        <p class="auth-security-note">รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร ระบบจะไม่แสดงรหัสผ่านของคุณให้ร้านเห็น</p>
+        <p class="auth-security-note">หากเคยสมัครด้วยอีเมลที่ยืนยันแล้วและ Google ใช้อีเมลเดียวกัน ระบบจะเชื่อม Google เข้ากับบัญชีเดิมแทนการสร้างบัญชีซ้ำ</p>
       </div>
     </div>
   </section>
 </BaseLayout>
 <script>
-  import { friendlyAuthError, safeNextPath, signOutCustomer, signUpCustomer } from '../../lib/customer-auth'
+  import { friendlyAuthError, safeNextPath, signOutCustomer, signUpCustomer, startGoogleSignIn } from '../../lib/customer-auth'
   const form = document.getElementById('signup-form') as HTMLFormElement
   const submit = document.getElementById('signup-submit') as HTMLButtonElement
+  const google = document.getElementById('google-signup') as HTMLButtonElement
   const message = document.getElementById('signup-message') as HTMLElement
   const next = safeNextPath(new URLSearchParams(location.search).get('next'))
   const show = (text:string, tone:'error'|'success'|'info') => { message.textContent = text; message.className = `auth-message ${tone}`; message.hidden = false }
+  google.addEventListener('click', () => {
+    message.hidden = true
+    google.disabled = true
+    google.querySelector('span:last-child')!.textContent = 'กำลังไป Google...'
+    try { startGoogleSignIn(next) } catch (error) {
+      show(friendlyAuthError(error), 'error')
+      google.disabled = false
+      google.querySelector('span:last-child')!.textContent = 'ดำเนินการต่อด้วย Google'
+    }
+  })
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     message.hidden = true
