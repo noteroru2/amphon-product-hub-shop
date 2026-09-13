@@ -1,0 +1,51 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import '../../styles/auth.css'
+---
+<BaseLayout title="เข้าสู่ระบบ | AMPHON SHOP" description="เข้าสู่ระบบ AMPHON SHOP ด้วยอีเมลและรหัสผ่าน" canonicalPath="/account/login/" robots="noindex,nofollow">
+  <section class="auth-shell">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="eyebrow">SIGN IN</div>
+        <h1>เข้าสู่ระบบ</h1>
+        <p class="auth-copy">เข้าสู่ระบบด้วยอีเมลและรหัสผ่านของคุณ</p>
+        <form id="login-form" class="auth-form">
+          <label class="auth-field"><span>อีเมล</span><input name="email" type="email" autocomplete="email" required maxlength="180" /></label>
+          <label class="auth-field"><span>รหัสผ่าน</span><input name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128" /></label>
+          <button id="login-submit" class="button button-primary button-wide auth-button" type="submit">เข้าสู่ระบบ</button>
+        </form>
+        <div id="login-message" class="auth-message" hidden></div>
+        <div class="auth-links">
+          <a class="inline-link" href="/account/signup/">สมัครสมาชิก</a>
+          <a class="inline-link" href="/account/forgot-password/">ลืมรหัสผ่าน?</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+<script>
+  import { friendlyAuthError, safeNextPath, signInCustomer } from '../../lib/customer-auth'
+  const form = document.getElementById('login-form') as HTMLFormElement
+  const submit = document.getElementById('login-submit') as HTMLButtonElement
+  const message = document.getElementById('login-message') as HTMLElement
+  const next = safeNextPath(new URLSearchParams(location.search).get('next'))
+  const show = (text:string, tone:'error'|'success'|'info') => { message.textContent = text; message.className = `auth-message ${tone}`; message.hidden = false }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    message.hidden = true
+    submit.disabled = true; submit.textContent = 'กำลังเข้าสู่ระบบ...'
+    const data = new FormData(form)
+    try {
+      const session = await signInCustomer(String(data.get('email') || ''), String(data.get('password') || ''))
+      if (!session.user?.email_confirmed_at) {
+        show('กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ', 'info')
+        submit.disabled = false; submit.textContent = 'เข้าสู่ระบบ'
+        return
+      }
+      location.href = next
+    } catch (error) {
+      show(friendlyAuthError(error), 'error')
+      submit.disabled = false; submit.textContent = 'เข้าสู่ระบบ'
+    }
+  })
+</script>
