@@ -1,6 +1,6 @@
 ---
-// Backward-compatibility bridge for Product Hub Batch 4.1 links.
-// Canonical SEO ownership lives at /p/{slug}-{sku}/.
+// Backward-compatible product URL. Canonical product pages live under /p/.
+import BaseLayout from '../../layouts/BaseLayout.astro'
 import { getStoreProduct } from '../../lib/store-api'
 import { productPath } from '../../lib/seo'
 
@@ -16,4 +16,10 @@ try {
   Astro.response.status = 503
 }
 ---
-<!doctype html><html lang="th"><head><meta charset="utf-8" /><meta name="robots" content="noindex,nofollow" /><title>AMPHON SHOP</title></head><body>Store API unavailable</body></html>
+<BaseLayout title="กำลังโหลดข้อมูลสินค้า | AMPHON SHOP" description="ไม่สามารถโหลดข้อมูลสินค้าได้ในขณะนี้" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
+  <section class="section"><div class="container"><div class="empty">
+    <h1 class="not-found-title">ไม่สามารถโหลดข้อมูลสินค้าได้</h1>
+    <p>กรุณาลองเปิดหน้านี้อีกครั้ง หรือกลับไปเลือกสินค้าจากหน้าร้าน</p>
+    <a class="button button-primary" href="/">กลับหน้าร้าน</a>
+  </div></div></section>
+</BaseLayout>
