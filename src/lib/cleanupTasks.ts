@@ -11,27 +11,29 @@ function client() {
 }
 
 function mapTask(row: any): SalesChannelTask {
+  const status = String(row?.status || "OPEN") as SalesChannelTask["status"];
+  const priority = String(row?.priority || "NORMAL") as SalesChannelTask["priority"];
   return {
-    id: String(row.id),
-    productId: String(row.product_id),
-    publicationId: String(row.publication_id),
-    channel: row.channel,
-    taskType: row.task_type,
-    status: row.status,
-    priority: row.priority,
-    assignedTo: row.assigned_to ?? undefined,
-    assignedToName: row.assigned_to_name ?? undefined,
-    claimedAt: row.claimed_at ?? undefined,
-    createdAt: row.created_at,
-    createdByName: String(row.created_by_name || "ระบบ"),
-    completedAt: row.completed_at ?? undefined,
-    completedByName: row.completed_by_name ?? undefined,
-    cancelledAt: row.cancelled_at ?? undefined,
-    cancelledByName: row.cancelled_by_name ?? undefined,
-    cancellationReason: row.cancellation_reason ?? undefined,
-    completionNote: row.completion_note ?? undefined,
-    sourceEvent: row.source_event,
-    updatedAt: row.updated_at,
+    id: String(row?.id || ""),
+    productId: String(row?.product_id || ""),
+    publicationId: String(row?.publication_id || ""),
+    channel: String(row?.channel || "website") as SalesChannelTask["channel"],
+    taskType: String(row?.task_type || "VERIFY_REMOVAL") as SalesChannelTask["taskType"],
+    status,
+    priority,
+    assignedTo: row?.assigned_to ?? undefined,
+    assignedToName: row?.assigned_to_name ?? undefined,
+    claimedAt: row?.claimed_at ?? undefined,
+    createdAt: String(row?.created_at || ""),
+    createdByName: String(row?.created_by_name || "ระบบ"),
+    completedAt: row?.completed_at ?? undefined,
+    completedByName: row?.completed_by_name ?? undefined,
+    cancelledAt: row?.cancelled_at ?? undefined,
+    cancelledByName: row?.cancelled_by_name ?? undefined,
+    cancellationReason: row?.cancellation_reason ?? undefined,
+    completionNote: row?.completion_note ?? undefined,
+    sourceEvent: String(row?.source_event || "RECONCILIATION") as SalesChannelTask["sourceEvent"],
+    updatedAt: String(row?.updated_at || row?.created_at || ""),
   };
 }
 
