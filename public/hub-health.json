@@ -1,0 +1,7 @@
+{
+  "app": "AMPHON Product Hub",
+  "runtimeSafety": "v1",
+  "whiteScreenRecovery": true,
+  "pwaSingleBundle": true,
+  "deployedFrom": "main"
+}
