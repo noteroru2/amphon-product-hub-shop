@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
+    "build": "node scripts/verify-one0.mjs && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
     "deploy:hub": "npm run build && wrangler deploy",
     "preview": "vite preview",
+    "verify:one0": "node scripts/verify-one0.mjs",
     "verify:hub1": "node scripts/verify-hub1.mjs",
     "verify:hub2": "node scripts/verify-hub2.mjs",
     "verify:hub3": "node scripts/verify-hub3.mjs",
