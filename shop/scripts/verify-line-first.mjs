@@ -18,13 +18,16 @@ const cartActionBlock = cart.split('<div class="cart-channel-actions">')[1] || '
 
 const checks = [
   ['LINE identity is @webuy', contact.includes("primaryLineId = '@webuy'") && contact.includes('line.me/R/ti/p/@webuy')],
-  ['LINE CTA is globally visible in the header', layout.includes('header-line-link') && layout.includes('LINE {primaryLineId}')],
+  ['Official trust links are configured', contact.includes('facebook.com/amphontrading') && contact.includes('https://amphon.co.th/')],
+  ['LINE CTA is globally visible in the header', layout.includes('header-line-link') && layout.includes('สั่งซื้อผ่าน LINE {primaryLineId}')],
+  ['Footer keeps brand links secondary to LINE', layout.includes('เว็บไซต์หลัก AMPHON TRADING') && layout.includes('Facebook อำพล เทรดดิ้ง')],
   ['LINE-first stylesheet is loaded after storefront styles', layout.indexOf("'../styles/line-first.css'") > layout.indexOf("'../styles/storefront-human.css'")],
-  ['Product purchase UI promotes LINE first', layout.includes('line-primary-purchase') && layout.includes('ซื้อผ่าน LINE')],
+  ['Product purchase UI promotes LINE first', layout.includes('line-primary-purchase') && layout.includes('สั่งซื้อผ่าน LINE')],
   ['Existing product web-cart flow remains present', product.includes('id="add-to-cart"') && product.includes('href="/cart/"')],
   ['Web purchase CTA is explicitly demoted, not removed', layout.includes('web-purchase-secondary') && layout.includes('ใส่ตะกร้า (ชำระผ่านเว็บ)')],
-  ['Homepage promotes LINE as the primary buying path', home.includes('ซื้อ / สอบถามผ่าน LINE') && home.includes('LINE เป็นช่องทางหลัก')],
-  ['Cart renders LINE before optional web checkout', cartActionBlock.includes('button-line button-wide') && cartActionBlock.indexOf('button-line button-wide') < cartActionBlock.indexOf('${webCheckout}')],
+  ['Homepage promotes LINE as the primary buying path', home.includes('สั่งซื้อผ่าน LINE {primaryLineId}') && home.includes('LINE เป็นช่องทางหลัก')],
+  ['Homepage connects official brand profiles in schema', home.includes('sameAs: [mainWebsiteUrl, facebookPageUrl]')],
+  ['Cart renders LINE before optional web checkout', cartActionBlock.includes('สั่งซื้อผ่าน LINE ${escapeHtml(lineId)}') && cartActionBlock.indexOf('button-line button-wide') < cartActionBlock.indexOf('${webCheckout}')],
   ['PromptPay/card web checkout remains implemented', checkout.includes('promptPayEnabled') && checkout.includes('ชำระออนไลน์')],
   ['LINE primary visual treatment exists', styles.includes('--line-green: #06c755') && styles.includes('.button-line')],
 ]
@@ -37,4 +40,4 @@ if (failed.length) {
   process.exit(1)
 }
 
-console.log('SHOP LINE-FIRST: PASS — LINE @webuy is primary; web checkout remains a secondary option')
+console.log('SHOP LINE-FIRST: PASS — LINE @webuy is primary; Facebook/main website are secondary trust links; web checkout remains available')
