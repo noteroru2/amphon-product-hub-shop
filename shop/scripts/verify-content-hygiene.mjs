@@ -73,7 +73,7 @@ const required = [
   ['product quick navigation', files.product.includes('href="#condition"') && files.product.includes('href="#specs"') && files.product.includes('href="#shipping"')],
   ['product natural purchase microcopy', files.product.includes('ก่อนยืนยัน ร้านจะเช็กว่าสินค้ายังว่างให้อีกครั้ง')],
   ['legacy product friendly failure', files.legacyProduct.includes('ไม่สามารถโหลดข้อมูลสินค้าได้')],
-  ['cart customer CTA', files.cart.includes('ดำเนินการสั่งซื้อ')],
+  ['cart LINE-first CTA', files.cart.includes('ซื้อ / สอบถามผ่าน LINE') && files.cart.includes('ชำระผ่านเว็บ (บัตร / PromptPay)')],
   ['cart customer product code', files.cart.includes('รหัสสินค้า ${escapeHtml(item.sku)}')],
   ['checkout simple CTA', files.checkout.includes("submit.textContent = memberPolicyLoaded ? 'ยืนยันคำสั่งซื้อ'")],
   ['checkout member guidance', files.checkout.includes('เข้าสู่ระบบก่อนสั่งซื้อ')],
