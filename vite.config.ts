@@ -3,6 +3,17 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        // Product Hub is an internal operational PWA. Reliability after deploys
+        // is more important than splitting a few screens into lazy chunks.
+        // A single JS bundle prevents an old PWA shell from requesting a chunk
+        // filename that disappeared in a newer deployment.
+        inlineDynamicImports: true,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -31,6 +42,9 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'image',
