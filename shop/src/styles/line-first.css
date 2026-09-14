@@ -130,6 +130,18 @@
     padding: 8px 10px;
     font-size: .76rem;
   }
+
+  .cart-channel-actions {
+    position: sticky;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 8;
+    margin: 14px -10px -10px;
+    padding: 12px 10px 10px;
+    border-top: 1px solid var(--line);
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 -10px 26px rgba(24,24,24,.07);
+  }
 }
 
 @media (max-width: 520px) {
