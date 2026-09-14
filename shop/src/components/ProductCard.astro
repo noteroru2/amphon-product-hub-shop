@@ -23,6 +23,6 @@ const cover = [...product.images].sort((a, b) => Number(b.isCover) - Number(a.is
       {[product.brand, product.model, product.conditionPercent ? `สภาพ ${product.conditionPercent}%` : null].filter(Boolean).join(' • ')}
     </div>
     <div class="product-price">{formatPrice(product.price)}</div>
-    <span class="product-card-cta">ดูรูปและรายละเอียด →</span>
+    <span class="product-card-cta">ดูรายละเอียด • ซื้อผ่าน LINE ได้ →</span>
   </div>
 </a>
