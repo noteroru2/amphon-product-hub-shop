@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "check": "astro check",
-    "build": "node scripts/verify-content-hygiene.mjs && node scripts/verify-shop87b.mjs && node scripts/verify-shop87c.mjs && node scripts/verify-shopseo4.mjs && node scripts/verify-shopseo41.mjs && astro check && astro build",
+    "build": "node scripts/verify-content-hygiene.mjs && node scripts/verify-shop87b.mjs && node scripts/verify-shop87c.mjs && node scripts/verify-shopseo4.mjs && node scripts/verify-shopseo41.mjs && node scripts/verify-shop9.mjs && astro check && astro build",
     "preview": "astro preview",
     "deploy": "npm run build && wrangler deploy",
     "verify:foundation": "node scripts/verify-foundation.mjs",
@@ -29,7 +29,8 @@
     "verify:shop87b": "node scripts/verify-shop87b.mjs",
     "verify:shop87c": "node scripts/verify-shop87c.mjs",
     "verify:shopseo4": "node scripts/verify-shopseo4.mjs",
-    "verify:shopseo41": "node scripts/verify-shopseo41.mjs"
+    "verify:shopseo41": "node scripts/verify-shopseo41.mjs",
+    "verify:shop9": "node scripts/verify-shop9.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.1",
