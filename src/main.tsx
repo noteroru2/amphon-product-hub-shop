@@ -4,6 +4,7 @@ import App from './App'
 import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
+import './styles/hubEase.css'
 
 // Mobile browsers can treat capture="environment" as a camera-only request.
 // App.tsx still uses capture on image inputs so taking a new photo remains a
