@@ -1,10 +1,12 @@
 ---
 import { indexCategories } from '../config/catalog'
+import { primaryLineId, primaryLineUrl } from '../lib/contact'
 import { absoluteUrl } from '../lib/seo'
 import '../styles/global.css'
 import '../styles/auth.css'
 import '../styles/mobile-first.css'
 import '../styles/storefront-human.css'
+import '../styles/line-first.css'
 
 interface Props {
   title: string
@@ -55,7 +57,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     {productMeta && <meta property="product:condition" content={productMeta.condition} />}
     {schemas.map((schema) => <script type="application/ld+json" set:html={JSON.stringify(schema)} />)}
   </head>
-  <body>
+  <body data-line-url={primaryLineUrl} data-line-id={primaryLineId}>
     <a class="skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
     <header class="site-header">
       <div class="container header-row">
@@ -69,6 +71,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           ))}
         </nav>
         <div class="header-actions">
+          <a class="header-line-link" href={primaryLineUrl} target="_blank" rel="nofollow noopener" aria-label={`ซื้อหรือสอบถามผ่าน LINE ${primaryLineId}`}>LINE {primaryLineId}</a>
           <a class="account-link" href="/account/" aria-label="บัญชีของฉัน">บัญชี</a>
           <a class="account-link orders-link" href="/account/orders/" aria-label="รายการสั่งซื้อของฉัน">รายการสั่งซื้อ</a>
           <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
@@ -83,6 +86,10 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
         <div>
           <strong>AMPHON TRADING</strong>
           <div class="footer-small">เลือกของมือสองจากรูปและรายละเอียดของชิ้นจริง ถ้ามีจุดไหนไม่แน่ใจ ติดต่อร้านก่อนสั่งซื้อได้เสมอ</div>
+          <div class="footer-line-box">
+            <a class="button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ซื้อ / สอบถามผ่าน LINE {primaryLineId}</a>
+            <span class="footer-small">LINE เป็นช่องทางหลักของร้าน ส่วนการสั่งซื้อและชำระผ่านเว็บยังใช้งานได้เป็นทางเลือก</span>
+          </div>
         </div>
         <div class="footer-small">© {new Date().getFullYear()} AMPHON TRADING</div>
       </div>
@@ -96,6 +103,50 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
       updateCartCount()
       window.addEventListener(CART_EVENT, updateCartCount)
       window.addEventListener('storage', updateCartCount)
+
+      // LINE-first commerce UX. Keep the existing web checkout fully available,
+      // but present LINE @webuy as the first purchase/contact action.
+      const purchaseActions = document.querySelector('.purchase-actions') as HTMLElement | null
+      if (purchaseActions) {
+        const lineUrl = document.body.dataset.lineUrl || 'https://line.me/R/ti/p/@webuy'
+        const lineId = document.body.dataset.lineId || '@webuy'
+        const links = Array.from(purchaseActions.querySelectorAll<HTMLAnchorElement>('a'))
+        let lineAction = links.find((link) => link.href.includes('line.me') || (link.textContent || '').includes('LINE')) || null
+
+        if (!lineAction) {
+          lineAction = document.createElement('a')
+          lineAction.href = lineUrl
+          lineAction.target = '_blank'
+          lineAction.rel = 'nofollow noopener'
+          purchaseActions.prepend(lineAction)
+        }
+
+        lineAction.classList.remove('button-primary', 'button-secondary')
+        lineAction.classList.add('button', 'button-line', 'button-wide', 'line-primary-purchase')
+        lineAction.textContent = `ซื้อผ่าน LINE ${lineId}`
+
+        if (!purchaseActions.querySelector('.line-purchase-note')) {
+          const note = document.createElement('p')
+          note.className = 'line-purchase-note'
+          const sku = (document.getElementById('add-to-cart') as HTMLElement | null)?.dataset.sku || ''
+          note.innerHTML = `ช่องทางหลักของร้าน — ทัก LINE แล้วแจ้ง${sku ? `รหัสสินค้า <strong>${sku}</strong>` : 'รหัสสินค้า'} เพื่อให้ร้านเช็กสถานะก่อนชำระได้ครับ`
+          lineAction.insertAdjacentElement('afterend', note)
+        }
+
+        const addToCart = document.getElementById('add-to-cart')
+        if (addToCart) {
+          addToCart.classList.remove('button-primary')
+          addToCart.classList.add('button-secondary', 'web-purchase-secondary')
+          addToCart.textContent = 'ใส่ตะกร้า (ชำระผ่านเว็บ)'
+        }
+
+        const cartAction = purchaseActions.querySelector<HTMLAnchorElement>('a[href="/cart/"]')
+        if (cartAction) {
+          cartAction.classList.remove('button-primary')
+          cartAction.classList.add('button-secondary', 'web-purchase-secondary')
+          cartAction.textContent = 'ไปตะกร้า / ชำระผ่านเว็บ'
+        }
+      }
     </script>
   </body>
 </html>
