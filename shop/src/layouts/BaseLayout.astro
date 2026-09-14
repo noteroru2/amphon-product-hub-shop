@@ -1,6 +1,6 @@
 ---
 import { indexCategories } from '../config/catalog'
-import { primaryLineId, primaryLineUrl } from '../lib/contact'
+import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { absoluteUrl } from '../lib/seo'
 import '../styles/global.css'
 import '../styles/auth.css'
@@ -71,7 +71,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           ))}
         </nav>
         <div class="header-actions">
-          <a class="header-line-link" href={primaryLineUrl} target="_blank" rel="nofollow noopener" aria-label={`ซื้อหรือสอบถามผ่าน LINE ${primaryLineId}`}>LINE {primaryLineId}</a>
+          <a class="header-line-link" href={primaryLineUrl} target="_blank" rel="nofollow noopener" aria-label={`สั่งซื้อผ่าน LINE ${primaryLineId}`}>สั่งซื้อผ่าน LINE {primaryLineId}</a>
           <a class="account-link" href="/account/" aria-label="บัญชีของฉัน">บัญชี</a>
           <a class="account-link orders-link" href="/account/orders/" aria-label="รายการสั่งซื้อของฉัน">รายการสั่งซื้อ</a>
           <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
@@ -87,8 +87,14 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           <strong>AMPHON TRADING</strong>
           <div class="footer-small">เลือกของมือสองจากรูปและรายละเอียดของชิ้นจริง ถ้ามีจุดไหนไม่แน่ใจ ติดต่อร้านก่อนสั่งซื้อได้เสมอ</div>
           <div class="footer-line-box">
-            <a class="button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ซื้อ / สอบถามผ่าน LINE {primaryLineId}</a>
+            <a class="button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สั่งซื้อผ่าน LINE {primaryLineId}</a>
             <span class="footer-small">LINE เป็นช่องทางหลักของร้าน ส่วนการสั่งซื้อและชำระผ่านเว็บยังใช้งานได้เป็นทางเลือก</span>
+          </div>
+          <div class="footer-small">
+            รู้จักร้านเพิ่มเติม:
+            <a href={mainWebsiteUrl} target="_blank" rel="noopener noreferrer">เว็บไซต์หลัก AMPHON TRADING</a>
+            <span aria-hidden="true"> · </span>
+            <a href={facebookPageUrl} target="_blank" rel="noopener noreferrer">Facebook อำพล เทรดดิ้ง</a>
           </div>
         </div>
         <div class="footer-small">© {new Date().getFullYear()} AMPHON TRADING</div>
@@ -123,7 +129,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
 
         lineAction.classList.remove('button-primary', 'button-secondary')
         lineAction.classList.add('button', 'button-line', 'button-wide', 'line-primary-purchase')
-        lineAction.textContent = `ซื้อผ่าน LINE ${lineId}`
+        lineAction.textContent = `สั่งซื้อผ่าน LINE ${lineId}`
 
         if (!purchaseActions.querySelector('.line-purchase-note')) {
           const note = document.createElement('p')
