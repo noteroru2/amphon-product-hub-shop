@@ -1,0 +1,134 @@
+/* HUB Publish Center — keep publication workflow inside the Hub context.
+   The React tab remains an internal implementation detail; visually this is a
+   focused work sheet instead of a second standalone page. */
+
+body:has(.publish-center-screen) {
+  overflow: hidden;
+}
+
+body:has(.publish-center-screen) .bottom-nav {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+}
+
+.publish-center-screen {
+  position: fixed;
+  z-index: 160;
+  top: max(8px, env(safe-area-inset-top));
+  right: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  left: 8px;
+  min-height: 0;
+  height: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 100vmax rgba(15, 23, 42, 0.38),
+    0 24px 70px rgba(15, 23, 42, 0.24);
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+.publish-center-screen .topbar {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+  margin: -24px -16px 18px;
+  padding: calc(16px + env(safe-area-inset-top)) 16px 14px;
+  background: rgba(248, 250, 252, 0.96);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.publish-center-screen .publish-title-row .icon-btn {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+.publish-center-screen .publish-title-row .eyebrow {
+  font-size: 0;
+}
+
+.publish-center-screen .publish-title-row .eyebrow::after {
+  content: "PUBLISH CENTER";
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.publish-center-screen .publish-title-row h1 {
+  font-size: 0;
+}
+
+.publish-center-screen .publish-title-row h1::after {
+  content: "ลงขายสินค้า";
+  font-size: 27px;
+  letter-spacing: -0.03em;
+}
+
+.publish-center-screen .publish-filter-line,
+.publish-center-screen .publish-search,
+.publish-center-screen .publish-summary-grid,
+.publish-center-screen .publish-product-list,
+.publish-center-screen .cleanup-task-queue,
+.publish-center-screen .cleanup-task-card {
+  scroll-margin-top: 96px;
+}
+
+@media (min-width: 700px) {
+  .publish-center-screen {
+    top: 24px;
+    bottom: 24px;
+    left: 50%;
+    right: auto;
+    width: min(760px, calc(100vw - 48px));
+    transform: translateX(-50%);
+    border-radius: 28px;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .publish-center-screen .topbar {
+    margin-left: -28px;
+    margin-right: -28px;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .publish-center-screen {
+    animation: publish-center-enter 180ms ease-out both;
+  }
+
+  @keyframes publish-center-enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.992);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (min-width: 700px) {
+    .publish-center-screen {
+      animation-name: publish-center-enter-desktop;
+    }
+
+    @keyframes publish-center-enter-desktop {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px) scale(0.992);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+      }
+    }
+  }
+}
