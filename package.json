@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/verify-hub-publish-center-ux.mjs && tsc -b && vite build",
     "deploy:hub": "npm run build && wrangler deploy",
     "preview": "vite preview",
     "verify:hub1": "node scripts/verify-hub1.mjs",
@@ -14,6 +14,7 @@
     "verify:hub4": "node scripts/verify-hub4.mjs",
     "verify:hub5": "node scripts/verify-hub5.mjs",
     "verify:hub6": "node scripts/verify-hub6.mjs",
+    "verify:publish-center-ux": "node scripts/verify-hub-publish-center-ux.mjs",
     "reconcile:hub6": "node scripts/reconcile-hub6-cleanup-tasks.mjs",
     "verify:shop71": "node scripts/verify-shop71.mjs",
     "typecheck": "tsc -b"
