@@ -2,7 +2,7 @@
 import ProductCard from '../components/ProductCard.astro'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { indexCategories } from '../config/catalog'
-import { primaryLineId, primaryLineUrl } from '../lib/contact'
+import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { listStoreProducts, type StoreProduct } from '../lib/store-api'
 import { absoluteUrl } from '../lib/seo'
 
@@ -32,6 +32,7 @@ const schema = [
     '@type': 'OnlineStore',
     name: 'AMPHON TRADING',
     url: absoluteUrl('/'),
+    sameAs: [mainWebsiteUrl, facebookPageUrl],
   },
 ]
 
@@ -54,7 +55,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         <h1>สินค้าไอทีมือสองออนไลน์<br />ดูข้อมูลจริงก่อนตัดสินใจ</h1>
         <p class="lead">เลือกของมือสองไม่ควรต้องเดาครับ ที่นี่เราแยกราคา สเปก สภาพ รูปจริง และตำหนิของแต่ละชิ้นไว้ให้ดูตรง ๆ เจอเครื่องที่ถูกใจทักร้านผ่าน LINE ได้เลย</p>
         <div class="hero-actions">
-          <a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ซื้อ / สอบถามผ่าน LINE {primaryLineId}</a>
+          <a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สั่งซื้อผ่าน LINE {primaryLineId}</a>
           <a class="button button-secondary" href="#shop-categories">เลือกหมวดสินค้า</a>
         </div>
         <span class="line-hero-note">LINE เป็นช่องทางหลัก • ถ้าสะดวกชำระบนเว็บก็ยังใช้ตะกร้าและ PromptPay / บัตรได้</span>
@@ -70,7 +71,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
   <section class="home-trust-strip" aria-label="จุดเด่นของร้าน">
     <div class="container home-trust-grid">
       <div class="home-trust-item"><span class="home-trust-icon">👀</span><span><strong>เห็นของก่อนซื้อ</strong><span>รูป สเปก สภาพ และตำหนิของชิ้นนั้นดูได้จากหน้าสินค้า</span></span></div>
-      <div class="home-trust-item"><span class="home-trust-icon">💬</span><span><strong>ซื้อผ่าน LINE @webuy เป็นหลัก</strong><span>ส่งรหัสสินค้าให้ร้านเช็กสถานะและคุยรายละเอียดก่อนชำระได้</span></span></div>
+      <div class="home-trust-item"><span class="home-trust-icon">💬</span><span><strong>สั่งซื้อผ่าน LINE @webuy เป็นหลัก</strong><span>ส่งรหัสสินค้าให้ร้านเช็กสถานะและคุยรายละเอียดก่อนชำระได้</span></span></div>
       <div class="home-trust-item"><span class="home-trust-icon">💳</span><span><strong>เว็บเป็นทางเลือกสำรอง</strong><span>ลูกค้าที่สะดวกสามารถเข้าตะกร้าและชำระผ่านบัตรหรือ PromptPay บนเว็บได้</span></span></div>
     </div>
   </section>
