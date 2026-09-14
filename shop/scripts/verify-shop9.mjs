@@ -4,11 +4,12 @@ import { resolve } from 'node:path'
 const shopRoot = resolve(import.meta.dirname, '..')
 const projectRoot = resolve(shopRoot, '..')
 
-const [worker, checkout, storeApi, migration] = await Promise.all([
+const [worker, checkout, storeApi, migration, memberBridge] = await Promise.all([
   readFile(resolve(projectRoot, 'workers/r2-upload/src/index.ts'), 'utf8'),
   readFile(resolve(shopRoot, 'src/pages/checkout/index.astro'), 'utf8'),
   readFile(resolve(shopRoot, 'src/lib/store-api.ts'), 'utf8'),
   readFile(resolve(projectRoot, 'supabase/migrations/20260914133000_shop9_promptpay_activation.sql'), 'utf8'),
+  readFile(resolve(projectRoot, 'supabase/migrations/20260914182500_shop9_shop62_member_checkout_test_bridge.sql'), 'utf8'),
 ])
 
 const checks = [
@@ -28,6 +29,10 @@ const checks = [
   ['activation migration requires Stripe enabled', migration.includes('SHOP9_STRIPE_MUST_BE_ENABLED')],
   ['activation migration requires THB', migration.includes('SHOP9_PROMPTPAY_REQUIRES_THB')],
   ['activation migration requires Thailand store', migration.includes('SHOP9_PROMPTPAY_REQUIRES_TH_STORE')],
+  ['isolated provider E2E bypasses member checkout only transaction-locally', memberBridge.includes('member_checkout_required = false')],
+  ['isolated provider E2E restores the original member checkout policy', memberBridge.includes('member_checkout_required = original.member_checkout_required')],
+  ['isolated provider bridge remains restricted to AT-TST fixtures', memberBridge.includes("sku !~ '^AT-TST-'")],
+  ['provider bridge does not alter public create_commerce_order implementation', !memberBridge.includes('create or replace function public.create_commerce_order(')],
 ]
 
 const failures = checks.filter(([, ok]) => !ok)
@@ -38,4 +43,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('SHOP-9 verification PASS — PromptPay QR checkout, webhook confirmation, and activation safeguards are intact')
+console.log('SHOP-9 verification PASS — PromptPay QR checkout, webhook confirmation, activation safeguards, and isolated member-checkout bridge are intact')
