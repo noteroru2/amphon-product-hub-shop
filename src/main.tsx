@@ -1,7 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { AppCrashBoundary } from './components/AppCrashBoundary'
 import { PwaInstallPrompt } from './components/PwaInstallPrompt'
+import { installRuntimeRecovery } from './lib/runtimeRecovery'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
 import './styles/hubEase.css'
@@ -46,11 +48,17 @@ function enableMobileImageLibraryPicker() {
   document.addEventListener('click', normalizeBeforePickerOpens, true)
 }
 
+installRuntimeRecovery()
 enableMobileImageLibraryPicker()
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root')
+if (!root) throw new Error('AMPHON Hub root element is missing')
+
+createRoot(root).render(
   <StrictMode>
-    <App />
-    <PwaInstallPrompt />
+    <AppCrashBoundary>
+      <App />
+      <PwaInstallPrompt />
+    </AppCrashBoundary>
   </StrictMode>,
 )
