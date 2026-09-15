@@ -6,6 +6,7 @@ on:
     paths:
       - 'config/amphon-one2c.json'
       - 'supabase/migrations/20260915133000_one2c_product_hub_enrichment_workflow.sql'
+      - 'supabase/migrations/20260915133500_one2c_enrichment_hardening.sql'
       - 'src/components/EnrichmentQueueDock.tsx'
       - 'src/main.tsx'
       - 'src/styles/one2cEnrichment.css'
