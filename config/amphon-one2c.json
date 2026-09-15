@@ -1,0 +1,103 @@
+{
+  "contractVersion": "ONE-2C.1",
+  "status": "SOURCE_READY",
+  "productionAccepted": false,
+  "parent": "ONE-2B",
+  "principles": {
+    "systemIntakeWorkflowChanged": false,
+    "technicalInspectionStageAdded": false,
+    "qcStageAdded": false,
+    "enrichmentMayOccurInAnyOrder": true,
+    "productIdentityMayChangeDuringEnrichment": false,
+    "systemOwnedSkuMayChangeDuringEnrichment": false
+  },
+  "workstreams": {
+    "photos": {
+      "field": "one_photos_complete",
+      "automatic": true,
+      "rule": "SAVED_IMAGES_GTE_2_AND_COVER_EXISTS",
+      "completionTimestamp": "one_photos_completed_at"
+    },
+    "specs": {
+      "field": "one_specs_complete",
+      "automatic": true,
+      "rule": "CATEGORY_AND_SUBTYPE_REQUIRED_SPECS_COMPLETE",
+      "completionTimestamp": "one_specs_completed_at"
+    },
+    "listingContent": {
+      "field": "one_listing_content_complete",
+      "automatic": true,
+      "required": ["category", "subtype", "brand", "model", "title", "price_gt_0"],
+      "completionTimestamp": "one_listing_content_completed_at"
+    }
+  },
+  "readiness": {
+    "field": "one_listing_readiness",
+    "states": [
+      "INTAKE_ONLY",
+      "PHOTO_PENDING",
+      "SPEC_PENDING",
+      "LISTING_CONTENT_PENDING",
+      "READY_TO_LIST"
+    ],
+    "independentFlagsAuthoritative": true,
+    "readyRule": "photos_complete && specs_complete && listing_content_complete",
+    "legacyStatusCompatibility": {
+      "ready": "ready_to_list",
+      "incompleteWithPhotos": "photo_ready",
+      "incompleteWithoutPhotos": "draft",
+      "neverOverride": ["published", "reserved", "sold", "repair", "consignment", "returned", "cancelled"]
+    }
+  },
+  "batteryHealth": {
+    "field": "battery_health_grade",
+    "values": ["LOW", "GOOD", "VERY_GOOD", "UNKNOWN"],
+    "labelsTh": {
+      "LOW": "ต่ำ",
+      "GOOD": "ดี",
+      "VERY_GOOD": "ดีมาก",
+      "UNKNOWN": "ไม่ทราบ"
+    },
+    "percentageRequired": false
+  },
+  "audit": {
+    "activityLogActions": ["one_enrichment_photos_changed", "one_enrichment_changed"],
+    "actorUsesAuthenticatedHubUser": true,
+    "completionTimestampsStored": true
+  },
+  "events": {
+    "output": "product.enrichment_changed",
+    "destination": "amphon-system",
+    "transactionalOutbox": true,
+    "payload": [
+      "hubProductId",
+      "sku",
+      "listingReadiness",
+      "photosComplete",
+      "specsComplete",
+      "listingContentComplete",
+      "batteryHealthGrade"
+    ]
+  },
+  "ui": {
+    "component": "EnrichmentQueueDock",
+    "activationFlag": "VITE_ONE2C_ENRICHMENT_ENABLED",
+    "defaultEnabled": false,
+    "queueCounts": ["intakeOnly", "photosPending", "specsPending", "listingContentPending", "readyToList"],
+    "qrOpensExistingProduct": true,
+    "batteryQuickGrade": true
+  },
+  "security": {
+    "browserUsesExistingEmployeeSessionAndRls": true,
+    "integrationOutboxNotBrowserWritable": true,
+    "triggerHelpersSchema": "private",
+    "triggerHelpersSecurityDefiner": true,
+    "triggerHelpersPublicExecuteRevoked": true,
+    "serviceRoleSecretInBrowser": false
+  },
+  "activation": {
+    "migrationBeforeFrontendFlag": true,
+    "requiresOne2bMigration": true,
+    "productionActivationDeferredToOneProd": true
+  }
+}
