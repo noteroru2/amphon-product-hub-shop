@@ -1,10 +1,11 @@
 {
   "name": "amphon-one-bridge",
-  "main": "src/index.ts",
+  "main": "src/one2b-entry.ts",
   "compatibility_date": "2026-09-15",
   "vars": {
     "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
     "SYSTEM_INTEGRATION_KEY_ID": "amphon-system-v1",
-    "INTEGRATION_SIGNATURE_MAX_AGE_SECONDS": "300"
+    "INTEGRATION_SIGNATURE_MAX_AGE_SECONDS": "300",
+    "ONE2B_SHELL_CONSUMER_ENABLED": "false"
   }
 }
