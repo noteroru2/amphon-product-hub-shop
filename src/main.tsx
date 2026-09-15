@@ -2,11 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { AppCrashBoundary } from './components/AppCrashBoundary'
+import { EnrichmentQueueDock } from './components/EnrichmentQueueDock'
 import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 import { installRuntimeRecovery } from './lib/runtimeRecovery'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
 import './styles/hubEase.css'
+import './styles/one2cEnrichment.css'
 
 // Mobile browsers can treat capture="environment" as a camera-only request.
 // App.tsx still uses capture on image inputs so taking a new photo remains a
@@ -58,6 +60,7 @@ createRoot(root).render(
   <StrictMode>
     <AppCrashBoundary>
       <App />
+      <EnrichmentQueueDock />
       <PwaInstallPrompt />
     </AppCrashBoundary>
   </StrictMode>,
