@@ -11,6 +11,8 @@ on:
       - 'src/main.tsx'
       - 'src/styles/one2cEnrichment.css'
       - 'src/vite-env.d.ts'
+      - '.env.example'
+      - 'docs/ONE_2C_PRODUCT_HUB_ENRICHMENT_WORKFLOW.md'
       - 'scripts/verify-one2c.mjs'
       - 'package.json'
       - 'package-lock.json'
