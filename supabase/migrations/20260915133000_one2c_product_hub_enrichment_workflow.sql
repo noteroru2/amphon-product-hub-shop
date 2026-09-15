@@ -181,6 +181,7 @@ declare
   v_specs_complete boolean;
   v_content_complete boolean;
   v_now timestamptz := now();
+  v_meaningful_edit boolean := false;
 begin
   if not coalesce(new.one_managed, false) then
     return new;
@@ -196,20 +197,25 @@ begin
     new.price
   );
 
-  -- Product Hub user edits always carry updated_by in the existing save flow.
-  if new.updated_by is not null and (
-       tg_op = 'INSERT'
-       or old.updated_by is distinct from new.updated_by
-       or old.category is distinct from new.category
-       or old.subtype is distinct from new.subtype
-       or old.brand is distinct from new.brand
-       or old.model is distinct from new.model
-       or old.title is distinct from new.title
-       or old.price is distinct from new.price
-       or old.specs is distinct from new.specs
-       or old.battery_health_grade is distinct from new.battery_health_grade
-     ) then
-    new.one_enrichment_started := true;
+  if tg_op = 'UPDATE' then
+    v_meaningful_edit :=
+      old.category is distinct from new.category
+      or old.subtype is distinct from new.subtype
+      or old.brand is distinct from new.brand
+      or old.model is distinct from new.model
+      or old.serial_number is distinct from new.serial_number
+      or old.title is distinct from new.title
+      or old.price is distinct from new.price
+      or old.condition_percent is distinct from new.condition_percent
+      or old.warranty_until is distinct from new.warranty_until
+      or old.defects is distinct from new.defects
+      or old.notes is distinct from new.notes
+      or old.specs is distinct from new.specs
+      or old.battery_health_grade is distinct from new.battery_health_grade;
+
+    if v_meaningful_edit then
+      new.one_enrichment_started := true;
+    end if;
   end if;
 
   if new.one_specs_complete is distinct from v_specs_complete then
@@ -260,8 +266,13 @@ declare
   v_complete boolean;
   v_old_complete boolean;
 begin
-  v_product_id := coalesce(new.product_id, old.product_id);
-  v_actor_id := coalesce((select auth.uid()), new.created_by, old.created_by);
+  if tg_op = 'DELETE' then
+    v_product_id := old.product_id;
+    v_actor_id := coalesce((select auth.uid()), old.created_by);
+  else
+    v_product_id := new.product_id;
+    v_actor_id := coalesce((select auth.uid()), new.created_by);
+  end if;
 
   select count(*)::integer, coalesce(bool_or(is_cover), false)
   into v_photo_count, v_has_cover
@@ -277,7 +288,7 @@ begin
     and one_managed = true;
 
   if not found then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then return old; else return new; end if;
   end if;
 
   update public.products
@@ -310,7 +321,7 @@ begin
     );
   end if;
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then return old; else return new; end if;
 end;
 $$;
 
@@ -411,7 +422,7 @@ $$;
 
 revoke all on function private.one2c_after_product_change() from public;
 
--- Product trigger runs only for fields that can affect enrichment readiness.
+-- Product trigger runs only for fields that can affect enrichment readiness/start state.
 drop trigger if exists trg_one2c_product_before_write on public.products;
 create trigger trg_one2c_product_before_write
 before insert or update of
@@ -419,11 +430,15 @@ before insert or update of
   subtype,
   brand,
   model,
+  serial_number,
   title,
   price,
+  condition_percent,
+  warranty_until,
+  defects,
+  notes,
   specs,
-  battery_health_grade,
-  updated_by
+  battery_health_grade
 on public.products
 for each row
 execute function private.one2c_product_before_write();
