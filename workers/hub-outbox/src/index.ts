@@ -23,6 +23,7 @@ type OutboxRow = {
 }
 
 type FinishOutcome = 'DELIVERED' | 'FAILED' | 'DEAD'
+type WaitUntilContext = { waitUntil(promise: Promise<unknown>): void }
 
 const EVENTS_PATH = '/api/integrations/v1/events'
 
@@ -244,7 +245,7 @@ export default {
     }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })
   },
 
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  async scheduled(_event: unknown, env: Env, ctx: WaitUntilContext) {
     ctx.waitUntil(sweep(env).then((result) => console.log('AMPHON HUB OUTBOX SWEEP', result)).catch((error) => {
       console.error('AMPHON HUB OUTBOX SWEEP ERROR', clean((error as Error)?.message || error))
     }))
