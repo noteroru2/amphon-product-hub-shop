@@ -19,6 +19,30 @@
     "entityRequired": ["type", "id"],
     "skuOptional": true
   },
+  "storage": {
+    "inbox": {
+      "uniqueEventId": true,
+      "uniqueSourceIdempotencyKey": true,
+      "deadLetterVisible": true
+    },
+    "outbox": {
+      "uniqueEventId": true,
+      "uniqueDestinationIdempotencyKey": true,
+      "retryable": true,
+      "nextAttemptAt": true,
+      "lockFields": ["lockedAt", "lockedBy"],
+      "deadLetterVisible": true
+    },
+    "externalEntityLink": {
+      "businessKey": "sku",
+      "mappingConflictMode": "STOP_FOR_RECONCILIATION"
+    },
+    "replayNonce": {
+      "persistent": true,
+      "uniqueKey": ["keyId", "nonce"],
+      "expires": true
+    }
+  },
   "events": {
     "systemToHub": [
       "product.intake_created",
