@@ -52,8 +52,10 @@ assert(!/generate[_a-z]*sku/i.test(migration), 'Hub consumer must never generate
 assert(entry.includes("import baseBridge from './index'"), 'ONE-2B must preserve the existing signed Inbox handler as the first boundary')
 assert(entry.includes('const baseResponse = await baseBridge.fetch(request, env)'), 'base HMAC/Inbox handler must execute before shell consumption')
 assert(entry.includes("ONE2B_SHELL_CONSUMER_ENABLED"), 'consumer activation flag missing')
-assert(entry.includes("rpc/one2b_consume_intake_event"), 'Worker must invoke the transactional RPC')
-assert(entry.includes("eventType !== 'product.intake_created'"), 'Worker must scope ONE-2B to intake-created events')
+// ONE-2D refactors RPC transport into a shared helper. Verify the semantic call,
+// not the old inline `rpc/...` string shape.
+assert(entry.includes("callRpc(env, 'one2b_consume_intake_event', envelope.eventId)"), 'Worker must invoke the ONE-2B transactional RPC')
+assert(entry.includes("envelope.eventType === 'product.intake_created'"), 'Worker must scope ONE-2B to intake-created events')
 assert(entry.includes("BRIDGE_SHELL_CONSUMER_UNAVAILABLE"), 'retryable consumer failure response missing')
 assert(entry.includes('markInboxFailed'), 'RPC infrastructure failures must leave the Inbox retryable')
 
