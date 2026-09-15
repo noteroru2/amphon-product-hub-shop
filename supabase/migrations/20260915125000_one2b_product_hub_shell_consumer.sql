@@ -86,7 +86,7 @@ begin
   end if;
 
   if v_inbox.status = 'PROCESSED' then
-    select eel.*, p.sku
+    select eel, p.sku
     into v_link, v_existing_sku
     from public.external_entity_links eel
     join public.products p on p.id::text = eel.target_entity_id
@@ -141,7 +141,6 @@ begin
     return jsonb_build_object('outcome','CONFLICT','error',v_error);
   end if;
 
-  -- Serialize by immutable source identity and SKU to prevent concurrent adoption races.
   perform pg_advisory_xact_lock(hashtextextended('one2b-source:' || v_source_identity_id, 0));
   perform pg_advisory_xact_lock(hashtextextended('one2b-sku:' || v_sku, 0));
 
@@ -180,7 +179,6 @@ begin
     v_price := null;
   end if;
 
-  -- Existing source mapping is the only safe way to reuse a shell.
   select *
   into v_link
   from public.external_entity_links
@@ -208,7 +206,6 @@ begin
       return jsonb_build_object('outcome','CONFLICT','error',v_error,'sku',v_sku);
     end if;
   else
-    -- Never adopt a pre-existing SKU without the exact System physical-identity mapping.
     select id, sku into v_product_id, v_existing_sku
     from public.products
     where sku = v_sku
@@ -273,7 +270,6 @@ begin
     );
   end if;
 
-  -- Stable acknowledgement Outbox. Retried consumption cannot enqueue a second logical event.
   v_ack_idempotency := 'product-shell:' || v_source_identity_id || ':created:v1';
   select event_id into v_ack_event_id
   from public.integration_event_outbox
@@ -340,8 +336,6 @@ begin
   );
 exception
   when others then
-    -- The function transaction rolls back partial product/link/outbox changes.
-    -- The Worker records FAILED outside this RPC so the same durable Inbox event can retry.
     raise;
 end;
 $$;
