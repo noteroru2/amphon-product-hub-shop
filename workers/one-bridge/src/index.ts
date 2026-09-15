@@ -4,6 +4,7 @@ interface Env {
   SYSTEM_INTEGRATION_KEY_ID: string
   SYSTEM_INTEGRATION_SECRET: string
   INTEGRATION_SIGNATURE_MAX_AGE_SECONDS?: string
+  ONE2D_RECONCILIATION_ENABLED?: string
 }
 
 type Envelope = {
@@ -26,6 +27,18 @@ type InboxIdentity = {
   status: string
 }
 
+type HubSnapshotRow = {
+  id: string
+  sku: string
+  status: string
+  one_listing_readiness: string | null
+  category: string | null
+  serial_number: string | null
+  title: string | null
+  one_managed: boolean
+  updated_at: string
+}
+
 const MAX_BODY_BYTES = 1024 * 1024
 const DEFAULT_MAX_AGE_SECONDS = 300
 const SYSTEM_EVENT_ALLOWLIST = new Set([
@@ -35,6 +48,7 @@ const SYSTEM_EVENT_ALLOWLIST = new Set([
   'product.mark_sold_requested',
   'product.price_change_requested',
   'publication.end_requested',
+  'product.legacy_link_requested',
 ])
 
 function response(data: unknown, status = 200) {
@@ -50,6 +64,10 @@ function response(data: unknown, status = 200) {
 
 function clean(value: string | null | undefined) {
   return String(value ?? '').trim()
+}
+
+function enabled(value: string | undefined) {
+  return clean(value).toLowerCase() === 'true'
 }
 
 function maxAgeSeconds(env: Env) {
@@ -278,12 +296,58 @@ async function storeInbox(env: Env, envelope: Envelope) {
   return { inserted: true as const, conflict: false, status: 'RECEIVED' }
 }
 
+function normalizeSnapshotRequest(value: unknown) {
+  const input = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { cursor?: unknown; limit?: unknown }
+    : {}
+  const cursor = clean(String(input.cursor ?? ''))
+  if (cursor && !validUuid(cursor)) return { ok: false as const, error: 'RECONCILIATION_CURSOR_INVALID' }
+  const parsedLimit = Number(input.limit ?? 200)
+  const limit = Number.isFinite(parsedLimit) ? Math.min(500, Math.max(1, Math.floor(parsedLimit))) : 200
+  return { ok: true as const, cursor: cursor || null, limit }
+}
+
+async function reconciliationSnapshot(env: Env, value: unknown) {
+  if (!enabled(env.ONE2D_RECONCILIATION_ENABLED)) {
+    return response({ ok: false, error: 'RECONCILIATION_DISABLED' }, 503)
+  }
+  const normalized = normalizeSnapshotRequest(value)
+  if (!normalized.ok) return response({ ok: false, error: normalized.error }, 400)
+
+  const take = normalized.limit + 1
+  const select = 'id,sku,status,one_listing_readiness,category,serial_number,title,one_managed,updated_at'
+  const cursorFilter = normalized.cursor ? `&id=gt.${encodeURIComponent(normalized.cursor)}` : ''
+  const path = `products?select=${select}&order=id.asc&limit=${take}${cursorFilter}`
+  const rows = await readRows<HubSnapshotRow>(await supabaseRequest(env, path))
+  const hasMore = rows.length > normalized.limit
+  const page = hasMore ? rows.slice(0, normalized.limit) : rows
+  const products = page.map((row) => ({
+    hubProductId: row.id,
+    sku: row.sku,
+    status: row.status,
+    listingReadiness: row.one_listing_readiness,
+    category: row.category,
+    serialNumber: row.serial_number,
+    title: row.title,
+    oneManaged: Boolean(row.one_managed),
+    updatedAt: row.updated_at,
+  }))
+  return response({
+    ok: true,
+    products,
+    hasMore,
+    nextCursor: hasMore && page.length ? page[page.length - 1].id : null,
+  })
+}
+
 async function handle(request: Request, env: Env) {
   const url = new URL(request.url)
-  if (!['/v1/health', '/v1/events'].includes(url.pathname)) return response({ ok: false, error: 'NOT_FOUND' }, 404)
+  const supportedPaths = ['/v1/health', '/v1/events', '/v1/reconciliation/products']
+  if (!supportedPaths.includes(url.pathname)) return response({ ok: false, error: 'NOT_FOUND' }, 404)
   if (request.method === 'OPTIONS') return response({ ok: false, error: 'BRIDGE_BROWSER_ACCESS_DISABLED' }, 405)
   if (url.pathname === '/v1/health' && request.method !== 'GET') return response({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405)
   if (url.pathname === '/v1/events' && request.method !== 'POST') return response({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405)
+  if (url.pathname === '/v1/reconciliation/products' && request.method !== 'POST') return response({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405)
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > MAX_BODY_BYTES) return response({ ok: false, error: 'BRIDGE_BODY_TOO_LARGE' }, 413)
@@ -308,6 +372,15 @@ async function handle(request: Request, env: Env) {
     parsed = JSON.parse(new TextDecoder().decode(rawBuffer))
   } catch {
     return response({ ok: false, error: 'BRIDGE_JSON_INVALID' }, 400)
+  }
+
+  if (url.pathname === '/v1/reconciliation/products') {
+    try {
+      return await reconciliationSnapshot(env, parsed)
+    } catch (error) {
+      console.error('ONE-2D reconciliation snapshot error', error)
+      return response({ ok: false, error: 'RECONCILIATION_UNAVAILABLE' }, 503)
+    }
   }
 
   const validation = validateEnvelope(parsed)
