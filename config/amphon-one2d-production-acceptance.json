@@ -1,0 +1,116 @@
+{
+  "contractVersion": "ONE-2D-PROD.1",
+  "assessedDate": "2026-09-15",
+  "status": "PARTIAL_PASS_BLOCKED_SYSTEM_RUNTIME",
+  "productionAccepted": false,
+  "activationAllowed": false,
+  "hubDatabase": {
+    "projectRef": "mfpdtlxwdbxitgfzdape",
+    "projectStatus": "ACTIVE_HEALTHY",
+    "postgresVersion": "17.6.1.166",
+    "schemaGate": "PASS",
+    "migrationsApplied": [
+      { "version": "20260915153218", "name": "one2b_product_hub_shell_consumer" },
+      { "version": "20260915153319", "name": "one2c_product_hub_enrichment_workflow" },
+      { "version": "20260915153340", "name": "one2c_enrichment_hardening" },
+      { "version": "20260915153409", "name": "one2d_legacy_mapping_consumer" }
+    ],
+    "legacyCatalogBefore": {
+      "productCount": 25,
+      "canonicalAtSkuCount": 25,
+      "serialPresentCount": 2,
+      "statusCounts": { "published": 24, "ready_to_list": 1 }
+    },
+    "legacyCatalogAfter": {
+      "productCount": 25,
+      "oneManagedCount": 0,
+      "listingReadinessNonNullCount": 0,
+      "batteryGradeNonNullCount": 0,
+      "statusCounts": { "published": 24, "ready_to_list": 1 }
+    },
+    "rpcSecurity": {
+      "one2bConsumeIntakeEvent": {
+        "securityInvoker": true,
+        "anonExecute": false,
+        "authenticatedExecute": false,
+        "serviceRoleExecute": true
+      },
+      "one2dConsumeLegacyLinkEvent": {
+        "securityInvoker": true,
+        "anonExecute": false,
+        "authenticatedExecute": false,
+        "serviceRoleExecute": true
+      }
+    },
+    "one2cTriggersPresent": [
+      "trg_one2c_product_after_change",
+      "trg_one2c_product_before_write",
+      "trg_one2c_product_images_after_change"
+    ],
+    "transactionalSmoke": {
+      "exactLinkOutcome": "LINKED",
+      "duplicateOutcome": "DUPLICATE",
+      "conflictingRemapOutcome": "CONFLICT",
+      "conflictingRemapError": "BRIDGE_LEGACY_MAPPING_CONFLICT",
+      "rolledBack": true,
+      "testRowsRemaining": { "inbox": 0, "outbox": 0, "links": 0 }
+    },
+    "advisorGate": {
+      "securityCheckedAfterMigration": true,
+      "performanceCheckedAfterMigration": true,
+      "newOne2bOrOne2dSecurityWarningObserved": false,
+      "preExistingProjectWarningsRemain": true
+    },
+    "backupOrPitrIndependentlyVerified": false
+  },
+  "systemRuntime": {
+    "apiHostname": "api.amphontd.com",
+    "dnsResolvedDuringAcceptance": false,
+    "apiHealthVerified": false,
+    "apiReadyVerified": false,
+    "hetznerDatabaseMigrationsApplied": false,
+    "one1StorageDatabaseVerified": false,
+    "one2aDatabaseVerified": false,
+    "one2dDatabaseVerified": false,
+    "one2dFeatureFlagEnabled": false
+  },
+  "bridgeRuntime": {
+    "hostname": "bridge.amphon.co.th",
+    "dnsResolvedDuringAcceptance": false,
+    "workerDeploymentVerified": false,
+    "hmacSecretsMatchVerified": false,
+    "signedHealthSmokePassed": false,
+    "signedSnapshotSmokePassed": false,
+    "one2bConsumerEnabled": false,
+    "one2dReconciliationEnabled": false
+  },
+  "endToEnd": {
+    "hubSnapshotHttpVerified": false,
+    "systemDryReconciliationRunPassed": false,
+    "ownerQueueReviewed": false,
+    "legacyProposalConfirmRoundTripPassed": false,
+    "continuousOutboxDeliveryEnabled": false
+  },
+  "blockers": [
+    "SYSTEM_API_DNS_NOT_RESOLVED",
+    "HETZNER_DATABASE_MIGRATIONS_NOT_VERIFIED",
+    "BRIDGE_DNS_AND_DEPLOYMENT_NOT_VERIFIED",
+    "HMAC_RUNTIME_SECRETS_NOT_VERIFIED",
+    "SIGNED_SNAPSHOT_HTTP_SMOKE_NOT_RUN",
+    "SYSTEM_RECONCILIATION_DRY_RUN_NOT_RUN",
+    "BACKUP_OR_PITR_NOT_INDEPENDENTLY_VERIFIED"
+  ],
+  "acceptanceRule": "productionAccepted may become true only when every System, Bridge and end-to-end runtime gate is true and blockers is empty. Hub database schema acceptance alone is insufficient.",
+  "nextActivationOrder": [
+    "verify_backup_or_pitr",
+    "activate_system_api_dns_and_runtime",
+    "deploy_system_migrations_and_db_verifiers",
+    "deploy_amphon_one_bridge_with_server_only_secrets",
+    "run_signed_health_and_snapshot_smoke",
+    "run_system_reconciliation_dry_run_with_flags_off",
+    "review_owner_issue_and_proposal_queue",
+    "enable_one2d_reconciliation_in_controlled_window",
+    "run_exact_link_round_trip",
+    "mark_production_accepted_only_after_reverification"
+  ]
+}
