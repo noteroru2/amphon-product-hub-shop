@@ -86,16 +86,23 @@ begin
   end if;
 
   if v_inbox.status = 'PROCESSED' then
-    select eel, p.sku
-    into v_link, v_existing_sku
-    from public.external_entity_links eel
-    join public.products p on p.id::text = eel.target_entity_id
-    where eel.source_system = 'amphon-system'
-      and eel.source_entity_type = 'product_intake_unit'
-      and eel.source_entity_id = v_inbox.entity_id
-      and eel.target_system = 'product-hub'
-      and eel.target_entity_type = 'product'
+    select *
+    into v_link
+    from public.external_entity_links
+    where source_system = 'amphon-system'
+      and source_entity_type = 'product_intake_unit'
+      and source_entity_id = v_inbox.entity_id
+      and target_system = 'product-hub'
+      and target_entity_type = 'product'
     limit 1;
+
+    if found then
+      select sku
+      into v_existing_sku
+      from public.products
+      where id::text = v_link.target_entity_id
+      limit 1;
+    end if;
 
     return jsonb_build_object(
       'outcome','DUPLICATE',
