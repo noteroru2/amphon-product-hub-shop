@@ -6,6 +6,7 @@
     "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
     "SYSTEM_INTEGRATION_KEY_ID": "amphon-system-v1",
     "INTEGRATION_SIGNATURE_MAX_AGE_SECONDS": "300",
-    "ONE2B_SHELL_CONSUMER_ENABLED": "false"
+    "ONE2B_SHELL_CONSUMER_ENABLED": "false",
+    "ONE2D_RECONCILIATION_ENABLED": "false"
   }
 }
