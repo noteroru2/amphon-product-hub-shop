@@ -43,6 +43,28 @@
       "expires": true
     }
   },
+  "security": {
+    "rawBodyRequired": true,
+    "maxBodyBytes": 1048576,
+    "replayProtection": "PERSISTENT_NONCE",
+    "retryRule": "SAME_EVENT_ID_AND_IDEMPOTENCY_KEY_NEW_TIMESTAMP_AND_NONCE",
+    "browserCorsRequired": false,
+    "systemInbound": {
+      "runtime": "amphon_system_backend",
+      "path": "/api/integrations/v1/events",
+      "healthPath": "/api/integrations/v1/health",
+      "sourceReady": true,
+      "productionAccepted": false
+    },
+    "hubBridge": {
+      "runtime": "cloudflare_worker",
+      "workerName": "amphon-one-bridge",
+      "productionHostname": "bridge.amphon.co.th",
+      "path": "/v1/events",
+      "healthPath": "/v1/health",
+      "productionAccepted": false
+    }
+  },
   "events": {
     "systemToHub": [
       "product.intake_created",
