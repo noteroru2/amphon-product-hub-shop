@@ -103,6 +103,9 @@
     "systemIntakeHook": {
       "sourceReady": true,
       "productionAccepted": false,
+      "activationFlag": "ONE2A_INTAKE_HOOK_ENABLED",
+      "defaultEnabled": false,
+      "activationRequiresDbVerification": true,
       "existingStaffWorkflowChanged": false,
       "technicalInspectionStageAdded": false,
       "qcStageAdded": false,
