@@ -1,0 +1,52 @@
+{
+  "flowVersion": "ONE-0R.1",
+  "status": "ACTIVE",
+  "origin": {
+    "application": "amphon_system",
+    "event": "intake_created",
+    "skuAllocatedBeforeHubSync": true,
+    "qrAvailableBeforeHubSync": true,
+    "hubSyncFailureDoesNotBlockReceiving": true
+  },
+  "identity": {
+    "systemIntakeId": "required",
+    "sku": "required_and_immutable",
+    "hubProductId": "assigned_after_hub_sync",
+    "serialOrImei": "optional_attribute",
+    "qrPayload": "sku"
+  },
+  "hubEnrichment": {
+    "technicalInspectionStage": false,
+    "qcStage": false,
+    "flags": {
+      "photos_complete": false,
+      "specs_complete": false,
+      "listing_content_complete": false
+    },
+    "flagsMayCompleteInAnyOrder": true,
+    "listingState": {
+      "pending": "ENRICHMENT_PENDING",
+      "ready": "READY_TO_LIST",
+      "published": "PUBLISHED"
+    },
+    "readyExpression": "photos_complete && specs_complete && listing_content_complete"
+  },
+  "batteryHealth": {
+    "field": "battery_health_grade",
+    "optional": true,
+    "grades": ["LOW", "GOOD", "VERY_GOOD", "UNKNOWN"],
+    "percentRequired": false,
+    "nullMeansNotApplicable": true
+  },
+  "availability": {
+    "masterAfterHubSync": "product_hub",
+    "targetStates": ["IN_STOCK", "RESERVED", "SOLD", "REPAIR", "RETURNED", "WRITTEN_OFF"],
+    "shopMayMutateInventoryDirectly": false
+  },
+  "failurePolicy": {
+    "hubUnavailableAtIntake": "KEEP_SYSTEM_INTAKE_AND_QUEUE_SYNC",
+    "duplicateDelivery": "IDEMPOTENT_BY_INTAKE_ID_AND_SKU",
+    "skuConflict": "STOP_AND_RECONCILE",
+    "missingPhotosOrSpecs": "KEEP_IN_STOCK_BUT_NOT_READY_TO_LIST"
+  }
+}
