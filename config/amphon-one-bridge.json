@@ -1,0 +1,61 @@
+{
+  "contractVersion": "ONE-1.0-draft",
+  "status": "FOUNDATION",
+  "transport": "HTTPS_SERVER_TO_SERVER",
+  "delivery": "AT_LEAST_ONCE_IDEMPOTENT_CONSUMERS",
+  "signature": {
+    "algorithm": "HMAC-SHA256",
+    "headers": {
+      "keyId": "X-Amphon-Key-Id",
+      "timestamp": "X-Amphon-Timestamp",
+      "nonce": "X-Amphon-Nonce",
+      "signature": "X-Amphon-Signature"
+    },
+    "maxAgeSeconds": 300,
+    "canonicalFormat": "timestamp\\nnonce\\nMETHOD\\n/path\\nsha256(body)"
+  },
+  "envelope": {
+    "required": ["eventId", "eventType", "version", "source", "occurredAt", "idempotencyKey", "entity", "payload"],
+    "entityRequired": ["type", "id"],
+    "skuOptional": true
+  },
+  "events": {
+    "systemToHub": [
+      "product.intake_created",
+      "product.reserve_requested",
+      "product.release_requested",
+      "product.mark_sold_requested",
+      "product.price_change_requested",
+      "publication.end_requested"
+    ],
+    "hubToSystem": [
+      "product.shell_created",
+      "product.enrichment_changed",
+      "product.availability_changed",
+      "publication.changed",
+      "cleanup_task.changed"
+    ],
+    "shopToSystem": [
+      "order.created",
+      "order.payment_notified",
+      "order.payment_confirmed",
+      "order.cancelled",
+      "order.shipped",
+      "order.completed"
+    ]
+  },
+  "intakeCreated": {
+    "source": "amphon-system",
+    "entityType": "product_intake",
+    "requiredPayload": ["systemIntakeId", "inventoryItemId", "sku", "name"],
+    "optionalPayload": ["category", "brand", "model", "serialNumber", "condition", "accessories", "batteryHealthGrade", "sourceType"]
+  },
+  "rules": {
+    "secretsServerOnly": true,
+    "browserMayCallBridgeDirectly": false,
+    "duplicateEventMayRepeatSideEffects": false,
+    "lastWriteWins": false,
+    "hubFailureMayRollbackSystemIntake": false,
+    "skuConflictMayAutoAllocateReplacement": false
+  }
+}
