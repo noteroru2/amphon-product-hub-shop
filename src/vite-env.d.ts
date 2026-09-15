@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_APP_URL: string
   readonly VITE_SALES_SITE_URL: string
   readonly VITE_FACEBOOK_MARKETPLACE_URL?: string
+  readonly VITE_ONE2C_ENRICHMENT_ENABLED?: string
 }
 
 interface ImportMeta {
