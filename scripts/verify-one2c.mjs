@@ -20,6 +20,12 @@ const contract = JSON.parse(contractText)
 const checks = []
 const check = (name, ok) => checks.push({ name, ok: Boolean(ok) })
 
+const listingFunctionStart = migration.indexOf('create or replace function private.one2c_listing_content_complete')
+const listingFunctionEnd = migration.indexOf('create or replace function private.one2c_product_before_write', listingFunctionStart)
+const listingFunction = listingFunctionStart >= 0 && listingFunctionEnd > listingFunctionStart
+  ? migration.slice(listingFunctionStart, listingFunctionEnd)
+  : ''
+
 check('contract version ONE-2C.1', contract.contractVersion === 'ONE-2C.1')
 check('source ready but not production accepted', contract.status === 'SOURCE_READY' && contract.productionAccepted === false)
 check('no technical inspection stage', contract.principles?.technicalInspectionStageAdded === false)
@@ -38,7 +44,7 @@ check('enrichment event to system', contract.events?.output === 'product.enrichm
 check('migration alters completion timestamps', migration.includes('one_photos_completed_at') && migration.includes('one_specs_completed_at') && migration.includes('one_listing_content_completed_at'))
 check('category-aware specs function', migration.includes('private.one2c_specs_complete') && migration.includes("when 'notebook'") && migration.includes("when 'camera'") && migration.includes("when 'component'"))
 check('photo rule is >=2 + cover', migration.includes('v_photo_count >= 2 and v_has_cover'))
-check('listing content rule excludes serial requirement', migration.includes('private.one2c_listing_content_complete') && !/one2c_listing_content_complete[\s\S]{0,800}serial_number/.test(migration))
+check('listing content rule excludes serial requirement', Boolean(listingFunction) && !listingFunction.includes('serial_number'))
 check('private trigger helpers', migration.includes('create schema if not exists private') && migration.includes('security definer') && migration.includes('revoke all on function private.one2c_'))
 check('no public security definer function', !migration.match(/create or replace function public\.one2c_[\s\S]{0,180}security definer/i))
 check('photos/spec/content can update independently', migration.includes('trg_one2c_product_images_after_change') && migration.includes('trg_one2c_product_before_write'))
@@ -59,7 +65,7 @@ const failed = checks.filter((item) => !item.ok)
 for (const item of checks) console.log(`${item.ok ? 'PASS' : 'FAIL'} - ${item.name}`)
 
 if (failed.length) {
-  console.error(`\nONE-2C source verification failed: ${failed.length} check(s)`) 
+  console.error(`\nONE-2C source verification failed: ${failed.length} check(s)`)
   process.exit(1)
 }
 
