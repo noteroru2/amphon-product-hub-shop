@@ -49,8 +49,10 @@ assert(migration.includes("'draft'"), 'legacy Product Hub status must remain dra
 assert(migration.includes("v_ack_idempotency := 'product-shell:' || v_source_identity_id || ':created:v1'"), 'shell-created acknowledgement must have a stable idempotency key')
 assert(!/generate[_a-z]*sku/i.test(migration), 'Hub consumer must never generate a replacement SKU')
 assert(!migration.includes('select eel, p.sku'), 'PL/pgSQL rowtype must not be combined with another INTO target')
-assert(migration.includes('select *\n    into v_link\n    from public.external_entity_links'), 'duplicate branch must load the link row separately')
-assert(migration.includes('select sku\n      into v_existing_sku\n      from public.products'), 'duplicate branch must load product SKU in a separate scalar query')
+// Git may check SQL out as LF on Linux and CRLF on Windows. Verify the SQL semantics,
+// not a platform-specific newline encoding.
+assert(/select \*\r?\n\s+into v_link\r?\n\s+from public\.external_entity_links/.test(migration), 'duplicate branch must load the link row separately')
+assert(/select sku\r?\n\s+into v_existing_sku\r?\n\s+from public\.products/.test(migration), 'duplicate branch must load product SKU in a separate scalar query')
 
 assert(entry.includes("import baseBridge from './index'"), 'ONE-2B must preserve the existing signed Inbox handler as the first boundary')
 assert(entry.includes('const baseResponse = await baseBridge.fetch(request, env)'), 'base HMAC/Inbox handler must execute before shell consumption')
