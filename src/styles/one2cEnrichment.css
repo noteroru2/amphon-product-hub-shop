@@ -1,0 +1,275 @@
+.one2c-dock {
+  position: fixed;
+  right: 14px;
+  bottom: 86px;
+  z-index: 80;
+  font-family: inherit;
+}
+
+.one2c-dock-trigger {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #171717;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .24);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.one2c-dock-trigger strong {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f97316;
+  color: #fff;
+  font-size: 13px;
+}
+
+.one2c-panel {
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(74vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 18px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .22);
+  overflow: hidden;
+}
+
+.one2c-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 16px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.one2c-panel-head strong {
+  display: block;
+  color: #171717;
+  font-size: 16px;
+}
+
+.one2c-panel-head small {
+  display: block;
+  margin-top: 3px;
+  color: #737373;
+  font-size: 11px;
+}
+
+.one2c-panel-head > button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #f5f5f5;
+  color: #404040;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.one2c-count-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+  padding: 11px 12px 8px;
+}
+
+.one2c-count-grid > div {
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: #f5f5f5;
+  text-align: center;
+}
+
+.one2c-count-grid > div.ready {
+  background: #ecfdf3;
+}
+
+.one2c-count-grid strong,
+.one2c-count-grid span {
+  display: block;
+}
+
+.one2c-count-grid strong {
+  font-size: 17px;
+  color: #171717;
+}
+
+.one2c-count-grid span {
+  margin-top: 2px;
+  color: #737373;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.one2c-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px 9px;
+  color: #737373;
+  font-size: 11px;
+}
+
+.one2c-toolbar button {
+  border: 0;
+  background: transparent;
+  color: #ea580c;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.one2c-error {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 11px;
+}
+
+.one2c-list {
+  min-height: 80px;
+  overflow-y: auto;
+  padding: 0 8px 10px;
+}
+
+.one2c-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.one2c-item-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.one2c-item-main > strong {
+  font-size: 12px;
+  color: #262626;
+}
+
+.one2c-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #525252;
+  font-size: 11px;
+}
+
+.one2c-state {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.one2c-state.state-intake_only {
+  background: #f5f5f5;
+  color: #525252;
+}
+
+.one2c-state.state-spec_pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.one2c-state.state-listing_content_pending {
+  background: #faf5ff;
+  color: #7e22ce;
+}
+
+.one2c-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.one2c-checks > span {
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #a3a3a3;
+  font-size: 9px;
+}
+
+.one2c-checks > span.done {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.one2c-battery {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #737373;
+  font-size: 9px;
+}
+
+.one2c-battery select {
+  max-width: 88px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 6px;
+  color: #262626;
+  font: inherit;
+  font-size: 10px;
+}
+
+.one2c-empty {
+  padding: 24px 10px;
+  color: #737373;
+  text-align: center;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .one2c-dock {
+    right: 8px;
+    bottom: 78px;
+  }
+
+  .one2c-panel {
+    width: calc(100vw - 16px);
+    max-height: 68vh;
+    border-radius: 16px;
+  }
+
+  .one2c-count-grid {
+    gap: 3px;
+    padding-inline: 8px;
+  }
+
+  .one2c-count-grid span {
+    font-size: 8px;
+  }
+}
