@@ -1,0 +1,26 @@
+name: ONE-2A Intake Contract Source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/amphon-one-bridge.json'
+      - 'scripts/verify-one2a-contract.mjs'
+      - 'package.json'
+      - '.github/workflows/one2a-contract-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify ONE-2A mirrored intake contract
+        run: node scripts/verify-one2a-contract.mjs
