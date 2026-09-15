@@ -42,7 +42,20 @@ for (const token of [
 
 assert(worker.includes("return response({ ok: true, accepted: true, duplicate: false"), 'new event 202 response missing')
 assert(worker.includes("return response({ ok: true, accepted: false, duplicate: true"), 'duplicate idempotent response missing')
-assert(!worker.includes("products?"), 'ONE-1 Bridge must not mutate product records yet')
+
+// ONE-1 originally prohibited any Product Hub product access from the Bridge.
+// ONE-2D adds a signed server-to-server READ snapshot only. Keep the original
+// mutation guard by proving the product query is select-only and has no write
+// method attached to its Supabase request.
+const productReadStart = worker.indexOf('products?select=')
+if (productReadStart >= 0) {
+  const productReadWindow = worker.slice(productReadStart, productReadStart + 550)
+  assert(!/method:\s*['"](?:POST|PATCH|PUT|DELETE)['"]/i.test(productReadWindow), 'Bridge product snapshot must remain read-only')
+  assert(worker.includes("'/v1/reconciliation/products'"), 'product reads are only allowed for the ONE-2D reconciliation endpoint')
+  assert(bridge.one2d?.snapshot?.serverToServerOnly === true, 'ONE-2D snapshot must remain server-to-server only')
+} else {
+  assert(!worker.includes('products?'), 'unexpected product access outside approved snapshot')
+}
 assert(!worker.includes("commerce_orders?"), 'ONE-1 Bridge must not mutate Shop orders yet')
 assert(!wrangler.includes('SYSTEM_INTEGRATION_SECRET'), 'HMAC secret must never be committed in Wrangler config')
 assert(!wrangler.includes('SUPABASE_SECRET_KEY'), 'Supabase secret must never be committed in Wrangler config')
@@ -53,4 +66,4 @@ assert(migration.includes('integration_replay_nonces'), 'persistent nonce table 
 assert(migration.includes('integration_event_inbox'), 'Inbox migration missing')
 assert(migration.includes('revoke all on table public.integration_event_inbox from anon, authenticated'), 'browser roles must remain blocked from Inbox')
 
-console.log('AMPHON ONE-1 SECURITY: PASS — dedicated Worker HMAC, replay protection, conflict detection and Inbox-only endpoint are locked')
+console.log('AMPHON ONE-1 SECURITY: PASS — HMAC/replay protection stays locked; ONE-2D product access is signed read-only snapshot only')
