@@ -1,0 +1,19 @@
+{
+  "name": "amphon-one-hub-outbox",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-16",
+  "vars": {
+    "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
+    "SYSTEM_API_BASE_URL": "https://api.amphontd.com",
+    "SYSTEM_INTEGRATION_KEY_ID": "amphon-system-v1",
+    "HUB_OUTBOX_DELIVERY_ENABLED": "false",
+    "HUB_OUTBOX_BATCH_SIZE": "10",
+    "HUB_OUTBOX_LOCK_TIMEOUT_SECONDS": "120",
+    "HUB_OUTBOX_MAX_ATTEMPTS": "12",
+    "HUB_OUTBOX_BACKOFF_BASE_SECONDS": "30",
+    "HUB_OUTBOX_BACKOFF_MAX_SECONDS": "1800"
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}
