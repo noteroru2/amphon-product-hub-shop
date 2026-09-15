@@ -1,0 +1,27 @@
+name: ONE-PROD Hub Outbox Delivery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/hub-outbox/**'
+      - 'scripts/verify-hub-outbox-delivery.mjs'
+      - 'package.json'
+      - '.github/workflows/hub-outbox-delivery.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify Hub outbox delivery contract
+        run: npm run verify:hub-outbox
+      - name: Run full Hub build gate
+        run: npm run build
