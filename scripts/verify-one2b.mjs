@@ -48,6 +48,9 @@ assert(migration.includes("where sku = v_sku"), 'consumer must detect pre-existi
 assert(migration.includes("'draft'"), 'legacy Product Hub status must remain draft for a new shell')
 assert(migration.includes("v_ack_idempotency := 'product-shell:' || v_source_identity_id || ':created:v1'"), 'shell-created acknowledgement must have a stable idempotency key')
 assert(!/generate[_a-z]*sku/i.test(migration), 'Hub consumer must never generate a replacement SKU')
+assert(!migration.includes('select eel, p.sku'), 'PL/pgSQL rowtype must not be combined with another INTO target')
+assert(migration.includes('select *\n    into v_link\n    from public.external_entity_links'), 'duplicate branch must load the link row separately')
+assert(migration.includes('select sku\n      into v_existing_sku\n      from public.products'), 'duplicate branch must load product SKU in a separate scalar query')
 
 assert(entry.includes("import baseBridge from './index'"), 'ONE-2B must preserve the existing signed Inbox handler as the first boundary')
 assert(entry.includes('const baseResponse = await baseBridge.fetch(request, env)'), 'base HMAC/Inbox handler must execute before shell consumption')
@@ -75,7 +78,7 @@ assert(one2b?.rpcSecurity === 'SECURITY_INVOKER_SERVICE_ROLE_ONLY', 'RPC privile
 assert(one2b?.legacyProductStatus === 'draft', 'legacy product status must remain draft')
 assert(one2b?.initialListingReadiness === 'INTAKE_ONLY', 'initial ONE readiness must be INTAKE_ONLY')
 assert(one2b?.systemProvidedSkuOnly === true, 'Hub must use System-provided SKU only')
-assert(one2b?.adoptExistingSkuWithoutExactMapping === false, 'silent SKU adoption must remain forbidden')
+assert(one2b?.adoptExistingSkuWithoutExactMapping === false, 'silent SKU adoption must be forbidden')
 assert(one2b?.replacementSkuOnConflict === false, 'replacement SKU allocation must remain forbidden')
 assert(bridge.one2b?.readiness?.enrichmentMayOccurInAnyOrder === true, 'photo/spec/content enrichment must remain order-independent')
 assert(bridge.one2b?.readiness?.qcStageAdded === false, 'QC stage must remain absent')
