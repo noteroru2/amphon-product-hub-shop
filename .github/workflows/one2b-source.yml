@@ -1,0 +1,32 @@
+name: ONE-2B Product Shell Consumer Source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/one-bridge/**'
+      - 'supabase/migrations/20260915125000_one2b_product_hub_shell_consumer.sql'
+      - 'config/amphon-one-bridge.json'
+      - 'scripts/verify-one2b.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/one2b-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify ONE-2B Product Hub shell consumer
+        run: npm run verify:one2b
