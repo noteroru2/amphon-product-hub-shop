@@ -1,0 +1,87 @@
+{
+  "contractVersion": "ONE-2D.1",
+  "status": "SOURCE_READY",
+  "productionAccepted": false,
+  "effectiveDate": "2026-09-15",
+  "title": "Inventory Reconciliation + Legacy Mapping",
+  "sourceOfTruth": {
+    "physicalProduct": "product-hub",
+    "systemInventoryItemRole": "LEGACY_PROJECTION",
+    "canonicalIdentity": ["hub_product_id", "sku"],
+    "authoritativeLinkTable": "ExternalEntityLink",
+    "duplicateMappingTableAllowed": false,
+    "lastWriteWinsAllowed": false
+  },
+  "mappingChain": [
+    "InventoryItem",
+    "AmphonProductIdentity",
+    "ExternalEntityLink",
+    "ProductHubProduct"
+  ],
+  "hubSnapshot": {
+    "transport": "HTTPS_HMAC_SERVER_TO_SERVER",
+    "method": "POST",
+    "path": "/v1/reconciliation/products",
+    "featureFlag": "ONE2D_RECONCILIATION_ENABLED",
+    "defaultEnabled": false,
+    "financialFieldsAllowed": false,
+    "fields": ["hubProductId", "sku", "status", "listingReadiness", "category", "serialNumber", "title", "oneManaged", "updatedAt"]
+  },
+  "systemProjection": {
+    "table": "ProductHubProjection",
+    "isSourceOfTruth": false,
+    "replaceHubWrites": false,
+    "storesSnapshotOnly": true
+  },
+  "reconciliation": {
+    "runTable": "InventoryReconciliationRun",
+    "issueTable": "InventoryReconciliationIssue",
+    "proposalTable": "InventoryReconciliationProposal",
+    "proposalIsAuthoritativeMapping": false,
+    "issueTypes": ["LEGACY_NO_IDENTITY", "IDENTITY_NO_HUB_LINK", "HUB_PRODUCT_UNMAPPED", "MISSING_HUB_PRODUCT", "SKU_MISMATCH", "DUPLICATE_SKU", "QUANTITY_IDENTITY_MISMATCH", "STATUS_MISMATCH", "LEGACY_SKU_REKEY_REQUIRED", "AMBIGUOUS_MATCH"],
+    "severities": ["INFO", "WARN", "BLOCKING"],
+    "issueStatuses": ["OPEN", "ACKNOWLEDGED", "RESOLVED", "IGNORED"]
+  },
+  "legacyMapping": {
+    "autoLinkAllowed": false,
+    "ownerConfirmationRequired": true,
+    "multiQuantityAutoAdoptionAllowed": false,
+    "fuzzyMatchMayCreateProposalOnly": true,
+    "rules": [
+      { "name": "EXACT_SKU", "confidence": 100, "mayAutoConfirm": false },
+      { "name": "EXACT_SERIAL", "confidence": 95, "requiresUniqueBothSides": true, "mayAutoConfirm": false },
+      { "name": "NORMALIZED_NAME_CATEGORY", "confidence": 60, "mayAutoConfirm": false },
+      { "name": "MANUAL", "confidence": 100, "mayAutoConfirm": false }
+    ],
+    "confirmedFlow": ["validate_one_physical_unit", "adopt_hub_sku_into_AmphonProductIdentity", "advance_AmphonSkuCounter_floor", "create_ExternalEntityLink_PENDING", "enqueue_product.legacy_link_requested", "hub_validates_exact_product_and_sku", "hub_creates_external_link", "hub_emits_product.legacy_linked", "system_marks_ExternalEntityLink_LINKED"],
+    "hubSkuMutationAllowed": false,
+    "replacementSkuAutoAllocationAllowed": false
+  },
+  "events": {
+    "systemToHub": ["product.legacy_link_requested"],
+    "hubToSystem": ["product.legacy_linked"]
+  },
+  "security": {
+    "browserMayCallHubSnapshot": false,
+    "browserMayHoldHubIntegrationSecret": false,
+    "serviceRoleMayBeExposed": false,
+    "adminApiRequiredForMappingConfirmation": true
+  },
+  "activation": {
+    "systemFeatureFlag": "ONE2D_RECONCILIATION_ENABLED",
+    "hubFeatureFlag": "ONE2D_RECONCILIATION_ENABLED",
+    "defaultEnabled": false,
+    "requiresOne1": true,
+    "requiresOne2a": true,
+    "requiresOne2b": true,
+    "requiresOne2c": true,
+    "productionActivationDeferredTo": "ONE-PROD"
+  },
+  "rules": {
+    "noAutomaticMerge": true,
+    "noAutomaticDelete": true,
+    "noInventoryItemRewriteDuringScan": true,
+    "noHubProductRewriteDuringScan": true,
+    "exactConflictStopsForOwnerReview": true
+  }
+}
