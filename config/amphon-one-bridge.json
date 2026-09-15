@@ -5,46 +5,16 @@
   "delivery": "AT_LEAST_ONCE_IDEMPOTENT_CONSUMERS",
   "signature": {
     "algorithm": "HMAC-SHA256",
-    "headers": {
-      "keyId": "X-Amphon-Key-Id",
-      "timestamp": "X-Amphon-Timestamp",
-      "nonce": "X-Amphon-Nonce",
-      "signature": "X-Amphon-Signature"
-    },
+    "headers": { "keyId": "X-Amphon-Key-Id", "timestamp": "X-Amphon-Timestamp", "nonce": "X-Amphon-Nonce", "signature": "X-Amphon-Signature" },
     "maxAgeSeconds": 300,
     "canonicalFormat": "timestamp\\nnonce\\nMETHOD\\n/path\\nsha256(body)"
   },
-  "envelope": {
-    "required": ["eventId", "eventType", "version", "source", "occurredAt", "idempotencyKey", "entity", "payload"],
-    "entityRequired": ["type", "id"],
-    "skuOptional": true
-  },
+  "envelope": { "required": ["eventId", "eventType", "version", "source", "occurredAt", "idempotencyKey", "entity", "payload"], "entityRequired": ["type", "id"], "skuOptional": true },
   "storage": {
-    "inbox": {
-      "uniqueEventId": true,
-      "uniqueSourceIdempotencyKey": true,
-      "deadLetterVisible": true
-    },
-    "outbox": {
-      "uniqueEventId": true,
-      "uniqueDestinationIdempotencyKey": true,
-      "retryable": true,
-      "nextAttemptAt": true,
-      "lockFields": ["lockedAt", "lockedBy"],
-      "lockStrategy": "POSTGRES_FOR_UPDATE_SKIP_LOCKED",
-      "staleLockRecovery": true,
-      "deadLetterVisible": true,
-      "deadLetterAutoRedrive": false
-    },
-    "externalEntityLink": {
-      "businessKey": "sku",
-      "mappingConflictMode": "STOP_FOR_RECONCILIATION"
-    },
-    "replayNonce": {
-      "persistent": true,
-      "uniqueKey": ["keyId", "nonce"],
-      "expires": true
-    }
+    "inbox": { "uniqueEventId": true, "uniqueSourceIdempotencyKey": true, "deadLetterVisible": true },
+    "outbox": { "uniqueEventId": true, "uniqueDestinationIdempotencyKey": true, "retryable": true, "nextAttemptAt": true, "lockFields": ["lockedAt", "lockedBy"], "lockStrategy": "POSTGRES_FOR_UPDATE_SKIP_LOCKED", "staleLockRecovery": true, "deadLetterVisible": true, "deadLetterAutoRedrive": false },
+    "externalEntityLink": { "businessKey": "sku", "mappingConflictMode": "STOP_FOR_RECONCILIATION" },
+    "replayNonce": { "persistent": true, "uniqueKey": ["keyId", "nonce"], "expires": true }
   },
   "security": {
     "rawBodyRequired": true,
@@ -52,179 +22,44 @@
     "replayProtection": "PERSISTENT_NONCE",
     "retryRule": "SAME_EVENT_ID_AND_IDEMPOTENCY_KEY_NEW_TIMESTAMP_AND_NONCE",
     "browserCorsRequired": false,
-    "systemInbound": {
-      "runtime": "amphon_system_backend",
-      "path": "/api/integrations/v1/events",
-      "healthPath": "/api/integrations/v1/health",
-      "sourceReady": true,
-      "productionAccepted": false
-    },
-    "hubBridge": {
-      "runtime": "cloudflare_worker",
-      "workerName": "amphon-one-bridge",
-      "productionHostname": "bridge.amphon.co.th",
-      "path": "/v1/events",
-      "healthPath": "/v1/health",
-      "sourceReady": true,
-      "productionAccepted": false
-    }
+    "systemInbound": { "runtime": "amphon_system_backend", "path": "/api/integrations/v1/events", "healthPath": "/api/integrations/v1/health", "sourceReady": true, "productionAccepted": false },
+    "hubBridge": { "runtime": "cloudflare_worker", "workerName": "amphon-one-bridge", "productionHostname": "bridge.amphon.co.th", "path": "/v1/events", "healthPath": "/v1/health", "sourceReady": true, "productionAccepted": false }
   },
   "outboxDeliveryWorker": {
-    "runtime": "amphon_system_dedicated_process",
-    "destination": "product-hub",
-    "baseUrlEnv": "HUB_BRIDGE_BASE_URL",
-    "eventPath": "/v1/events",
-    "sourceReady": true,
-    "productionAccepted": false,
-    "batchSizeDefault": 10,
-    "lockTimeoutSecondsDefault": 120,
-    "httpTimeoutMsDefault": 15000,
-    "maxAttemptsDefault": 12,
-    "backoff": {
-      "strategy": "EXPONENTIAL_WITH_JITTER",
-      "baseMsDefault": 15000,
-      "maxMsDefault": 1800000,
-      "jitterRatioDefault": 0.2
-    },
-    "attemptAccounting": "INCREMENT_AFTER_DELIVERY_ATTEMPT",
-    "authOrDeploymentMismatch": "RETRY_UNTIL_MAX_ATTEMPTS",
-    "permanentFailureCodes": [
-      "BRIDGE_IDEMPOTENCY_CONFLICT",
-      "BRIDGE_ENVELOPE_INVALID",
-      "BRIDGE_EVENT_NOT_ALLOWED",
-      "BRIDGE_BODY_TOO_LARGE",
-      "BRIDGE_JSON_REQUIRED",
-      "BRIDGE_JSON_INVALID"
-    ],
-    "deadLetterStatus": "DEAD",
-    "autoStartWithApi": false
+    "runtime": "amphon_system_dedicated_process", "destination": "product-hub", "baseUrlEnv": "HUB_BRIDGE_BASE_URL", "eventPath": "/v1/events", "sourceReady": true, "productionAccepted": false, "batchSizeDefault": 10, "lockTimeoutSecondsDefault": 120, "httpTimeoutMsDefault": 15000, "maxAttemptsDefault": 12,
+    "backoff": { "strategy": "EXPONENTIAL_WITH_JITTER", "baseMsDefault": 15000, "maxMsDefault": 1800000, "jitterRatioDefault": 0.2 },
+    "attemptAccounting": "INCREMENT_AFTER_DELIVERY_ATTEMPT", "authOrDeploymentMismatch": "RETRY_UNTIL_MAX_ATTEMPTS",
+    "permanentFailureCodes": ["BRIDGE_IDEMPOTENCY_CONFLICT", "BRIDGE_ENVELOPE_INVALID", "BRIDGE_EVENT_NOT_ALLOWED", "BRIDGE_BODY_TOO_LARGE", "BRIDGE_JSON_REQUIRED", "BRIDGE_JSON_INVALID"],
+    "deadLetterStatus": "DEAD", "autoStartWithApi": false
   },
   "one2a": {
-    "systemIntakeHook": {
-      "sourceReady": true,
-      "productionAccepted": false,
-      "activationFlag": "ONE2A_INTAKE_HOOK_ENABLED",
-      "defaultEnabled": false,
-      "activationRequiresDbVerification": true,
-      "existingStaffWorkflowChanged": false,
-      "technicalInspectionStageAdded": false,
-      "qcStageAdded": false,
-      "transactionBoundary": [
-        "seller_customer",
-        "legacy_inventory_item",
-        "cashbook_entry",
-        "physical_product_identity",
-        "integration_outbox"
-      ]
-    },
-    "physicalIdentity": {
-      "table": "AmphonProductIdentity",
-      "oneSkuPerPhysicalUnit": true,
-      "quantityFanout": true,
-      "legacyInventoryCodeRetained": true,
-      "qrPayload": "SKU"
-    },
-    "sku": {
-      "format": "AT-{CATEGORY}-{YYMM}-{6_DIGIT_SEQUENCE}",
-      "timezone": "Asia/Bangkok",
-      "allocation": "POSTGRES_ATOMIC_COUNTER_BY_PERIOD_AND_CATEGORY",
-      "immutable": true,
-      "unknownCategoryCode": "IT"
-    },
+    "systemIntakeHook": { "sourceReady": true, "productionAccepted": false, "activationFlag": "ONE2A_INTAKE_HOOK_ENABLED", "defaultEnabled": false, "activationRequiresDbVerification": true, "existingStaffWorkflowChanged": false, "technicalInspectionStageAdded": false, "qcStageAdded": false, "transactionBoundary": ["seller_customer", "legacy_inventory_item", "cashbook_entry", "physical_product_identity", "integration_outbox"] },
+    "physicalIdentity": { "table": "AmphonProductIdentity", "oneSkuPerPhysicalUnit": true, "quantityFanout": true, "legacyInventoryCodeRetained": true, "qrPayload": "SKU" },
+    "sku": { "format": "AT-{CATEGORY}-{YYMM}-{6_DIGIT_SEQUENCE}", "timezone": "Asia/Bangkok", "allocation": "POSTGRES_ATOMIC_COUNTER_BY_PERIOD_AND_CATEGORY", "immutable": true, "unknownCategoryCode": "IT" },
     "multiQuantitySerialRule": "ONLY_PROPAGATE_SHARED_SERIAL_WHEN_QUANTITY_EQUALS_ONE"
   },
   "one2b": {
-    "productHubShellConsumer": {
-      "sourceReady": true,
-      "productionAccepted": false,
-      "activationFlag": "ONE2B_SHELL_CONSUMER_ENABLED",
-      "defaultEnabled": false,
-      "inputEvent": "product.intake_created",
-      "outputEvent": "product.shell_created",
-      "rpc": "one2b_consume_intake_event",
-      "rpcSecurity": "SECURITY_INVOKER_SERVICE_ROLE_ONLY",
-      "legacyProductStatus": "draft",
-      "initialListingReadiness": "INTAKE_ONLY",
-      "systemProvidedSkuOnly": true,
-      "adoptExistingSkuWithoutExactMapping": false,
-      "replacementSkuOnConflict": false,
-      "transactionBoundary": [
-        "product_shell",
-        "external_entity_link",
-        "integration_outbox_shell_created",
-        "integration_inbox_processed"
-      ]
-    },
-    "readiness": {
-      "separateFromInventoryStatus": true,
-      "independentFlags": [
-        "one_photos_complete",
-        "one_specs_complete",
-        "one_listing_content_complete"
-      ],
-      "enrichmentMayOccurInAnyOrder": true,
-      "technicalInspectionStageAdded": false,
-      "qcStageAdded": false
-    },
+    "productHubShellConsumer": { "sourceReady": true, "productionAccepted": false, "activationFlag": "ONE2B_SHELL_CONSUMER_ENABLED", "defaultEnabled": false, "inputEvent": "product.intake_created", "outputEvent": "product.shell_created", "rpc": "one2b_consume_intake_event", "rpcSecurity": "SECURITY_INVOKER_SERVICE_ROLE_ONLY", "legacyProductStatus": "draft", "initialListingReadiness": "INTAKE_ONLY", "systemProvidedSkuOnly": true, "adoptExistingSkuWithoutExactMapping": false, "replacementSkuOnConflict": false, "transactionBoundary": ["product_shell", "external_entity_link", "integration_outbox_shell_created", "integration_inbox_processed"] },
+    "readiness": { "separateFromInventoryStatus": true, "independentFlags": ["one_photos_complete", "one_specs_complete", "one_listing_content_complete"], "enrichmentMayOccurInAnyOrder": true, "technicalInspectionStageAdded": false, "qcStageAdded": false },
     "batteryHealthGrade": ["LOW", "GOOD", "VERY_GOOD", "UNKNOWN"]
   },
+  "one2d": {
+    "sourceReady": true,
+    "productionAccepted": false,
+    "activationFlag": "ONE2D_RECONCILIATION_ENABLED",
+    "defaultEnabled": false,
+    "snapshot": { "method": "POST", "path": "/v1/reconciliation/products", "serverToServerOnly": true, "financialFieldsAllowed": false },
+    "legacyLink": { "inputEvent": "product.legacy_link_requested", "outputEvent": "product.legacy_linked", "rpc": "one2d_consume_legacy_link_event", "ownerConfirmationRequired": true, "autoLinkAllowed": false, "hubSkuMutationAllowed": false }
+  },
   "events": {
-    "systemToHub": [
-      "product.intake_created",
-      "product.reserve_requested",
-      "product.release_requested",
-      "product.mark_sold_requested",
-      "product.price_change_requested",
-      "publication.end_requested"
-    ],
-    "hubToSystem": [
-      "product.shell_created",
-      "product.enrichment_changed",
-      "product.availability_changed",
-      "publication.changed",
-      "cleanup_task.changed"
-    ],
-    "shopToSystem": [
-      "order.created",
-      "order.payment_notified",
-      "order.payment_confirmed",
-      "order.cancelled",
-      "order.shipped",
-      "order.completed"
-    ]
+    "systemToHub": ["product.intake_created", "product.reserve_requested", "product.release_requested", "product.mark_sold_requested", "product.price_change_requested", "publication.end_requested", "product.legacy_link_requested"],
+    "hubToSystem": ["product.shell_created", "product.enrichment_changed", "product.availability_changed", "product.legacy_linked", "publication.changed", "cleanup_task.changed"],
+    "shopToSystem": ["order.created", "order.payment_notified", "order.payment_confirmed", "order.cancelled", "order.shipped", "order.completed"]
   },
   "intakeCreated": {
-    "source": "amphon-system",
-    "entityType": "product_intake_unit",
-    "requiredPayload": [
-      "systemIntakeId",
-      "inventoryItemId",
-      "productIdentityId",
-      "unitOrdinal",
-      "quantityInIntake",
-      "sku",
-      "qrPayload",
-      "name"
-    ],
-    "optionalPayload": [
-      "category",
-      "categoryCode",
-      "brand",
-      "model",
-      "serialNumber",
-      "condition",
-      "accessories",
-      "batteryHealthGrade",
-      "sourceType",
-      "targetPrice"
-    ]
+    "source": "amphon-system", "entityType": "product_intake_unit",
+    "requiredPayload": ["systemIntakeId", "inventoryItemId", "productIdentityId", "unitOrdinal", "quantityInIntake", "sku", "qrPayload", "name"],
+    "optionalPayload": ["category", "categoryCode", "brand", "model", "serialNumber", "condition", "accessories", "batteryHealthGrade", "sourceType", "targetPrice"]
   },
-  "rules": {
-    "secretsServerOnly": true,
-    "browserMayCallBridgeDirectly": false,
-    "duplicateEventMayRepeatSideEffects": false,
-    "lastWriteWins": false,
-    "hubFailureMayRollbackSystemIntake": false,
-    "skuConflictMayAutoAllocateReplacement": false
-  }
+  "rules": { "secretsServerOnly": true, "browserMayCallBridgeDirectly": false, "duplicateEventMayRepeatSideEffects": false, "lastWriteWins": false, "hubFailureMayRollbackSystemIntake": false, "skuConflictMayAutoAllocateReplacement": false }
 }
