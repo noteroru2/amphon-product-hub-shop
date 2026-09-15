@@ -1,36 +1,45 @@
 {
-  "contractVersion": "ONE-0.1",
+  "contractVersion": "ONE-0R.1",
   "status": "ACTIVE",
-  "effectiveDate": "2026-09-14",
+  "effectiveDate": "2026-09-15",
+  "supersedes": "ONE-0.1",
   "platform": "AMPHON ONE",
   "applications": {
     "amphon_system": {
-      "role": "owner_control_plane",
+      "role": "owner_control_and_receiving_plane",
       "repo": "noteroru2/amphon-system"
     },
     "product_hub": {
-      "role": "product_operations_engine",
+      "role": "product_enrichment_and_publication_engine",
       "repo": "noteroru2/amphon-product-hub-shop",
       "url": "https://hub.amphon.co.th"
     },
     "shop": {
-      "role": "customer_storefront",
+      "role": "customer_storefront_and_online_commerce_edge",
       "repo": "noteroru2/amphon-product-hub-shop",
       "url": "https://shop.amphon.co.th"
     }
   },
   "domains": {
     "owner_control": { "master": "amphon_system" },
+    "product_intake": { "master": "amphon_system" },
+    "business_sku": { "master": "amphon_system", "formatExample": "AT-NB-2609-000123" },
+    "acquisition_cost_source": { "master": "amphon_system" },
     "customer_crm": { "master": "amphon_system" },
     "employee_hr": { "master": "amphon_system" },
     "contracts": { "master": "amphon_system" },
     "repairs": { "master": "amphon_system" },
     "finance_ledger": { "master": "amphon_system" },
     "sales_ledger": { "master": "amphon_system", "normalizedIn": "ONE-3" },
-    "product_identity": { "master": "product_hub", "primaryKey": "hub_product_id", "businessKey": "sku" },
-    "inventory_lifecycle": { "master": "product_hub" },
+    "hub_product_record": {
+      "master": "product_hub",
+      "primaryKey": "hub_product_id",
+      "externalBusinessKey": "sku",
+      "creationTrigger": "amphon_system_intake"
+    },
+    "inventory_availability": { "master": "product_hub", "afterHubSync": true },
     "product_specs_images": { "master": "product_hub" },
-    "product_cost_source": { "master": "product_hub" },
+    "listing_readiness": { "master": "product_hub" },
     "publication_channels": { "master": "product_hub" },
     "sold_cleanup_tasks": { "master": "product_hub" },
     "storefront_seo_catalog": { "master": "shop" },
@@ -38,26 +47,78 @@
     "online_payment_fulfillment": { "master": "shop" },
     "warranty_cases": { "master": "amphon_system", "normalizedIn": "ONE-8" }
   },
+  "productIdentity": {
+    "intakeIdOwner": "amphon_system",
+    "skuOwner": "amphon_system",
+    "hubProductIdOwner": "product_hub",
+    "qrBusinessIdentity": "sku",
+    "serialIsPrimaryKey": false,
+    "hubSyncMayBeDeferred": true
+  },
+  "receiving": {
+    "preserveExistingSystemWorkflow": true,
+    "additionalTechnicalInspectionStage": false,
+    "additionalQcStage": false,
+    "mustWaitForPhotos": false,
+    "mustWaitForFullSpecs": false,
+    "mustWaitForHubAvailability": false
+  },
+  "listingReadiness": {
+    "independentFlags": ["photos_complete", "specs_complete", "listing_content_complete"],
+    "readyWhenAllTrue": true,
+    "qcRequired": false,
+    "technicalInspectionRequired": false
+  },
+  "batteryHealth": {
+    "required": false,
+    "percentRequired": false,
+    "grades": ["LOW", "GOOD", "VERY_GOOD", "UNKNOWN"],
+    "labelsTh": {
+      "LOW": "ต่ำ",
+      "GOOD": "ดี",
+      "VERY_GOOD": "ดีมาก",
+      "UNKNOWN": "ไม่ทราบ"
+    },
+    "notApplicableRepresentation": "null"
+  },
   "legacy": {
-    "amphon_system_inventory_item": "LEGACY_ACTIVE_UNTIL_ONE-2",
+    "amphon_system_inventory_item": "LEGACY_ACTIVE_DURING_ONE-2",
+    "product_hub_direct_product_creation": "LEGACY_FALLBACK_UNTIL_ONE-2B",
+    "product_hub_sku_generator": "LEGACY_FALLBACK_UNTIL_ONE-2B",
     "product_hub_profiles": "AUTH_PROJECTION_UNTIL_ONE-9",
     "shop_customer_identity": "COMMERCE_IDENTITY_EDGE_UNTIL_ONE-7"
   },
   "rules": {
+    "allNewSellableProductsOriginateFromSystemIntake": true,
+    "hubMayForkSku": false,
+    "shopMayCreateInventory": false,
     "crossDatabaseBrowserWrites": false,
     "serverToServerMutationsOnly": true,
     "idempotencyRequired": true,
     "eventIdRequired": true,
     "lastWriteWinsAcrossSystems": false,
     "publicShopMayReceiveInternalFinancials": false,
-    "implicitSourceOfTruthChangesAllowed": false
+    "implicitSourceOfTruthChangesAllowed": false,
+    "photosAndSpecsMayCompleteInAnyOrder": true
   },
   "conflictResolution": {
-    "product_availability": "product_hub",
+    "intake_and_acquisition_cost": "amphon_system",
+    "business_sku": "amphon_system",
+    "hub_product_details": "product_hub",
+    "product_availability_after_hub_sync": "product_hub",
     "online_order_state": "shop",
     "customer_crm": "amphon_system",
     "employee_hr": "amphon_system",
     "finance_ledger": "amphon_system"
   },
-  "nextBatches": ["ONE-1", "ONE-2", "ONE-3", "ONE-4", "ONE-5"]
+  "nextBatches": [
+    "ONE-1",
+    "ONE-2A",
+    "ONE-2B",
+    "ONE-2C",
+    "ONE-2D",
+    "ONE-3",
+    "ONE-4",
+    "ONE-5"
+  ]
 }
