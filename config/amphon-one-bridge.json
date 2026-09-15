@@ -31,7 +31,10 @@
       "retryable": true,
       "nextAttemptAt": true,
       "lockFields": ["lockedAt", "lockedBy"],
-      "deadLetterVisible": true
+      "lockStrategy": "POSTGRES_FOR_UPDATE_SKIP_LOCKED",
+      "staleLockRecovery": true,
+      "deadLetterVisible": true,
+      "deadLetterAutoRedrive": false
     },
     "externalEntityLink": {
       "businessKey": "sku",
@@ -65,6 +68,36 @@
       "sourceReady": true,
       "productionAccepted": false
     }
+  },
+  "outboxDeliveryWorker": {
+    "runtime": "amphon_system_dedicated_process",
+    "destination": "product-hub",
+    "baseUrlEnv": "HUB_BRIDGE_BASE_URL",
+    "eventPath": "/v1/events",
+    "sourceReady": true,
+    "productionAccepted": false,
+    "batchSizeDefault": 10,
+    "lockTimeoutSecondsDefault": 120,
+    "httpTimeoutMsDefault": 15000,
+    "maxAttemptsDefault": 12,
+    "backoff": {
+      "strategy": "EXPONENTIAL_WITH_JITTER",
+      "baseMsDefault": 15000,
+      "maxMsDefault": 1800000,
+      "jitterRatioDefault": 0.2
+    },
+    "attemptAccounting": "INCREMENT_AFTER_DELIVERY_ATTEMPT",
+    "authOrDeploymentMismatch": "RETRY_UNTIL_MAX_ATTEMPTS",
+    "permanentFailureCodes": [
+      "BRIDGE_IDEMPOTENCY_CONFLICT",
+      "BRIDGE_ENVELOPE_INVALID",
+      "BRIDGE_EVENT_NOT_ALLOWED",
+      "BRIDGE_BODY_TOO_LARGE",
+      "BRIDGE_JSON_REQUIRED",
+      "BRIDGE_JSON_INVALID"
+    ],
+    "deadLetterStatus": "DEAD",
+    "autoStartWithApi": false
   },
   "events": {
     "systemToHub": [
