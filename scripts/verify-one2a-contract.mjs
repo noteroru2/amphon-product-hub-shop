@@ -8,6 +8,9 @@ function assert(condition, message) {
 
 assert(bridge.one2a?.systemIntakeHook?.sourceReady === true, 'System intake hook sourceReady missing')
 assert(bridge.one2a?.systemIntakeHook?.productionAccepted === false, 'ONE-2A must not be production accepted yet')
+assert(bridge.one2a?.systemIntakeHook?.activationFlag === 'ONE2A_INTAKE_HOOK_ENABLED', 'ONE-2A activation flag drifted')
+assert(bridge.one2a?.systemIntakeHook?.defaultEnabled === false, 'ONE-2A must remain disabled by default until live DB acceptance')
+assert(bridge.one2a?.systemIntakeHook?.activationRequiresDbVerification === true, 'ONE-2A DB verification gate missing')
 assert(bridge.one2a?.systemIntakeHook?.existingStaffWorkflowChanged === false, 'existing AMPHON System intake workflow must remain unchanged')
 assert(bridge.one2a?.systemIntakeHook?.technicalInspectionStageAdded === false, 'Technical Inspection must not be added')
 assert(bridge.one2a?.systemIntakeHook?.qcStageAdded === false, 'QC stage must not be added')
@@ -21,4 +24,4 @@ for (const field of ['productIdentityId', 'unitOrdinal', 'quantityInIntake', 'sk
   assert(bridge.intakeCreated?.requiredPayload?.includes(field), `required intake payload missing ${field}`)
 }
 
-console.log('AMPHON ONE-2A CONTRACT: PASS — Hub expects System-owned physical SKU/QR intake units without QC or Technical Inspection stages')
+console.log('AMPHON ONE-2A CONTRACT: PASS — Hub expects guarded System-owned physical SKU/QR intake units without QC or Technical Inspection stages')
