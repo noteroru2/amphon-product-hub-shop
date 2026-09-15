@@ -26,11 +26,15 @@ for (const token of [
   "crypto.subtle.digest('SHA-256'",
   "crypto.subtle.verify(",
   'SYSTEM_INTEGRATION_SECRET',
+  'SUPABASE_SECRET_KEY',
   'integration_replay_nonces',
   'integration_event_inbox',
   'BRIDGE_REPLAY_DETECTED',
   'BRIDGE_SOURCE_MISMATCH',
+  'BRIDGE_IDEMPOTENCY_CONFLICT',
   'SYSTEM_EVENT_ALLOWLIST',
+  'findExistingInbox',
+  'exactDuplicate',
   "status: 'RECEIVED'",
 ]) {
   assert(worker.includes(token), `Bridge worker missing ${token}`)
@@ -49,4 +53,4 @@ assert(migration.includes('integration_replay_nonces'), 'persistent nonce table 
 assert(migration.includes('integration_event_inbox'), 'Inbox migration missing')
 assert(migration.includes('revoke all on table public.integration_event_inbox from anon, authenticated'), 'browser roles must remain blocked from Inbox')
 
-console.log('AMPHON ONE-1 SECURITY: PASS — dedicated Worker HMAC, nonce replay protection and Inbox-only endpoint are locked')
+console.log('AMPHON ONE-1 SECURITY: PASS — dedicated Worker HMAC, replay protection, conflict detection and Inbox-only endpoint are locked')
