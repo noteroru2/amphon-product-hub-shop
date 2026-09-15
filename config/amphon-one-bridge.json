@@ -99,6 +99,37 @@
     "deadLetterStatus": "DEAD",
     "autoStartWithApi": false
   },
+  "one2a": {
+    "systemIntakeHook": {
+      "sourceReady": true,
+      "productionAccepted": false,
+      "existingStaffWorkflowChanged": false,
+      "technicalInspectionStageAdded": false,
+      "qcStageAdded": false,
+      "transactionBoundary": [
+        "seller_customer",
+        "legacy_inventory_item",
+        "cashbook_entry",
+        "physical_product_identity",
+        "integration_outbox"
+      ]
+    },
+    "physicalIdentity": {
+      "table": "AmphonProductIdentity",
+      "oneSkuPerPhysicalUnit": true,
+      "quantityFanout": true,
+      "legacyInventoryCodeRetained": true,
+      "qrPayload": "SKU"
+    },
+    "sku": {
+      "format": "AT-{CATEGORY}-{YYMM}-{6_DIGIT_SEQUENCE}",
+      "timezone": "Asia/Bangkok",
+      "allocation": "POSTGRES_ATOMIC_COUNTER_BY_PERIOD_AND_CATEGORY",
+      "immutable": true,
+      "unknownCategoryCode": "IT"
+    },
+    "multiQuantitySerialRule": "ONLY_PROPAGATE_SHARED_SERIAL_WHEN_QUANTITY_EQUALS_ONE"
+  },
   "events": {
     "systemToHub": [
       "product.intake_created",
@@ -126,9 +157,29 @@
   },
   "intakeCreated": {
     "source": "amphon-system",
-    "entityType": "product_intake",
-    "requiredPayload": ["systemIntakeId", "inventoryItemId", "sku", "name"],
-    "optionalPayload": ["category", "brand", "model", "serialNumber", "condition", "accessories", "batteryHealthGrade", "sourceType"]
+    "entityType": "product_intake_unit",
+    "requiredPayload": [
+      "systemIntakeId",
+      "inventoryItemId",
+      "productIdentityId",
+      "unitOrdinal",
+      "quantityInIntake",
+      "sku",
+      "qrPayload",
+      "name"
+    ],
+    "optionalPayload": [
+      "category",
+      "categoryCode",
+      "brand",
+      "model",
+      "serialNumber",
+      "condition",
+      "accessories",
+      "batteryHealthGrade",
+      "sourceType",
+      "targetPrice"
+    ]
   },
   "rules": {
     "secretsServerOnly": true,
