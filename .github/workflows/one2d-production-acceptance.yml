@@ -1,0 +1,32 @@
+name: ONE-2D Production Acceptance Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/amphon-one2d.json'
+      - 'config/amphon-one2d-production-acceptance.json'
+      - 'docs/ONE_2D_PRODUCTION_ACCEPTANCE.md'
+      - 'scripts/verify-one2d-production-acceptance.mjs'
+      - 'workers/one-bridge/wrangler.jsonc'
+      - 'package.json'
+      - '.github/workflows/one2d-production-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify fail-closed ONE-2D production evidence
+        run: npm run verify:one2dprod
