@@ -1,0 +1,31 @@
+name: ONE-1 Bridge Security Source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/one-bridge/**'
+      - 'config/amphon-one-bridge.json'
+      - 'scripts/verify-one1-security.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/one1-security-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify ONE-1 bridge security and Worker types
+        run: npm run verify:one1security
