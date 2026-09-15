@@ -62,6 +62,12 @@ function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  return copy.buffer
+}
+
 function hexToBytes(hex: string): Uint8Array | null {
   const normalized = clean(hex).toLowerCase()
   if (!/^[0-9a-f]{64}$/.test(normalized)) return null
@@ -73,16 +79,18 @@ function hexToBytes(hex: string): Uint8Array | null {
 }
 
 async function sha256Hex(body: Uint8Array) {
-  const digest = await crypto.subtle.digest('SHA-256', body)
+  const digest = await crypto.subtle.digest('SHA-256', toArrayBuffer(body))
   return bytesToHex(new Uint8Array(digest))
 }
 
 async function verifyHmac(secret: string, signature: string, canonical: string) {
   const signatureBytes = hexToBytes(signature)
   if (!secret || !signatureBytes) return false
+  const secretBytes = new TextEncoder().encode(secret)
+  const messageBytes = new TextEncoder().encode(canonical)
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(secret),
+    toArrayBuffer(secretBytes),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['verify'],
@@ -90,8 +98,8 @@ async function verifyHmac(secret: string, signature: string, canonical: string) 
   return crypto.subtle.verify(
     'HMAC',
     key,
-    signatureBytes,
-    new TextEncoder().encode(canonical),
+    toArrayBuffer(signatureBytes),
+    toArrayBuffer(messageBytes),
   )
 }
 
