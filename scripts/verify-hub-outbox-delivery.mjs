@@ -33,7 +33,7 @@ for (const token of [
   "'x-amphon-nonce'",
   "'x-amphon-signature'",
   'crypto.randomUUID()',
-  "outcome: 'DELIVERED'",
+  "finish(env, row, workerId, 'DELIVERED'",
 ]) {
   assert(worker.includes(token), `worker missing ${token}`)
 }
