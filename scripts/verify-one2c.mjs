@@ -3,14 +3,16 @@ import { readFile } from 'node:fs/promises'
 const files = {
   contract: 'config/amphon-one2c.json',
   migration: 'supabase/migrations/20260915133000_one2c_product_hub_enrichment_workflow.sql',
+  hardening: 'supabase/migrations/20260915133500_one2c_enrichment_hardening.sql',
   component: 'src/components/EnrichmentQueueDock.tsx',
   main: 'src/main.tsx',
   env: 'src/vite-env.d.ts',
 }
 
-const [contractText, migration, component, main, env] = await Promise.all([
+const [contractText, migration, hardening, component, main, env] = await Promise.all([
   readFile(files.contract, 'utf8'),
   readFile(files.migration, 'utf8'),
+  readFile(files.hardening, 'utf8'),
   readFile(files.component, 'utf8'),
   readFile(files.main, 'utf8'),
   readFile(files.env, 'utf8'),
@@ -43,15 +45,18 @@ check('enrichment event to system', contract.events?.output === 'product.enrichm
 
 check('migration alters completion timestamps', migration.includes('one_photos_completed_at') && migration.includes('one_specs_completed_at') && migration.includes('one_listing_content_completed_at'))
 check('category-aware specs function', migration.includes('private.one2c_specs_complete') && migration.includes("when 'notebook'") && migration.includes("when 'camera'") && migration.includes("when 'component'"))
-check('photo rule is >=2 + cover', migration.includes('v_photo_count >= 2 and v_has_cover'))
+check('photo rule is >=2 + cover', migration.includes('v_photo_count >= 2 and v_has_cover') && hardening.includes('v_photo_count >= 2 and v_has_cover'))
 check('listing content rule excludes serial requirement', Boolean(listingFunction) && !listingFunction.includes('serial_number'))
 check('private trigger helpers', migration.includes('create schema if not exists private') && migration.includes('security definer') && migration.includes('revoke all on function private.one2c_'))
-check('no public security definer function', !migration.match(/create or replace function public\.one2c_[\s\S]{0,180}security definer/i))
+check('no public security definer function', !`${migration}\n${hardening}`.match(/create or replace function public\.one2c_[\s\S]{0,180}security definer/i))
 check('photos/spec/content can update independently', migration.includes('trg_one2c_product_images_after_change') && migration.includes('trg_one2c_product_before_write'))
 check('legacy ready_to_list compatibility', migration.includes("new.status := 'ready_to_list'"))
+check('photos can be final workstream for legacy status', hardening.includes("and one_specs_complete") && hardening.includes("and one_listing_content_complete") && hardening.includes("then 'ready_to_list'"))
+check('photo regression safely leaves legacy ready state', hardening.includes("when not v_complete") && hardening.includes("then 'draft'"))
 check('transactional enrichment outbox', migration.includes("'product.enrichment_changed'") && migration.includes("'amphon-system'"))
+check('enrichment outbox identity unique per event', hardening.includes("v_idempotency := 'product-enrichment:' || new.id::text || ':' || v_event_id::text || ':v1'"))
 check('activity audit actions', migration.includes('one_enrichment_photos_changed') && migration.includes('one_enrichment_changed'))
-check('no QC_PENDING state', !migration.includes('QC_PENDING') && !contractText.includes('QC_PENDING'))
+check('no QC_PENDING state', !migration.includes('QC_PENDING') && !hardening.includes('QC_PENDING') && !contractText.includes('QC_PENDING'))
 
 check('queue component feature gated', component.includes("VITE_ONE2C_ENRICHMENT_ENABLED === 'true'"))
 check('queue shows independent flags', component.includes('one_photos_complete') && component.includes('one_specs_complete') && component.includes('one_listing_content_complete'))
