@@ -1,0 +1,36 @@
+name: ONE-2D Hub Reconciliation Source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/amphon-one2d.json'
+      - 'config/amphon-one-bridge.json'
+      - 'supabase/migrations/20260915214500_one2d_legacy_mapping_consumer.sql'
+      - 'workers/one-bridge/src/index.ts'
+      - 'workers/one-bridge/src/one2b-entry.ts'
+      - 'workers/one-bridge/wrangler.jsonc'
+      - 'scripts/verify-one2d.mjs'
+      - 'package.json'
+      - '.github/workflows/one2d-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify ONE-2D source and Bridge TypeScript
+        run: npm run verify:one2d
+      - name: Run full Hub build gate
+        run: npm run build
