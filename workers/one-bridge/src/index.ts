@@ -18,6 +18,14 @@ type Envelope = {
   payload: Record<string, unknown>
 }
 
+type InboxIdentity = {
+  event_id: string
+  source: string
+  event_type: string
+  idempotency_key: string
+  status: string
+}
+
 const MAX_BODY_BYTES = 1024 * 1024
 const DEFAULT_MAX_AGE_SECONDS = 300
 const SYSTEM_EVENT_ALLOWLIST = new Set([
@@ -105,6 +113,12 @@ async function supabaseRequest(env: Env, path: string, init: RequestInit = {}) {
   })
 }
 
+async function readRows<T>(result: Response): Promise<T[]> {
+  if (!result.ok) throw new Error(`SUPABASE_READ:${result.status}`)
+  const text = await result.text()
+  return text ? JSON.parse(text) as T[] : []
+}
+
 async function cleanupExpiredNonces(env: Env) {
   const now = encodeURIComponent(new Date().toISOString())
   const result = await supabaseRequest(env, `integration_replay_nonces?expires_at=lt.${now}`, {
@@ -168,6 +182,7 @@ async function authenticate(request: Request, env: Env, body: Uint8Array, url: U
 
   if (!keyId || !timestamp || !nonce || !signature) return { ok: false as const, status: 401, error: 'BRIDGE_AUTH_REQUIRED' }
   if (!env.SYSTEM_INTEGRATION_KEY_ID || !env.SYSTEM_INTEGRATION_SECRET) return { ok: false as const, status: 503, error: 'BRIDGE_NOT_CONFIGURED' }
+  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) return { ok: false as const, status: 503, error: 'BRIDGE_STORAGE_NOT_CONFIGURED' }
   if (keyId !== env.SYSTEM_INTEGRATION_KEY_ID) return { ok: false as const, status: 401, error: 'BRIDGE_AUTH_INVALID' }
 
   const parsedTime = Date.parse(timestamp)
@@ -201,6 +216,21 @@ async function authenticate(request: Request, env: Env, body: Uint8Array, url: U
   return { ok: true as const, source: 'amphon-system', keyId }
 }
 
+async function findExistingInbox(env: Env, envelope: Envelope): Promise<InboxIdentity | null> {
+  const select = 'event_id,source,event_type,idempotency_key,status'
+  const byEvent = await readRows<InboxIdentity>(await supabaseRequest(
+    env,
+    `integration_event_inbox?event_id=eq.${encodeURIComponent(envelope.eventId)}&select=${select}&limit=1`,
+  ))
+  if (byEvent[0]) return byEvent[0]
+
+  const byIdempotency = await readRows<InboxIdentity>(await supabaseRequest(
+    env,
+    `integration_event_inbox?source=eq.${encodeURIComponent(envelope.source)}&idempotency_key=eq.${encodeURIComponent(envelope.idempotencyKey)}&select=${select}&limit=1`,
+  ))
+  return byIdempotency[0] || null
+}
+
 async function storeInbox(env: Env, envelope: Envelope) {
   const result = await supabaseRequest(env, 'integration_event_inbox', {
     method: 'POST',
@@ -218,12 +248,26 @@ async function storeInbox(env: Env, envelope: Envelope) {
     }),
   })
 
-  if (result.status === 409) return { inserted: false as const }
+  if (result.status === 409) {
+    const existing = await findExistingInbox(env, envelope)
+    const exactDuplicate = Boolean(
+      existing
+        && existing.event_id === envelope.eventId
+        && existing.source === envelope.source
+        && existing.event_type === envelope.eventType
+        && existing.idempotency_key === envelope.idempotencyKey
+    )
+    return {
+      inserted: false as const,
+      conflict: !exactDuplicate,
+      status: existing?.status || 'EXISTS',
+    }
+  }
   if (!result.ok) {
     const text = await result.text().catch(() => '')
     throw new Error(`INBOX_INSERT:${result.status}:${text.slice(0, 200)}`)
   }
-  return { inserted: true as const }
+  return { inserted: true as const, conflict: false, status: 'RECEIVED' }
 }
 
 async function handle(request: Request, env: Env) {
@@ -266,10 +310,13 @@ async function handle(request: Request, env: Env) {
 
   try {
     const stored = await storeInbox(env, envelope)
-    if (!stored.inserted) {
-      return response({ ok: true, accepted: false, duplicate: true, eventId: envelope.eventId, status: 'EXISTS' }, 200)
+    if (!stored.inserted && stored.conflict) {
+      return response({ ok: false, error: 'BRIDGE_IDEMPOTENCY_CONFLICT', eventId: envelope.eventId }, 409)
     }
-    return response({ ok: true, accepted: true, duplicate: false, eventId: envelope.eventId, status: 'RECEIVED' }, 202)
+    if (!stored.inserted) {
+      return response({ ok: true, accepted: false, duplicate: true, eventId: envelope.eventId, status: stored.status }, 200)
+    }
+    return response({ ok: true, accepted: true, duplicate: false, eventId: envelope.eventId, status: stored.status }, 202)
   } catch (error) {
     console.error('ONE-1 inbox error', error)
     return response({ ok: false, error: 'BRIDGE_INBOX_UNAVAILABLE' }, 503)
