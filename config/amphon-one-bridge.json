@@ -133,6 +133,41 @@
     },
     "multiQuantitySerialRule": "ONLY_PROPAGATE_SHARED_SERIAL_WHEN_QUANTITY_EQUALS_ONE"
   },
+  "one2b": {
+    "productHubShellConsumer": {
+      "sourceReady": true,
+      "productionAccepted": false,
+      "activationFlag": "ONE2B_SHELL_CONSUMER_ENABLED",
+      "defaultEnabled": false,
+      "inputEvent": "product.intake_created",
+      "outputEvent": "product.shell_created",
+      "rpc": "one2b_consume_intake_event",
+      "rpcSecurity": "SECURITY_INVOKER_SERVICE_ROLE_ONLY",
+      "legacyProductStatus": "draft",
+      "initialListingReadiness": "INTAKE_ONLY",
+      "systemProvidedSkuOnly": true,
+      "adoptExistingSkuWithoutExactMapping": false,
+      "replacementSkuOnConflict": false,
+      "transactionBoundary": [
+        "product_shell",
+        "external_entity_link",
+        "integration_outbox_shell_created",
+        "integration_inbox_processed"
+      ]
+    },
+    "readiness": {
+      "separateFromInventoryStatus": true,
+      "independentFlags": [
+        "one_photos_complete",
+        "one_specs_complete",
+        "one_listing_content_complete"
+      ],
+      "enrichmentMayOccurInAnyOrder": true,
+      "technicalInspectionStageAdded": false,
+      "qcStageAdded": false
+    },
+    "batteryHealthGrade": ["LOW", "GOOD", "VERY_GOOD", "UNKNOWN"]
+  },
   "events": {
     "systemToHub": [
       "product.intake_created",
