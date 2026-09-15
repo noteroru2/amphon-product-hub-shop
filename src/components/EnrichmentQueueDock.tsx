@@ -77,7 +77,7 @@ export function EnrichmentQueueDock() {
       .from('products')
       .select('id,sku,title,category,subtype,status,battery_health_grade,one_listing_readiness,one_photos_complete,one_specs_complete,one_listing_content_complete,updated_at')
       .eq('one_managed', true)
-      .in('status', ['draft', 'photo_ready', 'ready_to_list', 'published', 'reserved', 'repair', 'consignment'])
+      .in('status', ['draft', 'photo_ready', 'ready_to_list'])
       .order('updated_at', { ascending: false })
       .limit(250)
 
@@ -124,7 +124,10 @@ export function EnrichmentQueueDock() {
       )
       .subscribe()
 
+    const timer = window.setInterval(() => void refresh(), 30_000)
+
     return () => {
+      window.clearInterval(timer)
       void client.removeChannel(channel)
     }
   }, [refresh, sessionUserId])
