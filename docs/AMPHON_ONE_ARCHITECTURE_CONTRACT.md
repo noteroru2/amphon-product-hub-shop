@@ -1,118 +1,228 @@
-# AMPHON ONE — Architecture Contract & Source of Truth
+# AMPHON ONE — Revised Architecture Contract & Source of Truth
 
-Contract version: `ONE-0.1`
-Status: `ACTIVE`
-Effective date: 2026-09-14
-Canonical control-plane repository: `noteroru2/amphon-system`
+Contract version: `ONE-0R.1`  
+Status: `ACTIVE`  
+Effective date: 2026-09-15  
+Supersedes: `ONE-0.1`  
+Canonical control/receiving repository: `noteroru2/amphon-system`  
 Product/commerce repository: `noteroru2/amphon-product-hub-shop`
 
-## 1. Purpose
+## 1. Operating principle
 
-AMPHON ONE is one business platform implemented as three applications with explicit ownership boundaries:
-
-- **AMPHON System** — Owner Control Plane. The owner should be able to supervise and operate the business primarily from this application.
-- **Product Hub** — Product Operations Engine. Owns physical product identity, SKU, product details, images, inventory lifecycle and publication/channel state.
-- **AMPHON Shop** — Customer Storefront. Owns storefront SEO/catalog presentation and online commerce orders/reservations/payment/fulfillment workflow.
-
-The systems may expose projections of another system's data, but a projection MUST NOT become a second source of truth.
-
-## 2. Non-negotiable architecture rules
-
-1. Every business domain has exactly one authoritative writer/source of truth.
-2. Browser clients MUST NOT write directly into another application's database.
-3. Cross-system mutations MUST be server-to-server through the AMPHON Bridge introduced in ONE-1 or through an explicitly approved adapter.
-4. Cross-system commands/events MUST carry an `eventId` and `idempotencyKey`; retries must be safe.
-5. Conflict resolution always follows the domain owner, never `last write wins` across databases.
-6. No distributed transaction is required across PostgreSQL/Supabase. Local commit first, then durable event/outbox/retry in ONE-1+.
-7. Public Shop code never receives internal cost, profit, seller, employee, contract, payroll or private customer data.
-8. Existing production data is preserved during ONE-0. Ownership migration is additive and staged.
-9. No new feature may create a second product master, second customer master, second employee master or second finance ledger.
-10. Internal Product Hub (`hub.amphon.co.th`) is not a public customer destination; Shop is the customer storefront.
-
-## 3. Source of Truth matrix
-
-| Domain | Source of Truth | Read/Control surface | Notes |
-|---|---|---|---|
-| Owner dashboard / command center | AMPHON System | AMPHON System | System is the owner's primary application. |
-| Customer master / CRM | AMPHON System | AMPHON System | Shop identity/order customer data is an acquisition/commerce edge until reconciled to System. |
-| Employee master / payroll / commission policy | AMPHON System | AMPHON System | Hub `profiles` is an auth/permission projection, not HR master. |
-| Contracts / deposit / consignment business | AMPHON System | AMPHON System | Financial/legal operational records remain in System. |
-| Repairs | AMPHON System | AMPHON System | Product linkage may reference Hub product identity. |
-| Finance / cashbook / P&L / business profit | AMPHON System | AMPHON System | Shop/Hub emit events; they do not own the company ledger. |
-| Sale ledger (completed business sale) | AMPHON System | AMPHON System | Formal normalized Sale engine is ONE-3. Legacy sale recording remains temporarily. |
-| Physical product identity | Product Hub | Hub + System projection | Canonical keys are `hub_product_id` (UUID) and `sku`. |
-| SKU / Serial / Specs / Images | Product Hub | Hub + System projection | System must reference, not fork, these fields after ONE-2. |
-| Inventory lifecycle / availability | Product Hub | Hub + System control | `draft/photo_ready/ready_to_list/published/reserved/sold/...` is canonical. |
-| Product cost/margin source record | Product Hub | Owner/Admin; System projection | Financial reporting still belongs to System. |
-| Publication/channel state | Product Hub | Hub + System projection/control | Facebook/Marketplace/WINNER/Website/LINE tracking belongs to Hub. |
-| Sold cleanup tasks | Product Hub | Hub + System projection/control | Shop unpublish is automatic; manual channels produce tasks. |
-| Storefront SEO taxonomy / canonical public product URL | Shop commerce layer | Shop | Evergreen categories/brands/series/models/listing metadata are commerce concerns. |
-| Online order | Shop commerce layer | Shop + System control | `commerce_orders` remains the order source of truth. |
-| Online reservation | Shop commerce layer + Hub inventory lock | Shop + System control | Shop order owns reservation transaction; Hub product status reflects reserved/sold availability. |
-| Payment/fulfillment state for online order | Shop commerce layer | System control via Bridge | System receives events and owner actions; Shop keeps order state. |
-| Warranty case / after-sales case | AMPHON System | AMPHON System | Planned normalization in ONE-8. |
-
-## 4. Product identity contract
-
-A physical sellable unit has one canonical Hub product identity:
+AMPHON ONE is one business platform implemented as three applications with one continuous product journey:
 
 ```text
-hub_product_id = UUID from Product Hub `products.id`
-sku            = server-generated AMPHON SKU, e.g. AT-NB-2609-000123
-serial_number  = product identifier attribute, not a cross-system primary key
+physical item arrives at store
+        ↓
+AMPHON System
+existing fast receiving / buyback workflow
+        ↓
+System Intake + immutable business SKU + QR
+        ↓
+AMPHON Bridge
+        ↓
+Product Hub product record
+        ↓
+photos + full specs + listing content
+        ↓
+READY_TO_LIST → publication
+        ↓
+AMPHON Shop / sales channels
+        ↓
+reservation / sale
+        ↓
+AMPHON System sales, finance, customer, commission, warranty
 ```
+
+The product MUST originate from AMPHON System receiving. Product Hub is not the store receiving application. Shop never creates stock.
+
+## 2. Roles of the three applications
+
+### AMPHON System — Owner Control + Receiving Plane
+
+AMPHON System is the first system touched when physical stock enters the store. The existing receiving/buyback workflow is preserved because it is already optimized for fast staff entry.
+
+System owns product intake, business SKU allocation, acquisition source/cost, seller/customer business relation, owner control, sales/finance, employees, contracts, repairs and after-sales cases.
+
+ONE-0R does **not** add a Technical Inspection stage, a new QC stage or a new mandatory receiving checklist.
+
+### Product Hub — Product Enrichment + Publication Engine
+
+Product Hub receives a product shell created from a System intake. It owns `hub_product_id`, photos, full specs, listing title/content, listing readiness, publication/channel state, sellable availability after synchronization, and sold cleanup tasks.
+
+Photo work and specification work may happen at different times, by different employees, in either order.
+
+### AMPHON Shop — Customer Storefront + Online Commerce Edge
+
+Shop owns public storefront rendering, SEO taxonomy, cart/order lifecycle and online payment/fulfillment state. Shop is never an inventory master and never receives private acquisition cost/seller/payroll data.
+
+## 3. Product identity
+
+```text
+system_intake_id  = intake identity in AMPHON System
+sku               = immutable business identity generated by AMPHON System
+hub_product_id    = UUID generated by Product Hub after synchronization
+serial / IMEI     = optional product attribute
+```
+
+Example SKU: `AT-NB-2609-000123`.
 
 Rules:
 
-- `hub_product_id` is the immutable cross-system identity.
-- `sku` is the human/scanner/business identity and must remain unique.
-- AMPHON System may retain a legacy integer `InventoryItem.id`, but it becomes a local legacy/projection key after ONE-2.
-- Do not generate a second SKU for the same physical item in System or Shop.
-- Serial/IMEI may re-enter inventory after historical sale/return; it must not be used as the global immutable key.
+1. New sellable products originate from AMPHON System intake.
+2. System allocates SKU before Hub sync so receiving and QR labeling do not depend on Hub availability.
+3. Hub accepts the System SKU and MUST NOT fork it.
+4. The current Hub SKU generator remains legacy fallback only until ONE-2B.
+5. Hub returns `hub_product_id`; System stores the mapping.
+6. Serial/IMEI is not the immutable cross-system key.
+7. QR business identity is the SKU.
 
-## 5. Transitional legacy rules
+## 4. Source of Truth matrix
 
-### AMPHON System `InventoryItem`
+| Domain | Source of Truth | Notes |
+|---|---|---|
+| Product intake / receiving | AMPHON System | Existing store workflow remains the entry point. |
+| Business SKU | AMPHON System | Generated once; Hub mirrors it. |
+| Acquisition source / cost | AMPHON System | Internal financial data. |
+| Hub product record / UUID | Product Hub | Created from System intake. |
+| Product photos | Product Hub | Asynchronous enrichment. |
+| Full specs | Product Hub | Independent from photo timing. |
+| Listing content/readiness | Product Hub | Computed from flags; no QC gate. |
+| Inventory availability after Hub sync | Product Hub | System controls via commands/projection. |
+| Publication/channel state | Product Hub | Shop/Facebook/Marketplace/WINNER/LINE tracking. |
+| Sold cleanup tasks | Product Hub | Channel cleanup coordination. |
+| Customer CRM | AMPHON System | Shop identity reconciled later. |
+| Employee/HR/payroll/commission | AMPHON System | Hub profile is permission projection. |
+| Sales ledger / finance | AMPHON System | Company financial authority. |
+| Repairs/contracts/warranty | AMPHON System | Link to SKU/hub_product_id. |
+| Storefront SEO/catalog rendering | Shop | Public commerce concern. |
+| Online order/payment/fulfillment | Shop | System receives events/control through Bridge. |
 
-Current status: `LEGACY_ACTIVE_UNTIL_ONE-2`.
+## 5. Receiving contract
 
-It remains operational so production is not broken in ONE-0. Starting now:
+Current AMPHON System receiving remains fast and MUST NOT wait for photos, full specs, listing content, Technical Inspection, QC, or Hub availability.
 
-- Do not expand it as an independent product master.
-- New integration work must plan to map it to `hub_product_id` + `sku`.
-- Product title/spec/image/status edits should migrate to Hub ownership in ONE-2.
-- Financial sale history, customer relation and commission history must be preserved during migration.
-
-### Product Hub `profiles`
-
-Current status: `AUTH_PROJECTION_UNTIL_ONE-9`.
-
-Hub may continue to authenticate/authorize its users. Employee HR truth (name/active employment/role policy/payroll/commission) belongs to AMPHON System. ONE-9 will define employee sync and disable behavior.
-
-### Shop customer identity
-
-Current status: `COMMERCE_IDENTITY_EDGE_UNTIL_ONE-7`.
-
-Shop may maintain login/account/order identity required for ecommerce. It must not become the company CRM master. ONE-7 will reconcile customers into AMPHON System Customer 360.
-
-## 6. Command and event direction
-
-The following directions are authoritative. Exact HTTP schemas are ONE-1 work.
+A successful intake may immediately have:
 
 ```text
-Product Hub -> AMPHON System
-  product.created
-  product.updated
-  product.status_changed
-  publication.changed
-  cleanup_task.changed
+system_intake_id = INT-...
+sku              = AT-...
+qr                = based on SKU
+hub_sync_status   = PENDING | SYNCED | ERROR
+```
 
+If Hub is unavailable, System keeps the intake and ONE-1 outbox/retry syncs it later.
+
+## 6. Enrichment/readiness contract
+
+Canonical flags:
+
+```text
+photos_complete
+specs_complete
+listing_content_complete
+```
+
+They may become true in any order.
+
+```text
+all true  → READY_TO_LIST
+otherwise → ENRICHMENT_PENDING
+published → PUBLISHED
+```
+
+There is no `QC_PENDING` requirement and no `Technical Inspection` state.
+
+## 7. Battery health contract
+
+Canonical optional field: `battery_health_grade`.
+
+```text
+LOW        = ต่ำ
+GOOD       = ดี
+VERY_GOOD  = ดีมาก
+UNKNOWN    = ไม่ทราบ
+```
+
+Battery percentage and cycle count are optional metadata. `null` means not applicable. Battery health never blocks intake or readiness by default.
+
+## 8. Availability lifecycle
+
+Target availability after Hub synchronization:
+
+```text
+IN_STOCK
+RESERVED
+SOLD
+REPAIR
+RETURNED
+WRITTEN_OFF
+```
+
+Current Hub `products.status` mixes availability and readiness. ONE-2C will separate these additively while preserving production behavior during migration.
+
+## 9. Intake → Hub synchronization
+
+```text
+AMPHON System
+  complete existing receiving
+  allocate SKU + QR
+  commit locally
+      ↓
+Outbox: product.intake_created
+      ↓
+AMPHON Bridge
+      ↓
+Product Hub private intake endpoint
+  idempotent by system_intake_id + sku
+  create product shell with supplied SKU
+  return hub_product_id
+      ↓
+AMPHON System
+  store mapping
+  hub_sync_status = SYNCED
+```
+
+No distributed transaction is required.
+
+## 10. Product shell minimum concept
+
+```json
+{
+  "systemIntakeId": "INT-20260915-0042",
+  "sku": "AT-NB-2609-000123",
+  "category": "notebook",
+  "brand": "ASUS",
+  "model": null,
+  "serialNumber": null,
+  "sourceType": "BUYBACK",
+  "batteryHealthGrade": "GOOD"
+}
+```
+
+Full specs, photos and listing text are deliberately absent.
+
+## 11. QR workflow
+
+The same SKU/QR follows the product. System uses it for business operations; Hub uses it to open the exact product for photos/specs/listing work. Staff must not create another Hub product when enriching an existing physical item.
+
+## 12. Events and commands
+
+```text
 AMPHON System -> Product Hub
+  product.intake_created
   product.reserve_requested
   product.release_requested
   product.mark_sold_requested
   product.price_change_requested
   publication.end_requested
+
+Product Hub -> AMPHON System
+  product.shell_created
+  product.enrichment_changed
+  product.availability_changed
+  publication.changed
+  cleanup_task.changed
 
 Shop -> AMPHON System
   order.created
@@ -121,95 +231,49 @@ Shop -> AMPHON System
   order.cancelled
   order.shipped
   order.completed
-
-AMPHON System -> Shop
-  order.owner_action_requested
-  order.fulfillment_update_requested
-  customer_link_applied
-
-AMPHON System -> Hub/Shop
-  employee.access_changed       (ONE-9)
-  customer.master_link_changed  (ONE-7)
 ```
 
-A request to change a domain owned by another system is a **command**, not a direct database write. The owner system validates and applies it, then emits the resulting event.
+Every cross-system command/event requires event ID, idempotency, replay safety and server-to-server authentication.
 
-## 7. Minimum integration envelope
+## 13. Failure/conflict policy
 
-ONE-1 must implement an envelope equivalent to:
+- Intake/acquisition cost/SKU: AMPHON System wins.
+- Hub content/images/readiness: Product Hub wins.
+- Availability after Hub sync: Product Hub wins.
+- Online order/payment/fulfillment: Shop wins for that order.
+- Customer/employee/finance: AMPHON System wins.
+- Hub outage during receiving never rolls back valid System intake.
+- Duplicate intake delivery is idempotent by System intake identity + SKU.
+- SKU conflict stops synchronization for reconciliation; never silently allocate another SKU.
 
-```json
-{
-  "eventId": "uuid",
-  "eventType": "product.status_changed",
-  "version": 1,
-  "source": "product-hub",
-  "occurredAt": "2026-09-14T12:00:00Z",
-  "idempotencyKey": "stable-retry-key",
-  "entity": { "type": "product", "id": "uuid", "sku": "AT-NB-2609-000123" },
-  "actor": { "type": "user|system", "id": "optional" },
-  "payload": {}
-}
-```
+## 14. Transitional legacy rules
 
-Required behavior:
+System `InventoryItem`: `LEGACY_ACTIVE_DURING_ONE-2`.
 
-- duplicate `eventId` or `idempotencyKey` must not duplicate side effects;
-- receivers record integration audit state;
-- failed delivery is retryable;
-- events must be safe to replay;
-- secrets remain server-only;
-- timestamps are ISO-8601; business display uses `Asia/Bangkok`.
+Hub direct product creation and SKU generator: `LEGACY_FALLBACK_UNTIL_ONE-2B`. Existing production remains functional while System-first intake is introduced. After acceptance, normal new store stock must originate from System.
 
-## 8. Owner UX contract
+Hub profiles and Shop customer identity remain transitional projections until ONE-9 and ONE-7.
 
-AMPHON System is the primary owner-facing control plane. The owner should eventually be able to do the following without opening Hub or Shop admin screens for routine work:
+## 15. Security boundary
 
-- view unified stock and product status;
-- reserve/release/mark sold;
-- approve or adjust sale price;
-- view and act on Shop orders;
-- confirm payment/fulfillment actions;
-- see publication status and sold-cleanup exceptions;
-- see finance, profit, commission, customer, repair and contract context.
+Cross-system mutation is server-to-server only. No Supabase service-role key reaches browsers. Internal acquisition cost, seller identity, payroll, commission and private notes never reach public Shop payloads.
 
-Hub remains a specialized staff workspace for product intake, photos, specs, QC, QR and publication operations. Shop remains the customer-facing storefront.
+## 16. Revised implementation roadmap
 
-## 9. Failure and conflict policy
+- **ONE-0R** — revised System-first receiving architecture contract.
+- **ONE-INFRA-0/0A/0B** — cloud foundation and Cloudflare automation.
+- **ONE-1** — Bridge, HMAC, Inbox/Outbox, idempotency, audit, retry.
+- **ONE-2A** — System receiving integration layer without changing receiving UX.
+- **ONE-2B** — System SKU/QR → Hub product shell + mapping.
+- **ONE-2C** — asynchronous photo/spec/content readiness; no QC dependency.
+- **ONE-2D** — inventory reconciliation / legacy transition.
+- **ONE-3** — unified Sale engine.
+- **ONE-4** — Shop order integration.
+- **ONE-5** — Owner Control Room 2.0 with intake/enrichment queues.
+- **ONE-6** — finance + commission automation.
+- **ONE-7** — Customer 360.
+- **ONE-8** — warranty + repair linkage.
+- **ONE-9** — employee/permission sync.
+- **ONE-10** — Shopee/marketplace integrations.
 
-- If System and Hub disagree on product availability, **Hub wins**.
-- If System and Shop disagree on an online order/payment/fulfillment state, **Shop commerce order wins** for that order, then System reconciles its projection/ledger.
-- If Shop and System disagree on canonical customer CRM data, **System wins** after reconciliation.
-- If Hub and System disagree on employee HR/active-employment truth, **System wins**; Hub may temporarily deny access more strictly for security.
-- If finance values disagree, **System ledger wins**; source events must be investigated, never silently overwritten.
-- Integration outage must not corrupt local source data. Queue/retry and show reconciliation warnings instead.
-
-## 10. Security boundary
-
-- Product Hub browser -> Supabase/R2 Worker only within existing Hub security model.
-- Shop browser -> Shop server/Worker; browser never receives Supabase service-role credentials.
-- AMPHON System browser -> AMPHON System API.
-- System <-> Hub/Shop cross-system communication is server-to-server only.
-- ONE-1 must use signed requests (HMAC or equivalent), timestamp/replay protection, secret rotation support, rate limiting and audit logs.
-
-## 11. ONE-0 acceptance criteria
-
-ONE-0 is PASS when:
-
-- this contract exists in both repositories at the same contract version;
-- machine-readable contract declares the same domain owners;
-- repository verification scripts reject accidental ownership drift;
-- no production table is deleted or rewritten;
-- no checkout/payment behavior is changed;
-- no existing AMPHON System inventory workflow is disabled yet;
-- future ONE batches can reference one stable ownership model.
-
-## 12. Next batches
-
-- **ONE-1** — AMPHON Bridge, signed server-to-server contract, idempotency/event audit/retry.
-- **ONE-2** — Product Hub <-> System inventory mapping and migration from legacy System inventory master behavior.
-- **ONE-3** — Unified Sale engine in AMPHON System.
-- **ONE-4** — Shop Orders surfaced and controlled from AMPHON System.
-- **ONE-5** — Owner Control Room 2.0.
-
-Any architecture change that moves a Source of Truth to another system requires an explicit new contract version and migration plan. It must never happen implicitly inside a feature batch.
+Any source-of-truth change requires an explicit new contract and migration plan.
