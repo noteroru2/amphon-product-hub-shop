@@ -62,6 +62,7 @@
       "productionHostname": "bridge.amphon.co.th",
       "path": "/v1/events",
       "healthPath": "/v1/health",
+      "sourceReady": true,
       "productionAccepted": false
     }
   },
