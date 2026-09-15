@@ -10,6 +10,7 @@ on:
       - 'workers/one-bridge/src/index.ts'
       - 'workers/one-bridge/src/one2b-entry.ts'
       - 'workers/one-bridge/wrangler.jsonc'
+      - 'scripts/verify-one1-security.mjs'
       - 'scripts/verify-one2d.mjs'
       - 'package.json'
       - '.github/workflows/one2d-source.yml'
