@@ -111,10 +111,11 @@ export function EnrichmentQueueDock() {
   }, [])
 
   useEffect(() => {
-    if (!enabled || !supabase || !sessionUserId) return
+    const client = supabase
+    if (!enabled || !client || !sessionUserId) return
     void refresh()
 
-    const channel = supabase
+    const channel = client
       .channel('one2c-enrichment-queue')
       .on(
         'postgres_changes',
@@ -124,7 +125,7 @@ export function EnrichmentQueueDock() {
       .subscribe()
 
     return () => {
-      void supabase.removeChannel(channel)
+      void client.removeChannel(channel)
     }
   }, [refresh, sessionUserId])
 
