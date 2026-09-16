@@ -16,6 +16,7 @@ function run(command, args) {
 }
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const sourceRaw = await readFile(sourceConfigPath, 'utf8')
 const source = JSON.parse(sourceRaw)
 
@@ -33,10 +34,12 @@ production.vars = {
   ONE3_STOCK_CONSUMER_ENABLED: 'true',
 }
 
-await run(npx, ['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run'])
+await run(npm, ['run', 'verify:one3c'])
+await rm(tempConfigPath, { force: true })
+await writeFile(tempConfigPath, `${JSON.stringify(production, null, 2)}\n`, { flag: 'wx' })
 
 try {
-  await writeFile(tempConfigPath, `${JSON.stringify(production, null, 2)}\n`, { flag: 'wx' })
+  await run(npx, ['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run'])
   await run(npx, ['wrangler', 'deploy', '--config', tempConfigPath, '--keep-vars', '--yes'])
   console.log('AMPHON ONE-3C: production bridge deployed with ONE2B=true, ONE2D=true, ONE3=true; source config remains fail-closed')
 } finally {
