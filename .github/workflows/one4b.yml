@@ -1,0 +1,37 @@
+name: ONE-4B Shop System Reservation Wiring
+
+on:
+  push:
+    paths:
+      - 'config/amphon-one4.json'
+      - 'supabase/migrations/20260916235000_one4b_system_authority_checkout.sql'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/src/index.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4b.yml'
+  pull_request:
+    paths:
+      - 'config/amphon-one4.json'
+      - 'supabase/migrations/20260916235000_one4b_system_authority_checkout.sql'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/src/index.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4b.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify ONE-4B Shop source and bundle
+        run: npm run verify:one4b
