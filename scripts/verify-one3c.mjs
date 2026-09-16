@@ -98,15 +98,21 @@ for (const runtimeFlag of [
   "ONE2D_RECONCILIATION_ENABLED: 'true'",
   "ONE3_STOCK_CONSUMER_ENABLED: 'true'",
 ]) requireText(deploy, runtimeFlag, 'production activation helper')
-requireText(deploy, "['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run']", 'production activation dry-run')
-requireText(deploy, "['wrangler', 'deploy', '--config', tempConfigPath, '--keep-vars', '--yes']", 'production activation deploy')
+
+const dryRunCommand = "['wrangler', 'deploy', '--config', tempConfigPath, '--keep-vars', '--dry-run']"
+const deployCommand = "['wrangler', 'deploy', '--config', tempConfigPath, '--keep-vars']"
+requireText(deploy, dryRunCommand, 'production activation dry-run')
+requireText(deploy, deployCommand, 'production activation deploy')
+requireText(deploy, "process.argv.includes('--runner-smoke')", 'Windows/runner smoke gate')
+requireText(deploy, 'wrangler deploy dry-run accepted', 'runner smoke CLI validation')
 requireText(deploy, "await run(npm, ['run', 'verify:one3c'])", 'production activation preflight')
 requireText(deploy, 'await rm(tempConfigPath, { force: true })', 'temporary config cleanup')
+forbidText(deploy, "'--yes'", 'Wrangler v4 unsupported deploy flag')
 forbidText(deploy, "writeFile(sourceConfigPath", 'source config immutability')
 
 const writePosition = deploy.indexOf('await writeFile(tempConfigPath')
-const dryRunPosition = deploy.indexOf("await run(npx, ['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run'])")
-if (writePosition < 0 || dryRunPosition < 0 || writePosition > dryRunPosition) {
+const firstDryRunPosition = deploy.indexOf(dryRunCommand)
+if (writePosition < 0 || firstDryRunPosition < 0 || writePosition > firstDryRunPosition) {
   failures.push('production activation helper: temporary config must exist before Wrangler dry-run')
 }
 
@@ -116,4 +122,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('AMPHON ONE-3C: PASS — versioned Hub projection, new-shell IN_STOCK v0 initialization, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and safe fail-closed production activation are locked')
+console.log('AMPHON ONE-3C: PASS — versioned Hub projection, new-shell IN_STOCK v0 initialization, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and Wrangler-v4-safe fail-closed production activation are locked')
