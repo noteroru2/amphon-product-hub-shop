@@ -5,6 +5,7 @@ on:
     paths:
       - 'config/amphon-one3.json'
       - 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
+      - 'supabase/migrations/20260916104824_one3c_new_product_availability_init.sql'
       - 'workers/one-bridge/src/one2b-entry.ts'
       - 'workers/one-bridge/wrangler.jsonc'
       - 'scripts/verify-one3c.mjs'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'config/amphon-one3.json'
       - 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
+      - 'supabase/migrations/20260916104824_one3c_new_product_availability_init.sql'
       - 'workers/one-bridge/src/one2b-entry.ts'
       - 'workers/one-bridge/wrangler.jsonc'
       - 'scripts/verify-one3c.mjs'
