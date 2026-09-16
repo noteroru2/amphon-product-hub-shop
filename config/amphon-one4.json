@@ -1,0 +1,72 @@
+{
+  "contractVersion": "ONE-4.0",
+  "status": "SOURCE_LOCKED_FAIL_CLOSED",
+  "effectiveDate": "2026-09-16",
+  "authority": {
+    "inventoryAvailability": "amphon_system",
+    "reservationAuthority": "amphon_system",
+    "saleAuthority": "amphon_system",
+    "financeCashbook": "amphon_system",
+    "orderAuthority": "shop",
+    "paymentProviderAuthority": "shop",
+    "hubAvailabilityRole": "projection",
+    "shopAvailabilityRole": "requester_only",
+    "shopMayMutateOneManagedInventoryDirectly": false,
+    "shopMayCreatePaymentBeforeSystemReservation": false
+  },
+  "checkoutFlow": {
+    "reserve": "SYNCHRONOUS_SYSTEM_AUTHORITY_BEFORE_ORDER_CREATE",
+    "orderCreate": "ONLY_AFTER_SYSTEM_RESERVE_ACCEPTED",
+    "hubProjection": "ASYNC_SYSTEM_OUTBOX_AFTER_CANONICAL_COMMIT",
+    "reservationFailure": "NO_ORDER_NO_PAYMENT",
+    "orderCreateFailureAfterReserve": "SYNCHRONOUS_RELEASE_REQUEST",
+    "paymentSale": "ONE-4C_DEFERRED",
+    "expiryRelease": "ONE-4C_DEFERRED"
+  },
+  "shopToSystemCommands": [
+    "shop.reserve_requested",
+    "shop.release_requested",
+    "shop.sale_confirm_requested"
+  ],
+  "systemToHubCommands": [
+    "product.reserve_requested",
+    "product.release_requested",
+    "product.mark_sold_requested"
+  ],
+  "systemRoute": "/api/integrations/v1/shop/stock",
+  "reservationContract": {
+    "atomicAllOrNothing": true,
+    "checkoutIdempotencyKeyRequired": true,
+    "exactSkuRequired": true,
+    "exactLinkedIdentityRequired": true,
+    "canonicalInStockRequired": true,
+    "expiryRequired": true,
+    "maxSkus": 10,
+    "duplicateReserveReturnsExistingReservation": true,
+    "releaseIsIdempotent": true,
+    "hubProjectionIsNotReservationAuthority": true
+  },
+  "security": {
+    "hmacRequired": true,
+    "source": "shop",
+    "dedicatedShopKeyRequired": true,
+    "replayProtectionRequired": true,
+    "browserMayCallSystemStockRoute": false,
+    "piiInStockCommand": false
+  },
+  "featureFlags": {
+    "systemShopAuthority": "ONE4_SHOP_AUTHORITY_ENABLED",
+    "shopSystemStock": "ONE4_SYSTEM_STOCK_ENABLED",
+    "purchaseEnabledMustRemainFalseUntilOne4d": true,
+    "default": false
+  },
+  "scope": {
+    "oneManagedProductsOnly": true,
+    "reserveReleaseImplementedIn": "ONE-4B",
+    "paymentToSoldImplementedIn": "ONE-4C",
+    "productionActivationImplementedIn": "ONE-4D",
+    "legacyUnresolvedProductsRemainExcluded": true,
+    "technicalInspectionStage": false,
+    "qcStage": false
+  }
+}
