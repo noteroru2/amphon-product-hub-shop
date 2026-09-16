@@ -1,0 +1,31 @@
+name: ONE-4A Shop Stock Authority Contract
+
+on:
+  push:
+    paths:
+      - 'config/amphon-one4.json'
+      - 'docs/ONE_4_SHOP_RESERVATION_CHECKOUT.md'
+      - 'scripts/verify-one4a.mjs'
+      - 'workers/r2-upload/src/index.ts'
+      - 'package.json'
+      - '.github/workflows/one4a.yml'
+  pull_request:
+    paths:
+      - 'config/amphon-one4.json'
+      - 'docs/ONE_4_SHOP_RESERVATION_CHECKOUT.md'
+      - 'scripts/verify-one4a.mjs'
+      - 'workers/r2-upload/src/index.ts'
+      - 'package.json'
+      - '.github/workflows/one4a.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify ONE-4A authority contract
+        run: npm run verify:one4a
