@@ -8,6 +8,7 @@ interface Env {
   INTEGRATION_SIGNATURE_MAX_AGE_SECONDS?: string
   ONE2B_SHELL_CONSUMER_ENABLED?: string
   ONE2D_RECONCILIATION_ENABLED?: string
+  ONE3_STOCK_CONSUMER_ENABLED?: string
 }
 
 type BridgeEnvelope = {
@@ -23,6 +24,9 @@ type ConsumeResult = {
   productIdentityId?: string | null
   sku?: string | null
   listingReadiness?: string | null
+  availability?: string | null
+  availabilityVersion?: number | string | null
+  hubStatus?: string | null
   ackEventId?: string | null
 }
 
@@ -181,6 +185,56 @@ async function consumeLegacyLink(env: Env, envelope: BridgeEnvelope) {
   return response({ ok: false, error: 'BRIDGE_LEGACY_LINK_CONSUMER_UNAVAILABLE' }, 503)
 }
 
+async function consumeAvailability(env: Env, envelope: BridgeEnvelope) {
+  const consumed = await callRpc(env, 'one3c_consume_stock_event', envelope.eventId)
+  const outcome = String(consumed.outcome || '').toUpperCase()
+  const projection = {
+    hubProductId: consumed.hubProductId || null,
+    productIdentityId: consumed.productIdentityId || null,
+    sku: consumed.sku || null,
+    availability: consumed.availability || null,
+    availabilityVersion: consumed.availabilityVersion ?? null,
+    hubStatus: consumed.hubStatus || null,
+    ackEventId: consumed.ackEventId || null,
+  }
+
+  if (outcome === 'APPLIED') {
+    return response({
+      ok: true,
+      accepted: true,
+      duplicate: false,
+      stale: false,
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      projection,
+    }, 202)
+  }
+
+  if (outcome === 'DUPLICATE' || outcome === 'STALE') {
+    return response({
+      ok: true,
+      accepted: false,
+      duplicate: outcome === 'DUPLICATE',
+      stale: outcome === 'STALE',
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      projection,
+    }, 200)
+  }
+
+  if (outcome === 'CONFLICT' || outcome === 'DEAD') {
+    return response({
+      ok: false,
+      error: consumed.error || 'BRIDGE_AVAILABILITY_CONFLICT',
+      eventId: envelope.eventId,
+      sku: consumed.sku || null,
+    }, 409)
+  }
+
+  console.error('ONE-3C unexpected consumer outcome', { eventId: envelope.eventId, outcome })
+  return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
+}
+
 async function maybeConsume(requestCopy: Request, baseResponse: Response, env: Env) {
   if (![200, 202].includes(baseResponse.status)) return baseResponse
 
@@ -219,6 +273,19 @@ async function maybeConsume(requestCopy: Request, baseResponse: Response, env: E
         console.error('ONE-2D failed to mark inbox retryable', { eventId: envelope.eventId, markError })
       })
       return response({ ok: false, error: 'BRIDGE_LEGACY_LINK_CONSUMER_UNAVAILABLE' }, 503)
+    }
+  }
+
+  if (['product.reserve_requested', 'product.release_requested', 'product.mark_sold_requested'].includes(envelope.eventType)) {
+    if (!enabled(env.ONE3_STOCK_CONSUMER_ENABLED)) return baseResponse
+    try {
+      return await consumeAvailability(env, envelope)
+    } catch (error) {
+      console.error('ONE-3C availability consumer error', { eventId: envelope.eventId, error })
+      await markInboxFailed(env, envelope.eventId, 'ONE3C_CONSUMER', error).catch((markError) => {
+        console.error('ONE-3C failed to mark inbox retryable', { eventId: envelope.eventId, markError })
+      })
+      return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
     }
   }
 
