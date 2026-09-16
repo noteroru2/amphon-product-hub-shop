@@ -6,17 +6,32 @@ import process from 'node:process'
 const workerDir = path.resolve('workers/one-bridge')
 const sourceConfigPath = path.join(workerDir, 'wrangler.jsonc')
 const tempConfigPath = path.join(workerDir, '.wrangler.one3c.production.json')
+const isWindows = process.platform === 'win32'
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit', shell: false })
+    const child = spawn(command, args, {
+      stdio: 'inherit',
+      // Node 22 on Windows can reject direct spawning of npm.cmd/npx.cmd with EINVAL.
+      // The commands and arguments here are repository-owned constants, so using the
+      // platform command shell on Windows is intentional and bounded.
+      shell: isWindows,
+    })
     child.on('error', reject)
     child.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}`)))
   })
 }
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const npx = 'npx'
+const npm = 'npm'
+
+if (process.argv.includes('--runner-smoke')) {
+  await run(npm, ['--version'])
+  await run(npx, ['--version'])
+  console.log(`AMPHON ONE-3C RUNNER: PASS — platform=${process.platform}`)
+  process.exit(0)
+}
+
 const sourceRaw = await readFile(sourceConfigPath, 'utf8')
 const source = JSON.parse(sourceRaw)
 
