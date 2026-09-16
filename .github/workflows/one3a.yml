@@ -1,0 +1,24 @@
+name: ONE-3A Hub Projection Contract
+
+on:
+  push:
+    paths:
+      - 'config/amphon-one3.json'
+      - 'config/amphon-one-product-flow.json'
+      - 'docs/ONE_3_UNIFIED_SALE_STOCK_STATE.md'
+      - 'scripts/verify-one3a.mjs'
+      - 'src/lib/backend.ts'
+      - 'package.json'
+      - '.github/workflows/one3a.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify ONE-3A Hub projection contract
+        run: node scripts/verify-one3a.mjs
