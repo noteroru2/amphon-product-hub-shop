@@ -3,12 +3,14 @@ import { readFile } from 'node:fs/promises'
 const migrationPath = 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
 const workerPath = 'workers/one-bridge/src/one2b-entry.ts'
 const wranglerPath = 'workers/one-bridge/wrangler.jsonc'
+const deployPath = 'scripts/deploy-one3c-production.mjs'
 const contractPath = 'config/amphon-one3.json'
 
-const [migration, worker, wrangler, contractRaw] = await Promise.all([
+const [migration, worker, wrangler, deploy, contractRaw] = await Promise.all([
   readFile(new URL(`../${migrationPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${workerPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${wranglerPath}`, import.meta.url), 'utf8'),
+  readFile(new URL(`../${deployPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${contractPath}`, import.meta.url), 'utf8'),
 ])
 
@@ -82,10 +84,27 @@ requireText(worker, "markInboxFailed(env, envelope.eventId, 'ONE3C_CONSUMER'", '
 requireText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "false"', 'fail-closed source flag')
 forbidText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "true"', 'fail-closed source flag')
 
+for (const runtimeFlag of [
+  "ONE2B_SHELL_CONSUMER_ENABLED: 'true'",
+  "ONE2D_RECONCILIATION_ENABLED: 'true'",
+  "ONE3_STOCK_CONSUMER_ENABLED: 'true'",
+]) requireText(deploy, runtimeFlag, 'production activation helper')
+requireText(deploy, "['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run']", 'production activation dry-run')
+requireText(deploy, "['wrangler', 'deploy', '--config', tempConfigPath, '--keep-vars', '--yes']", 'production activation deploy')
+requireText(deploy, "await run(npm, ['run', 'verify:one3c'])", 'production activation preflight')
+requireText(deploy, 'await rm(tempConfigPath, { force: true })', 'temporary config cleanup')
+forbidText(deploy, "writeFile(sourceConfigPath", 'source config immutability')
+
+const writePosition = deploy.indexOf('await writeFile(tempConfigPath')
+const dryRunPosition = deploy.indexOf("await run(npx, ['wrangler', 'deploy', '--config', tempConfigPath, '--dry-run'])")
+if (writePosition < 0 || dryRunPosition < 0 || writePosition > dryRunPosition) {
+  failures.push('production activation helper: temporary config must exist before Wrangler dry-run')
+}
+
 if (failures.length) {
   console.error('AMPHON ONE-3C: FAIL')
   for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
 
-console.log('AMPHON ONE-3C: PASS — versioned Hub projection, exact mapping, stale/gap guards, server-only RPC and browser mutation guard are locked fail-closed')
+console.log('AMPHON ONE-3C: PASS — versioned Hub projection, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and safe fail-closed production activation are locked')
