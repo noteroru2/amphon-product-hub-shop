@@ -1,5 +1,5 @@
 {
-  "flowVersion": "ONE-0R.1",
+  "flowVersion": "ONE-3.0",
   "status": "ACTIVE",
   "origin": {
     "application": "amphon_system",
@@ -39,13 +39,19 @@
     "nullMeansNotApplicable": true
   },
   "availability": {
-    "masterAfterHubSync": "product_hub",
+    "masterAfterHubSync": "amphon_system",
+    "hubRole": "projection",
+    "shopRole": "requester_only",
     "targetStates": ["IN_STOCK", "RESERVED", "SOLD", "REPAIR", "RETURNED", "WRITTEN_OFF"],
-    "shopMayMutateInventoryDirectly": false
+    "versionOwner": "amphon_system",
+    "shopMayMutateInventoryDirectly": false,
+    "hubBrowserMayMutateOneManagedAvailabilityDirectly": false
   },
   "failurePolicy": {
     "hubUnavailableAtIntake": "KEEP_SYSTEM_INTAKE_AND_QUEUE_SYNC",
-    "duplicateDelivery": "IDEMPOTENT_BY_INTAKE_ID_AND_SKU",
+    "hubUnavailableAfterSale": "KEEP_SYSTEM_SALE_AND_QUEUE_PROJECTION_SYNC",
+    "duplicateDelivery": "IDEMPOTENT_BY_EVENT_AND_AVAILABILITY_VERSION",
+    "staleAvailabilityProjection": "IGNORE_STALE_AND_KEEP_NEWER_VERSION",
     "skuConflict": "STOP_AND_RECONCILE",
     "missingPhotosOrSpecs": "KEEP_IN_STOCK_BUT_NOT_READY_TO_LIST"
   }
