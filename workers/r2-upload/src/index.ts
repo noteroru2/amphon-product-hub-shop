@@ -1,4 +1,6 @@
-interface Env {
+import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
+
+interface Env extends One4SystemStockEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_PUBLISHABLE_KEY: string
@@ -1111,10 +1113,47 @@ async function createPublicCheckout(request: Request, env: Env) {
     invoiceAddress: cleanCheckoutText(body.invoiceAddress, 500),
     invoiceEmail: cleanCheckoutText(body.invoiceEmail, 180).toLowerCase(),
   }
-  const result = await serviceRest<any>(env, 'rpc/create_commerce_order', {
-    method: 'POST',
-    body: JSON.stringify({ checkout: payload }),
-  })
+  if (!one4SystemStockEnabled(env)) {
+    return storeJson({ error: 'ระบบสำรองสินค้ากลางยังไม่เปิดใช้งาน', code: 'ONE4_SYSTEM_STOCK_DISABLED' }, 503, 'no-store')
+  }
+
+  const reservationMinutes = Math.min(240, Math.max(1, Number(settings.reservation_minutes || 60)))
+  const reservationExpiresAt = new Date(Date.now() + reservationMinutes * 60_000).toISOString()
+  let systemReservation
+  try {
+    systemReservation = await reserveOne4SystemStock(env, {
+      checkoutIdempotencyKey: String(payload.idempotencyKey),
+      skus,
+      expiresAt: reservationExpiresAt,
+    })
+  } catch (error) {
+    console.error('ONE4_SYSTEM_RESERVE_ERROR:', error instanceof Error ? error.message : error)
+    return storeJson({ error: 'ระบบสำรองสินค้าไม่พร้อม กรุณาลองใหม่', code: 'ONE4_SYSTEM_STOCK_UNAVAILABLE' }, 503, 'no-store')
+  }
+  if (!systemReservation.ok || systemReservation.outcome !== 'RESERVED') {
+    const unavailable = systemReservation.errorCode === 'ONE4_STOCK_UNAVAILABLE'
+      || systemReservation.outcome === 'REJECTED'
+      || systemReservation.outcome === 'CONFLICT'
+    return storeJson({
+      error: unavailable ? 'สินค้าบางรายการถูกจองหรือขายแล้ว กรุณารีเฟรชตะกร้า' : 'ระบบสำรองสินค้าไม่พร้อม กรุณาลองใหม่',
+      code: systemReservation.errorCode || 'ONE4_RESERVATION_REJECTED',
+    }, unavailable ? 409 : 503, 'no-store')
+  }
+
+  let result: any
+  try {
+    result = await serviceRest<any>(env, 'rpc/one4_create_commerce_order', {
+      method: 'POST',
+      body: JSON.stringify({ checkout: payload, system_reservation: systemReservation }),
+    })
+  } catch (error) {
+    await releaseOne4SystemStock(env, {
+      checkoutIdempotencyKey: String(payload.idempotencyKey),
+      skus,
+      reason: 'SHOP_ORDER_CREATE_FAILED',
+    }).catch((releaseError) => console.error('ONE4_SYSTEM_RELEASE_AFTER_ORDER_ERROR:', releaseError))
+    throw error
+  }
 
   if (payload.paymentMethod === 'STRIPE') {
     try {
@@ -1131,6 +1170,11 @@ async function createPublicCheckout(request: Request, env: Env) {
           }),
         }).catch(() => undefined)
       }
+      await releaseOne4SystemStock(env, {
+        checkoutIdempotencyKey: String(payload.idempotencyKey),
+        skus,
+        reason: 'STRIPE_SESSION_CREATE_FAILED',
+      }).catch((releaseError) => console.error('ONE4_SYSTEM_RELEASE_AFTER_STRIPE_ERROR:', releaseError))
       throw error
     }
   }
