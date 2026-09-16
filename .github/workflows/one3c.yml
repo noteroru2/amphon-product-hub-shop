@@ -35,3 +35,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:one3c
+
+  windows-runner-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/deploy-one3c-production.mjs --runner-smoke
