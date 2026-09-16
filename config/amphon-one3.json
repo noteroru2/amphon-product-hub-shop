@@ -1,0 +1,56 @@
+{
+  "contractVersion": "ONE-3.0",
+  "status": "SOURCE_LOCKED_FAIL_CLOSED",
+  "effectiveDate": "2026-09-16",
+  "authority": {
+    "inventoryAvailability": "amphon_system",
+    "saleLedger": "amphon_system",
+    "financeCashbook": "amphon_system",
+    "productContent": "product_hub",
+    "hubAvailabilityRole": "projection",
+    "shopAvailabilityRole": "requester_only",
+    "shopMayMutateInventoryDirectly": false,
+    "hubBrowserMayMutateOneManagedAvailabilityDirectly": false
+  },
+  "states": ["IN_STOCK", "RESERVED", "SOLD", "REPAIR", "RETURNED", "WRITTEN_OFF"],
+  "transitions": {
+    "IN_STOCK": ["RESERVED", "SOLD", "REPAIR", "WRITTEN_OFF"],
+    "RESERVED": ["IN_STOCK", "SOLD"],
+    "SOLD": ["RETURNED"],
+    "REPAIR": ["IN_STOCK", "WRITTEN_OFF"],
+    "RETURNED": ["IN_STOCK", "REPAIR", "WRITTEN_OFF"],
+    "WRITTEN_OFF": []
+  },
+  "systemToHubCommands": [
+    "product.reserve_requested",
+    "product.release_requested",
+    "product.mark_sold_requested"
+  ],
+  "hubToSystemEvents": ["product.availability_changed"],
+  "commandContract": {
+    "identityRequired": true,
+    "skuExactRequired": true,
+    "linkedHubProductRequired": true,
+    "availabilityVersionRequired": true,
+    "idempotencyRequired": true,
+    "staleVersionPolicy": "IGNORE_AS_DUPLICATE_OR_STALE",
+    "conflictPolicy": "STOP_AND_RECONCILE"
+  },
+  "saleRules": {
+    "systemSaleCommitsFinancialsBeforeProjection": true,
+    "hubProjectionFailureDoesNotRollbackCommittedSystemSale": true,
+    "projectionFailureQueuesRetry": true,
+    "reservationDoesNotCreateSaleLedgerEntry": true,
+    "soldRequiresSystemSaleOrExplicitSystemCommand": true
+  },
+  "featureFlags": {
+    "systemSaleSync": "ONE3_SALE_SYNC_ENABLED",
+    "hubStockConsumer": "ONE3_STOCK_CONSUMER_ENABLED",
+    "default": false
+  },
+  "scope": {
+    "oneManagedProductsOnly": true,
+    "shopOrderIntegrationDeferredTo": "ONE-4",
+    "legacyUnresolvedProductsRemainExcluded": true
+  }
+}
