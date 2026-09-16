@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "node scripts/verify-one0.mjs && node scripts/verify-one1.mjs && node scripts/verify-one1-storage.mjs && node scripts/verify-one1-security.mjs && node scripts/verify-one2a-contract.mjs && node scripts/verify-one2b.mjs && node scripts/verify-one2c.mjs && node scripts/verify-one2d.mjs && node scripts/verify-one2d-production-acceptance.mjs && node scripts/verify-one3a.mjs && node scripts/verify-one3c.mjs && node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/one-bridge/tsconfig.json && tsc -p workers/hub-outbox/tsconfig.json && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
     "deploy:hub": "npm run build && wrangler deploy",
+    "deploy:one3c-prod": "node scripts/deploy-one3c-production.mjs",
     "preview": "vite preview",
     "verify:one0": "node scripts/verify-one0.mjs",
     "verify:one1": "node scripts/verify-one1.mjs",
