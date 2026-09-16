@@ -22,8 +22,8 @@ jobs:
         run: node scripts/apply-one4b-r2-patch.mjs
       - name: Install dependencies
         run: npm ci
-      - name: Typecheck Store Worker
-        run: npx tsc -p workers/r2-upload/tsconfig.json
+      - name: Bundle-check Store Worker with Wrangler
+        run: npx wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run
       - name: Validate diff
         run: git diff --check
       - name: Commit generated Worker patch
