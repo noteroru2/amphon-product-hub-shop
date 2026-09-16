@@ -1,13 +1,15 @@
 import { readFile } from 'node:fs/promises'
 
 const migrationPath = 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
+const initMigrationPath = 'supabase/migrations/20260916104824_one3c_new_product_availability_init.sql'
 const workerPath = 'workers/one-bridge/src/one2b-entry.ts'
 const wranglerPath = 'workers/one-bridge/wrangler.jsonc'
 const deployPath = 'scripts/deploy-one3c-production.mjs'
 const contractPath = 'config/amphon-one3.json'
 
-const [migration, worker, wrangler, deploy, contractRaw] = await Promise.all([
+const [migration, initMigration, worker, wrangler, deploy, contractRaw] = await Promise.all([
   readFile(new URL(`../${migrationPath}`, import.meta.url), 'utf8'),
+  readFile(new URL(`../${initMigrationPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${workerPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${wranglerPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${deployPath}`, import.meta.url), 'utf8'),
@@ -41,6 +43,13 @@ requireText(migration, 'private.one3c_guard_one_managed_availability', 'browser 
 requireText(migration, 'ONE_MANAGED_AVAILABILITY_SYSTEM_OWNED', 'browser mutation guard')
 requireText(migration, "current_setting('amphon.one3_projection', true)", 'projection transaction marker')
 requireText(migration, "current_user = 'service_role'", 'server-only projection marker')
+
+requireText(initMigration, 'private.one3c_initialize_availability', 'new shell initializer')
+requireText(initMigration, "new.one_availability := 'IN_STOCK'", 'new shell initial availability')
+requireText(initMigration, 'new.one_availability_version := 0', 'new shell initial version')
+requireText(initMigration, 'ONE3_INITIALIZED', 'new shell initialization reason')
+requireText(initMigration, 'before insert or update of one_managed on public.products', 'new shell initializer trigger')
+requireText(initMigration, 'security invoker', 'new shell initializer security')
 
 requireText(migration, 'public.one3c_consume_stock_event', 'consumer RPC')
 requireText(migration, 'security invoker', 'consumer RPC security')
@@ -107,4 +116,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('AMPHON ONE-3C: PASS — versioned Hub projection, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and safe fail-closed production activation are locked')
+console.log('AMPHON ONE-3C: PASS — versioned Hub projection, new-shell IN_STOCK v0 initialization, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and safe fail-closed production activation are locked')
