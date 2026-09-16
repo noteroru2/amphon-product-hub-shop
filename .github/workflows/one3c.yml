@@ -1,0 +1,33 @@
+name: ONE-3C Hub Stock Projection Consumer
+
+on:
+  push:
+    paths:
+      - 'config/amphon-one3.json'
+      - 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
+      - 'workers/one-bridge/src/one2b-entry.ts'
+      - 'workers/one-bridge/wrangler.jsonc'
+      - 'scripts/verify-one3c.mjs'
+      - 'package.json'
+      - '.github/workflows/one3c.yml'
+  pull_request:
+    paths:
+      - 'config/amphon-one3.json'
+      - 'supabase/migrations/20260916104009_one3c_hub_stock_projection.sql'
+      - 'workers/one-bridge/src/one2b-entry.ts'
+      - 'workers/one-bridge/wrangler.jsonc'
+      - 'scripts/verify-one3c.mjs'
+      - 'package.json'
+      - '.github/workflows/one3c.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:one3c
