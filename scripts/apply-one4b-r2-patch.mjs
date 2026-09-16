@@ -1,4 +1,4 @@
-// ONE-4B deterministic generated patch; reruns are intentionally idempotent.
+// ONE-4B deterministic generated patch; reruns are intentionally idempotent. Bundler-checked.
 import { readFile, writeFile } from 'node:fs/promises'
 
 const path = 'workers/r2-upload/src/index.ts'
