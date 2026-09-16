@@ -8,6 +8,7 @@ on:
       - 'workers/one-bridge/src/one2b-entry.ts'
       - 'workers/one-bridge/wrangler.jsonc'
       - 'scripts/verify-one3c.mjs'
+      - 'scripts/deploy-one3c-production.mjs'
       - 'package.json'
       - '.github/workflows/one3c.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'workers/one-bridge/src/one2b-entry.ts'
       - 'workers/one-bridge/wrangler.jsonc'
       - 'scripts/verify-one3c.mjs'
+      - 'scripts/deploy-one3c-production.mjs'
       - 'package.json'
       - '.github/workflows/one3c.yml'
 
