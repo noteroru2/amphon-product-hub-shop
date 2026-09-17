@@ -1,0 +1,10 @@
+
+> typecheck
+> tsc --noEmit --pretty false
+
+src/index.ts(1126,7): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+  Type 'unknown' is not assignable to type 'string'.
+src/index.ts(1152,7): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+  Type 'unknown' is not assignable to type 'string'.
+src/index.ts(1175,9): error TS2322: Type 'unknown[]' is not assignable to type 'string[]'.
+  Type 'unknown' is not assignable to type 'string'.
