@@ -1,0 +1,47 @@
+{
+  "contractVersion": "ONE-4D-PROD.1",
+  "status": "BLOCKED_SAFE",
+  "productionAccepted": false,
+  "activationAllowed": false,
+  "hubDatabase": {
+    "projectRef": "mfpdtlxwdbxitgfzdape",
+    "activationGuardSourcePresent": true,
+    "activationGuardApplied": false,
+    "purchaseEnabled": false,
+    "nonterminalCommands": 0,
+    "deadCommands": 0,
+    "oneOrders": 0
+  },
+  "systemRuntime": {
+    "signedHealthPassed": false,
+    "one3SaleSyncEnabled": null,
+    "one4ShopAuthorityEnabled": null,
+    "one4PaymentSaleEnabled": null,
+    "reserveDuplicateReleaseE2EPassed": false,
+    "confirmSoldE2EPassed": false,
+    "confirmSoldTestIsolation": null
+  },
+  "storeWorker": {
+    "sourceEntry": "src/one4c-entry.ts",
+    "systemStockEnabled": false,
+    "productionDeploymentVerified": false,
+    "scheduledDrainVerified": false
+  },
+  "reconciliation": {
+    "projectionConverged": false,
+    "zeroUnresolvedDrift": false
+  },
+  "safety": {
+    "realCustomerCheckoutOpened": false,
+    "realInventoryUsedForSoldSmoke": false,
+    "syntheticFinancialEntriesCreated": false
+  },
+  "blockers": [
+    "SUPABASE_ACTIVATION_GUARD_NOT_APPLIED",
+    "SYSTEM_RUNTIME_FLAGS_NOT_VERIFIED",
+    "SIGNED_RESERVE_DUPLICATE_RELEASE_E2E_NOT_RUN",
+    "CONFIRM_SOLD_ISOLATED_SMOKE_NOT_RUN",
+    "STORE_WORKER_ONE4D_NOT_DEPLOYED",
+    "PROJECTION_RECONCILIATION_NOT_ACCEPTED"
+  ]
+}
