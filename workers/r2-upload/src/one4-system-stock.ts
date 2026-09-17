@@ -116,13 +116,17 @@ async function send(
   return parsed
 }
 
-function normalizedSkus(skus: string[]) {
-  return [...new Set(skus.map((sku) => clean(sku).toUpperCase()).filter(Boolean))].sort()
+function normalizedSkus(skus: readonly unknown[]) {
+  return [...new Set(
+    skus
+      .map((sku) => clean(sku).toUpperCase())
+      .filter((sku) => sku.length > 0),
+  )].sort()
 }
 
 export async function reserveOne4SystemStock(env: One4SystemStockEnv, input: {
   checkoutIdempotencyKey: string
-  skus: string[]
+  skus: readonly unknown[]
   expiresAt: string
 }) {
   const checkoutKey = clean(input.checkoutIdempotencyKey)
@@ -137,7 +141,7 @@ export async function reserveOne4SystemStock(env: One4SystemStockEnv, input: {
 
 export async function releaseOne4SystemStock(env: One4SystemStockEnv, input: {
   checkoutIdempotencyKey: string
-  skus: string[]
+  skus: readonly unknown[]
   reason?: string
 }) {
   const checkoutKey = clean(input.checkoutIdempotencyKey)
@@ -153,7 +157,7 @@ export async function releaseOne4SystemStock(env: One4SystemStockEnv, input: {
 export async function confirmOne4SystemSale(env: One4SystemStockEnv, input: {
   checkoutIdempotencyKey: string
   orderId: string
-  skus: string[]
+  skus: readonly unknown[]
   saleItems: Array<{ sku: string; unitPrice: number }>
   paymentProvider: string
   paymentReference?: string | null
