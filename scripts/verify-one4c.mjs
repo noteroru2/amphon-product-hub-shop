@@ -5,6 +5,9 @@ const files = {
   entry: 'workers/r2-upload/src/one4c-entry.ts',
   client: 'workers/r2-upload/src/one4-system-stock.ts',
   wrangler: 'workers/r2-upload/wrangler.jsonc',
+  workerPackage: 'workers/r2-upload/package.json',
+  workerTsconfig: 'workers/r2-upload/tsconfig.json',
+  rootPackage: 'package.json',
 }
 const source = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([key,path]) => [key, await readFile(path,'utf8')])))
 const failures = []
@@ -46,9 +49,16 @@ requireText('wrangler', '"SYSTEM_API_BASE_URL": "https://api.amphontd.com"', 'Sy
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'Shop HMAC key id')
 forbidText('wrangler', 'SHOP_INTEGRATION_SECRET', 'Shop secret must remain remote only')
 
+requireText('workerPackage', '"@cloudflare/workers-types"', 'Store Worker Cloudflare typings')
+requireText('workerPackage', '"typecheck": "tsc --noEmit"', 'Store Worker strict typecheck')
+requireText('workerTsconfig', '"@cloudflare/workers-types"', 'Store Worker tsconfig typings')
+requireText('workerTsconfig', '"strict": true', 'Store Worker strict compiler mode')
+requireText('rootPackage', 'npm --prefix workers/r2-upload ci', 'ONE-4C verifier Worker dependency install')
+requireText('rootPackage', 'npm --prefix workers/r2-upload run typecheck', 'ONE-4C verifier Worker typecheck')
+
 if (failures.length) {
   console.error('AMPHON ONE-4C SHOP: FAIL')
   for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
-console.log('AMPHON ONE-4C SHOP: PASS — payment/release commands are durable, System-authoritative, retryable and source fail-closed')
+console.log('AMPHON ONE-4C SHOP: PASS — payment/release commands are durable, System-authoritative, retryable, Worker-typed and source fail-closed')

@@ -4,7 +4,11 @@ on:
   push:
     branches: [main, one4c-shop-payment-sale-runtime]
     paths:
+      - 'supabase/migrations/20260917125804_one4b_system_authority_checkout.sql'
       - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
       - 'workers/r2-upload/src/one4c-entry.ts'
       - 'workers/r2-upload/src/one4-system-stock.ts'
       - 'workers/r2-upload/wrangler.jsonc'
@@ -14,7 +18,11 @@ on:
       - '.github/workflows/one4c.yml'
   pull_request:
     paths:
+      - 'supabase/migrations/20260917125804_one4b_system_authority_checkout.sql'
       - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
       - 'workers/r2-upload/src/one4c-entry.ts'
       - 'workers/r2-upload/src/one4-system-stock.ts'
       - 'workers/r2-upload/wrangler.jsonc'
@@ -24,7 +32,7 @@ on:
       - '.github/workflows/one4c.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -35,33 +43,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - name: Install root dependencies
+        run: npm ci
       - name: Verify ONE-4B contract
         run: npm run verify:one4b
       - name: Verify ONE-4C source contract
         run: node scripts/verify-one4c.mjs
+      - name: Install Store Worker dependencies
+        run: npm ci
+        working-directory: workers/r2-upload
       - name: Typecheck Store Worker
-        id: strict_tsc
-        continue-on-error: true
-        shell: bash
-        run: |
-          mkdir -p ci
-          set +e
-          npx tsc -p workers/r2-upload/tsconfig.json --pretty false > ci/one4c-tsc-report.txt 2>&1
-          code=$?
-          cat ci/one4c-tsc-report.txt
-          exit $code
-      - name: Persist typecheck diagnostics
-        if: steps.strict_tsc.outcome == 'failure' && github.event_name == 'push' && github.ref_name == 'one4c-shop-payment-sale-runtime'
-        shell: bash
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add ci/one4c-tsc-report.txt
-          git commit -m "ci(one4): capture typecheck failure" || exit 0
-          git push origin HEAD:one4c-shop-payment-sale-runtime
-      - name: Fail on strict typecheck errors
-        if: steps.strict_tsc.outcome == 'failure'
-        run: exit 1
+        run: npm run typecheck
+        working-directory: workers/r2-upload
       - name: Wrangler dry-run Store Worker
-        run: npx wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run
+        run: npx wrangler deploy --config wrangler.jsonc --dry-run
+        working-directory: workers/r2-upload

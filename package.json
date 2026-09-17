@@ -22,7 +22,7 @@
     "verify:one3c": "node scripts/verify-one3c.mjs && tsc -p workers/one-bridge/tsconfig.json",
     "verify:one4a": "node scripts/verify-one4a.mjs",
     "verify:one4b": "node scripts/verify-one4b.mjs && wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run",
-    "verify:one4c": "node scripts/verify-one4c.mjs && tsc -p workers/r2-upload/tsconfig.json && wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run",
+    "verify:one4c": "node scripts/verify-one4c.mjs && npm --prefix workers/r2-upload ci && npm --prefix workers/r2-upload run typecheck && cd workers/r2-upload && npx wrangler deploy --config wrangler.jsonc --dry-run",
     "verify:hub-outbox": "node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/hub-outbox/tsconfig.json",
     "verify:hub1": "node scripts/verify-hub1.mjs",
     "verify:hub2": "node scripts/verify-hub2.mjs",
