@@ -7,6 +7,9 @@ on:
     paths:
       - 'scripts/apply-one4c-store-coordination.mjs'
       - 'workers/r2-upload/src/one4-stock-coordinator.ts'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -17,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -30,6 +34,7 @@ jobs:
       - name: Validate diff
         run: git diff --check
       - name: Commit generated Store Worker coordination
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
           if git diff --quiet -- workers/r2-upload/src/index.ts; then
@@ -40,4 +45,4 @@ jobs:
           git config user.email "4189822+github-actions[bot]@users.noreply.github.com"
           git add workers/r2-upload/src/index.ts
           git commit -m "feat(one4): wire durable payment and release coordination"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:${GITHUB_HEAD_REF}
