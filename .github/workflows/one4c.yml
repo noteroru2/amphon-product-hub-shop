@@ -1,0 +1,37 @@
+name: ONE-4C Shop Payment To System Sale
+
+on:
+  push:
+    branches: [main, one4c-shop-payment-sale-runtime]
+    paths:
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4c.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4c.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:one4b
+      - run: npm run verify:one4c

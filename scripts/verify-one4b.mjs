@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 const files = {
   contract: 'config/amphon-one4.json',
-  migration: 'supabase/migrations/20260916235000_one4b_system_authority_checkout.sql',
+  migration: 'supabase/migrations/20260917125804_one4b_system_authority_checkout.sql',
   client: 'workers/r2-upload/src/one4-system-stock.ts',
   worker: 'workers/r2-upload/src/index.ts',
   wrangler: 'workers/r2-upload/wrangler.jsonc',

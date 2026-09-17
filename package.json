@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/verify-one0.mjs && node scripts/verify-one1.mjs && node scripts/verify-one1-storage.mjs && node scripts/verify-one1-security.mjs && node scripts/verify-one2a-contract.mjs && node scripts/verify-one2b.mjs && node scripts/verify-one2c.mjs && node scripts/verify-one2d.mjs && node scripts/verify-one2d-production-acceptance.mjs && node scripts/verify-one3a.mjs && node scripts/verify-one3c.mjs && node scripts/verify-one4a.mjs && node scripts/verify-one4b.mjs && node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/one-bridge/tsconfig.json && tsc -p workers/hub-outbox/tsconfig.json && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
+    "build": "node scripts/verify-one0.mjs && node scripts/verify-one1.mjs && node scripts/verify-one1-storage.mjs && node scripts/verify-one1-security.mjs && node scripts/verify-one2a-contract.mjs && node scripts/verify-one2b.mjs && node scripts/verify-one2c.mjs && node scripts/verify-one2d.mjs && node scripts/verify-one2d-production-acceptance.mjs && node scripts/verify-one3a.mjs && node scripts/verify-one3c.mjs && node scripts/verify-one4a.mjs && node scripts/verify-one4b.mjs && node scripts/verify-one4c.mjs && node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/one-bridge/tsconfig.json && tsc -p workers/hub-outbox/tsconfig.json && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
     "deploy:hub": "npm run build && wrangler deploy",
     "deploy:one3c-prod": "node scripts/deploy-one3c-production.mjs",
     "preview": "vite preview",
@@ -22,6 +22,7 @@
     "verify:one3c": "node scripts/verify-one3c.mjs && tsc -p workers/one-bridge/tsconfig.json",
     "verify:one4a": "node scripts/verify-one4a.mjs",
     "verify:one4b": "node scripts/verify-one4b.mjs && wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run",
+    "verify:one4c": "node scripts/verify-one4c.mjs && tsc -p workers/r2-upload/tsconfig.json && wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run",
     "verify:hub-outbox": "node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/hub-outbox/tsconfig.json",
     "verify:hub1": "node scripts/verify-hub1.mjs",
     "verify:hub2": "node scripts/verify-hub2.mjs",
