@@ -1,0 +1,62 @@
+name: ONE-4D Production Activation & E2E Acceptance
+
+on:
+  push:
+    branches: [main, one4d-production-activation-e2e]
+    paths:
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'supabase/migrations/20260917161000_one4d_production_activation_guard.sql'
+      - 'config/one4d-production-acceptance.json'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4d.mjs'
+      - 'package.json'
+      - '.github/workflows/one4d.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'supabase/migrations/20260917161000_one4d_production_activation_guard.sql'
+      - 'config/one4d-production-acceptance.json'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4d.mjs'
+      - 'package.json'
+      - '.github/workflows/one4d.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Verify ONE-4C prerequisite
+        run: node scripts/verify-one4c.mjs
+      - name: Verify ONE-4D activation contract
+        run: node scripts/verify-one4d.mjs
+      - name: Install Store Worker dependencies
+        run: npm ci
+        working-directory: workers/r2-upload
+      - name: Typecheck Store Worker
+        run: npm run typecheck
+        working-directory: workers/r2-upload
+      - name: Wrangler dry-run Store Worker
+        run: npx wrangler deploy --config wrangler.jsonc --dry-run
+        working-directory: workers/r2-upload
