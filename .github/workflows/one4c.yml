@@ -23,6 +23,9 @@ on:
       - 'package.json'
       - '.github/workflows/one4c.yml'
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -38,6 +41,27 @@ jobs:
       - name: Verify ONE-4C source contract
         run: node scripts/verify-one4c.mjs
       - name: Typecheck Store Worker
-        run: npx tsc -p workers/r2-upload/tsconfig.json
+        id: strict_tsc
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ci
+          set +e
+          npx tsc -p workers/r2-upload/tsconfig.json --pretty false > ci/one4c-tsc-report.txt 2>&1
+          code=$?
+          cat ci/one4c-tsc-report.txt
+          exit $code
+      - name: Persist typecheck diagnostics
+        if: steps.strict_tsc.outcome == 'failure' && github.event_name == 'push' && github.ref_name == 'one4c-shop-payment-sale-runtime'
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/one4c-tsc-report.txt
+          git commit -m "ci(one4): capture typecheck failure" || exit 0
+          git push origin HEAD:one4c-shop-payment-sale-runtime
+      - name: Fail on strict typecheck errors
+        if: steps.strict_tsc.outcome == 'failure'
+        run: exit 1
       - name: Wrangler dry-run Store Worker
         run: npx wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run
