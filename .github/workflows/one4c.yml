@@ -1,0 +1,60 @@
+name: ONE-4C Shop Payment To System Sale
+
+on:
+  push:
+    branches: [main, one4c-shop-payment-sale-runtime]
+    paths:
+      - 'supabase/migrations/20260917125804_one4b_system_authority_checkout.sql'
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4c.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260917125804_one4b_system_authority_checkout.sql'
+      - 'supabase/migrations/20260917130327_one4c_payment_sale_outbox.sql'
+      - 'workers/r2-upload/package.json'
+      - 'workers/r2-upload/package-lock.json'
+      - 'workers/r2-upload/tsconfig.json'
+      - 'workers/r2-upload/src/one4c-entry.ts'
+      - 'workers/r2-upload/src/one4-system-stock.ts'
+      - 'workers/r2-upload/wrangler.jsonc'
+      - 'scripts/verify-one4c.mjs'
+      - 'scripts/verify-one4b.mjs'
+      - 'package.json'
+      - '.github/workflows/one4c.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Verify ONE-4B contract
+        run: npm run verify:one4b
+      - name: Verify ONE-4C source contract
+        run: node scripts/verify-one4c.mjs
+      - name: Install Store Worker dependencies
+        run: npm ci
+        working-directory: workers/r2-upload
+      - name: Typecheck Store Worker
+        run: npm run typecheck
+        working-directory: workers/r2-upload
+      - name: Wrangler dry-run Store Worker
+        run: npx wrangler deploy --config wrangler.jsonc --dry-run
+        working-directory: workers/r2-upload
