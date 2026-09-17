@@ -33,5 +33,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run verify:one4b
-      - run: npm run verify:one4c
+      - name: Verify ONE-4B contract
+        run: npm run verify:one4b
+      - name: Verify ONE-4C source contract
+        run: node scripts/verify-one4c.mjs
+      - name: Typecheck Store Worker
+        run: npx tsc -p workers/r2-upload/tsconfig.json
+      - name: Wrangler dry-run Store Worker
+        run: npx wrangler deploy --config workers/r2-upload/wrangler.jsonc --dry-run
