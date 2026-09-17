@@ -54,6 +54,10 @@ for (const token of [
 
 assert(evidence.contractVersion === 'ONE-4D-PROD.1', 'unexpected ONE-4D production acceptance contract version')
 assert(evidence.hubDatabase?.projectRef === 'mfpdtlxwdbxitgfzdape', 'wrong production Supabase project')
+assert(evidence.hubDatabase?.outboxRetryDeliveredSmokePassed === true, 'production retry-to-delivered outbox smoke must pass')
+assert(evidence.hubDatabase?.outboxDeadAuditSmokePassed === true, 'production non-retryable DEAD/audit outbox smoke must pass')
+assert(evidence.hubDatabase?.outboxSmokeCleanupPassed === true, 'production outbox smoke fixtures must be fully cleaned up')
+assert(evidence.hubDatabase?.referenceStockUnchanged === true, 'production outbox smoke must leave reference stock unchanged')
 assert(evidence.safety?.realCustomerCheckoutOpened === false || evidence.productionAccepted === true,
   'real customer checkout cannot open before production acceptance')
 assert(evidence.safety?.realInventoryUsedForSoldSmoke === false,
@@ -64,6 +68,12 @@ assert(evidence.safety?.syntheticFinancialEntriesCreated === false,
 const blockers = Array.isArray(evidence.blockers) ? evidence.blockers : []
 const acceptedGates = [
   evidence.hubDatabase?.activationGuardApplied === true,
+  evidence.hubDatabase?.guardRejectsPrematureEnable === true,
+  evidence.hubDatabase?.readinessRpcServiceRoleOnly === true,
+  evidence.hubDatabase?.outboxRetryDeliveredSmokePassed === true,
+  evidence.hubDatabase?.outboxDeadAuditSmokePassed === true,
+  evidence.hubDatabase?.outboxSmokeCleanupPassed === true,
+  evidence.hubDatabase?.referenceStockUnchanged === true,
   evidence.hubDatabase?.purchaseEnabled === true,
   evidence.hubDatabase?.nonterminalCommands === 0,
   evidence.hubDatabase?.deadCommands === 0,
