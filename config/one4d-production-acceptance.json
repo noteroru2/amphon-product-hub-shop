@@ -13,7 +13,11 @@
     "purchaseEnabled": false,
     "nonterminalCommands": 0,
     "deadCommands": 0,
-    "oneOrders": 0
+    "oneOrders": 0,
+    "outboxRetryDeliveredSmokePassed": true,
+    "outboxDeadAuditSmokePassed": true,
+    "outboxSmokeCleanupPassed": true,
+    "referenceStockUnchanged": true
   },
   "systemRuntime": {
     "signedHealthPassed": false,
