@@ -32,7 +32,7 @@ on:
       - '.github/workflows/one4c.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -53,8 +53,28 @@ jobs:
         run: npm ci
         working-directory: workers/r2-upload
       - name: Typecheck Store Worker
-        run: npm run typecheck
-        working-directory: workers/r2-upload
+        id: worker_tsc
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ci
+          set +e
+          (cd workers/r2-upload && npm run typecheck -- --pretty false) > ci/one4c-worker-tsc-report.txt 2>&1
+          code=$?
+          cat ci/one4c-worker-tsc-report.txt
+          exit $code
+      - name: Persist Worker typecheck diagnostics
+        if: steps.worker_tsc.outcome == 'failure' && github.event_name == 'push' && github.ref_name == 'one4c-shop-payment-sale-runtime'
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/one4c-worker-tsc-report.txt
+          git commit -m "ci(one4): capture Worker typecheck failure" || exit 0
+          git push origin HEAD:one4c-shop-payment-sale-runtime
+      - name: Fail on Worker typecheck errors
+        if: steps.worker_tsc.outcome == 'failure'
+        run: exit 1
       - name: Wrangler dry-run Store Worker
         run: npx wrangler deploy --config wrangler.jsonc --dry-run
         working-directory: workers/r2-upload
