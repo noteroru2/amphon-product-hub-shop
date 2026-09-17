@@ -6,7 +6,10 @@
   "hubDatabase": {
     "projectRef": "mfpdtlxwdbxitgfzdape",
     "activationGuardSourcePresent": true,
-    "activationGuardApplied": false,
+    "activationGuardApplied": true,
+    "guardRejectsPrematureEnable": true,
+    "readinessRpcServiceRoleOnly": true,
+    "newOne4dSecurityAdvisorWarningObserved": false,
     "purchaseEnabled": false,
     "nonterminalCommands": 0,
     "deadCommands": 0,
@@ -37,7 +40,6 @@
     "syntheticFinancialEntriesCreated": false
   },
   "blockers": [
-    "SUPABASE_ACTIVATION_GUARD_NOT_APPLIED",
     "SYSTEM_RUNTIME_FLAGS_NOT_VERIFIED",
     "SIGNED_RESERVE_DUPLICATE_RELEASE_E2E_NOT_RUN",
     "CONFIRM_SOLD_ISOLATED_SMOKE_NOT_RUN",
