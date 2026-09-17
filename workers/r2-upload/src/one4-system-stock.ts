@@ -9,17 +9,23 @@ export type One4SystemReservationItem = {
   sku: string
   productIdentityId: string
   hubProductId: string
-  availability: 'RESERVED' | 'IN_STOCK'
+  availability: 'RESERVED' | 'IN_STOCK' | 'SOLD'
   availabilityVersion: number
+  unitPrice?: number
+  profit?: number
 }
 
 export type One4SystemStockResult = {
   ok: boolean
-  outcome?: 'RESERVED' | 'RELEASED' | 'REJECTED' | 'CONFLICT' | 'DISABLED'
+  outcome?: 'RESERVED' | 'RELEASED' | 'SOLD' | 'REJECTED' | 'CONFLICT' | 'DISABLED'
   duplicate?: boolean
   checkoutIdempotencyKey?: string
   expiresAt?: string
   releasedCount?: number
+  soldCount?: number
+  orderId?: string
+  paymentProvider?: string
+  paidAt?: string
   items?: One4SystemReservationItem[]
   errorCode?: string | null
 }
@@ -141,5 +147,32 @@ export async function releaseOne4SystemStock(env: One4SystemStockEnv, input: {
     checkoutIdempotencyKey: checkoutKey,
     skus: normalizedSkus(input.skus),
     reason: clean(input.reason || 'SHOP_ORDER_CREATE_FAILED'),
+  })
+}
+
+export async function confirmOne4SystemSale(env: One4SystemStockEnv, input: {
+  checkoutIdempotencyKey: string
+  orderId: string
+  skus: string[]
+  saleItems: Array<{ sku: string; unitPrice: number }>
+  paymentProvider: string
+  paymentReference?: string | null
+  paidAt: string
+}) {
+  const checkoutKey = clean(input.checkoutIdempotencyKey)
+  const skus = normalizedSkus(input.skus)
+  const saleItems = input.saleItems
+    .map((item) => ({ sku: clean(item.sku).toUpperCase(), unitPrice: Number(item.unitPrice) }))
+    .sort((a, b) => a.sku.localeCompare(b.sku))
+  return send(env, {
+    action: 'CONFIRM_SOLD',
+    commandKey: `shop:${checkoutKey}:confirm-sold:v1`,
+    checkoutIdempotencyKey: checkoutKey,
+    orderId: clean(input.orderId),
+    skus,
+    saleItems,
+    paymentProvider: clean(input.paymentProvider || 'MANUAL').toUpperCase(),
+    paymentReference: clean(input.paymentReference || '') || null,
+    paidAt: clean(input.paidAt),
   })
 }
