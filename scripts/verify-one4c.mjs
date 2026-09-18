@@ -10,6 +10,7 @@ const files = {
   rootPackage: 'package.json',
 }
 const source = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([key,path]) => [key, await readFile(path,'utf8')])))
+const wranglerConfig = JSON.parse(source.wrangler)
 const failures = []
 const requireText = (key, token, label) => { if (!source[key].includes(token)) failures.push(`${label}: missing ${token}`) }
 const forbidText = (key, token, label) => { if (source[key].includes(token)) failures.push(`${label}: forbidden ${token}`) }
@@ -47,7 +48,8 @@ requireText('wrangler', '"main":  "src/one4c-entry.ts"', 'ONE-4C Worker entry')
 requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED":', 'ONE-4C activation flag declaration')
 requireText('wrangler', '"SYSTEM_API_BASE_URL": "https://api.amphontd.com"', 'System API target')
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'Shop HMAC key id')
-forbidText('wrangler', 'SHOP_INTEGRATION_SECRET', 'Shop secret must remain remote only')
+if (Object.prototype.hasOwnProperty.call(wranglerConfig.vars || {}, 'SHOP_INTEGRATION_SECRET')) failures.push('Shop integration secret value must not be stored in vars')
+if (!wranglerConfig.secrets?.required?.includes('SHOP_INTEGRATION_SECRET')) failures.push('SHOP_INTEGRATION_SECRET must be declared as a required remote secret')
 
 requireText('workerPackage', '"@cloudflare/workers-types"', 'Store Worker Cloudflare typings')
 requireText('workerPackage', '"typecheck": "tsc --noEmit"', 'Store Worker strict typecheck')
