@@ -11,7 +11,7 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 let products: StoreProduct[] = []
 let apiError = false
 try {
-  const result = await listStoreProducts({ limit: 12 })
+  const result = await listStoreProducts({ availability: 'available', limit: 16 })
   products = result.products
 } catch (error) {
   apiError = true
@@ -76,6 +76,21 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
     </div>
   </section>
 
+  <section class="section home-product-showcase" id="latest-products">
+    <div class="container">
+      <div class="section-head human-section-head">
+        <div><div class="eyebrow">ของเพิ่งลงร้าน</div><h2>มีอะไรใหม่ ลองดูก่อน</h2><p class="muted">ของมือสองเปลี่ยนตลอด เจอตัวถูกใจเปิดดูรายละเอียด แล้วส่งรหัสสินค้าให้ร้านทาง LINE ได้เลยครับ</p></div>
+      </div>
+      {products.length ? (
+        <div class="product-grid home-product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+      ) : (
+        <div class="empty human-empty">
+          {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองเข้ามาใหม่อีกครั้งในอีกสักครู่ครับ' : 'ตอนนี้ยังไม่มีของใหม่ลงหน้าเว็บ ลองแวะกลับมาดูอีกครั้งครับ'}
+        </div>
+      )}
+    </div>
+  </section>
+
   <section class="section" id="shop-categories">
     <div class="container">
       <div class="section-head human-section-head">
@@ -110,18 +125,4 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
     </div>
   </section>
 
-  <section class="section" id="latest-products">
-    <div class="container">
-      <div class="section-head human-section-head">
-        <div><div class="eyebrow">ของเพิ่งลงร้าน</div><h2>มีอะไรใหม่ ลองดูก่อน</h2><p class="muted">ของมือสองเปลี่ยนตลอด เจอตัวถูกใจเปิดดูรายละเอียด แล้วส่งรหัสสินค้าให้ร้านทาง LINE ได้เลยครับ</p></div>
-      </div>
-      {products.length ? (
-        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
-      ) : (
-        <div class="empty human-empty">
-          {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองเข้ามาใหม่อีกครั้งในอีกสักครู่ครับ' : 'ตอนนี้ยังไม่มีของใหม่ลงหน้าเว็บ ลองแวะกลับมาดูอีกครั้งครับ'}
-        </div>
-      )}
-    </div>
-  </section>
 </BaseLayout>
