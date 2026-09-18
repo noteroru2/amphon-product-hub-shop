@@ -1,0 +1,60 @@
+---
+import ProductCard from '../../components/ProductCard.astro'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { listStoreProducts, type StoreProduct } from '../../lib/store-api'
+import { absoluteUrl, productPath } from '../../lib/seo'
+
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+
+let products: StoreProduct[] = []
+let apiError = false
+try {
+  const result = await listStoreProducts({ availability: 'available', limit: 60 })
+  products = result.products
+} catch (error) {
+  apiError = true
+  console.error('SHOP_NEW_ARRIVALS_STORE_API', error)
+}
+
+const title = 'สินค้าไอทีมือสองเข้าใหม่ พร้อมขาย | AMPHON TRADING'
+const description = 'รวมสินค้าไอทีมือสองที่เพิ่งลงขายล่าสุด ดูรูปจริง ราคา สเปก สภาพ และรหัสสินค้าก่อนสอบถามหรือสั่งซื้อผ่าน LINE @webuy'
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'สินค้าไอทีมือสองเข้าใหม่',
+    url: absoluteUrl('/new-arrivals/'),
+    description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: products.slice(0, 50).map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: absoluteUrl(productPath(product)),
+      name: product.title,
+    })),
+  },
+]
+---
+<BaseLayout title={title} description={description} canonicalPath="/new-arrivals/" jsonLd={schema}>
+  <section class="hero compact-store-hero">
+    <div class="container">
+      <div class="eyebrow">อัปเดตล่าสุดจาก AMPHON SHOP</div>
+      <h1>สินค้าไอทีมือสองเข้าใหม่</h1>
+      <p class="lead">รายการที่พร้อมขายล่าสุดจะขึ้นหน้านี้อัตโนมัติ เปิดดูรูปจริง สเปก สภาพ ราคา และรหัสสินค้าได้ก่อนทักร้านครับ</p>
+    </div>
+  </section>
+  <section class="section">
+    <div class="container">
+      {products.length ? (
+        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+      ) : (
+        <div class="empty human-empty">
+          {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ' : 'ตอนนี้ยังไม่มีสินค้าใหม่ที่พร้อมขายครับ'}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
