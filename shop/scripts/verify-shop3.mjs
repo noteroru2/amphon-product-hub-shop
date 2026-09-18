@@ -48,6 +48,9 @@ const invariants = [
   [product.includes('data-gallery-prev') && product.includes('data-gallery-next'), 'gallery previous/next controls'],
   [product.includes("addEventListener('touchstart'") && product.includes("addEventListener('touchend'") && product.includes('Math.abs(delta) < 45'), 'mobile swipe gallery interaction'],
   [layout.includes('ogImage'), 'product social image metadata'],
+  [layout.includes('ogTitle') && layout.includes('content={socialTitle}') && layout.includes('twitter:title'), 'social title override metadata'],
+  [product.includes('const socialTitle = product ?') && product.includes('formatPrice(product.price)') && product.includes('ogTitle={socialTitle}'), 'Facebook share title includes product name and price'],
+  [product.includes('ogImageAlt={socialImageAlt}') && layout.includes('og:image:alt'), 'social product image alt metadata'],
   [trust.includes('ACCESSORY_RE'), 'accessory grouping'],
   [trust.includes('CONDITION_RE'), 'condition grouping'],
 ]
