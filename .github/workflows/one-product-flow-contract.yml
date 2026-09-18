@@ -1,0 +1,34 @@
+name: AMPHON ONE Product Flow Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-one0.mjs'
+      - 'config/amphon-one-contract.json'
+      - 'config/amphon-one-product-flow.json'
+      - 'config/amphon-one3.json'
+      - 'docs/AMPHON_ONE_ARCHITECTURE_CONTRACT.md'
+      - '.github/workflows/one-product-flow-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-one0.mjs'
+      - 'config/amphon-one-contract.json'
+      - 'config/amphon-one-product-flow.json'
+      - 'config/amphon-one3.json'
+      - 'docs/AMPHON_ONE_ARCHITECTURE_CONTRACT.md'
+      - '.github/workflows/one-product-flow-contract.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify ONE baseline and superseding product flow
+        run: node scripts/verify-one0.mjs
+      - name: Verify ONE-3 availability authority
+        run: node scripts/verify-one3a.mjs
