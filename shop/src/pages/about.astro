@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
+---
+<BaseLayout title="เกี่ยวกับ AMPHON TRADING | ร้านสินค้าไอทีมือสอง" description="รู้จัก AMPHON TRADING ร้านสินค้าไอทีมือสองที่แสดงรูป ราคา สเปก สภาพ และข้อมูลของสินค้าจริงก่อนตัดสินใจซื้อ" canonicalPath="/about/">
+  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">AMPHON TRADING</div><h1>เลือกของมือสองจากข้อมูลของชิ้นจริง</h1><p class="lead">AMPHON SHOP ทำหน้าที่เป็นหน้าร้านออนไลน์สำหรับดูสินค้าที่พร้อมขาย โดยแสดงรูป ราคา สเปก สภาพ ตำหนิ อุปกรณ์ และข้อมูลประกันตามที่มีของสินค้าแต่ละชิ้น</p></div></section>
+  <section class="section"><div class="container policy-grid">
+    <article class="panel trust-card"><h2>ดูข้อมูลก่อนซื้อ</h2><p>สินค้ามือสองแต่ละชิ้นไม่เหมือนกัน เราจึงแยกหน้าสินค้าเป็นรายชิ้นและใช้รหัสสินค้าเพื่อให้ลูกค้าอ้างอิงกับร้านได้ตรงเครื่อง</p></article>
+    <article class="panel trust-card"><h2>คุยกับร้านได้ก่อนชำระ</h2><p>ช่องทางหลักคือ LINE {primaryLineId} เพื่อเช็กสถานะ ถามรายละเอียด หรือยืนยันของที่ได้ก่อนชำระ</p><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ติดต่อ LINE {primaryLineId}</a></article>
+    <article class="panel trust-card"><h2>ช่องทางของร้าน</h2><p><a href={mainWebsiteUrl} target="_blank" rel="noopener">เว็บไซต์หลัก AMPHON TRADING</a><br/><a href={facebookPageUrl} target="_blank" rel="noopener">Facebook อำพล เทรดดิ้ง</a></p></article>
+  </div></section>
+</BaseLayout>
