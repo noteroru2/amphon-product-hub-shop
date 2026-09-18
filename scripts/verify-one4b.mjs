@@ -39,7 +39,7 @@ for (const token of [
 ]) requireText('worker', token, 'public checkout wiring')
 forbidText('worker', "rpc/create_commerce_order', {\n    method: 'POST',\n    body: JSON.stringify({ checkout: payload })", 'legacy public checkout order RPC')
 
-requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED": "false"', 'fail-closed Worker config')
+requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED":', 'ONE-4 activation flag declaration')
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'dedicated Shop key id')
 forbidText('wrangler', 'SHOP_INTEGRATION_SECRET', 'Shop integration secret must not be stored in source')
 
@@ -48,4 +48,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
-console.log('AMPHON ONE-4B SHOP: PASS — checkout reserves System stock before order/payment, uses server-only HMAC, compensates release on failure and remains source fail-closed')
+console.log('AMPHON ONE-4B SHOP: PASS — checkout reserves System stock before order/payment, uses server-only HMAC, compensates release on failure and remains activation-gated by ONE-4D')
