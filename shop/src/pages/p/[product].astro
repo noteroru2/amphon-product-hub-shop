@@ -95,6 +95,8 @@ else Astro.response.headers.set('Cache-Control', 'no-store')
 const canonicalPath = product ? productPath(product) : Astro.url.pathname
 const title = product?.seoTitle?.trim() || (product ? `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING` : 'ไม่พบสินค้า | AMPHON SHOP')
 const description = product ? productDescription(product) : 'ไม่พบสินค้าที่ต้องการใน AMPHON SHOP'
+const socialTitle = product ? `${product.title} • ${formatPrice(product.price)} | AMPHON SHOP` : title
+const socialImageAlt = product ? `${product.title} ราคา ${formatPrice(product.price)}` : null
 const robots = product && product.indexPolicy !== 'NOINDEX' && product.indexPolicy !== 'HOLD' && product.indexPolicy !== 'RETIRED'
   ? 'index,follow,max-image-preview:large'
   : 'noindex,follow'
@@ -159,6 +161,8 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
   robots={robots}
   jsonLd={schema}
   ogImage={primaryImage}
+  ogImageAlt={socialImageAlt}
+  ogTitle={socialTitle}
   ogType={product ? 'product' : 'website'}
   productMeta={product ? {
     price: product.price,
