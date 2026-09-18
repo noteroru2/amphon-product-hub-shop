@@ -68,7 +68,18 @@ assert(contract.rules?.eventIdRequired === true, 'eventId must be required')
 assert(contract.rules?.lastWriteWinsAcrossSystems === false, 'cross-system last-write-wins is forbidden')
 assert(contract.rules?.publicShopMayReceiveInternalFinancials === false, 'Shop must not receive internal financials')
 
-assert(flow.flowVersion === 'ONE-0R.1' && flow.status === 'ACTIVE', 'product flow contract version/status drifted')
+// ONE-0R remains the baseline architecture contract, while the shared product-flow
+// document is intentionally amended by later ONE batches. ONE-3 moved availability
+// authority to AMPHON System without changing the original System-first intake rules.
+assert(flow.status === 'ACTIVE', 'product flow contract must remain ACTIVE')
+assert(['ONE-0R.1', 'ONE-3.0'].includes(flow.flowVersion), 'product flow contract version is unsupported')
+if (flow.flowVersion === 'ONE-3.0') {
+  assert(flow.availability?.masterAfterHubSync === 'amphon_system', 'ONE-3 flow must keep System as availability master')
+  assert(flow.availability?.hubRole === 'projection', 'ONE-3 flow must keep Hub as availability projection')
+  assert(flow.availability?.shopRole === 'requester_only', 'ONE-3 flow must keep Shop requester-only')
+  assert(flow.availability?.versionOwner === 'amphon_system', 'ONE-3 flow availability version must be owned by System')
+  assert(flow.availability?.hubBrowserMayMutateOneManagedAvailabilityDirectly === false, 'ONE-3 flow must forbid direct Hub browser availability mutation')
+}
 assert(flow.origin?.application === 'amphon_system', 'flow must originate in System')
 assert(flow.origin?.skuAllocatedBeforeHubSync === true, 'SKU must exist before Hub sync')
 assert(flow.origin?.hubSyncFailureDoesNotBlockReceiving === true, 'Hub outage must not block receiving')
@@ -89,4 +100,4 @@ assert(doc.includes('The product MUST originate from AMPHON System receiving'), 
 assert(doc.includes('There is no `QC_PENDING` requirement'), 'no-QC readiness rule missing')
 assert(doc.includes('Battery percentage') || doc.includes('battery percentage'), 'simple battery rule missing')
 
-console.log('AMPHON ONE-0R: PASS — Hub accepts System SKU and owns async enrichment/publication without QC gating')
+console.log(`AMPHON ONE-0R: PASS — baseline System-first intake remains valid with product flow ${flow.flowVersion}`)
