@@ -1,4 +1,8 @@
-AMPHON SHOP-8.5 MEMBER CHECKOUT
-phase=SHOP-8.5
-activated_at=2026-09-13T21:06+07:00
-member_checkout_activation=active
+AMPHON SHOP UX LINE-FIRST DEPLOYMENT
+phase=HUB-SHOP-UX
+activated_at=2026-09-18T20:41+07:00
+target=hub-shop-ux-line-gallery-refresh
+line_primary=@webuy
+homepage=product-first
+gallery=slider-swipe
+facebook_og=product-image-title-price
