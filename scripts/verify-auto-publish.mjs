@@ -4,8 +4,9 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFile(resolve(root, path), 'utf8')
 
-const [migration, worker, entry, wrangler, publishCenter, commerceAdmin, types, autoClient] = await Promise.all([
+const [migration, cronMigration, worker, entry, wrangler, publishCenter, commerceAdmin, types, autoClient] = await Promise.all([
   read('supabase/migrations/20260918161500_commerce_auto_publish.sql'),
+  read('supabase/migrations/20260918164200_commerce_auto_publish_cron.sql'),
   read('workers/r2-upload/src/index.ts'),
   read('workers/r2-upload/src/one4c-entry.ts'),
   read('workers/r2-upload/wrangler.jsonc'),
@@ -28,6 +29,9 @@ const checks = [
   ['Auto publish does not mutate ONE availability', !/set\s+one_availability/i.test(migration) && !/one_availability\s*=/.test(migration)],
   ['Auto publish preserves explicit index governance', migration.includes("when public.commerce_listings.index_policy = 'HOLD' then 'INDEX'")],
   ['Retry policy exists', migration.includes('website_auto_publish_retry_scheduled') && migration.includes('q.attempt_count >= 5')],
+  ['Database Cron runs auto publish every minute', cronMigration.includes("create extension if not exists pg_cron") && cronMigration.includes("'commerce-auto-publish-minute'") && cronMigration.includes("'* * * * *'")],
+  ['Database Cron calls the same locked claim/execute/fail flow', cronMigration.includes('claim_commerce_auto_publish') && cronMigration.includes('execute_commerce_auto_publish') && cronMigration.includes('fail_commerce_auto_publish')],
+  ['Database Cron processor is not exposed to app roles', cronMigration.includes('revoke all on function private.process_commerce_auto_publish_batch(integer) from authenticated')],
   ['Worker claims queue from server-side RPC', worker.includes("rpc/claim_commerce_auto_publish") && worker.includes('runCommerceAutoPublishSweep')],
   ['Worker executes and marks failed jobs through RPC', worker.includes("rpc/execute_commerce_auto_publish") && worker.includes("rpc/fail_commerce_auto_publish")],
   ['Worker separates one-minute auto publish from five-minute reservation sweep', worker.includes("cron === '* * * * *'") && worker.includes("cron === '*/5 * * * *'")],
