@@ -9,6 +9,7 @@ const files = {
 }
 const source = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([k,p]) => [k, await readFile(p,'utf8')])))
 const contract = JSON.parse(source.contract)
+const wranglerConfig = JSON.parse(source.wrangler)
 const failures = []
 const requireText = (key, token, label) => { if (!source[key].includes(token)) failures.push(`${label}: missing ${token}`) }
 const forbidText = (key, token, label) => { if (source[key].includes(token)) failures.push(`${label}: forbidden ${token}`) }
@@ -41,7 +42,8 @@ forbidText('worker', "rpc/create_commerce_order', {\n    method: 'POST',\n    bo
 
 requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED":', 'ONE-4 activation flag declaration')
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'dedicated Shop key id')
-forbidText('wrangler', 'SHOP_INTEGRATION_SECRET', 'Shop integration secret must not be stored in source')
+if (Object.prototype.hasOwnProperty.call(wranglerConfig.vars || {}, 'SHOP_INTEGRATION_SECRET')) failures.push('Shop integration secret value must not be stored in vars')
+if (!wranglerConfig.secrets?.required?.includes('SHOP_INTEGRATION_SECRET')) failures.push('SHOP_INTEGRATION_SECRET must be declared as a required remote secret')
 
 if (failures.length) {
   console.error('AMPHON ONE-4B SHOP: FAIL')
