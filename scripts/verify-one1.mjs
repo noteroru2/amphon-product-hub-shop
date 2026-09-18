@@ -15,7 +15,14 @@ function assert(condition, message) {
 }
 
 assert(contract.contractVersion === 'ONE-0R.1', 'ONE-1 must build on ONE-0R.1')
-assert(flow.flowVersion === 'ONE-0R.1', 'product flow must match revised architecture')
+assert(['ONE-0R.1', 'ONE-3.0'].includes(flow.flowVersion), 'product flow version is unsupported')
+if (flow.flowVersion === 'ONE-3.0') {
+  assert(flow.availability?.masterAfterHubSync === 'amphon_system', 'ONE-3 flow must keep System as availability master')
+  assert(flow.availability?.hubRole === 'projection', 'ONE-3 flow must keep Hub projection-only')
+  assert(flow.availability?.shopRole === 'requester_only', 'ONE-3 flow must keep Shop requester-only')
+  assert(flow.availability?.versionOwner === 'amphon_system', 'ONE-3 flow must keep System as availability version owner')
+  assert(flow.availability?.hubBrowserMayMutateOneManagedAvailabilityDirectly === false, 'ONE-3 flow must forbid direct Hub browser availability mutation')
+}
 assert(bridge.contractVersion === 'ONE-1.0-draft', 'unexpected bridge contract version')
 assert(bridge.status === 'FOUNDATION', 'bridge must remain FOUNDATION until endpoints/storage are accepted')
 assert(bridge.transport === 'HTTPS_SERVER_TO_SERVER', 'bridge transport drifted')
@@ -34,4 +41,4 @@ assert(flow.hubEnrichment?.technicalInspectionStage === false, 'Hub must not rei
 assert(flow.hubEnrichment?.flagsMayCompleteInAnyOrder === true, 'photo/spec enrichment must remain non-linear')
 assert(migration.includes('if new.sku is not null and length(trim(new.sku)) > 0 then'), 'current Hub schema must preserve supplied System SKU')
 
-console.log('AMPHON ONE-1 FOUNDATION: PASS — Hub bridge contract accepts System-first intake identity')
+console.log(`AMPHON ONE-1 FOUNDATION: PASS — Hub bridge contract accepts System-first intake identity with product flow ${flow.flowVersion}`)
