@@ -24,19 +24,16 @@ import {
   buildMarketplaceListingDraft,
   marketplaceDestinationUrl,
 } from "../lib/marketplaceListing";
-import type { ProductDraft, Profile } from "../types/product";
+import type { ProductDraft } from "../types/product";
 import { ProductImageExportControls } from "./ProductImageExportActions";
-import { PublicationConfirmSheet } from "./PublicationConfirmSheet";
 import "../styles/marketplaceAssistant.css";
 
 export default function MarketplaceListingAssistant({
   draft,
-  profile,
   imageExport,
   onClose,
 }: {
   draft: ProductDraft;
-  profile: Profile;
   imageExport: ProductImageExportController;
   onClose: () => void;
 }) {
@@ -44,7 +41,6 @@ export default function MarketplaceListingAssistant({
     null,
   );
   const [message, setMessage] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const fields = useMemo(
     () => getSmartFields(draft),
     [draft.category, draft.subtype],
@@ -288,18 +284,6 @@ export default function MarketplaceListingAssistant({
                 <ExternalLink />
                 เปิด Facebook Marketplace
               </a>
-              {draft.remoteProductId &&
-              listing.readiness !== "BLOCKED" &&
-              ["owner", "admin", "sales"].includes(profile.role) ? (
-                <button
-                  type="button"
-                  className="marketplace-confirm-posted"
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  <CheckCircle2 />
-                  ทำเครื่องหมายว่าโพสต์ Marketplace แล้ว
-                </button>
-              ) : null}
             </section>
             {message ? (
               <div className="sales-package-message" aria-live="polite">
@@ -310,19 +294,6 @@ export default function MarketplaceListingAssistant({
               <ShoppingBag size={13} /> Hub ไม่ล็อกอิน ไม่กรอกฟอร์ม
               และไม่กดเผยแพร่ Facebook ให้ พนักงานต้องตรวจและโพสต์ด้วยตนเอง
             </p>
-            {confirmOpen && draft.remoteProductId ? (
-              <PublicationConfirmSheet
-                channel="marketplace"
-                product={{
-                  id: draft.remoteProductId,
-                  sku: draft.sku || "",
-                  status: draft.status,
-                }}
-                profile={profile}
-                onClose={() => setConfirmOpen(false)}
-                onSaved={() => setMessage("บันทึกว่าโพสต์ Marketplace แล้ว")}
-              />
-            ) : null}
           </>
         )}
       </div>
