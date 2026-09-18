@@ -5,6 +5,9 @@ on:
     paths:
       - 'src/**'
       - 'shop/**'
+      - 'workers/r2-upload/**'
+      - 'supabase/migrations/**'
+      - 'scripts/verify-auto-publish.mjs'
       - 'scripts/verify-hub-publish-center-ux.mjs'
       - 'scripts/verify-hub-ease.mjs'
       - '.github/workflows/hub-shop-ux.yml'
@@ -13,6 +16,9 @@ on:
     paths:
       - 'src/**'
       - 'shop/**'
+      - 'workers/r2-upload/**'
+      - 'supabase/migrations/**'
+      - 'scripts/verify-auto-publish.mjs'
       - 'scripts/verify-hub-publish-center-ux.mjs'
       - 'scripts/verify-hub-ease.mjs'
       - '.github/workflows/hub-shop-ux.yml'
@@ -34,13 +40,20 @@ jobs:
       - name: Hub TypeScript
         run: npm run typecheck
 
-      - name: Hub Website-manager UX contract
+      - name: Hub Website-manager + Auto Publish contracts
         run: |
+          node scripts/verify-auto-publish.mjs
           node scripts/verify-hub-publish-center-ux.mjs
           node scripts/verify-hub-ease.mjs
 
       - name: Hub Vite build
         run: npx vite build
+
+      - name: Install Worker dependencies
+        run: npm --prefix workers/r2-upload ci
+
+      - name: Worker TypeScript
+        run: npm --prefix workers/r2-upload run typecheck
 
       - name: Install Shop dependencies
         run: npm --prefix shop ci
