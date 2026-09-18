@@ -31,7 +31,7 @@
   },
   "storeWorker": {
     "sourceEntry": "src/one4c-entry.ts",
-    "systemStockEnabled": false,
+    "systemStockEnabled": true,
     "productionDeploymentVerified": false,
     "scheduledDrainVerified": false
   },
