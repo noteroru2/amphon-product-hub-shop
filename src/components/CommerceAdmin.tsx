@@ -340,6 +340,17 @@ export function MerchantSettingsModal({ profile, onClose }: { profile: Profile; 
     setSettings((current) => current ? { ...current, ...patch } : current)
   }
 
+  function patchAutoPublish(patch: Partial<NonNullable<CommerceStoreSettings['autoPublish']>>) {
+    setSettings((current) => current ? {
+      ...current,
+      autoPublish: {
+        enabled: current.autoPublish?.enabled ?? true,
+        delaySeconds: current.autoPublish?.delaySeconds ?? 180,
+        ...patch,
+      },
+    } : current)
+  }
+
   function patchShipping(patch: Partial<CommerceStoreSettings['shipping']>) {
     setSettings((current) => current ? { ...current, shipping: { ...current.shipping, ...patch } } : current)
   }
@@ -368,7 +379,7 @@ export function MerchantSettingsModal({ profile, onClose }: { profile: Profile; 
     try {
       const next = await updateCommerceStoreSettings(settings)
       setSettings(next)
-      setMessage('บันทึก Checkout / Merchant / Shipping / Return configuration แล้ว')
+      setMessage('บันทึก Auto Publish / Checkout / Merchant / Shipping / Return configuration แล้ว')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -410,6 +421,16 @@ export function MerchantSettingsModal({ profile, onClose }: { profile: Profile; 
             <label><span>Currency / Country</span><input value={`${settings.currency} / ${settings.countryCode}`} disabled/></label>
           </div>
           <div className={settings.purchaseEnabled ? 'commerce-lock-card checkout-live' : 'commerce-lock-card'}><ShieldCheck/><div><strong>{settings.purchaseEnabled ? 'Purchase flow: LIVE' : 'Purchase flow: OFF'}</strong><small>เปิดได้เมื่อ Shipping + Return policy + Turnstile และอย่างน้อยหนึ่งช่องทางชำระเงินจริงพร้อม ระบบ Order ล็อก SKU แบบ atomic ที่ฐานข้อมูล</small></div></div>
+        </section>
+
+        <section className="commerce-section auto-publish-config">
+          <div className="commerce-section-title"><CheckCircle2/><div><strong>ลงสินค้าในเว็บไซต์อัตโนมัติ</strong><small>เมื่อรูป สเปก และข้อมูลขายครบ ระบบจะรอให้ข้อมูลนิ่งก่อนขึ้น AMPHON SHOP เอง</small></div></div>
+          <label className="toggle-field wide"><span>เปิด Auto Publish ไป AMPHON SHOP</span><input type="checkbox" checked={settings.autoPublish?.enabled ?? true} onChange={(e) => patchAutoPublish({ enabled: e.target.checked })} disabled={!isAdmin}/></label>
+          <div className="commerce-form-grid two">
+            <label><span>รอหลังพร้อมครบ (นาที)</span><input type="number" min="1" max="60" value={Math.round((settings.autoPublish?.delaySeconds ?? 180) / 60)} onChange={(e) => patchAutoPublish({ delaySeconds: Math.max(60, Math.min(Number(e.target.value || 3) * 60, 3600)) })} disabled={!isAdmin || !(settings.autoPublish?.enabled ?? true)}/></label>
+            <label><span>ค่าแนะนำ</span><input value="3 นาที — กันข้อมูลระหว่างแก้ไข" disabled/></label>
+          </div>
+          <div className="commerce-policy-note"><ShieldCheck size={17}/><span>ใช้ readiness เดิมของ Hub: ต้องมีรูปพร้อม cover + สเปกครบ + ข้อมูลลงขายครบ ระบบนี้ไม่แก้สถานะสต๊อกของ AMPHON System</span></div>
         </section>
 
         <section className="commerce-section">
