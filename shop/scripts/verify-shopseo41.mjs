@@ -2,11 +2,12 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [catalog, sitemapCategories, sitemapProducts, sitemapEvergreen, baselineRaw] = await Promise.all([
+const [catalog, sitemapCategories, sitemapProducts, sitemapEvergreen, storeApi, baselineRaw] = await Promise.all([
   read('src/config/catalog.ts'),
   read('src/pages/sitemap-categories.xml.ts'),
   read('src/pages/sitemap-products.xml.ts'),
   read('src/pages/sitemap-evergreen.xml.ts'),
+  read('src/lib/store-api.ts'),
   read('seo-observation/shop-seo41-baseline.json'),
 ])
 
@@ -45,7 +46,12 @@ const checks = [
   ['baseline records Shop sitemap submission action', baseline.gsc_sitemaps?.action === 'SUBMIT_SHOP_SITEMAP_IN_GSC'],
   ['category sitemap is controlled by indexCategories', sitemapCategories.includes('indexCategories.map')],
   ['product sitemap excludes non-index policies', sitemapProducts.includes("['NOINDEX', 'HOLD', 'RETIRED']")],
-  ['evergreen sitemap requires effective INDEX policy', sitemapEvergreen.includes("effectiveIndexPolicy: 'INDEX'")],
+  [
+    'evergreen sitemap requires effective INDEX policy',
+    sitemapEvergreen.includes('getAllIndexEvergreenPages') &&
+      storeApi.includes('export async function getAllIndexEvergreenPages') &&
+      storeApi.includes("listEvergreenPages({ effectiveIndexPolicy: 'INDEX'"),
+  ],
 ]
 
 for (const slug of expectedIndex) {
