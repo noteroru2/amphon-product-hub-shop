@@ -2907,7 +2907,6 @@ function SalesToolkit({
           >
             <MarketplaceListingAssistant
               draft={draft}
-              profile={profile}
               imageExport={imageExport}
               onClose={() => setMarketplaceAssistantOpen(false)}
             />
