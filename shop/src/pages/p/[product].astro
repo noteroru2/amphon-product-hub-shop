@@ -93,7 +93,16 @@ if (product) Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, s
 else Astro.response.headers.set('Cache-Control', 'no-store')
 
 const canonicalPath = product ? productPath(product) : Astro.url.pathname
-const title = product?.seoTitle?.trim() || (product ? `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING` : 'ไม่พบสินค้า | AMPHON SHOP')
+const storedSeoTitle = product?.seoTitle?.trim() || ''
+const compactStoredSeoTitle = storedSeoTitle.replace(/[\\s,฿]/g, '')
+const storedSeoTitleHasPrice = product ? compactStoredSeoTitle.includes(String(Math.round(product.price))) : false
+const title = product
+  ? storedSeoTitle
+    ? storedSeoTitleHasPrice
+      ? storedSeoTitle
+      : `${storedSeoTitle.replace(/\\s*\\|\\s*AMPHON(?: TRADING| SHOP)?\\s*$/i, '')} ราคา ${formatPrice(product.price)} | AMPHON TRADING`
+    : `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING`
+  : 'ไม่พบสินค้า | AMPHON SHOP'
 const description = product ? productDescription(product) : 'ไม่พบสินค้าที่ต้องการใน AMPHON SHOP'
 const socialTitle = product ? `${product.title} • ${formatPrice(product.price)} | AMPHON SHOP` : title
 const socialImageAlt = product ? `${product.title} ราคา ${formatPrice(product.price)}` : null
@@ -110,7 +119,10 @@ const evidence = product ? productEvidence(product) : null
 const galleryImages = product
   ? [...product.images].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
   : []
-const primaryImage = galleryImages[0]?.url || null
+const primaryImageEntry = galleryImages[0] || null
+const primaryImage = primaryImageEntry?.url || null
+const primaryImageWidth = primaryImageEntry?.width || null
+const primaryImageHeight = primaryImageEntry?.height || null
 const defectImages = product?.images.filter((image) => image.role === 'defect') || []
 const accessoryImages = product?.images.filter((image) => image.role === 'accessories') || []
 const warrantyImages = product?.images.filter((image) => image.role === 'warranty') || []
@@ -162,6 +174,8 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
   jsonLd={schema}
   ogImage={primaryImage}
   ogImageAlt={socialImageAlt}
+  ogImageWidth={primaryImageWidth}
+  ogImageHeight={primaryImageHeight}
   ogTitle={socialTitle}
   ogType={product ? 'product' : 'website'}
   productMeta={product ? {
