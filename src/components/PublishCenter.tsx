@@ -17,8 +17,15 @@ import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
   canonicalShopUrl,
   getCommerceProduct,
+  getCommerceStoreSettings,
   prepareCommerceProduct,
 } from "../lib/commerce";
+import {
+  listAutoPublishQueue,
+  removeAutoPublishRealtimeChannel,
+  subscribeAutoPublishQueue,
+  type AutoPublishQueueItem,
+} from "../lib/autoPublish";
 import { MerchantSettingsModal, ProductCommerceEditor } from "./CommerceAdmin";
 import {
   listProductPublications,
@@ -156,6 +163,9 @@ export function PublishCenter({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [autoPublishQueue, setAutoPublishQueue] = useState<AutoPublishQueueItem[]>([]);
+  const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
+  const [autoPublishDelaySeconds, setAutoPublishDelaySeconds] = useState(180);
   const canManage = ["owner", "admin", "sales"].includes(profile.role);
 
   const eligible = useMemo(() => {
@@ -193,6 +203,24 @@ export function PublishCenter({
         products.map((product) => product.id),
       );
       setPublications(next);
+
+      try {
+        setAutoPublishQueue(
+          await listAutoPublishQueue(products.map((product) => product.id)),
+        );
+      } catch {
+        // Backward-compatible while the auto-publish migration is rolling out.
+        setAutoPublishQueue([]);
+      }
+
+      try {
+        const settings = await getCommerceStoreSettings();
+        setAutoPublishEnabled(settings.autoPublish?.enabled ?? true);
+        setAutoPublishDelaySeconds(settings.autoPublish?.delaySeconds ?? 180);
+      } catch {
+        // Keep safe defaults; publication status itself is still authoritative.
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -265,13 +293,17 @@ export function PublishCenter({
 
   useEffect(() => {
     let timer: number | undefined;
-    const channel = subscribePublications(() => {
+    const scheduleRefresh = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => void refresh(true), 350);
-    });
+    };
+    const channel = subscribePublications(scheduleRefresh);
+    const autoPublishChannel = subscribeAutoPublishQueue(scheduleRefresh);
     return () => {
       window.clearTimeout(timer);
       if (channel) void removePublicationRealtimeChannel(channel);
+      if (autoPublishChannel)
+        void removeAutoPublishRealtimeChannel(autoPublishChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id]);
@@ -282,6 +314,21 @@ export function PublishCenter({
       result[publicationState(product, publications)] += 1;
     return result;
   }, [eligible, publications]);
+
+  const autoPublishByProduct = useMemo(
+    () => new Map(autoPublishQueue.map((item) => [item.productId, item])),
+    [autoPublishQueue],
+  );
+
+  const autoPublishCounts = useMemo(
+    () => ({
+      waiting: autoPublishQueue.filter(
+        (item) => item.status === "pending" || item.status === "processing",
+      ).length,
+      failed: autoPublishQueue.filter((item) => item.status === "failed").length,
+    }),
+    [autoPublishQueue],
+  );
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -359,6 +406,35 @@ export function PublishCenter({
         </button>
       </div>
 
+      <div
+        className={`auto-publish-banner ${
+          autoPublishEnabled ? "enabled" : "disabled"
+        }`}
+      >
+        <div className="auto-publish-copy">
+          <strong>
+            {autoPublishEnabled
+              ? "Auto Publish เปิดอยู่"
+              : "Auto Publish ปิดอยู่"}
+          </strong>
+          <span>
+            {autoPublishEnabled
+              ? `เมื่อรูป + สเปก + ข้อมูลขายครบ ระบบจะขึ้น AMPHON SHOP อัตโนมัติหลัง ${Math.round(
+                  autoPublishDelaySeconds / 60,
+                )} นาที`
+              : "ระบบจะไม่ลงสินค้าใหม่อัตโนมัติ ใช้ปุ่มลงทั้งหมดด้านล่างแทน"}
+          </span>
+        </div>
+        <div className="auto-publish-stats">
+          <span>
+            รออัตโนมัติ <b>{autoPublishCounts.waiting}</b>
+          </span>
+          <span className={autoPublishCounts.failed ? "has-error" : ""}>
+            มีปัญหา <b>{autoPublishCounts.failed}</b>
+          </span>
+        </div>
+      </div>
+
       {canManage && (
         <div className="publish-bulk-panel">
           <button
@@ -420,6 +496,7 @@ export function PublishCenter({
             const cover =
               product.images.find((image) => image.isCover) ||
               product.images[0];
+            const autoPublish = autoPublishByProduct.get(product.id);
             return (
               <button
                 key={product.id}
@@ -466,6 +543,24 @@ export function PublishCenter({
                     );
                   })}
                 </div>
+                {autoPublish &&
+                  autoPublish.status !== "published" &&
+                  autoPublish.status !== "cancelled" && (
+                    <div
+                      className={`auto-publish-row status-${autoPublish.status}`}
+                    >
+                      {autoPublish.status === "pending" &&
+                        `รอ Auto Publish • หลัง ${formatDate(
+                          autoPublish.publishAfter,
+                        )}`}
+                      {autoPublish.status === "processing" &&
+                        "กำลังลงเว็บไซต์อัตโนมัติ..."}
+                      {autoPublish.status === "failed" &&
+                        `Auto Publish ไม่สำเร็จ • ${
+                          autoPublish.lastError || "กดเข้าไปตรวจข้อมูลสินค้า"
+                        }`}
+                    </div>
+                  )}
                 {state === "cleanup" && (
                   <div className="cleanup-warning">
                     ขายแล้ว — หน้าเว็บยังเปิดอยู่{" "}
