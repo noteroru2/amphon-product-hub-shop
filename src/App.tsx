@@ -2891,7 +2891,6 @@ function SalesToolkit({
           >
             <SalesPostPackagePanel
               draft={draft}
-              profile={profile}
               imageExport={imageExport}
               onClose={() => setSalesPackageOpen(false)}
             />
