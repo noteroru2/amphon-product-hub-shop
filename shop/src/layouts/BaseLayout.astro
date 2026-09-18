@@ -16,6 +16,8 @@ interface Props {
   jsonLd?: unknown | unknown[]
   ogImage?: string | null
   ogImageAlt?: string | null
+  ogImageWidth?: number | null
+  ogImageHeight?: number | null
   ogTitle?: string | null
   ogType?: 'website' | 'product'
   productMeta?: { price: number; currency: string; availability: string; condition: string } | null
@@ -29,6 +31,8 @@ const {
   jsonLd,
   ogImage = null,
   ogImageAlt = null,
+  ogImageWidth = null,
+  ogImageHeight = null,
   ogTitle = null,
   ogType = 'website',
   productMeta = null,
@@ -54,8 +58,12 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     {ogImage && <meta property="og:image" content={ogImage} />}
+    {ogImage && <meta property="og:image:secure_url" content={ogImage} />}
     {ogImage && ogImageAlt && <meta property="og:image:alt" content={ogImageAlt} />}
+    {ogImage && ogImageWidth && <meta property="og:image:width" content={String(ogImageWidth)} />}
+    {ogImage && ogImageHeight && <meta property="og:image:height" content={String(ogImageHeight)} />}
     <meta name="twitter:title" content={socialTitle} />
+    <meta name="twitter:description" content={description} />
     {ogImage && <meta name="twitter:image" content={ogImage} />}
     {ogImage && ogImageAlt && <meta name="twitter:image:alt" content={ogImageAlt} />}
     <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
