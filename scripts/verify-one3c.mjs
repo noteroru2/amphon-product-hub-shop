@@ -6,14 +6,18 @@ const workerPath = 'workers/one-bridge/src/one2b-entry.ts'
 const wranglerPath = 'workers/one-bridge/wrangler.jsonc'
 const deployPath = 'scripts/deploy-one3c-production.mjs'
 const contractPath = 'config/amphon-one3.json'
+const hubBackendPath = 'src/lib/backend.ts'
+const hubAppPath = 'src/App.tsx'
 
-const [migration, initMigration, worker, wrangler, deploy, contractRaw] = await Promise.all([
+const [migration, initMigration, worker, wrangler, deploy, contractRaw, hubBackend, hubApp] = await Promise.all([
   readFile(new URL(`../${migrationPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${initMigrationPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${workerPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${wranglerPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${deployPath}`, import.meta.url), 'utf8'),
   readFile(new URL(`../${contractPath}`, import.meta.url), 'utf8'),
+  readFile(new URL(`../${hubBackendPath}`, import.meta.url), 'utf8'),
+  readFile(new URL(`../${hubAppPath}`, import.meta.url), 'utf8'),
 ])
 
 const contract = JSON.parse(contractRaw)
@@ -92,6 +96,15 @@ requireText(worker, "markInboxFailed(env, envelope.eventId, 'ONE3C_CONSUMER'", '
 
 requireText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "false"', 'fail-closed source flag')
 forbidText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "true"', 'fail-closed source flag')
+
+requireText(
+  hubBackend,
+  ".or('one_availability.is.null,one_availability.neq.SOLD')",
+  'Hub inventory must hide System SOLD products',
+)
+forbidText(hubApp, 'active={filter === "sold"}', 'Hub sold inventory filter must stay removed')
+forbidText(hubApp, 'label="ขายแล้ววันนี้"', 'Hub home must not derive sold-today from hidden inventory')
+requireText(hubApp, 'label="กำลังขาย"', 'Hub home replacement inventory metric')
 
 for (const runtimeFlag of [
   "ONE2B_SHELL_CONSUMER_ENABLED: 'true'",

@@ -100,6 +100,10 @@ export async function listProducts(role: UserRole): Promise<ProductSummary[]> {
   const { data, error } = await db
     .from('products')
     .select('id,sku,category,subtype,brand,model,title,serial_number,status,condition_percent,price,warranty_until,defects,notes,specs,created_at,updated_at,sold_at,product_images(id,object_key,public_url,sort_order,is_cover,image_role)')
+    // AMPHON System owns inventory availability. Once System projects SOLD,
+    // the item must disappear from normal Hub inventory instead of lingering
+    // as a historical product card. NULL keeps legacy/non-ONE records visible.
+    .or('one_availability.is.null,one_availability.neq.SOLD')
     .order('updated_at', { ascending: false })
     .limit(500)
   if (error) throw error
