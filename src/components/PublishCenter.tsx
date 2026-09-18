@@ -18,7 +18,6 @@ import {
 import { draftFromProduct } from "../lib/backend";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
-import { CleanupTaskQueue } from "./CleanupTaskQueue";
 import {
   canonicalShopUrl,
   getCommerceProduct,
@@ -43,13 +42,11 @@ import type {
   PublicationStatus,
 } from "../types/product";
 
-type PublishFilter = "todo" | "partial" | "complete" | "cleanup" | "all";
+type PublishFilter = "todo" | "complete" | "cleanup" | "all";
 
-const contentChannelMap: Partial<Record<PublicationChannel, ContentChannel>> = {
-  facebook: "facebook",
-  marketplace: "marketplace",
-  winner_it: "winnerit",
-};
+const visiblePublicationChannels = publicationChannels.filter(
+  (channel) => channel.id === "website",
+);
 
 function publicationKey(productId: string, channel: PublicationChannel) {
   return `${productId}:${channel}`;
@@ -57,7 +54,10 @@ function publicationKey(productId: string, channel: PublicationChannel) {
 
 function publishedCount(productId: string, publications: ProductPublication[]) {
   return publications.filter(
-    (item) => item.productId === productId && item.status === "published",
+    (item) =>
+      item.productId === productId &&
+      item.channel === "website" &&
+      item.status === "published",
   ).length;
 }
 
@@ -65,16 +65,12 @@ function activeListingCount(
   productId: string,
   publications: ProductPublication[],
 ) {
-  return publications.filter((item) => {
-    const definition = publicationChannels.find(
-      (channel) => channel.id === item.channel,
-    );
-    return (
+  return publications.filter(
+    (item) =>
       item.productId === productId &&
-      item.status === "published" &&
-      definition?.persistentListing
-    );
-  }).length;
+      item.channel === "website" &&
+      item.status === "published",
+  ).length;
 }
 
 function channelRecord(
@@ -137,8 +133,8 @@ function publicationState(
     return "cleanup" as const;
   if (product.status === "sold") return "complete" as const;
   if (count === 0) return "todo" as const;
-  if (count === publicationChannels.length) return "complete" as const;
-  return "partial" as const;
+  if (count === visiblePublicationChannels.length) return "complete" as const;
+  return "todo" as const;
 }
 
 export function PublishCenter({
@@ -169,8 +165,7 @@ export function PublishCenter({
         .filter(
           (item) =>
             item.status === "published" &&
-            publicationChannels.find((channel) => channel.id === item.channel)
-              ?.persistentListing,
+            item.channel === "website",
         )
         .map((item) => item.productId),
     );
@@ -215,7 +210,7 @@ export function PublishCenter({
   }, [profile.id]);
 
   const counts = useMemo(() => {
-    const result = { todo: 0, partial: 0, complete: 0, cleanup: 0 };
+    const result = { todo: 0, complete: 0, cleanup: 0 };
     for (const product of eligible)
       result[publicationState(product, publications)] += 1;
     return result;
@@ -249,8 +244,8 @@ export function PublishCenter({
             <ChevronLeft />
           </button>
           <div>
-            <p className="eyebrow">SALES CHANNEL TRACKER</p>
-            <h1>งานช่องทางขาย</h1>
+            <p className="eyebrow">AMPHON SHOP</p>
+            <h1>สินค้าในเว็บไซต์</h1>
           </div>
         </div>
         <div className="publish-header-actions">
@@ -273,43 +268,26 @@ export function PublishCenter({
         </div>
       </header>
 
-      <CleanupTaskQueue
-        profile={profile}
-        products={products}
-        publications={publications}
-        onChanged={async () => {
-          await refresh(true);
-          await onProductsRefresh();
-        }}
-      />
-
       <div className="publish-summary-grid">
         <button
           className={filter === "todo" ? "active" : ""}
           onClick={() => setFilter("todo")}
         >
-          <span>รอลง</span>
+          <span>รอขึ้นเว็บ</span>
           <b>{counts.todo}</b>
-        </button>
-        <button
-          className={filter === "partial" ? "active" : ""}
-          onClick={() => setFilter("partial")}
-        >
-          <span>ลงไม่ครบ</span>
-          <b>{counts.partial}</b>
         </button>
         <button
           className={filter === "complete" ? "active" : ""}
           onClick={() => setFilter("complete")}
         >
-          <span>ครบแล้ว</span>
+          <span>ขึ้นเว็บแล้ว</span>
           <b>{counts.complete}</b>
         </button>
         <button
           className={`cleanup ${filter === "cleanup" ? "active" : ""}`}
           onClick={() => setFilter("cleanup")}
         >
-          <span>ต้องปิดประกาศ</span>
+          <span>ต้องถอนจากเว็บ</span>
           <b>{counts.cleanup}</b>
         </button>
       </div>
@@ -335,7 +313,7 @@ export function PublishCenter({
       {loading ? (
         <div className="publish-loading">
           <LoaderCircle className="spin" />
-          <span>กำลังโหลดสถานะการลงขาย</span>
+          <span>กำลังโหลดสถานะเว็บไซต์</span>
         </div>
       ) : (
         <div className="publish-product-list">
@@ -369,11 +347,11 @@ export function PublishCenter({
                     </b>
                   </div>
                   <span className="publish-progress">
-                    {count}/{publicationChannels.length}
+                    {count}/{visiblePublicationChannels.length}
                   </span>
                 </div>
                 <div className="publish-channel-dots">
-                  {publicationChannels.map((channel) => {
+                  {visiblePublicationChannels.map((channel) => {
                     const record = channelRecord(
                       product.id,
                       channel.id,
@@ -519,14 +497,7 @@ function PublishProductSheet({
         setMessage("ก๊อป URL หน้าสินค้าแล้ว");
         return;
       }
-      const mapped = contentChannelMap[channel];
-      const text = mapped
-        ? buildContentForChannel(draft, mapped)
-        : `${draft.title || product.title}\nSKU: ${product.sku}\nราคา: ${product.price ? money(product.price) : "-"}`;
-      await copyText(text);
-      setMessage(
-        `ก๊อปข้อความ ${publicationChannels.find((item) => item.id === channel)?.label} แล้ว`,
-      );
+      throw new Error("หน้านี้จัดการเฉพาะ AMPHON SHOP / Website");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
     }
@@ -636,11 +607,11 @@ function PublishProductSheet({
         </div>
         <div className="publish-sheet-overview">
           <div>
-            <span>ช่องทางที่ยังออนไลน์</span>
+            <span>สถานะบนเว็บไซต์</span>
             <b>
               {activeCount}/
               {
-                publicationChannels.filter(
+                visiblePublicationChannels.filter(
                   (channel) => channel.persistentListing,
                 ).length
               }
@@ -672,7 +643,7 @@ function PublishProductSheet({
         {message && <div className="publish-message">{message}</div>}
 
         <div className="channel-workflow-list">
-          {publicationChannels.map((channel) => {
+          {visiblePublicationChannels.map((channel) => {
             const record = channelRecord(product.id, channel.id, publications);
             const status = record?.status ?? "not_published";
             const isBusy = busy === channel.id;
@@ -890,9 +861,8 @@ function PublishProductSheet({
           })}
         </div>
         <p className="publish-sheet-note">
-          Facebook / Marketplace / WINNER IT ยังเป็น workflow ช่วยพนักงาน ส่วน
-          Website เชื่อม Store API จริงแล้ว: แก้ราคา รูป หรือสเปกใน Product Hub
-          แล้วหน้าเว็บอ่านข้อมูลล่าสุดโดยอัตโนมัติ
+          หน้านี้ดูแลเฉพาะ AMPHON SHOP / Website เท่านั้น
+          ส่วน Facebook, Marketplace และ LINE ใช้เครื่องมือเตรียมคอนเทนต์ในหน้าสินค้าโดยไม่ติดตามสถานะการโพสต์
         </p>
         {commerceOpen && (
           <ProductCommerceEditor
