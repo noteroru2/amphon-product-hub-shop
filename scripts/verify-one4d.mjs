@@ -12,6 +12,7 @@ const text = Object.fromEntries(await Promise.all(
   Object.entries(files).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 ))
 const evidence = JSON.parse(text.evidence)
+const wranglerConfig = JSON.parse(text.wrangler)
 const failures = []
 const need = (key, token, label) => {
   if (!text[key].includes(token)) failures.push(`${label}: missing ${token}`)
@@ -120,7 +121,8 @@ if (evidence.productionAccepted === true) {
   assert(evidence.safety?.realCustomerCheckoutOpened === false, 'blocked production must keep real customer checkout closed')
 }
 
-forbid('wrangler', 'SHOP_INTEGRATION_SECRET', 'HMAC secret must remain remote only')
+if (Object.prototype.hasOwnProperty.call(wranglerConfig.vars || {}, 'SHOP_INTEGRATION_SECRET')) failures.push('HMAC secret value must not be stored in Worker vars')
+if (!wranglerConfig.secrets?.required?.includes('SHOP_INTEGRATION_SECRET')) failures.push('SHOP_INTEGRATION_SECRET must be declared as a required remote secret')
 
 if (failures.length) {
   console.error('AMPHON ONE-4D SHOP: FAIL')
