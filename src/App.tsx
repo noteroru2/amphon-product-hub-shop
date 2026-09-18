@@ -53,7 +53,6 @@ import { PublishCenter } from "./components/PublishCenter";
 import { ProductImageExportControls } from "./components/ProductImageExportActions";
 import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
-import { CleanupTaskCountCard } from "./components/CleanupTaskQueue";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -86,9 +85,6 @@ const SalesPostPackagePanel = lazy(
 );
 const MarketplaceListingAssistant = lazy(
   () => import("./components/MarketplaceListingAssistant"),
-);
-const SalesChannelTracker = lazy(
-  () => import("./components/SalesChannelTracker"),
 );
 import type {
   DuplicateIdentifierMatch,
@@ -1141,15 +1137,14 @@ function HomeScreen({
         <div>
           <FileText size={21} />
           <span>
-            <strong>Publish Center</strong>
+            <strong>Shop / เว็บไซต์</strong>
             <small>
-              เช็กว่า Facebook / Marketplace / WINNER IT / Website ลงครบหรือยัง
+              จัดการสินค้าที่ขึ้นเว็บ ราคา SEO และหน้า AMPHON SHOP
             </small>
           </span>
         </div>
         <ChevronRight />
       </button>
-      <CleanupTaskCountCard onOpen={onPublish} />
       {["owner", "admin", "sales"].includes(profile.role) && (
         <button
           className="publish-center-launch order-center-launch"
@@ -1275,7 +1270,7 @@ function ProductsScreen({
           <button
             className="refresh-button publish-launch-icon"
             onClick={onPublish}
-            aria-label="Publish Center"
+            aria-label="จัดการ Shop / เว็บไซต์"
           >
             <FileText />
           </button>
@@ -2788,16 +2783,6 @@ function SalesToolkit({
 
   return (
     <>
-      <Suspense
-        fallback={
-          <div className="channel-loading">
-            <LoaderCircle className="spin" />
-            กำลังโหลดช่องทางการขาย...
-          </div>
-        }
-      >
-        <SalesChannelTracker draft={draft} profile={profile} />
-      </Suspense>
       <section className="sales-toolkit">
         <div className="sales-toolkit-head">
           <div>
