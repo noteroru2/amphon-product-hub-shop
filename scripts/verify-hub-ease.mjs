@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
-const [main, css] = await Promise.all([
+const [main, css, app] = await Promise.all([
   readFile(resolve(root, 'src/main.tsx'), 'utf8'),
   readFile(resolve(root, 'src/styles/hubEase.css'), 'utf8'),
+  readFile(resolve(root, 'src/App.tsx'), 'utf8'),
 ])
 
 const checks = [
@@ -22,6 +23,10 @@ const checks = [
     css.includes('.completeness-card') && css.includes('.completeness-bar')],
   ['Keyboard focus is visible', css.includes(':focus-visible')],
   ['Reduced motion preference is respected', css.includes('prefers-reduced-motion: reduce')],
+  ['Home dashboard shows the waiting-for-photos backlog separately',
+    app.includes('label="รอรูปภาพ"') && app.includes('product.status === "draft"')],
+  ['Home dashboard separates photo-ready items waiting for listing data',
+    app.includes('label="รอข้อมูลลงขาย"') && app.includes('product.status === "photo_ready"')],
   ['UX layer does not hide primary Hub actions',
     !/\.(?:primary-add|publish-center-launch|product-card|bottom-nav)[^{]*\{[^}]*display\s*:\s*none/i.test(css)],
 ]

@@ -1162,21 +1162,27 @@ function HomeScreen({
       )}
       <div className="stats-grid">
         <Stat
+          label="รอรูปภาพ"
+          value={String(
+            products.filter((product) => product.status === "draft").length,
+          )}
+          tone="rose"
+        />
+        <Stat
+          label="รอข้อมูลลงขาย"
+          value={String(
+            products.filter((product) => product.status === "photo_ready")
+              .length,
+          )}
+          tone="amber"
+        />
+        <Stat
           label="พร้อมลงขาย"
           value={String(
             products.filter((product) => product.status === "ready_to_list")
               .length,
           )}
           tone="green"
-        />
-        <Stat
-          label="รอลงขาย"
-          value={String(
-            products.filter((product) =>
-              ["draft", "photo_ready"].includes(product.status),
-            ).length,
-          )}
-          tone="amber"
         />
         <Stat
           label="จองแล้ว"
