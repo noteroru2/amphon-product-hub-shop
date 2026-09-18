@@ -2214,16 +2214,29 @@ export default {
       return json(request, env, { ok: true, service: 'amphon-product-api', employeeManagement: true, storeApi: true, commerceAdmin: true, shopVersion: 6 })
     }
 
-    if (request.method === 'GET' && url.pathname.startsWith('/image/')) {
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/image/')) {
       const key = url.pathname.slice('/image/'.length).split('/').map(decodeURIComponent).join('/')
       const object = await env.IMAGES.get(key)
       if (!object) return new Response('Not found', { status: 404 })
       const headers = new Headers()
       object.writeHttpMetadata(headers)
+      if (!headers.get('content-type')) {
+        const lowerKey = key.toLowerCase()
+        headers.set(
+          'content-type',
+          lowerKey.endsWith('.png') ? 'image/png'
+            : lowerKey.endsWith('.webp') ? 'image/webp'
+              : lowerKey.endsWith('.gif') ? 'image/gif'
+                : 'image/jpeg',
+        )
+      }
       headers.set('etag', object.httpEtag)
+      headers.set('content-length', String(object.size))
       headers.set('cache-control', 'public, max-age=31536000, immutable')
       headers.set('access-control-allow-origin', '*')
-      return new Response(object.body, { headers })
+      headers.set('cross-origin-resource-policy', 'cross-origin')
+      headers.set('x-content-type-options', 'nosniff')
+      return new Response(request.method === 'HEAD' ? null : object.body, { headers })
     }
 
     try {
