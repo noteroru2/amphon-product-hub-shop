@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/verify-one0.mjs'
+      - 'scripts/verify-one1.mjs'
       - 'config/amphon-one-contract.json'
       - 'config/amphon-one-product-flow.json'
       - 'config/amphon-one3.json'
@@ -30,5 +31,7 @@ jobs:
           node-version: '22'
       - name: Verify ONE baseline and superseding product flow
         run: node scripts/verify-one0.mjs
+      - name: Verify ONE-1 bridge foundation against current product flow
+        run: node scripts/verify-one1.mjs
       - name: Verify ONE-3 availability authority
         run: node scripts/verify-one3a.mjs
