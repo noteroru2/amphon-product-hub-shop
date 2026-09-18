@@ -11,10 +11,6 @@ import {
   Settings2,
   X,
 } from "lucide-react";
-import {
-  buildContentForChannel,
-  type ContentChannel,
-} from "../lib/contentTemplates";
 import { draftFromProduct } from "../lib/backend";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
@@ -371,7 +367,7 @@ export function PublishCenter({
                 </div>
                 {state === "cleanup" && (
                   <div className="cleanup-warning">
-                    ขายแล้ว — ยังมีประกาศที่ต้องปิด{" "}
+                    ขายแล้ว — หน้าเว็บยังเปิดอยู่{" "}
                     {activeListingCount(product.id, publications)} ช่องทาง
                   </div>
                 )}
@@ -637,7 +633,7 @@ function PublishProductSheet({
         )}
         {product.status === "sold" && activeCount > 0 && (
           <div className="cleanup-banner">
-            สินค้าขายแล้ว กรุณาปิดประกาศแบบ persistent ที่ยังเป็น “ลงแล้ว”
+            สินค้าขายแล้ว กรุณาถอนรายการออกจากเว็บไซต์
           </div>
         )}
         {message && <div className="publish-message">{message}</div>}
