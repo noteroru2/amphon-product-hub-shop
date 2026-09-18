@@ -44,7 +44,7 @@ for (const token of ['confirmOne4SystemSale', "action: 'CONFIRM_SOLD'", ':confir
   requireText('client', token, 'signed sale command')
 }
 
-requireText('wrangler', '"main":  "src/one4c-entry.ts"', 'ONE-4C Worker entry')
+if (wranglerConfig.main !== 'src/one4c-entry.ts') failures.push('ONE-4C Worker entry must be src/one4c-entry.ts')
 requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED":', 'ONE-4C activation flag declaration')
 requireText('wrangler', '"SYSTEM_API_BASE_URL": "https://api.amphontd.com"', 'System API target')
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'Shop HMAC key id')
