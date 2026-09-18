@@ -14,7 +14,7 @@
                  "ALLOWED_ORIGINS":  "http://localhost:5173,https://app.amphon.co.th,https://hub.amphon.co.th,https://shop.amphon.co.th",
                  "SYSTEM_API_BASE_URL": "https://api.amphontd.com",
                  "SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1",
-                 "ONE4_SYSTEM_STOCK_ENABLED": "false"
+                 "ONE4_SYSTEM_STOCK_ENABLED": "true"
              },
     "triggers":  {
                      "crons":  [
