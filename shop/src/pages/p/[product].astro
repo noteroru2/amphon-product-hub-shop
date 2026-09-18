@@ -94,13 +94,13 @@ else Astro.response.headers.set('Cache-Control', 'no-store')
 
 const canonicalPath = product ? productPath(product) : Astro.url.pathname
 const storedSeoTitle = product?.seoTitle?.trim() || ''
-const compactStoredSeoTitle = storedSeoTitle.replace(/[\\s,฿]/g, '')
+const compactStoredSeoTitle = storedSeoTitle.replace(/[\s,฿]/g, '')
 const storedSeoTitleHasPrice = product ? compactStoredSeoTitle.includes(String(Math.round(product.price))) : false
 const title = product
   ? storedSeoTitle
     ? storedSeoTitleHasPrice
       ? storedSeoTitle
-      : `${storedSeoTitle.replace(/\\s*\\|\\s*AMPHON(?: TRADING| SHOP)?\\s*$/i, '')} ราคา ${formatPrice(product.price)} | AMPHON TRADING`
+      : `${storedSeoTitle.replace(/\s*\|\s*AMPHON(?: TRADING| SHOP)?\s*$/i, '')} ราคา ${formatPrice(product.price)} | AMPHON TRADING`
     : `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING`
   : 'ไม่พบสินค้า | AMPHON SHOP'
 const description = product ? productDescription(product) : 'ไม่พบสินค้าที่ต้องการใน AMPHON SHOP'
