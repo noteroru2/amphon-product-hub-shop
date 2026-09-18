@@ -1,0 +1,58 @@
+name: Hub + Shop UX Refresh
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'shop/**'
+      - 'scripts/verify-hub-publish-center-ux.mjs'
+      - 'scripts/verify-hub-ease.mjs'
+      - '.github/workflows/hub-shop-ux.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'shop/**'
+      - 'scripts/verify-hub-publish-center-ux.mjs'
+      - 'scripts/verify-hub-ease.mjs'
+      - '.github/workflows/hub-shop-ux.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Hub dependencies
+        run: npm ci
+
+      - name: Hub TypeScript
+        run: npm run typecheck
+
+      - name: Hub Website-manager UX contract
+        run: |
+          node scripts/verify-hub-publish-center-ux.mjs
+          node scripts/verify-hub-ease.mjs
+
+      - name: Hub Vite build
+        run: npx vite build
+
+      - name: Install Shop dependencies
+        run: npm --prefix shop ci
+
+      - name: Shop LINE-first and gallery contracts
+        run: |
+          npm --prefix shop run verify:line-first
+          npm --prefix shop run verify:shop3
+
+      - name: Shop Astro check
+        run: npm --prefix shop run check
+
+      - name: Shop Astro build
+        working-directory: shop
+        run: npx astro build
