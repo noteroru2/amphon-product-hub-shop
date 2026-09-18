@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { primaryLineId, primaryLineUrl } from '../lib/contact'
+import { getStoreSettings, type StoreSettings } from '../lib/store-api'
+let settings: StoreSettings | null = null
+try { settings = await getStoreSettings() } catch {}
+const returns = settings?.returns
+---
+<BaseLayout title="การคืนสินค้า | AMPHON SHOP" description="ข้อมูลการคืนสินค้า AMPHON SHOP และช่องทางติดต่อร้านเพื่อยืนยันเงื่อนไขก่อนสั่งซื้อสินค้าไอทีมือสอง" canonicalPath="/returns/">
+  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">การคืนสินค้า</div><h1>ตรวจเงื่อนไขก่อนสั่งซื้อ</h1><p class="lead">เงื่อนไขการคืนสินค้าควรยืนยันตามการตั้งค่าปัจจุบันและลักษณะของสินค้าชิ้นนั้นก่อนชำระ</p></div></section>
+  <section class="section"><div class="container policy-grid">
+    <article class="panel trust-card"><h2>นโยบายปัจจุบัน</h2><p>{returns?.enabled ? 'ร้านเปิดใช้นโยบายคืนสินค้าตามเงื่อนไขที่กำหนด' : 'กรุณาสอบถามร้านเพื่อยืนยันเงื่อนไขการคืนสินค้าของรายการที่สนใจ'}</p>{returns?.enabled && returns.category === 'FINITE' && returns.days !== null && <p><strong>ระยะเวลาที่ตั้งไว้:</strong> {returns.days} วัน</p>}</article>
+    <article class="panel trust-card"><h2>ให้ร้านยืนยันก่อน</h2><p>ส่งรหัสสินค้าและคำถามไปที่ LINE {primaryLineId} เพื่อเช็กเงื่อนไขที่เกี่ยวข้องกับสินค้าชิ้นนั้น</p><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สอบถามเรื่องการคืนสินค้า</a></article>
+  </div></section>
+</BaseLayout>
