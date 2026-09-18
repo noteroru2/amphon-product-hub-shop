@@ -82,7 +82,8 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           <span>AMPHON SHOP</span>
         </a>
         <nav class="nav" aria-label="หมวดสินค้าหลัก">
-          {indexCategories.slice(0, 7).map((category) => (
+          <a href="/new-arrivals/">สินค้าเข้าใหม่</a>
+          {indexCategories.slice(0, 6).map((category) => (
             <a href={`/${category.slug}/`}>{category.navName}</a>
           ))}
         </nav>
@@ -106,8 +107,16 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
             <a class="button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สั่งซื้อผ่าน LINE {primaryLineId}</a>
             <span class="footer-small">LINE เป็นช่องทางหลักของร้าน ส่วนการสั่งซื้อและชำระผ่านเว็บยังใช้งานได้เป็นทางเลือก</span>
           </div>
+          <nav class="footer-trust-links" aria-label="ข้อมูลร้านและการสั่งซื้อ">
+            <a href="/about/">เกี่ยวกับร้าน</a>
+            <a href="/how-to-buy/">วิธีสั่งซื้อ</a>
+            <a href="/shipping/">การจัดส่ง</a>
+            <a href="/warranty/">การรับประกัน</a>
+            <a href="/returns/">การคืนสินค้า</a>
+            <a href="/new-arrivals/">สินค้าเข้าใหม่</a>
+          </nav>
           <div class="footer-small">
-            รู้จักร้านเพิ่มเติม:
+            ช่องทางทางการ:
             <a href={mainWebsiteUrl} target="_blank" rel="noopener noreferrer">เว็บไซต์หลัก AMPHON TRADING</a>
             <span aria-hidden="true"> · </span>
             <a href={facebookPageUrl} target="_blank" rel="noopener noreferrer">Facebook อำพล เทรดดิ้ง</a>
