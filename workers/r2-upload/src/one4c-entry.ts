@@ -136,10 +136,14 @@ export default {
     if (typeof (baseWorker as any).scheduled === 'function') {
       await (baseWorker as any).scheduled(controller, env, ctx)
     }
-    try {
-      await drainOne4ShopCommands(env)
-    } catch (error) {
-      console.error('ONE-4C Shop stock command drain failed', error)
+
+    const cron = controller.cron || ''
+    if (!cron || cron === '*/5 * * * *') {
+      try {
+        await drainOne4ShopCommands(env)
+      } catch (error) {
+        console.error('ONE-4C Shop stock command drain failed', error)
+      }
     }
   },
 }
