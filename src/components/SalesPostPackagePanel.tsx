@@ -20,9 +20,8 @@ import {
   type SalesPostPreset,
 } from "../lib/salesPostPackage";
 import { loadSalesPostContext } from "../lib/salesPostContext";
-import type { ProductDraft, Profile, PublicationChannel } from "../types/product";
+import type { ProductDraft } from "../types/product";
 import { ProductImageExportControls } from "./ProductImageExportActions";
-import { PublicationConfirmSheet } from "./PublicationConfirmSheet";
 
 const presetLabels: Array<{ id: SalesPostPreset; label: string }> = [
   { id: "GENERAL", label: "ทั่วไป" },
@@ -33,12 +32,10 @@ const presetLabels: Array<{ id: SalesPostPreset; label: string }> = [
 
 export default function SalesPostPackagePanel({
   draft,
-  profile,
   imageExport,
   onClose,
 }: {
   draft: ProductDraft;
-  profile: Profile;
   imageExport: ProductImageExportController;
   onClose: () => void;
 }) {
@@ -47,7 +44,6 @@ export default function SalesPostPackagePanel({
   const [caption, setCaption] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [confirmChannel, setConfirmChannel] = useState<PublicationChannel | null>(null);
   const fields = useMemo(
     () => getSmartFields(draft),
     [draft.category, draft.subtype],
@@ -197,16 +193,6 @@ export default function SalesPostPackagePanel({
                 <ClipboardCopy />
                 คัดลอกข้อความขาย
               </button>
-              {draft.remoteProductId && preset === "FACEBOOK_PAGE" && ["owner", "admin", "sales"].includes(profile.role) ? (
-                <button type="button" className="sales-channel-confirm" onClick={() => setConfirmChannel("facebook")}>
-                  <CheckCircle2 />ทำเครื่องหมายว่าโพสต์ Facebook Page แล้ว
-                </button>
-              ) : null}
-              {draft.remoteProductId && preset === "LINE" && ["owner", "admin", "sales"].includes(profile.role) ? (
-                <button type="button" className="sales-channel-confirm" onClick={() => setConfirmChannel("line")}>
-                  <CheckCircle2 />ทำเครื่องหมายว่าส่ง LINE แล้ว
-                </button>
-              ) : null}
             </section>
             <section className="sales-package-actions">
               <button
@@ -259,15 +245,6 @@ export default function SalesPostPackagePanel({
               Hub เตรียมข้อมูลให้เท่านั้น
               พนักงานต้องตรวจข้อความและโพสต์ด้วยตนเองในแต่ละช่องทาง
             </p>
-            {confirmChannel && draft.remoteProductId ? (
-              <PublicationConfirmSheet
-                channel={confirmChannel}
-                product={{ id: draft.remoteProductId, sku: draft.sku || "", status: draft.status }}
-                profile={profile}
-                onClose={() => setConfirmChannel(null)}
-                onSaved={() => setMessage(confirmChannel === "line" ? "บันทึกว่าส่ง LINE แล้ว" : "บันทึกว่าโพสต์ Facebook Page แล้ว")}
-              />
-            ) : null}
           </>
         )}
       </div>
