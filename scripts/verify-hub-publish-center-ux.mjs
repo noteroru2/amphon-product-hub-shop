@@ -13,6 +13,7 @@ const checks = [
   ['Home still opens the governed Shop/Website manager', app.includes('onPublish={() => setTab("publish")}') && app.includes('Shop / เว็บไซต์')],
   ['Publish Center remains the Shop/Website workflow owner', app.includes('<PublishCenter')],
   ['Social status tracker is not wired into active Hub UI', !app.includes('SalesChannelTracker')],
+  ['Home no longer asks staff to complete Facebook/Marketplace/LINE publication status', !app.includes('เช็กว่า Facebook / Marketplace') && !app.includes('ลงครบหรือยัง')],
   ['Publish Center renders only the Website publication channel', publishCenter.includes('visiblePublicationChannels') && publishCenter.includes('channel.id === "website"')],
   ['Social publication state actions are absent from Website manager', !publishCenter.includes('ทำเครื่องหมายว่าโพสต์ Facebook') && !publishCenter.includes('ทำเครื่องหมายว่าส่ง LINE') && !publishCenter.includes('ทำเครื่องหมายว่าโพสต์ Marketplace')],
   ['overlay stylesheet is loaded after base Hub styles', main.indexOf("./styles/publishCenterOverlay.css") > main.indexOf("./styles/app.css")],
