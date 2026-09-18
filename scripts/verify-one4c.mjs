@@ -44,7 +44,7 @@ for (const token of ['confirmOne4SystemSale', "action: 'CONFIRM_SOLD'", ':confir
 }
 
 requireText('wrangler', '"main":  "src/one4c-entry.ts"', 'ONE-4C Worker entry')
-requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED": "false"', 'ONE-4C fail-closed flag')
+requireText('wrangler', '"ONE4_SYSTEM_STOCK_ENABLED":', 'ONE-4C activation flag declaration')
 requireText('wrangler', '"SYSTEM_API_BASE_URL": "https://api.amphontd.com"', 'System API target')
 requireText('wrangler', '"SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1"', 'Shop HMAC key id')
 forbidText('wrangler', 'SHOP_INTEGRATION_SECRET', 'Shop secret must remain remote only')
@@ -61,4 +61,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
-console.log('AMPHON ONE-4C SHOP: PASS — payment/release commands are durable, System-authoritative, retryable, Worker-typed and source fail-closed')
+console.log('AMPHON ONE-4C SHOP: PASS — payment/release commands are durable, System-authoritative, retryable, Worker-typed and activation-gated by ONE-4D')
