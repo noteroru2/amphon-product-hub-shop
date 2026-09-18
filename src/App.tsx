@@ -109,7 +109,7 @@ type Tab =
   | "scanner"
   | "profile"
   | "employees";
-type StatusFilter = "all" | "ready_to_list" | "reserved" | "sold";
+type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
   key,
@@ -1103,10 +1103,8 @@ function HomeScreen({
   onOrders: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
-  const soldToday = products.filter(
-    (product) =>
-      product.soldAt &&
-      new Date(product.soldAt).toDateString() === new Date().toDateString(),
+  const publishedCount = products.filter(
+    (product) => product.status === "published",
   ).length;
   return (
     <section className="screen page-pad">
@@ -1187,7 +1185,7 @@ function HomeScreen({
           )}
           tone="blue"
         />
-        <Stat label="ขายแล้ววันนี้" value={String(soldToday)} tone="dark" />
+        <Stat label="กำลังขาย" value={String(publishedCount)} tone="dark" />
       </div>
       <div className="section-head">
         <h2>สินค้าล่าสุด</h2>
@@ -1315,11 +1313,6 @@ function ProductsScreen({
           label="จองแล้ว"
           active={filter === "reserved"}
           onClick={() => setFilter("reserved")}
-        />
-        <FilterChip
-          label="ขายแล้ว"
-          active={filter === "sold"}
-          onClick={() => setFilter("sold")}
         />
       </div>
       <div className="inventory-count">พบ {products.length} รายการ</div>
