@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/verify-one0.mjs'
+      - 'scripts/verify-one1.mjs'
       - 'config/amphon-one-contract.json'
       - 'config/amphon-one-product-flow.json'
       - 'config/amphon-one3.json'
