@@ -56,7 +56,7 @@ const apiBase = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '
         <div class="cart-summary"><div><span>รวมสินค้าที่พร้อมสั่งซื้อ</span><strong>${money(total)}</strong></div><small>ค่าจัดส่งจะแสดงใน Checkout หากเลือกชำระผ่านเว็บ</small></div>
         ${products.some((item: any) => item.missing || item.availability !== 'available') ? '<div class="notice">มีสินค้าบางรายการไม่พร้อมสั่งซื้อ กรุณาให้ร้านเช็กสถานะทาง LINE ก่อนครับ</div>' : ''}
         <div class="cart-channel-actions">
-          <a class="button button-line button-wide" href="${escapeHtml(lineUrl)}" target="_blank" rel="nofollow noopener">สั่งซื้อผ่าน LINE ${escapeHtml(lineId)}</a>
+          <a class="button button-line button-wide" href="${escapeHtml(lineUrl)}" target="_blank" rel="nofollow noopener">ซื้อ / สอบถามผ่าน LINE ${escapeHtml(lineId)}</a>
           <p class="cart-channel-note">ช่องทางหลักของร้าน — ส่งรหัสสินค้า <strong>${escapeHtml(availableSkus || skus.join(', '))}</strong> ให้ร้านเช็กของและคุยรายละเอียดก่อนชำระได้ครับ</p>
           ${webCheckout}
         </div>`
