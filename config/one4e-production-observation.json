@@ -1,0 +1,28 @@
+{
+  "contractVersion": "ONE-4E-PROD.1",
+  "cutoverAt": "2026-09-18T11:16:52.727193Z",
+  "authority": {
+    "systemCanonicalStock": true,
+    "hubProjectionOnly": true
+  },
+  "observation": {
+    "targetRealOrders": 10,
+    "systemObserverOwnsCompletionDecision": true
+  },
+  "monitoring": {
+    "expiredOrderGraceMinutes": 10,
+    "criticalSignals": [
+      "activation not ACCEPTED",
+      "purchase unexpectedly disabled",
+      "activationAllowed false",
+      "DEAD Shop command",
+      "incomplete ONE product projection",
+      "DEAD Hub integration inbox"
+    ],
+    "warningSignals": [
+      "nonterminal Shop command",
+      "FAILED Hub integration inbox",
+      "expired ONE order not terminal after grace"
+    ]
+  }
+}
