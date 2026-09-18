@@ -154,6 +154,9 @@ export function PublishCenter({
   const [filter, setFilter] = useState<PublishFilter>("todo");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const canManage = ["owner", "admin", "sales"].includes(profile.role);
 
   const eligible = useMemo(() => {
     const soldWithLiveListing = new Set(
@@ -172,6 +175,17 @@ export function PublishCenter({
     );
   }, [products, publications]);
 
+  const bulkReady = useMemo(
+    () =>
+      eligible.filter(
+        (product) =>
+          product.status === "ready_to_list" &&
+          channelRecord(product.id, "website", publications)?.status !==
+            "published",
+      ),
+    [eligible, publications],
+  );
+
   async function refresh(silent = false) {
     if (!silent) setRefreshing(true);
     try {
@@ -185,6 +199,63 @@ export function PublishCenter({
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }
+
+  async function publishAllReady() {
+    if (!canManage || bulkPublishing || bulkReady.length === 0) return;
+    const total = bulkReady.length;
+    if (
+      !window.confirm(
+        `ยืนยันลงสินค้าที่พร้อมแล้วทั้งหมด ${total} รายการขึ้น AMPHON SHOP หรือไม่?`,
+      )
+    )
+      return;
+
+    setBulkPublishing(true);
+    setBulkMessage(null);
+    setError(null);
+    let succeeded = 0;
+    const failures: string[] = [];
+
+    try {
+      for (const product of bulkReady) {
+        try {
+          const commerce = await prepareCommerceProduct(product.id);
+          const externalUrl =
+            canonicalShopUrl(commerce) ||
+            websiteProductUrl(product.sku, commerce.slug);
+          if (!externalUrl)
+            throw new Error("ยังไม่ได้ตั้งค่า URL ของ AMPHON SHOP");
+
+          await saveProductPublication({
+            product,
+            profile,
+            channel: "website",
+            status: "published",
+            externalUrl,
+            listingRef: product.sku,
+          });
+          succeeded += 1;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          failures.push(`${product.sku}: ${message}`);
+        }
+      }
+
+      await refresh(true);
+      await onProductsRefresh();
+      setBulkMessage(`ลงเว็บสำเร็จ ${succeeded}/${total} รายการ`);
+      if (failures.length) {
+        const preview = failures.slice(0, 3).join(" · ");
+        const remaining =
+          failures.length > 3 ? ` · และอีก ${failures.length - 3} รายการ` : "";
+        setError(
+          `มี ${failures.length} รายการที่ลงเว็บไม่สำเร็จ: ${preview}${remaining}`,
+        );
+      }
+    } finally {
+      setBulkPublishing(false);
     }
   }
 
@@ -287,6 +358,36 @@ export function PublishCenter({
           <b>{counts.cleanup}</b>
         </button>
       </div>
+
+      {canManage && (
+        <div className="publish-bulk-panel">
+          <button
+            className="publish-bulk-button"
+            type="button"
+            disabled={bulkPublishing || bulkReady.length === 0}
+            onClick={() => void publishAllReady()}
+          >
+            {bulkPublishing ? (
+              <LoaderCircle className="spin" />
+            ) : (
+              <CheckCircle2 />
+            )}
+            <span>
+              <strong>
+                {bulkPublishing
+                  ? "กำลังลงสินค้าที่พร้อมแล้ว..."
+                  : `ลงสินค้าที่พร้อมแล้วทั้งหมด (${bulkReady.length})`}
+              </strong>
+              <small>
+                เฉพาะสินค้าสถานะ “พร้อมลงขาย” ที่ยังไม่ขึ้น AMPHON SHOP
+              </small>
+            </span>
+          </button>
+          {bulkMessage && (
+            <div className="publish-bulk-message">{bulkMessage}</div>
+          )}
+        </div>
+      )}
 
       <label className="searchbox publish-search">
         <Search size={18} />

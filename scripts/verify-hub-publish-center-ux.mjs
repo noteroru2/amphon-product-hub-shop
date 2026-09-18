@@ -15,6 +15,8 @@ const checks = [
   ['Social status tracker is not wired into active Hub UI', !app.includes('SalesChannelTracker')],
   ['Home no longer asks staff to complete Facebook/Marketplace/LINE publication status', !app.includes('เช็กว่า Facebook / Marketplace') && !app.includes('ลงครบหรือยัง')],
   ['Publish Center renders only the Website publication channel', publishCenter.includes('visiblePublicationChannels') && publishCenter.includes('channel.id === "website"')],
+  ['Bulk publish action exists for all ready Website products', publishCenter.includes('publishAllReady') && publishCenter.includes('ลงสินค้าที่พร้อมแล้วทั้งหมด') && publishCenter.includes('product.status === "ready_to_list"')],
+  ['Bulk publish reuses governed commerce preparation and publication flow', publishCenter.includes('prepareCommerceProduct(product.id)') && publishCenter.includes('saveProductPublication({') && publishCenter.includes('channel: "website"') && publishCenter.includes('status: "published"')],
   ['Social publication state actions are absent from Website manager', !publishCenter.includes('ทำเครื่องหมายว่าโพสต์ Facebook') && !publishCenter.includes('ทำเครื่องหมายว่าส่ง LINE') && !publishCenter.includes('ทำเครื่องหมายว่าโพสต์ Marketplace')],
   ['overlay stylesheet is loaded after base Hub styles', main.indexOf("./styles/publishCenterOverlay.css") > main.indexOf("./styles/app.css")],
   ['Website manager is rendered as an in-context fixed work sheet', css.includes('.publish-center-screen') && css.includes('position: fixed')],
