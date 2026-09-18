@@ -159,6 +159,15 @@ button:active:not(:disabled) {
   font-size: 24px;
 }
 
+.stat.rose {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.stats-grid > .stat:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .section-head {
   margin: 20px 0 9px;
 }
