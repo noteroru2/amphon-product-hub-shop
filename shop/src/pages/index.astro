@@ -80,6 +80,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
     <div class="container">
       <div class="section-head human-section-head">
         <div><div class="eyebrow">ของเพิ่งลงร้าน</div><h2>มีอะไรใหม่ ลองดูก่อน</h2><p class="muted">ของมือสองเปลี่ยนตลอด เจอตัวถูกใจเปิดดูรายละเอียด แล้วส่งรหัสสินค้าให้ร้านทาง LINE ได้เลยครับ</p></div>
+        <a class="section-link" href="/new-arrivals/">ดูสินค้าเข้าใหม่ทั้งหมด →</a>
       </div>
       {products.length ? (
         <div class="product-grid home-product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
@@ -108,6 +109,18 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
             </a>
           )
         })}
+      </div>
+    </div>
+  </section>
+
+  <section class="section storefront-trust">
+    <div class="container">
+      <div class="section-head human-section-head"><div><div class="eyebrow">ซื้อให้มั่นใจกว่าเดิม</div><h2>ข้อมูลร้านและเงื่อนไขอยู่ในที่เดียว</h2><p class="muted">ก่อนชำระสามารถดูวิธีสั่งซื้อ การจัดส่ง การรับประกัน และการคืนสินค้า แล้วค่อยยืนยันรายละเอียดกับร้านได้ครับ</p></div></div>
+      <div class="trust-link-grid">
+        <a class="trust-link-card" href="/about/"><strong>เกี่ยวกับ AMPHON TRADING</strong><span>รู้จักร้านและช่องทางทางการ</span></a>
+        <a class="trust-link-card" href="/how-to-buy/"><strong>วิธีสั่งซื้อ</strong><span>เลือกสินค้าและยืนยันกับร้านทีละขั้น</span></a>
+        <a class="trust-link-card" href="/shipping/"><strong>การจัดส่ง</strong><span>ดูข้อมูลการส่งที่ตั้งไว้ปัจจุบัน</span></a>
+        <a class="trust-link-card" href="/warranty/"><strong>การรับประกัน</strong><span>เช็กข้อมูลตามสินค้าของชิ้นจริง</span></a>
       </div>
     </div>
   </section>
