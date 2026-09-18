@@ -318,6 +318,10 @@ export interface CommerceStoreSettings {
   countryCode: string;
   purchaseEnabled: boolean;
   purchaseActivationLocked: boolean;
+  autoPublish?: {
+    enabled: boolean;
+    delaySeconds: number;
+  };
   checkout: {
     enabled: boolean;
     reservationMinutes: number;

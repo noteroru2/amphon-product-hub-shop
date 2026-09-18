@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { primaryLineId, primaryLineUrl } from '../lib/contact'
+import { getStoreSettings, type StoreSettings } from '../lib/store-api'
+let settings: StoreSettings | null = null
+try { settings = await getStoreSettings() } catch {}
+const shipping = settings?.shipping
+const hasWindow = shipping?.handlingMinDays !== null && shipping?.handlingMinDays !== undefined && shipping?.transitMinDays !== null && shipping?.transitMinDays !== undefined
+---
+<BaseLayout title="การจัดส่งสินค้า | AMPHON SHOP" description="ข้อมูลการจัดส่งสินค้าไอทีมือสองจาก AMPHON SHOP ตรวจสอบรายละเอียดของสินค้าก่อนยืนยันคำสั่งซื้อ" canonicalPath="/shipping/">
+  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">การจัดส่ง</div><h1>เช็กรายละเอียดการส่งก่อนยืนยัน</h1><p class="lead">ข้อมูลการจัดส่งที่ใช้กับร้านจะแสดงตามการตั้งค่าปัจจุบัน และรายละเอียดเฉพาะของสินค้าให้ตรวจสอบในหน้าสินค้าก่อนชำระ</p></div></section>
+  <section class="section"><div class="container policy-grid">
+    <article class="panel trust-card"><h2>สถานะการจัดส่ง</h2><p>{shipping?.enabled ? 'ร้านเปิดการจัดส่งสำหรับคำสั่งซื้อที่เข้าเงื่อนไข' : 'กรุณาติดต่อร้านเพื่อยืนยันรูปแบบการรับสินค้าที่ใช้ได้กับรายการนี้'}</p>{shipping?.rate !== null && shipping?.rate !== undefined && <p><strong>ค่าจัดส่งที่ตั้งไว้:</strong> {new Intl.NumberFormat('th-TH').format(shipping.rate)} บาท</p>}{hasWindow && <p><strong>กรอบเวลาโดยประมาณ:</strong> เตรียมสินค้า {shipping?.handlingMinDays}–{shipping?.handlingMaxDays ?? shipping?.handlingMinDays} วัน และขนส่ง {shipping?.transitMinDays}–{shipping?.transitMaxDays ?? shipping?.transitMinDays} วัน</p>}</article>
+    <article class="panel trust-card"><h2>ก่อนชำระ</h2><p>หากต้องการยืนยันค่าจัดส่ง พื้นที่ปลายทาง หรือวิธีรับสินค้า ให้ส่งรหัสสินค้าไปที่ LINE {primaryLineId}</p><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ถามเรื่องการจัดส่ง</a></article>
+  </div></section>
+</BaseLayout>

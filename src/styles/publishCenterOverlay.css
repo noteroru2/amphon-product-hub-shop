@@ -196,3 +196,98 @@ body:has(.publish-center-screen) .bottom-nav {
   font-size: 9px;
   font-weight: 700;
 }
+
+
+.publish-center-screen .auto-publish-banner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4, #ffffff);
+  border-radius: 18px;
+  padding: 12px 13px;
+  margin: 0 0 11px;
+}
+
+.publish-center-screen .auto-publish-banner.disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.publish-center-screen .auto-publish-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.publish-center-screen .auto-publish-copy strong {
+  color: #166534;
+  font-size: 11px;
+}
+
+.publish-center-screen .auto-publish-banner.disabled .auto-publish-copy strong {
+  color: #475569;
+}
+
+.publish-center-screen .auto-publish-copy span {
+  color: #64748b;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.publish-center-screen .auto-publish-stats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.publish-center-screen .auto-publish-stats span {
+  border: 1px solid #dcfce7;
+  background: #fff;
+  color: #166534;
+  border-radius: 999px;
+  padding: 5px 7px;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.publish-center-screen .auto-publish-stats span.has-error {
+  color: #be123c;
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+
+.publish-center-screen .auto-publish-row {
+  border-radius: 10px;
+  padding: 7px 9px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.publish-center-screen .auto-publish-row.status-pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.publish-center-screen .auto-publish-row.status-processing {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.publish-center-screen .auto-publish-row.status-failed {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+@media (max-width: 520px) {
+  .publish-center-screen .auto-publish-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .publish-center-screen .auto-publish-stats {
+    justify-content: flex-start;
+  }
+}

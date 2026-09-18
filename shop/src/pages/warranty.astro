@@ -1,0 +1,8 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { primaryLineId, primaryLineUrl } from '../lib/contact'
+---
+<BaseLayout title="ข้อมูลการรับประกันสินค้า | AMPHON SHOP" description="ดูข้อมูลการรับประกันของสินค้าไอทีมือสอง AMPHON SHOP เป็นรายชิ้นจากหน้าสินค้า และสอบถามร้านก่อนซื้อได้" canonicalPath="/warranty/">
+  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">การรับประกัน</div><h1>ประกันดูตามข้อมูลของสินค้าแต่ละชิ้น</h1><p class="lead">สินค้ามือสองแต่ละรายการอาจมีเงื่อนไขและระยะประกันต่างกัน หน้าสินค้าจะแสดงข้อมูลที่มีของชิ้นนั้นโดยตรง</p></div></section>
+  <section class="section"><div class="container policy-grid"><article class="panel trust-card"><h2>เช็กตรงหน้าสินค้า</h2><p>ดูหัวข้อ “ประกัน” ในหน้าสินค้าที่สนใจ หากมีวันที่หรือรายละเอียด ระบบจะแสดงไว้ตรงนั้น</p></article><article class="panel trust-card"><h2>ยืนยันก่อนซื้อ</h2><p>ถ้าข้อมูลไม่ชัดเจน ให้ส่งรหัสสินค้าไปที่ LINE {primaryLineId} เพื่อให้ร้านยืนยันก่อนชำระ</p><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สอบถามการรับประกัน</a></article></div></section>
+</BaseLayout>

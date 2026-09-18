@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import { primaryLineId, primaryLineUrl } from '../lib/contact'
+---
+<BaseLayout title="วิธีสั่งซื้อสินค้าไอทีมือสอง | AMPHON SHOP" description="ขั้นตอนเลือกสินค้า เช็กข้อมูล ติดต่อร้าน และสั่งซื้อสินค้าไอทีมือสองจาก AMPHON SHOP" canonicalPath="/how-to-buy/">
+  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">วิธีสั่งซื้อ</div><h1>เลือกสินค้าให้ตรงชิ้น แล้วค่อยยืนยันกับร้าน</h1><p class="lead">ทุกชิ้นมีรหัสสินค้าเฉพาะ ใช้รหัสนี้คุยกับร้านเพื่อเช็กว่ายังพร้อมขายและยืนยันรายละเอียดก่อนชำระได้ครับ</p></div></section>
+  <section class="section"><div class="container storefront-step-grid">
+    <article class="storefront-step"><span>1</span><strong>เปิดดูหน้าสินค้า</strong><p>เช็กราคา รูปจริง สเปก สภาพ ตำหนิ อุปกรณ์ และข้อมูลประกันของชิ้นที่สนใจ</p></article>
+    <article class="storefront-step"><span>2</span><strong>ส่งรหัสสินค้าให้ร้าน</strong><p>ทัก LINE {primaryLineId} พร้อมรหัสสินค้า เพื่อให้ร้านยืนยันสถานะและตอบคำถามเพิ่มเติม</p></article>
+    <article class="storefront-step"><span>3</span><strong>ยืนยันก่อนชำระ</strong><p>เลือกช่องทางที่สะดวก โดย LINE เป็นช่องทางหลัก ส่วนตะกร้าและการชำระบนเว็บเป็นทางเลือกเมื่อเปิดใช้งาน</p></article>
+  </div><div class="container policy-cta"><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ซื้อ / สอบถามผ่าน LINE {primaryLineId}</a></div></section>
+</BaseLayout>

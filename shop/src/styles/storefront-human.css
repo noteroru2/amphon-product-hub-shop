@@ -416,3 +416,109 @@
     grid-auto-columns: minmax(74px, 88px);
   }
 }
+
+
+/* Store trust + crawl surfaces */
+.section-link {
+  align-self: center;
+  color: var(--brand-dark);
+  font-weight: 850;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.product-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.product-image-count,
+.product-sku {
+  color: var(--muted);
+  font-size: .74rem;
+}
+
+.product-sku {
+  margin-top: 5px;
+}
+
+.storefront-trust {
+  background: #fff;
+}
+
+.trust-link-grid,
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.trust-link-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px;
+  color: inherit;
+  text-decoration: none;
+  box-shadow: 0 10px 26px rgba(69,39,20,.045);
+}
+
+.trust-link-card strong {
+  font-size: 1rem;
+}
+
+.trust-link-card span {
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.55;
+}
+
+.compact-store-hero {
+  padding-bottom: 34px;
+}
+
+.policy-grid .trust-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.policy-grid .trust-card h2 {
+  margin: 0;
+}
+
+.policy-grid .trust-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.policy-cta {
+  margin-top: 20px;
+}
+
+.footer-trust-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 12px 0;
+}
+
+.footer-trust-links a {
+  color: inherit;
+  font-size: .82rem;
+}
+
+@media (max-width: 700px) {
+  .trust-link-grid,
+  .policy-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-link {
+    align-self: flex-start;
+  }
+}

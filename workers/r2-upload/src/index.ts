@@ -312,6 +312,8 @@ type StoreSettingsRow = {
   invoice_email?: string | null
   default_warranty_days?: number | null
   default_warranty_terms?: string | null
+  auto_publish_enabled?: boolean | null
+  auto_publish_delay_seconds?: number | null
   updated_at?: string | null
 }
 
@@ -324,6 +326,12 @@ function mapStoreSettings(row: StoreSettingsRow) {
     currency: row.currency || 'THB',
     countryCode: row.country_code || 'TH',
     purchaseEnabled: Boolean(row.purchase_enabled),
+    autoPublish: {
+      enabled: row.auto_publish_enabled === undefined || row.auto_publish_enabled === null
+        ? true
+        : Boolean(row.auto_publish_enabled),
+      delaySeconds: Math.max(60, Math.min(Number(row.auto_publish_delay_seconds || 180), 3600)),
+    },
     shipping: {
       enabled: Boolean(row.shipping_enabled),
       country: row.shipping_country || row.country_code || 'TH',
@@ -1787,6 +1795,11 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     const checkout = body.checkout || {}
     const documents = body.documents || {}
     const warranty = body.warranty || {}
+    const autoPublish = body.autoPublish || {}
+    const autoPublishDelaySeconds = Math.max(
+      60,
+      Math.min(Number(autoPublish.delaySeconds || 180), 3600),
+    )
     const stripeEnabled = Boolean(checkout.stripeEnabled)
     const promptPayEnabled = Boolean(checkout.promptPayEnabled)
     const reservationMinutes = Math.max(10, Math.min(Number(checkout.reservationMinutes || 60), 240))
@@ -1816,6 +1829,8 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
       legal_name: cleanNullableText(body.legalName, 180),
       site_url: cleanUrl(body.siteUrl) || 'https://shop.amphon.co.th',
       purchase_enabled: Boolean(body.purchaseEnabled),
+      auto_publish_enabled: autoPublish.enabled === undefined ? true : Boolean(autoPublish.enabled),
+      auto_publish_delay_seconds: autoPublishDelaySeconds,
       reservation_minutes: reservationMinutes,
       payment_review_hold_hours: 24,
       bank_transfer_enabled: Boolean(body.checkout?.bankTransferEnabled),
@@ -1865,6 +1880,8 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
       documentMode: patch.document_mode,
       defaultWarrantyDays: patch.default_warranty_days,
       purchaseEnabled: patch.purchase_enabled,
+      autoPublishEnabled: patch.auto_publish_enabled,
+      autoPublishDelaySeconds: patch.auto_publish_delay_seconds,
     })
     const next = await commerceSettingsForStaff(env, context.authorization)
     return json(request, env, { settings: { ...mapAdminStoreSettings(next!), purchaseActivationLocked: false } })
@@ -2177,6 +2194,75 @@ function friendlyWorkerError(code: string) {
   return null
 }
 
+
+type CommerceAutoPublishClaim = {
+  product_id: string
+  sku: string
+  attempt_count: number
+  publish_after: string
+}
+
+async function runCommerceAutoPublishSweep(env: Env) {
+  const workerId = `commerce-auto-publish:${crypto.randomUUID()}`
+  const claims = await serviceRest<CommerceAutoPublishClaim[]>(
+    env,
+    'rpc/claim_commerce_auto_publish',
+    {
+      method: 'POST',
+      body: JSON.stringify({ p_worker_id: workerId, p_limit: 20 }),
+    },
+  )
+
+  for (const claim of Array.isArray(claims) ? claims : []) {
+    try {
+      const result = await serviceRest<Record<string, unknown>>(
+        env,
+        'rpc/execute_commerce_auto_publish',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            target_product_id: claim.product_id,
+            p_worker_id: workerId,
+          }),
+        },
+      )
+      console.log('SHOP AUTO PUBLISH completed', {
+        sku: claim.sku,
+        productId: claim.product_id,
+        attempt: claim.attempt_count,
+        result,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('SHOP AUTO PUBLISH attempt failed', {
+        sku: claim.sku,
+        productId: claim.product_id,
+        attempt: claim.attempt_count,
+        error: message,
+      })
+      try {
+        await serviceRest<Record<string, unknown>>(
+          env,
+          'rpc/fail_commerce_auto_publish',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              target_product_id: claim.product_id,
+              p_worker_id: workerId,
+              p_error: message.slice(0, 1500),
+            }),
+          },
+        )
+      } catch (markError) {
+        console.error('SHOP AUTO PUBLISH failed to schedule retry', {
+          productId: claim.product_id,
+          markError,
+        })
+      }
+    }
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -2214,16 +2300,29 @@ export default {
       return json(request, env, { ok: true, service: 'amphon-product-api', employeeManagement: true, storeApi: true, commerceAdmin: true, shopVersion: 6 })
     }
 
-    if (request.method === 'GET' && url.pathname.startsWith('/image/')) {
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/image/')) {
       const key = url.pathname.slice('/image/'.length).split('/').map(decodeURIComponent).join('/')
       const object = await env.IMAGES.get(key)
       if (!object) return new Response('Not found', { status: 404 })
       const headers = new Headers()
       object.writeHttpMetadata(headers)
+      if (!headers.get('content-type')) {
+        const lowerKey = key.toLowerCase()
+        headers.set(
+          'content-type',
+          lowerKey.endsWith('.png') ? 'image/png'
+            : lowerKey.endsWith('.webp') ? 'image/webp'
+              : lowerKey.endsWith('.gif') ? 'image/gif'
+                : 'image/jpeg',
+        )
+      }
       headers.set('etag', object.httpEtag)
+      headers.set('content-length', String(object.size))
       headers.set('cache-control', 'public, max-age=31536000, immutable')
       headers.set('access-control-allow-origin', '*')
-      return new Response(object.body, { headers })
+      headers.set('cross-origin-resource-policy', 'cross-origin')
+      headers.set('x-content-type-options', 'nosniff')
+      return new Response(request.method === 'HEAD' ? null : object.body, { headers })
     }
 
     try {
@@ -2288,15 +2387,28 @@ export default {
       return json(request, env, { error: 'Internal server error' }, 500)
     }
   },
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    try {
-      const result = await serviceRest<any>(env, 'rpc/expire_commerce_reservations', {
-        method: 'POST',
-        body: JSON.stringify({ max_orders: 200 }),
-      })
-      console.log('SHOP6 reservation expiry sweep', result)
-    } catch (error) {
-      console.error('SHOP6 reservation expiry sweep failed', error)
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    const cron = controller.cron || ''
+    const isManual = !cron
+
+    if (isManual || cron === '* * * * *') {
+      try {
+        await runCommerceAutoPublishSweep(env)
+      } catch (error) {
+        console.error('SHOP AUTO PUBLISH sweep failed', error)
+      }
+    }
+
+    if (isManual || cron === '*/5 * * * *') {
+      try {
+        const result = await serviceRest<any>(env, 'rpc/expire_commerce_reservations', {
+          method: 'POST',
+          body: JSON.stringify({ max_orders: 200 }),
+        })
+        console.log('SHOP6 reservation expiry sweep', result)
+      } catch (error) {
+        console.error('SHOP6 reservation expiry sweep failed', error)
+      }
     }
   },
 }
