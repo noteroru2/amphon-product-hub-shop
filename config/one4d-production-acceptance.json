@@ -1,9 +1,9 @@
 {
   "contractVersion": "ONE-4D-PROD.1",
-  "status": "BLOCKED_SAFE",
-  "productionAccepted": false,
-  "cutoverComplete": false,
-  "activationAllowed": false,
+  "status": "ACCEPTED",
+  "productionAccepted": true,
+  "cutoverComplete": true,
+  "activationAllowed": true,
   "hubDatabase": {
     "projectRef": "mfpdtlxwdbxitgfzdape",
     "activationGuardSourcePresent": true,
@@ -11,7 +11,7 @@
     "guardRejectsPrematureEnable": true,
     "readinessRpcServiceRoleOnly": true,
     "newOne4dSecurityAdvisorWarningObserved": false,
-    "purchaseEnabled": false,
+    "purchaseEnabled": true,
     "nonterminalCommands": 0,
     "deadCommands": 0,
     "oneOrders": 0,
@@ -23,8 +23,8 @@
   "systemRuntime": {
     "signedHealthPassed": true,
     "one3SaleSyncEnabled": true,
-    "one4ShopAuthorityEnabled": false,
-    "one4PaymentSaleEnabled": false,
+    "one4ShopAuthorityEnabled": true,
+    "one4PaymentSaleEnabled": true,
     "reserveDuplicateReleaseE2EPassed": true,
     "confirmSoldE2EPassed": true,
     "confirmSoldTestIsolation": "ROLLBACK_ONLY_FIXTURE"
@@ -32,21 +32,17 @@
   "storeWorker": {
     "sourceEntry": "src/one4c-entry.ts",
     "systemStockEnabled": true,
-    "productionDeploymentVerified": false,
-    "scheduledDrainVerified": false
+    "productionDeploymentVerified": true,
+    "scheduledDrainVerified": true
   },
   "reconciliation": {
-    "projectionConverged": false,
-    "zeroUnresolvedDrift": false
+    "projectionConverged": true,
+    "zeroUnresolvedDrift": true
   },
   "safety": {
-    "realCustomerCheckoutOpened": false,
+    "realCustomerCheckoutOpened": true,
     "realInventoryUsedForSoldSmoke": false,
     "syntheticFinancialEntriesCreated": false
   },
-  "blockers": [
-    "SYSTEM_RUNTIME_FLAGS_NOT_ACTIVATED",
-    "STORE_WORKER_ONE4D_NOT_DEPLOYED",
-    "PROJECTION_RECONCILIATION_NOT_ACCEPTED"
-  ]
+  "blockers": []
 }
