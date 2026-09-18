@@ -469,6 +469,7 @@ button:active:not(:disabled) {
 
 /* Publish Center: keep information dense but less noisy */
 .publish-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import { primaryLineId, primaryLineUrl } from '../../lib/contact'
 import { getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
 import {
   absoluteUrl,
@@ -104,7 +105,10 @@ const publishedDate = product ? formatThaiDate(product.publishedAt) : null
 const updatedDate = product ? formatThaiDate(product.updatedAt) : null
 const warrantyDate = product ? formatThaiDate(product.warrantyUntil) : null
 const evidence = product ? productEvidence(product) : null
-const primaryImage = product?.images.find((image) => image.isCover)?.url || product?.images[0]?.url || null
+const galleryImages = product
+  ? [...product.images].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
+  : []
+const primaryImage = galleryImages[0]?.url || null
 const defectImages = product?.images.filter((image) => image.role === 'defect') || []
 const accessoryImages = product?.images.filter((image) => image.role === 'accessories') || []
 const warrantyImages = product?.images.filter((image) => image.role === 'warranty') || []
@@ -143,7 +147,8 @@ const availabilityLabel = product?.availability === 'out_of_stock'
     ? 'มีคนจองแล้ว'
     : 'พร้อมขาย'
 
-const lineUrl = import.meta.env.PUBLIC_LINE_URL?.trim() || ''
+const lineUrl = primaryLineUrl
+const lineId = primaryLineId
 const phone = import.meta.env.PUBLIC_PHONE?.trim() || ''
 const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
 ---
@@ -171,18 +176,50 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
       </div>
 
       <div class="container product-detail">
-        <section class="gallery" aria-label={`รูปสินค้าจริง ${product.title}`}>
-          {product.images.length ? product.images.map((image, index) => (
-            <figure class:list={['product-photo', index === 0 && 'main-photo']}>
-              <img
-                src={image.url}
-                alt={`${product.title} ${imageRoleLabel(image.role)}${index === 0 ? '' : ` รูปที่ ${index + 1}`}`}
-                loading={index === 0 ? 'eager' : 'lazy'}
-                decoding="async"
-              />
-              <figcaption>{imageRoleLabel(image.role)}</figcaption>
-            </figure>
-          )) : <div class="gallery-placeholder main-photo">ยังไม่มีรูปสินค้า</div>}
+        <section class="gallery product-gallery" data-product-gallery aria-label={`รูปสินค้าจริง ${product.title}`}>
+          {galleryImages.length ? (
+            <>
+              <div class="gallery-stage" data-gallery-stage>
+                {galleryImages.length > 1 && (
+                  <button class="gallery-nav gallery-prev" type="button" data-gallery-prev aria-label="ดูรูปก่อนหน้า">‹</button>
+                )}
+                <figure class="product-photo gallery-main-photo">
+                  <img
+                    src={galleryImages[0].url}
+                    alt={`${product.title} ${imageRoleLabel(galleryImages[0].role)}`}
+                    loading="eager"
+                    decoding="async"
+                    data-gallery-main
+                  />
+                  <figcaption class="gallery-caption">
+                    <span data-gallery-role>{imageRoleLabel(galleryImages[0].role)}</span>
+                    <span data-gallery-counter>1 / {galleryImages.length}</span>
+                  </figcaption>
+                </figure>
+                {galleryImages.length > 1 && (
+                  <button class="gallery-nav gallery-next" type="button" data-gallery-next aria-label="ดูรูปถัดไป">›</button>
+                )}
+              </div>
+              {galleryImages.length > 1 && (
+                <div class="gallery-thumbnails" role="list" aria-label="เลือกรูปสินค้า">
+                  {galleryImages.map((image, index) => (
+                    <button
+                      type="button"
+                      class:list={['gallery-thumb', index === 0 && 'active']}
+                      data-gallery-index={index}
+                      data-src={image.url}
+                      data-alt={`${product.title} ${imageRoleLabel(image.role)} รูปที่ ${index + 1}`}
+                      data-caption={imageRoleLabel(image.role)}
+                      aria-label={`ดูรูปที่ ${index + 1}: ${imageRoleLabel(image.role)}`}
+                      aria-current={index === 0 ? 'true' : 'false'}
+                    >
+                      <img src={image.url} alt="" loading="lazy" decoding="async" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : <div class="gallery-placeholder main-photo">ยังไม่มีรูปสินค้า</div>}
         </section>
 
         <aside class="panel buy-panel">
@@ -216,17 +253,21 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
 
           {product.availability === 'available' && (
             <div class="purchase-actions" aria-label="ช่องทางสั่งซื้อสินค้า">
+              <a class="button button-line button-wide line-primary-purchase" href={lineUrl} rel="nofollow noopener" target="_blank">
+                สั่งซื้อผ่าน LINE {lineId}
+              </a>
+              <p class="line-purchase-note">
+                ช่องทางหลักของร้าน — ทัก LINE แล้วแจ้งรหัสสินค้า <strong>{product.sku}</strong> เพื่อให้ร้านเช็กสถานะและตอบรายละเอียดก่อนชำระ
+              </p>
               {settings?.purchaseEnabled ? (
                 <>
-                  <button id="add-to-cart" class="button button-primary button-wide" type="button" data-sku={product.sku}>ใส่ตะกร้า</button>
-                  <a class="button button-secondary button-wide" href="/cart/">ไปที่ตะกร้า</a>
-                  <p id="cart-message" class="microcopy">ก่อนยืนยัน ร้านจะเช็กว่าสินค้ายังว่างให้อีกครั้ง</p>
+                  <button id="add-to-cart" class="button button-secondary button-wide web-purchase-secondary" type="button" data-sku={product.sku}>ใส่ตะกร้า (ชำระผ่านเว็บ)</button>
+                  <a class="button button-secondary button-wide web-purchase-secondary" href="/cart/">ไปตะกร้า / ชำระผ่านเว็บ</a>
+                  <p id="cart-message" class="microcopy">การชำระผ่านเว็บเป็นทางเลือก ร้านจะเช็กว่าสินค้ายังว่างอีกครั้งก่อนยืนยัน</p>
                 </>
               ) : (
                 <>
-                  {lineUrl && <a class="button button-primary button-wide" href={lineUrl} rel="nofollow noopener" target="_blank">ถามร้านทาง LINE</a>}
                   {phoneHref && <a class="button button-secondary button-wide" href={phoneHref}>โทรถามร้าน</a>}
-                  <p class="microcopy">ถ้าสนใจ แจ้งรหัสสินค้า <strong>{product.sku}</strong> ให้ร้านเช็กสถานะให้ได้ครับ</p>
                 </>
               )}
             </div>
@@ -362,6 +403,52 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
     const cart = addCartSku(sku)
     if (message) message.textContent = `ใส่ตะกร้าแล้ว · ตอนนี้มี ${cart.length} รายการ`
     button.textContent = 'ใส่ตะกร้าแล้ว'
-    window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า' }, 1400)
+    window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า (ชำระผ่านเว็บ)' }, 1400)
   })
+
+  const gallery = document.querySelector<HTMLElement>('[data-product-gallery]')
+  if (gallery) {
+    const main = gallery.querySelector<HTMLImageElement>('[data-gallery-main]')
+    const role = gallery.querySelector<HTMLElement>('[data-gallery-role]')
+    const counter = gallery.querySelector<HTMLElement>('[data-gallery-counter]')
+    const stage = gallery.querySelector<HTMLElement>('[data-gallery-stage]')
+    const thumbs = Array.from(gallery.querySelectorAll<HTMLButtonElement>('[data-gallery-index]'))
+    const prev = gallery.querySelector<HTMLButtonElement>('[data-gallery-prev]')
+    const next = gallery.querySelector<HTMLButtonElement>('[data-gallery-next]')
+    let active = 0
+
+    const selectImage = (index: number) => {
+      if (!main || !thumbs.length) return
+      active = (index + thumbs.length) % thumbs.length
+      const thumb = thumbs[active]
+      const src = thumb.dataset.src || ''
+      if (src) main.src = src
+      main.alt = thumb.dataset.alt || main.alt
+      if (role) role.textContent = thumb.dataset.caption || ''
+      if (counter) counter.textContent = `${active + 1} / ${thumbs.length}`
+      thumbs.forEach((item, itemIndex) => {
+        const selected = itemIndex === active
+        item.classList.toggle('active', selected)
+        item.setAttribute('aria-current', selected ? 'true' : 'false')
+      })
+      thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
+
+    thumbs.forEach((thumb, index) => thumb.addEventListener('click', () => selectImage(index)))
+    prev?.addEventListener('click', () => selectImage(active - 1))
+    next?.addEventListener('click', () => selectImage(active + 1))
+
+    let touchStartX: number | null = null
+    stage?.addEventListener('touchstart', (event) => {
+      touchStartX = event.touches[0]?.clientX ?? null
+    }, { passive: true })
+    stage?.addEventListener('touchend', (event) => {
+      if (touchStartX === null) return
+      const touchEndX = event.changedTouches[0]?.clientX ?? touchStartX
+      const delta = touchEndX - touchStartX
+      touchStartX = null
+      if (Math.abs(delta) < 45) return
+      selectImage(delta < 0 ? active + 1 : active - 1)
+    }, { passive: true })
+  }
 </script>

@@ -54,7 +54,7 @@ body:has(.publish-center-screen) .bottom-nav {
 }
 
 .publish-center-screen .publish-title-row .eyebrow::after {
-  content: "PUBLISH CENTER";
+  content: "AMPHON SHOP";
   font-size: 11px;
   letter-spacing: 0.14em;
 }
@@ -64,7 +64,7 @@ body:has(.publish-center-screen) .bottom-nav {
 }
 
 .publish-center-screen .publish-title-row h1::after {
-  content: "ลงขายสินค้า";
+  content: "สินค้าในเว็บไซต์";
   font-size: 27px;
   letter-spacing: -0.03em;
 }
