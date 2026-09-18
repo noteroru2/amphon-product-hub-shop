@@ -11,6 +11,7 @@ const [
   sitemapCategories,
   sitemapProducts,
   sitemapEvergreen,
+  storeApi,
 ] = await Promise.all([
   read('src/config/catalog.ts'),
   read('src/config/category-seo-content.ts'),
@@ -21,6 +22,7 @@ const [
   read('src/pages/sitemap-categories.xml.ts'),
   read('src/pages/sitemap-products.xml.ts'),
   read('src/pages/sitemap-evergreen.xml.ts'),
+  read('src/lib/store-api.ts'),
 ])
 
 const strategicIndexSlugs = [
@@ -54,7 +56,12 @@ const checks = [
   ['category HOLD remains noindex', categoryPage.includes("category.indexPolicy === 'INDEX'") && categoryPage.includes("'noindex,follow'")],
   ['category sitemap contains only index categories', sitemapCategories.includes('indexCategories.map')],
   ['product sitemap excludes non-index policies', sitemapProducts.includes("['NOINDEX', 'HOLD', 'RETIRED']")],
-  ['evergreen sitemap contains only effective INDEX', sitemapEvergreen.includes("effectiveIndexPolicy: 'INDEX'")],
+  [
+    'evergreen sitemap contains only effective INDEX',
+    sitemapEvergreen.includes('getAllIndexEvergreenPages') &&
+      storeApi.includes('export async function getAllIndexEvergreenPages') &&
+      storeApi.includes("listEvergreenPages({ effectiveIndexPolicy: 'INDEX'"),
+  ],
   ['product page respects listing index policy', productPage.includes("product.indexPolicy !== 'NOINDEX'") && productPage.includes("product.indexPolicy !== 'HOLD'") && productPage.includes("product.indexPolicy !== 'RETIRED'")],
   ['evergreen page respects effective index policy', evergreenPage.includes("page.effectiveIndexPolicy === 'INDEX'")],
 ]
