@@ -2,6 +2,7 @@
   "contractVersion": "ONE-4D-PROD.1",
   "status": "BLOCKED_SAFE",
   "productionAccepted": false,
+  "cutoverComplete": false,
   "activationAllowed": false,
   "hubDatabase": {
     "projectRef": "mfpdtlxwdbxitgfzdape",
@@ -20,13 +21,13 @@
     "referenceStockUnchanged": true
   },
   "systemRuntime": {
-    "signedHealthPassed": false,
-    "one3SaleSyncEnabled": null,
-    "one4ShopAuthorityEnabled": null,
-    "one4PaymentSaleEnabled": null,
-    "reserveDuplicateReleaseE2EPassed": false,
-    "confirmSoldE2EPassed": false,
-    "confirmSoldTestIsolation": null
+    "signedHealthPassed": true,
+    "one3SaleSyncEnabled": true,
+    "one4ShopAuthorityEnabled": false,
+    "one4PaymentSaleEnabled": false,
+    "reserveDuplicateReleaseE2EPassed": true,
+    "confirmSoldE2EPassed": true,
+    "confirmSoldTestIsolation": "ROLLBACK_ONLY_FIXTURE"
   },
   "storeWorker": {
     "sourceEntry": "src/one4c-entry.ts",
@@ -44,9 +45,7 @@
     "syntheticFinancialEntriesCreated": false
   },
   "blockers": [
-    "SYSTEM_RUNTIME_FLAGS_NOT_VERIFIED",
-    "SIGNED_RESERVE_DUPLICATE_RELEASE_E2E_NOT_RUN",
-    "CONFIRM_SOLD_ISOLATED_SMOKE_NOT_RUN",
+    "SYSTEM_RUNTIME_FLAGS_NOT_ACTIVATED",
     "STORE_WORKER_ONE4D_NOT_DEPLOYED",
     "PROJECTION_RECONCILIATION_NOT_ACCEPTED"
   ]
