@@ -8,6 +8,9 @@ on:
       - 'workers/r2-upload/**'
       - 'supabase/migrations/**'
       - 'scripts/verify-auto-publish.mjs'
+      - 'scripts/verify-merchant-shopee-foundation.mjs'
+      - 'docs/shopee-integration-discovery.md'
+      - '.github/workflows/store-worker-deploy.yml'
       - 'scripts/verify-hub-publish-center-ux.mjs'
       - 'scripts/verify-hub-ease.mjs'
       - '.github/workflows/hub-shop-ux.yml'
@@ -43,6 +46,7 @@ jobs:
       - name: Hub Website-manager + Auto Publish contracts
         run: |
           node scripts/verify-auto-publish.mjs
+          node scripts/verify-merchant-shopee-foundation.mjs
           node scripts/verify-hub-publish-center-ux.mjs
           node scripts/verify-hub-ease.mjs
 
