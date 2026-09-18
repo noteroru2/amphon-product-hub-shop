@@ -28,7 +28,7 @@ const checks = [
   ['Homepage promotes LINE as the primary buying path', home.includes('สั่งซื้อผ่าน LINE {primaryLineId}') && home.includes('LINE เป็นช่องทางหลัก')],
   ['Homepage shows available products before category browsing', home.includes("availability: 'available'") && home.includes('limit: 16') && home.indexOf('id="latest-products"') < home.indexOf('id="shop-categories"')],
   ['Homepage connects official brand profiles in schema', home.includes('sameAs: [mainWebsiteUrl, facebookPageUrl]')],
-  ['Cart renders LINE before optional web checkout', cartActionBlock.includes('สั่งซื้อผ่าน LINE ${escapeHtml(lineId)}') && cartActionBlock.indexOf('button-line button-wide') < cartActionBlock.indexOf('${webCheckout}')],
+  ['Cart renders LINE before optional web checkout', cartActionBlock.includes('ซื้อ / สอบถามผ่าน LINE ${escapeHtml(lineId)}') && cartActionBlock.indexOf('button-line button-wide') < cartActionBlock.indexOf('${webCheckout}')],
   ['PromptPay/card web checkout remains implemented', checkout.includes('promptPayEnabled') && checkout.includes('ชำระออนไลน์')],
   ['LINE primary visual treatment exists', styles.includes('--line-green: #06c755') && styles.includes('.button-line')],
 ]

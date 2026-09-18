@@ -45,14 +45,5 @@ jobs:
       - name: Install Shop dependencies
         run: npm --prefix shop ci
 
-      - name: Shop LINE-first and gallery contracts
-        run: |
-          npm --prefix shop run verify:line-first
-          npm --prefix shop run verify:shop3
-
-      - name: Shop Astro check
-        run: npm --prefix shop run check
-
-      - name: Shop Astro build
-        working-directory: shop
-        run: npx astro build
+      - name: Shop Cloudflare build parity
+        run: npm --prefix shop run build
