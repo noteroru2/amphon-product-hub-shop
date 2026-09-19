@@ -1,4 +1,5 @@
 export { ConversationBatcher } from './batcher'
+import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
 
 interface Env {
   IMAGES: R2Bucket
@@ -8,6 +9,8 @@ interface Env {
   LINE_CHANNEL_ACCESS_TOKEN: string
   OPENAI_API_KEY: string
   OPENAI_VISION_MODEL?: string
+  OPENAI_PRICING_MODEL?: string
+  AI_BUYER_ADMIN_TOKEN: string
   AI_BUYER_BATCH_DEBOUNCE_MS?: string
   CONVERSATION_BATCHER: DurableObjectNamespace
   AI_BUYER_ENV?: string
@@ -472,6 +475,73 @@ async function processEvent(env: Env, event: LineWebhookEvent) {
   }
 }
 
+async function sha256(value: string) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))
+}
+
+function constantTimeEqual(a: Uint8Array, b: Uint8Array) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i += 1) diff |= a[i] ^ b[i]
+  return diff === 0
+}
+
+async function requireAdmin(request: Request, env: Env) {
+  const expected = clean(env.AI_BUYER_ADMIN_TOKEN, 500)
+  const provided = clean(request.headers.get('x-ai-buyer-admin-token'), 500)
+  if (!expected || !provided) return false
+  return constantTimeEqual(await sha256(expected), await sha256(provided))
+}
+
+async function handlePriceBookImport(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  let payload: PriceBookImportPayload
+  try {
+    payload = await request.json() as PriceBookImportPayload
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+
+  try {
+    const result = await importPriceBook(env, payload)
+    return response(result, 201)
+  } catch (error) {
+    return response({
+      ok: false,
+      error: clean((error as Error)?.message || error, 1000),
+    }, 400)
+  }
+}
+
+async function handlePriceGuardCheck(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  let payload: { caseId?: string; decisionId?: string; amount?: number }
+  try {
+    payload = await request.json() as { caseId?: string; decisionId?: string; amount?: number }
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+
+  const caseId = clean(payload.caseId, 100)
+  const decisionId = clean(payload.decisionId, 100)
+  if (!caseId || !decisionId || !Number.isFinite(Number(payload.amount))) {
+    return response({ ok: false, error: 'PRICE_GUARD_INPUT_INVALID' }, 400)
+  }
+
+  const result = await guardOffer(env, {
+    caseId,
+    decisionId,
+    amount: Number(payload.amount),
+  })
+  return response({ ok: true, result })
+}
+
 async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext) {
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > MAX_BODY_BYTES) return response({ ok: false, error: 'BODY_TOO_LARGE' }, 413)
@@ -511,6 +581,8 @@ export default {
           line: Boolean(env.LINE_CHANNEL_SECRET && env.LINE_CHANNEL_ACCESS_TOKEN),
           images: Boolean(env.IMAGES),
           vision: Boolean(env.OPENAI_API_KEY),
+          pricing: Boolean(env.OPENAI_API_KEY),
+          admin: Boolean(env.AI_BUYER_ADMIN_TOKEN),
           batcher: Boolean(env.CONVERSATION_BATCHER),
         },
         time: new Date().toISOString(),
@@ -519,6 +591,14 @@ export default {
 
     if (url.pathname === '/v1/webhooks/line' && request.method === 'POST') {
       return handleWebhook(request, env, ctx)
+    }
+
+    if (url.pathname === '/v1/admin/price-book/import' && request.method === 'POST') {
+      return handlePriceBookImport(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/price-guard/check' && request.method === 'POST') {
+      return handlePriceGuardCheck(request, env)
     }
 
     return response({ ok: false, error: 'NOT_FOUND' }, 404)
