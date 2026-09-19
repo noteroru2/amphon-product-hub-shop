@@ -562,7 +562,7 @@ function ShopeeSettingsPanel() {
         <div>
           <strong>
             {status?.mode === 'disabled'
-              ? 'Shopee Direct API ปิดไว้ — โครง Channel พร้อมรอสิทธิ์หรือ Partner'
+              ? 'Shopee Manual ใช้งานได้ — Direct API ยังปิดไว้'
               : status?.mode === 'partner_api'
                 ? 'Shopee ใช้โหมด Partner API — รอเชื่อม Provider'
                 : !status?.configured
@@ -575,7 +575,7 @@ function ShopeeSettingsPanel() {
             {connection
               ? `สถานะ ${connection.status} • mapping ${status?.mappings?.categories ?? 0} หมวด • ลงแล้ว ${status?.mappings?.publishedProducts ?? 0} SKU • queue ${status?.queue?.pending ?? 0} • error ${status?.queue?.failed ?? 0}`
               : status?.mode === 'disabled'
-                ? 'ตอนนี้ Website ทำงานอัตโนมัติ ส่วน Facebook ใช้ Assisted Publish และ Shopee ยังไม่ยิง API'
+                ? 'พนักงานลง Shopee ผ่าน Sales Toolkit ได้ โดยระบบช่วยเตรียมราคา +18–20% ส่วน Direct API ยังไม่ยิงอัตโนมัติ'
                 : 'Partner key และ token อยู่ฝั่ง server เท่านั้น ไม่ส่งเข้า browser'}
           </small>
         </div>
