@@ -1,6 +1,6 @@
 import type { ProductDraft } from '../types/product'
 import { getSpecRows, getSubtypeLabel } from './productSchemas'
-import { SHOPEE_MANUAL_MARKUP_PERCENT, shopeeManualPrice } from './shopeePricing'
+import { shopeeManualPrice } from './shopeePricing'
 
 export type ContentChannel = 'facebook' | 'marketplace' | 'shopee' | 'winnerit' | 'generic'
 
