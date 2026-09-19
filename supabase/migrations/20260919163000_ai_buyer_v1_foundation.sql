@@ -12,7 +12,7 @@ begin
   new.updated_at = now();
   return new;
 end;
-$$;
+$ai_buyer$;
 
 create table if not exists public.ai_buyer_customers (
   id uuid primary key default gen_random_uuid(),
