@@ -98,6 +98,23 @@ type RequestedInput =
 
 type Fact = { key: string; value: string; evidence: string }
 
+type PricingTag =
+  | 'NO_CHARGER'
+  | 'BATTERY_BAD'
+  | 'SCREEN_DEFECT'
+  | 'BODY_HEAVY'
+  | 'HINGE_ISSUE'
+  | 'NO_BOX'
+  | 'DEVICE_NOT_BOOTING'
+  | 'LOCKED'
+  | 'MISSING_ACCESSORY'
+  | 'MAJOR_DAMAGE'
+
+const PRICING_TAGS: PricingTag[] = [
+  'NO_CHARGER','BATTERY_BAD','SCREEN_DEFECT','BODY_HEAVY','HINGE_ISSUE',
+  'NO_BOX','DEVICE_NOT_BOOTING','LOCKED','MISSING_ACCESSORY','MAJOR_DAMAGE',
+]
+
 type IntakeResult = {
   intent: 'SELL_ITEM' | 'GENERAL' | 'UNKNOWN'
   category: ProductCategory
@@ -115,6 +132,7 @@ type IntakeResult = {
   action: IntakeAction
   asked_if_ai: boolean
   handoff_requested: boolean
+  pricing_tags: PricingTag[]
   flags: string[]
 }
 
@@ -182,13 +200,14 @@ const VISION_SCHEMA = {
     action: { type: 'string', enum: ['ASK_PRODUCT_TYPE','ASK_MORE_INFO','READY_TO_PRICE','HUMAN_REVIEW','NO_ACTION'] },
     asked_if_ai: { type: 'boolean' },
     handoff_requested: { type: 'boolean' },
+    pricing_tags: { type: 'array', items: { type: 'string', enum: PRICING_TAGS }, maxItems: 10 },
     flags: { type: 'array', items: { type: 'string' }, maxItems: 12 },
   },
   required: [
     'intent','category','product_title','model_name','model_code','confirmed','inferred',
     'unknown_fields','requested_inputs','identity_confidence','spec_completeness',
     'condition_completeness','pricing_readiness','action','asked_if_ai',
-    'handoff_requested','flags',
+    'handoff_requested','pricing_tags','flags',
   ],
   additionalProperties: false,
 } as const
@@ -205,6 +224,7 @@ const SYSTEM_PROMPT = [
   'requested_inputs must contain at most 3 items, most useful first.',
   'READY_TO_PRICE means enough identity/spec/condition evidence exists for the separate Pricing Engine. It does not mean you know a price.',
   'Use HUMAN_REVIEW for rare products, complex damage, contradictory identity, or persistent ambiguity.',
+  'For pricing_tags, use only directly supported condition/accessory tags. Do not infer damage from weak visual evidence.',
   'If the customer explicitly asks for a human/admin, set handoff_requested=true.',
   'If the customer asks whether this is AI/bot/automatic, set asked_if_ai=true.',
   'Product categories are strictly NOTEBOOK, MACBOOK, DESKTOP_PC, SMARTPHONE, TABLET, CAMERA, OTHER, UNKNOWN.',
@@ -476,6 +496,9 @@ function normalizeIntake(value: unknown): IntakeResult {
     action,
     asked_if_ai: Boolean(raw.asked_if_ai),
     handoff_requested: Boolean(raw.handoff_requested),
+    pricing_tags: Array.isArray(raw.pricing_tags)
+      ? raw.pricing_tags.filter((item): item is PricingTag => PRICING_TAGS.includes(item as PricingTag)).slice(0, 10)
+      : [],
     flags: Array.isArray(raw.flags) ? raw.flags.map((item) => clean(item, 100)).filter(Boolean).slice(0, 12) : [],
   }
 }
@@ -717,6 +740,7 @@ async function updateCase(
     lastAnalysisRunId: runId,
     lastRequestedInputs: result.requested_inputs,
     lastFlags: result.flags,
+    lastPricingTags: result.pricing_tags,
     lastIntent: result.intent,
     pendingReply: reply ? {
       text: reply,
