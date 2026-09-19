@@ -796,6 +796,44 @@ async function clearPendingReply(
   })
 }
 
+async function escalatePricingSystemFailure(
+  env: ConversationEngineEnv,
+  batch: IntakeBatch,
+  currentCase: CaseRow,
+  error: unknown,
+) {
+  const message = clean((error as Error)?.message || error, 1000)
+  await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), {
+    state: 'HUMAN_REVIEW',
+    control_mode: 'HUMAN_REQUIRED',
+    metadata: {
+      ...(currentCase.metadata || {}),
+      pricingReviewReason: 'PRICING_ENGINE_ERROR',
+      pricingReviewDetail: { error: message },
+    },
+  })
+  await patchRows(
+    env,
+    'ai_buyer_conversations?id=eq.' + encodeURIComponent(batch.conversationId),
+    { control_mode: 'HUMAN_REQUIRED' },
+  )
+  const task = await supabaseRequest(env, 'ai_buyer_admin_tasks', {
+    method: 'POST',
+    headers: { prefer: 'return=minimal' },
+    body: JSON.stringify({
+      case_id: currentCase.id,
+      task_type: 'PRICING_REVIEW',
+      status: 'ACTION_REQUIRED',
+      priority: 'HIGH',
+      payload: {
+        reason: 'PRICING_ENGINE_ERROR',
+        error: message,
+      },
+    }),
+  })
+  if (!task.ok) console.error('AI BUYER pricing error task insert failed', task.status)
+}
+
 async function markMessagesConsumed(env: ConversationEngineEnv, ids: string[]) {
   if (!ids.length) return
   await patchRows(
@@ -957,8 +995,12 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
         pricingResult = await runPricingForCase(env, batch.caseId)
       } catch (pricingError) {
         console.error('AI BUYER pricing engine failed', batch.caseId, pricingError)
+        await escalatePricingSystemFailure(env, batch, currentCase, pricingError).catch((escalationError) => {
+          console.error('AI BUYER pricing escalation failed', batch.caseId, escalationError)
+        })
         pricingResult = {
           ok: false,
+          humanReview: true,
           reason: 'PRICING_ENGINE_ERROR',
           error: clean((pricingError as Error)?.message || pricingError, 500),
         }
