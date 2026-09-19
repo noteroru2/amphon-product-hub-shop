@@ -8,6 +8,7 @@ import { installRuntimeRecovery } from './lib/runtimeRecovery'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
 import './styles/hubEase.css'
+import './styles/shopeeContentTemplate.css'
 import './styles/one2cEnrichment.css'
 
 // Mobile browsers can treat capture="environment" as a camera-only request.

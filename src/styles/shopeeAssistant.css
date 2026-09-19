@@ -201,3 +201,14 @@
   .shopee-field { align-items: flex-start; }
   .shopee-cover { width: 96px; }
 }
+
+.shopee-fixed-markup {
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 900;
+}

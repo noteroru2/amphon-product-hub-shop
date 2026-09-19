@@ -1,11 +1,9 @@
 import type { SalesPostPackage } from './salesPostPackage'
 import type { ProductCategory, ProductDraft, ProductStatus } from '../types/product'
 import {
-  DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
-  normalizeShopeeMarkup,
+  SHOPEE_MANUAL_MARKUP_PERCENT,
   shopeeManualPrice,
   shopeeMarkupAmount,
-  type ShopeeManualMarkupPercent,
 } from './shopeePricing'
 
 export const DEFAULT_SHOPEE_SELLER_URL = 'https://seller.shopee.co.th/'
@@ -39,7 +37,7 @@ export interface ShopeeManualListingDraft {
   sku: string
   title: string
   basePrice: number
-  markupPercent: ShopeeManualMarkupPercent
+  markupPercent: typeof SHOPEE_MANUAL_MARKUP_PERCENT
   markupAmount: number
   shopeePrice: number
   shopeePriceCopyValue: string
@@ -104,11 +102,8 @@ function appendRows(
   lines.push('', heading, ...selected.map((row) => '• ' + row.label + ': ' + row.value))
 }
 
-export function buildShopeeManualDescription(pkg: SalesPostPackage, shopeePrice: number) {
+export function buildShopeeManualDescription(pkg: SalesPostPackage) {
   const lines = [
-    pkg.title,
-    '',
-    'ราคาใน Shopee ' + money(shopeePrice) + ' บาท',
     'สินค้ามือสอง ตรวจเช็กการใช้งานและแจ้งสภาพตามจริง',
   ]
   appendRows(lines, 'รายละเอียดสเปก', pkg.specifications, 12)
@@ -148,14 +143,13 @@ export function buildShopeeManualListingDraft(
     ProductDraft,
     'category' | 'specs' | 'status' | 'images' | 'conditionPercent'
   >,
-  markupPercent = DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
   imageReady = true,
 ): ShopeeManualListingDraft {
   // Public/manual projection only. Cost, serialNumber, notes and staff data never enter this object.
-  const markup = normalizeShopeeMarkup(Number(markupPercent))
+  const markup = SHOPEE_MANUAL_MARKUP_PERCENT
   const title = buildShopeeManualTitle(pkg, source)
-  const shopeePrice = shopeeManualPrice(pkg.price, markup)
-  const markupAmount = shopeeMarkupAmount(pkg.price, markup)
+  const shopeePrice = shopeeManualPrice(pkg.price)
+  const markupAmount = shopeeMarkupAmount(pkg.price)
   const categorySuggestion = source.category
     ? SHOPEE_CATEGORY_SUGGESTIONS[source.category]
     : 'ค้นหาหมวดหมู่ที่ตรงสินค้าใน Seller Centre'
@@ -172,7 +166,7 @@ export function buildShopeeManualListingDraft(
   if (!source.conditionPercent) warnings.push('ยังไม่มีเปอร์เซ็นต์สภาพ — ให้พนักงานตรวจสภาพใน Seller Centre')
   warnings.push('น้ำหนัก/ขนาดพัสดุต้องตรวจและกรอกใน Seller Centre ตามสินค้าจริง')
 
-  const description = buildShopeeManualDescription(pkg, shopeePrice)
+  const description = buildShopeeManualDescription(pkg)
   const checklist: ShopeeManualChecklistItem[] = [
     check('images', 'รูปสินค้า', pkg.imageCount > 0 && Boolean(cover), 'ไม่มีรูปพร้อมใช้'),
     check('image_export', 'ส่งออกรูป', imageReady, 'ใช้ ZIP fallback หาก Share รูปไม่ได้'),

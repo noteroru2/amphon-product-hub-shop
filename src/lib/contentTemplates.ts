@@ -1,6 +1,6 @@
 import type { ProductDraft } from '../types/product'
 import { getSpecRows, getSubtypeLabel } from './productSchemas'
-import { DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT, shopeeManualPrice } from './shopeePricing'
+import { shopeeManualPrice } from './shopeePricing'
 
 export type ContentChannel = 'facebook' | 'marketplace' | 'shopee' | 'winnerit' | 'generic'
 
@@ -14,7 +14,7 @@ export interface ContentTemplate {
 export const contentTemplates: ContentTemplate[] = [
   { id: 'facebook', label: 'Facebook', shortLabel: 'Facebook', description: 'โพสต์อ่านง่าย เน้นจุดขายและความน่าเชื่อถือ' },
   { id: 'marketplace', label: 'Facebook Marketplace', shortLabel: 'Marketplace', description: 'ข้อความกระชับ เน้นรุ่น สเปก สภาพ ราคา และคำค้น' },
-  { id: 'shopee', label: 'Shopee', shortLabel: 'Shopee', description: 'ข้อความสำหรับ Shopee พร้อมราคาบวก 20% จากราคา Hub โดยไม่ใส่ลิงก์ภายนอก' },
+  { id: 'shopee', label: 'Shopee', shortLabel: 'Shopee', description: 'แยกหัวข้อ ราคา และเนื้อหาหลัก พร้อมราคาบวก 18% จากราคา Hub' },
   { id: 'winnerit', label: 'WINNER IT', shortLabel: 'WINNER IT', description: 'โพสต์ขายในโทนแบรนด์ WINNER IT' },
   { id: 'generic', label: 'ข้อความกลาง', shortLabel: 'ทั่วไป', description: 'ใช้กับ LINE แชต หรือช่องทางอื่น' },
 ]
@@ -112,24 +112,78 @@ function marketplaceContent(draft: ProductDraft) {
   return lines.join('\n').trim()
 }
 
-function shopeeContent(draft: ProductDraft) {
-  const title = titleOf(draft)
+export interface ShopeeContentParts {
+  title: string
+  price: string
+  priceValue: number
+  body: string
+  all: string
+}
+
+function shopeeTitleOf(draft: ProductDraft) {
+  const parts = [titleOf(draft)]
+  const preferredKeys =
+    draft.category === 'notebook' || draft.category === 'pc'
+      ? ['cpu', 'gpu', 'ram', 'ssd', 'storage']
+      : draft.category === 'iphone' || draft.category === 'smartphone' || draft.category === 'tablet'
+        ? ['storage', 'color']
+        : draft.category === 'camera'
+          ? ['model_code', 'sensor', 'megapixel']
+          : draft.category === 'lens'
+            ? ['model_code', 'focal_length', 'aperture']
+            : draft.category === 'component'
+              ? ['model_code', 'gpu_chip', 'vram', 'ram_capacity', 'storage_capacity', 'wattage']
+              : ['model_code']
+
+  const normalized = () => parts.join(' ').toLocaleLowerCase('th-TH')
+  for (const key of preferredKeys) {
+    const value = clean(draft.specs?.[key])
+    if (value && !normalized().includes(value.toLocaleLowerCase('th-TH'))) parts.push(value)
+  }
+  return parts.join(' | ')
+}
+
+export function buildShopeeContentParts(draft: ProductDraft): ShopeeContentParts {
+  const title = shopeeTitleOf(draft)
   const specs = specRows(draft)
-  const shopeePrice = shopeeManualPrice(Number(draft.price || 0), DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT)
-  const lines = [title]
-  if (shopeePrice) lines.push('ราคา Shopee ' + formatPrice(shopeePrice) + ' บาท')
+  const priceValue = shopeeManualPrice(Number(draft.price || 0))
+  const price = priceValue ? formatPrice(priceValue) + ' บาท' : 'ยังไม่ได้ระบุราคา'
+  const lines: string[] = []
 
   if (specs.length) {
-    lines.push('', 'รายละเอียดสเปก')
-    for (const [label, value] of specs.slice(0, 12)) lines.push('• ' + label + ': ' + value)
+    for (const [label, value] of specs) lines.push('✅ ' + label + ': ' + value)
   }
 
   const condition = conditionLine(draft)
-  if (condition) lines.push('', condition)
-  if (draft.defects?.trim()) lines.push('ตำหนิ: ' + draft.defects.trim())
-  lines.push('', 'สินค้ามือสอง ตรวจเช็กก่อนขายและแจ้งสภาพตามจริง', 'กรุณาดูรูปสินค้าจริงประกอบการตัดสินใจ')
+  if (condition) lines.push('', '📌 ' + condition)
+  if (draft.defects?.trim()) lines.push('📌 ตำหนิ: ' + draft.defects.trim())
+
+  lines.push(
+    '',
+    '✅ สินค้ามือสอง ตรวจเช็กการใช้งานก่อนขาย',
+    '✅ แจ้งสภาพและตำหนิตามจริง',
+    '📦 จัดส่งทั่วประเทศ',
+    '📌 กรุณาดูรูปสินค้าจริงประกอบการตัดสินใจ',
+  )
   if (draft.sku) lines.push('รหัสสินค้า: ' + draft.sku)
-  return lines.join('\n').trim()
+
+  const body = lines.join('\n').trim()
+  const all = [
+    'หัวข้อ',
+    title,
+    '',
+    'ราคา',
+    price,
+    '',
+    'เนื้อหาหลัก',
+    body,
+  ].join('\n').trim()
+
+  return { title, price, priceValue, body, all }
+}
+
+function shopeeContent(draft: ProductDraft) {
+  return buildShopeeContentParts(draft).all
 }
 
 function winnerItContent(draft: ProductDraft) {
