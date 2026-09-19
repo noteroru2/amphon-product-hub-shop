@@ -1,0 +1,15 @@
+{
+  "name": "amphon-ai-buyer",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "amphon-product-images"
+    }
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
+    "AI_BUYER_ENV": "production"
+  }
+}
