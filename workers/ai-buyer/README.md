@@ -42,6 +42,7 @@ npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put LINE_CHANNEL_SECRET
 npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
 npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put AI_BUYER_ADMIN_TOKEN
 ```
 
 Never commit these values.
@@ -120,3 +121,131 @@ Checkpoint 3:
 4. category buyback rules
 5. server-side Price Guard
 6. produce `opening_offer / target_buy / hard_max`
+
+
+## Checkpoint 3 — Price Book + Pricing Engine + Price Guard
+
+Checkpoint 3 adds a deterministic pricing boundary after `READY_TO_PRICE`.
+
+### Pricing order
+
+```text
+READY_TO_PRICE
+  ↓
+Active Price Book
+  ↓
+Exact model code → alias → model → token/spec match
+  ↓
+Found and unambiguous?
+  ├─ YES → apply controlled pricing tags/adjustments → Pricing Decision
+  └─ NO  → Market fallback only when category.market_enabled=true
+               ↓
+          OpenAI web search
+               ↓
+          validate comparable URLs against returned web-search sources
+               ↓
+          reject wrong condition/spec/unverified sources
+               ↓
+          median + dispersion gate
+               ↓
+          category buyback rule
+               ↓
+          Pricing Decision
+```
+
+The OpenAI Responses API currently supports built-in web search and can include
+`web_search_call.action.sources`; the runtime uses those returned sources to reject
+comparables whose URLs cannot be tied back to actual search evidence.
+
+### Pricing Decision contract
+
+Every accepted pricing result stores:
+
+- `estimated_resale`
+- `opening_offer`
+- `target_buy`
+- `hard_max`
+- `current_authorized_offer`
+- `pricing_confidence`
+- source (`PRICE_BOOK` or `MARKET`)
+- adjustments
+- comparable evidence / rationale
+
+Checkpoint 3 creates the decision but does **not** send a numeric offer to LINE yet.
+Offer delivery and negotiation belong to Checkpoint 4.
+
+### Price Guard
+
+There are two independent guard layers:
+
+1. application guard: `guardOffer()`
+2. PostgreSQL trigger: `ai_buyer_offer_price_guard`
+
+Any AI/admin offer above the Pricing Decision `hard_max` is rejected by PostgreSQL,
+even if future application code accidentally bypasses the TypeScript guard.
+
+### Price Book import
+
+Admin-only endpoint:
+
+`POST /v1/admin/price-book/import`
+
+Header:
+
+`x-ai-buyer-admin-token: <AI_BUYER_ADMIN_TOKEN>`
+
+Example payload:
+
+```json
+{
+  "version_name": "2026-09-19-v1",
+  "source_name": "AMPHON master price sheet",
+  "activate": true,
+  "entries": [
+    {
+      "category": "NOTEBOOK",
+      "brand": "ASUS",
+      "model": "TUF A15 FA506IC",
+      "model_code": "FA506IC",
+      "aliases": ["TUF A15 3050"],
+      "spec_match": {
+        "gpu": "RTX 3050"
+      },
+      "estimated_resale": 13900,
+      "opening_offer": 8500,
+      "target_buy": 9000,
+      "hard_max": 9500,
+      "adjustments": {
+        "NO_CHARGER": -500,
+        "BATTERY_BAD": -500,
+        "SCREEN_DEFECT": -1500
+      }
+    }
+  ],
+  "category_rules": [
+    {
+      "category": "NOTEBOOK",
+      "market_enabled": true,
+      "buyback_percent": 0.65,
+      "min_buyback_percent": 0.55,
+      "max_buyback_percent": 0.70,
+      "hard_max_percent": 0.68,
+      "opening_discount_percent": 0.05,
+      "risk_reserve": 300,
+      "rounding_step": 100,
+      "min_market_comparables": 3,
+      "max_market_dispersion": 0.35
+    }
+  ]
+}
+```
+
+No market rule is enabled automatically. The business must explicitly configure
+the percentage and enable each category.
+
+### Admin guard inspection
+
+`POST /v1/admin/price-guard/check`
+
+This endpoint is protected by the same admin token and can verify an amount against
+an existing Pricing Decision before Checkpoint 4 is enabled.
