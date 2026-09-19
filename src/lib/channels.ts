@@ -65,7 +65,7 @@ export const salesChannels: readonly SalesChannelDefinition[] = [
     autoPublish: false,
     capabilities: ['publish', 'update_content', 'update_price', 'end_listing'],
     stockAuthority: 'AMPHON_SYSTEM',
-    note: 'Hub prepares listing data and +18–20% channel price; staff publishes manually in Seller Centre.',
+    note: 'Hub prepares listing data and a fixed +18% channel price; staff publishes manually in Seller Centre.',
   },
 ] as const
 
