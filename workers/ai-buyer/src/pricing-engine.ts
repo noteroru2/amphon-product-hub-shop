@@ -574,6 +574,12 @@ function specCompatibility(entry: EntryRow, confirmed: Record<string, unknown>) 
   return { compatible: true, score: matched / Math.max(1, pairs.length) }
 }
 
+function desiredConditionKey(tags: PricingTag[]) {
+  if (tags.some((tag) => ['DEVICE_NOT_BOOTING','LOCKED','MAJOR_DAMAGE'].includes(tag))) return 'DEFECTIVE'
+  if (tags.some((tag) => ['SCREEN_DEFECT','BODY_HEAVY','HINGE_ISSUE','BATTERY_BAD'].includes(tag))) return 'ROUGH'
+  return 'NORMAL'
+}
+
 function priceBookMatchScore(
   entry: EntryRow,
   identity: ReturnType<typeof aggregateIdentity>,
@@ -615,9 +621,23 @@ function priceBookMatchScore(
 
   const spec = specCompatibility(entry, identity.confirmed)
   if (!spec.compatible) return { score: 0, reason: 'SPEC_CONFLICT' }
+
+  const wantedCondition = desiredConditionKey(identity.tags)
+  const entryCondition = clean(entry.condition_key, 80).toUpperCase() || 'NORMAL'
+  const conditionBonus = entryCondition === wantedCondition
+    ? 0.025
+    : entryCondition === 'NORMAL'
+      ? 0
+      : -0.025
+
   return {
-    score: Math.min(1, score + (Object.keys(safeJsonObject(entry.spec_match)).length ? 0.02 * spec.score : 0)),
-    reason,
+    score: Math.max(0, Math.min(
+      1,
+      score
+        + (Object.keys(safeJsonObject(entry.spec_match)).length ? 0.02 * spec.score : 0)
+        + conditionBonus,
+    )),
+    reason: reason + ':CONDITION_' + entryCondition,
   }
 }
 
@@ -633,8 +653,11 @@ function bestPriceBookEntry(entries: EntryRow[], identity: ReturnType<typeof agg
   const ambiguous = Boolean(
     second
     && top.entry.id !== second.entry.id
-    && Math.abs(top.score - second.score) < 0.03
-    && normalizeLookup(top.entry.model_code) !== normalizeLookup(second.entry.model_code),
+    && Math.abs(top.score - second.score) < 0.02
+    && (
+      normalizeLookup(top.entry.model_code) !== normalizeLookup(second.entry.model_code)
+      || clean(top.entry.condition_key, 80).toUpperCase() !== clean(second.entry.condition_key, 80).toUpperCase()
+    ),
   )
   return { match: top, ambiguous }
 }
