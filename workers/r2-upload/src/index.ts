@@ -2285,6 +2285,10 @@ export default {
       }
     }
 
+    if (request.method === 'OPTIONS' && url.pathname.startsWith('/shopee')) {
+      return new Response(null, { status: 204, headers: corsHeaders(request, env) })
+    }
+
     if (url.pathname.startsWith('/shopee') || url.pathname === '/webhooks/shopee') {
       try {
         const shopeeResponse = await handleShopeeRoutes(request, env, url)
