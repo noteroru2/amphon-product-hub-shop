@@ -1,6 +1,7 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
+import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
 
-interface Env extends One4SystemStockEnv {
+interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_PUBLISHABLE_KEY: string
@@ -2283,6 +2284,41 @@ export default {
         return new Response('Webhook processing failed', { status: 500 })
       }
     }
+
+    if (request.method === 'OPTIONS' && url.pathname.startsWith('/shopee')) {
+      return new Response(null, { status: 204, headers: corsHeaders(request, env) })
+    }
+
+    if (url.pathname.startsWith('/shopee') || url.pathname === '/webhooks/shopee') {
+      try {
+        const shopeeResponse = await handleShopeeRoutes(request, env, url)
+        if (shopeeResponse) {
+          if (url.pathname === '/webhooks/shopee' || url.pathname === '/shopee/callback') {
+            return shopeeResponse
+          }
+          const headers = new Headers(shopeeResponse.headers)
+          for (const [key, value] of Object.entries(corsHeaders(request, env))) {
+            headers.set(key, value)
+          }
+          return new Response(shopeeResponse.body, {
+            status: shopeeResponse.status,
+            statusText: shopeeResponse.statusText,
+            headers,
+          })
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error('Shopee route error', error)
+        const status = /AUTH_REQUIRED|AUTH_INVALID/.test(message)
+          ? 401
+          : /ACCESS_DENIED/.test(message)
+            ? 403
+            : /NOT_CONFIGURED|MAPPING_|CATEGORY_|SHOP_ID_REQUIRED/.test(message)
+              ? 409
+              : 500
+        return json(request, env, { error: message }, status)
+      }
+    }
     if (url.pathname.startsWith('/store')) {
       try {
         const storeResponse = await handleStoreRoutes(request, env, url)
@@ -2396,6 +2432,13 @@ export default {
         await runCommerceAutoPublishSweep(env)
       } catch (error) {
         console.error('SHOP AUTO PUBLISH sweep failed', error)
+      }
+
+      try {
+        const result = await runShopeePublishSweep(env)
+        if (!('skipped' in result)) console.log('SHOPEE publish sweep', result)
+      } catch (error) {
+        console.error('SHOPEE publish sweep failed', error)
       }
     }
 

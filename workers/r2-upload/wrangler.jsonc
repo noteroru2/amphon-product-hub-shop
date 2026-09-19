@@ -14,7 +14,11 @@
     "ALLOWED_ORIGINS": "http://localhost:5173,https://app.amphon.co.th,https://hub.amphon.co.th,https://shop.amphon.co.th",
     "SYSTEM_API_BASE_URL": "https://api.amphontd.com",
     "SHOP_INTEGRATION_KEY_ID": "amphon-shop-v1",
-    "ONE4_SYSTEM_STOCK_ENABLED": "true"
+    "ONE4_SYSTEM_STOCK_ENABLED": "true",
+    "SHOPEE_API_BASE_URL": "https://partner.shopeemobile.com",
+    "SHOPEE_AUTH_URL": "https://open.shopee.com/auth",
+    "SHOPEE_REDIRECT_URI": "https://amphon-product-images.noteroru2.workers.dev/shopee/callback",
+    "SHOPEE_HUB_REDIRECT_URL": "https://hub.amphon.co.th/"
   },
   "triggers": {
     "crons": [
@@ -24,7 +28,9 @@
   },
   "secrets": {
     "required": [
-      "SHOP_INTEGRATION_SECRET"
+      "SHOP_INTEGRATION_SECRET",
+      "SHOPEE_PARTNER_ID",
+      "SHOPEE_PARTNER_KEY"
     ]
   }
 }

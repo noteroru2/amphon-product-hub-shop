@@ -13,7 +13,7 @@ const checks = [
   ['Merchant future Website publications sync automatically', migration.includes('trg_sync_merchant_from_website_publication') && migration.includes("new.channel <> 'website'")],
   ['Merchant eligibility refuses System SOLD', migration.includes("p.one_availability is distinct from 'SOLD'")],
   ['Store Worker deploy is production, not dry-run', workflow.includes('npx wrangler deploy --config wrangler.jsonc') && !workflow.includes('--dry-run')],
-  ['Store Worker deploy requires Cloudflare token', workflow.includes('CLOUDFLARE_API_TOKEN') && workflow.includes('Missing repository secret CLOUDFLARE_API_TOKEN')],
+  ['Store Worker deploy requires Cloudflare token', workflow.includes('secrets.CLOUDFLARE_API_TOKEN') && workflow.includes('CLOUDFLARE_API_TOKEN SHOPEE_PARTNER_ID SHOPEE_PARTNER_KEY') && workflow.includes('Missing repository secret $name')],
   ['Store Worker deploy smoke-checks live autoPublish settings', workflow.includes('amphon-product-images.noteroru2.workers.dev/store/settings') && workflow.includes('"autoPublish"')],
   ['Shopee keeps AMPHON System as stock authority', shopee.includes('AMPHON System') && shopee.includes('Shopee must **never** become master stock')],
   ['Shopee plan includes durable mapping + queue', shopee.includes('shopee_product_mappings') && shopee.includes('shopee_publish_queue')],
