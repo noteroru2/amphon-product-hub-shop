@@ -22,11 +22,6 @@ import {
   buildShopeeManualListingDraft,
   shopeeSellerDestinationUrl,
 } from "../lib/shopeeManualListing";
-import {
-  DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
-  SHOPEE_MANUAL_MARKUP_OPTIONS,
-  type ShopeeManualMarkupPercent,
-} from "../lib/shopeePricing";
 import type { ProductDraft } from "../types/product";
 import { ProductImageExportControls } from "./ProductImageExportActions";
 import "../styles/shopeeAssistant.css";
@@ -41,9 +36,6 @@ export default function ShopeeListingAssistant({
   onClose: () => void;
 }) {
   const [salesPackage, setSalesPackage] = useState<SalesPostPackage | null>(null);
-  const [markup, setMarkup] = useState<ShopeeManualMarkupPercent>(
-    DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
-  );
   const [message, setMessage] = useState<string | null>(null);
   const fields = useMemo(
     () => getSmartFields(draft),
@@ -67,9 +59,9 @@ export default function ShopeeListingAssistant({
   const listing = useMemo(
     () =>
       salesPackage
-        ? buildShopeeManualListingDraft(salesPackage, draft, markup, imageReady)
+        ? buildShopeeManualListingDraft(salesPackage, draft, imageReady)
         : null,
-    [draft, imageReady, markup, salesPackage],
+    [draft, imageReady, salesPackage],
   );
 
   const sellerUrl = shopeeSellerDestinationUrl(
@@ -130,18 +122,7 @@ export default function ShopeeListingAssistant({
                   <strong>{listing.shopeePriceDisplay}</strong>
                 </div>
               </div>
-              <div className="shopee-markup-tabs" role="tablist" aria-label="เลือกเปอร์เซ็นต์บวกราคา Shopee">
-                {SHOPEE_MANUAL_MARKUP_OPTIONS.map((value) => (
-                  <button
-                    type="button"
-                    key={value}
-                    className={markup === value ? "active" : ""}
-                    onClick={() => setMarkup(value)}
-                  >
-                    +{value}%
-                  </button>
-                ))}
-              </div>
+              <div className="shopee-fixed-markup">ราคา Shopee ใช้ +18% จากราคา Hub ทุกสินค้า</div>
               <small>{listing.priceFormulaText}</small>
               <button
                 type="button"
@@ -152,7 +133,7 @@ export default function ShopeeListingAssistant({
                 คัดลอกราคา {listing.shopeePriceDisplay}
               </button>
               <p>
-                ราคา Shopee เป็นราคาช่วยกรอกเท่านั้น ไม่แก้ราคาปกติใน Hub
+                ราคา Shopee บวก 18% ตายตัว ไม่แก้ราคาปกติใน Hub
                 และไม่ได้คำนวณค่าธรรมเนียม/โปรโมชันของ Shopee อัตโนมัติ
               </p>
             </section>
@@ -281,7 +262,7 @@ export default function ShopeeListingAssistant({
 
             <p className="sales-package-note shopee-note">
               <ShoppingBag size={13} />
-              Hub ช่วยเตรียมข้อมูลและคำนวณราคา +18–20% เท่านั้น
+              Hub ช่วยเตรียมข้อมูลและคำนวณราคา +18% ตายตัว
               พนักงานยังต้องตรวจหมวด น้ำหนัก ขนาด ขนส่ง และกดเผยแพร่เอง
             </p>
           </>
