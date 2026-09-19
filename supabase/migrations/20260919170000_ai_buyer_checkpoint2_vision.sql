@@ -22,6 +22,9 @@ create index if not exists ai_buyer_analysis_case_idx
 
 alter table public.ai_buyer_analysis_runs enable row level security;
 
+revoke all on table public.ai_buyer_analysis_runs from anon, authenticated;
+grant select, insert, update, delete on table public.ai_buyer_analysis_runs to service_role;
+
 comment on table public.ai_buyer_analysis_runs is
   'Auditable Conversation + Vision intake runs. Stores structured operational output, not hidden chain-of-thought.';
 
