@@ -920,17 +920,26 @@ export async function runShopeePublishSweep(env: ShopeeEnv) {
 }
 
 async function getConnectionStatus(env: ShopeeEnv) {
-  const [connections, settings, queue] = await Promise.all([
-    serviceRest<any[]>(
-      env,
-      'shopee_connections?select=id,shop_id,merchant_id,region,status,access_expires_at,refresh_expires_at,authorization_expires_at,last_refresh_at,last_error,created_at,updated_at&order=updated_at.desc',
-    ),
-    serviceRest<any[]>(env, 'shopee_settings?id=eq.1&select=*&limit=1'),
-    serviceRest<any[]>(
-      env,
-      'shopee_publish_queue?select=status,action&order=created_at.desc&limit=500',
-    ),
-  ])
+  const [connections, settings, queue, categoryMappings, productMappings] =
+    await Promise.all([
+      serviceRest<any[]>(
+        env,
+        'shopee_connections?select=id,shop_id,merchant_id,region,status,access_expires_at,refresh_expires_at,authorization_expires_at,last_refresh_at,last_error,created_at,updated_at&order=updated_at.desc',
+      ),
+      serviceRest<any[]>(env, 'shopee_settings?id=eq.1&select=*&limit=1'),
+      serviceRest<any[]>(
+        env,
+        'shopee_publish_queue?select=status,action&order=created_at.desc&limit=500',
+      ),
+      serviceRest<any[]>(
+        env,
+        'shopee_category_mappings?active=eq.true&select=id',
+      ),
+      serviceRest<any[]>(
+        env,
+        'shopee_product_mappings?status=eq.PUBLISHED&select=id',
+      ),
+    ])
   return {
     configured: configured(env),
     connections: connections.map((row) => ({
@@ -957,6 +966,10 @@ async function getConnectionStatus(env: ShopeeEnv) {
       pending: queue.filter((row) => row.status === 'PENDING').length,
       processing: queue.filter((row) => row.status === 'PROCESSING').length,
       failed: queue.filter((row) => row.status === 'FAILED').length,
+    },
+    mappings: {
+      categories: categoryMappings.length,
+      publishedProducts: productMappings.length,
     },
   }
 }
