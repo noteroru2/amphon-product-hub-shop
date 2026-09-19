@@ -2,6 +2,12 @@
 
 Status: discovery / foundation only. No Shopee listing is published by this document.
 
+## Seller eligibility update — 2026-09-19
+
+The current Shopee Seller Identification flow rejects this shop because it is neither a Managed Seller nor a Mall Seller. Therefore the direct Open Platform adapter is **disabled by default** in production.
+
+The direct runtime remains installed behind the Channel Architecture boundary for future eligibility. Until then, Shopee may later be connected through an approved partner adapter. Website publishing continues natively and Facebook remains assisted/manual. AMPHON System remains the inventory authority in every mode.
+
 ## Goal
 
 Publish unique used products from AMPHON Product Hub to Shopee without making Shopee the inventory authority.
