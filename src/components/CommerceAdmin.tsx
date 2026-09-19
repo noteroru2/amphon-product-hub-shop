@@ -27,6 +27,14 @@ import {
   updateCommerceStoreSettings,
   validateGtin,
 } from '../lib/commerce'
+import {
+  discoverShopee,
+  getShopeeStatus,
+  saveShopeeCategoryMapping,
+  seedShopeeQueue,
+  startShopeeAuthorization,
+  type ShopeeStatus,
+} from '../lib/shopee'
 import type {
   CommerceCatalog,
   CommerceIndexPolicy,
@@ -34,6 +42,7 @@ import type {
   CommerceStoreSettings,
   CommerceTaxonomyCandidate,
   MerchantItemCondition,
+  ProductCategory,
   ProductSummary,
   Profile,
 } from '../types/product'
@@ -307,6 +316,352 @@ export function ProductCommerceEditor({
   </div></div>
 }
 
+
+const SHOPEE_SOURCE_CATEGORIES: Array<{ value: ProductCategory; label: string }> = [
+  { value: 'notebook', label: 'Notebook / Laptop' },
+  { value: 'pc', label: 'PC / Desktop' },
+  { value: 'iphone', label: 'iPhone' },
+  { value: 'smartphone', label: 'Smartphone' },
+  { value: 'tablet', label: 'Tablet / iPad' },
+  { value: 'camera', label: 'Camera' },
+  { value: 'lens', label: 'Lens' },
+  { value: 'monitor', label: 'Monitor' },
+  { value: 'component', label: 'PC Component' },
+  { value: 'gaming', label: 'Gaming / Console' },
+  { value: 'accessory', label: 'Accessory' },
+  { value: 'other', label: 'Other' },
+]
+
+function shopeeCategoryRows(payload: any) {
+  const rows = payload?.response?.category_list
+  return Array.isArray(rows) ? rows : []
+}
+
+function shopeeLogisticRows(payload: any) {
+  const rows = payload?.response?.logistics_channel_list
+  return Array.isArray(rows) ? rows : []
+}
+
+function shopeeAttributeRows(payload: any) {
+  const groups = payload?.response?.list
+  if (!Array.isArray(groups)) return []
+  return groups.flatMap((group: any) =>
+    Array.isArray(group?.attribute_tree) ? group.attribute_tree : [],
+  )
+}
+
+function ShopeeSettingsPanel() {
+  const [status, setStatus] = useState<ShopeeStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [panelError, setPanelError] = useState<string | null>(null)
+
+  const [categories, setCategories] = useState<any[]>([])
+  const [categorySearch, setCategorySearch] = useState('')
+  const [logistics, setLogistics] = useState<any[]>([])
+  const [attributes, setAttributes] = useState<any[]>([])
+  const [sourceCategory, setSourceCategory] = useState<ProductCategory>('notebook')
+  const [sourceSubtype, setSourceSubtype] = useState('')
+  const [shopeeCategoryId, setShopeeCategoryId] = useState('')
+  const [shopeeCategoryName, setShopeeCategoryName] = useState('')
+  const [weightKg, setWeightKg] = useState('')
+  const [selectedLogistics, setSelectedLogistics] = useState<number[]>([])
+  const [attributeJson, setAttributeJson] = useState('[]')
+  const [dimensionJson, setDimensionJson] = useState('')
+
+  async function reloadStatus() {
+    setLoading(true)
+    setPanelError(null)
+    try {
+      setStatus(await getShopeeStatus())
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void reloadStatus() }, [])
+
+  const connection = status?.connections?.find((item) => item.status === 'CONNECTED')
+    || status?.connections?.[0]
+    || null
+
+  const leafCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase()
+    return categories
+      .filter((item) => !item?.has_children)
+      .filter((item) => {
+        if (!query) return true
+        return String(item?.display_category_name || item?.original_category_name || '')
+          .toLowerCase()
+          .includes(query)
+          || String(item?.category_id || '').includes(query)
+      })
+      .slice(0, 120)
+  }, [categories, categorySearch])
+
+  const enabledLogistics = useMemo(
+    () => logistics.filter((item) => item?.enabled),
+    [logistics],
+  )
+
+  const mandatoryAttributes = useMemo(
+    () => attributes.filter((item) => item?.mandatory),
+    [attributes],
+  )
+
+  async function connect() {
+    setBusy(true)
+    setPanelError(null)
+    try {
+      const result = await startShopeeAuthorization()
+      window.location.assign(result.authorizationUrl)
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : String(err))
+      setBusy(false)
+    }
+  }
+
+  async function loadDiscovery() {
+    if (!connection) return
+    setBusy(true)
+    setPanelError(null)
+    setNotice(null)
+    try {
+      const [categoryResult, logisticResult] = await Promise.all([
+        discoverShopee(connection.shopId, 'categories'),
+        discoverShopee(connection.shopId, 'logistics'),
+      ])
+      const nextCategories = shopeeCategoryRows(categoryResult)
+      const nextLogistics = shopeeLogisticRows(logisticResult)
+      setCategories(nextCategories)
+      setLogistics(nextLogistics)
+      setSelectedLogistics(
+        nextLogistics
+          .filter((item: any) => item?.enabled && item?.fee_type !== 'SIZE_SELECTION')
+          .map((item: any) => Number(item.logistics_channel_id))
+          .filter((value: number) => Number.isInteger(value) && value > 0),
+      )
+      setNotice(`โหลดจาก Shopee แล้ว: ${nextCategories.length} หมวด / ${nextLogistics.length} ช่องทางขนส่ง`)
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function chooseCategory(value: string) {
+    setShopeeCategoryId(value)
+    const selected = categories.find((item) => String(item?.category_id) === value)
+    setShopeeCategoryName(
+      String(selected?.display_category_name || selected?.original_category_name || ''),
+    )
+    setAttributes([])
+    setAttributeJson('[]')
+    if (!connection || !value) return
+    try {
+      const result = await discoverShopee(
+        connection.shopId,
+        'attributes',
+        [Number(value)],
+      )
+      setAttributes(shopeeAttributeRows(result))
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function saveMapping() {
+    if (!connection) return
+    const categoryId = Number(shopeeCategoryId)
+    const weight = Number(weightKg)
+    if (!categoryId || !weight || !selectedLogistics.length) {
+      setPanelError('เลือก Shopee category, น้ำหนัก และช่องทางขนส่งอย่างน้อย 1 รายการก่อน')
+      return
+    }
+
+    setBusy(true)
+    setPanelError(null)
+    setNotice(null)
+    try {
+      const attributeList = JSON.parse(attributeJson || '[]')
+      const dimension = dimensionJson.trim()
+        ? JSON.parse(dimensionJson)
+        : null
+      if (!Array.isArray(attributeList)) {
+        throw new Error('Attribute JSON ต้องเป็น array')
+      }
+      const result = await saveShopeeCategoryMapping({
+        sourceCategory,
+        sourceSubtype: sourceSubtype.trim() || null,
+        shopeeCategoryId: categoryId,
+        shopeeCategoryName: shopeeCategoryName || null,
+        attributeList,
+        logisticInfo: selectedLogistics.map((logisticId) => ({
+          logistic_id: logisticId,
+          enabled: true,
+        })),
+        weightKg: weight,
+        dimension,
+      })
+      setNotice(`บันทึก mapping แล้ว • เพิ่มคิวอัตโนมัติ ${result.queued} รายการ`)
+      await reloadStatus()
+    } catch (err) {
+      setPanelError(
+        err instanceof SyntaxError
+          ? 'JSON ของ Attribute/Dimension ไม่ถูกต้อง'
+          : err instanceof Error
+            ? err.message
+            : String(err),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function seed() {
+    if (!connection) return
+    setBusy(true)
+    setPanelError(null)
+    try {
+      const result = await seedShopeeQueue(connection.shopId)
+      setNotice(`ตรวจสินค้าปัจจุบันแล้ว • เข้า queue ใหม่ ${result.queued} รายการ`)
+      await reloadStatus()
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function toggleLogistic(id: number) {
+    setSelectedLogistics((current) =>
+      current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id],
+    )
+  }
+
+  return <section className="commerce-section shopee-settings-panel">
+    <div className="commerce-section-title">
+      <ExternalLink/>
+      <div>
+        <strong>Shopee Seller API</strong>
+        <small>AMPHON System เป็นเจ้าของสต๊อก • Shopee เป็นช่องทางขายภายนอกเท่านั้น</small>
+      </div>
+    </div>
+
+    {loading ? <div className="publish-loading"><LoaderCircle className="spin"/><span>กำลังตรวจ Shopee API</span></div> : <>
+      {panelError && <div className="publish-error">{panelError}</div>}
+      {notice && <div className="publish-message">{notice}</div>}
+
+      <div className="commerce-lock-card">
+        <ShieldCheck/>
+        <div>
+          <strong>
+            {!status?.configured
+              ? 'ยังไม่ได้ตั้ง Shopee Partner credentials'
+              : connection
+                ? `เชื่อม Shopee Shop ${connection.shopId} แล้ว`
+                : 'Shopee API พร้อม — รอ authorize ร้าน'}
+          </strong>
+          <small>
+            {connection
+              ? `สถานะ ${connection.status} • mapping ${status?.mappings?.categories ?? 0} หมวด • ลงแล้ว ${status?.mappings?.publishedProducts ?? 0} SKU • queue ${status?.queue?.pending ?? 0} • error ${status?.queue?.failed ?? 0}`
+              : 'Partner key และ token อยู่ฝั่ง server เท่านั้น ไม่ส่งเข้า browser'}
+          </small>
+        </div>
+      </div>
+
+      {status?.configured && !connection && (
+        <button className="primary-button" type="button" onClick={() => void connect()} disabled={busy}>
+          {busy ? <LoaderCircle className="spin" size={18}/> : <ExternalLink size={18}/>}
+          เชื่อมร้าน Shopee
+        </button>
+      )}
+
+      {connection && <>
+        <div className="commerce-save-row">
+          <button className="secondary-button" type="button" onClick={() => void loadDiscovery()} disabled={busy}>
+            <RefreshCw size={17}/>โหลด Category / Logistics จาก Shopee
+          </button>
+          <button className="secondary-button" type="button" onClick={() => void seed()} disabled={busy}>
+            <PackageSearch size={17}/>ตรวจและเข้าคิวสินค้าปัจจุบัน
+          </button>
+        </div>
+
+        {!!categories.length && <div className="shopee-mapping-box">
+          <strong>ตั้ง Mapping สำหรับ Auto Publish</strong>
+          <small>ทำครั้งเดียวต่อ AMPHON category/subtype แล้วสินค้าใหม่ใช้ mapping นี้อัตโนมัติ</small>
+
+          <div className="commerce-form-grid two">
+            <label>
+              <span>AMPHON category</span>
+              <select value={sourceCategory} onChange={(e) => setSourceCategory(e.target.value as ProductCategory)}>
+                {SHOPEE_SOURCE_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Subtype (ถ้าต้องแยก)</span>
+              <input value={sourceSubtype} onChange={(e) => setSourceSubtype(e.target.value)} placeholder="เว้นว่าง = ใช้ทั้งหมวด"/>
+            </label>
+            <label className="span-two">
+              <span>ค้นหา Shopee category</span>
+              <input value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="เช่น Laptop / Notebook / โทรศัพท์"/>
+            </label>
+            <label className="span-two">
+              <span>Shopee category — ต้องเป็น leaf category</span>
+              <select value={shopeeCategoryId} onChange={(e) => void chooseCategory(e.target.value)}>
+                <option value="">— เลือกหมวด —</option>
+                {leafCategories.map((item) => <option key={item.category_id} value={item.category_id}>
+                  {item.display_category_name || item.original_category_name} · {item.category_id}
+                </option>)}
+              </select>
+            </label>
+            <label>
+              <span>น้ำหนักพัสดุ (kg)</span>
+              <input type="number" min="0.01" step="0.01" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} placeholder="เช่น 2.5"/>
+            </label>
+            <label>
+              <span>Dimension JSON (ถ้าต้องใช้)</span>
+              <input value={dimensionJson} onChange={(e) => setDimensionJson(e.target.value)} placeholder='{"package_length":40,"package_width":30,"package_height":10}'/>
+            </label>
+          </div>
+
+          <div className="shopee-logistics">
+            <strong>ช่องทางขนส่งที่เปิดในร้าน</strong>
+            {enabledLogistics.map((item) => {
+              const id = Number(item.logistics_channel_id)
+              return <label key={id} className="toggle-field wide">
+                <span>{item.logistics_channel_name} <small>{item.fee_type || ''}</small></span>
+                <input type="checkbox" checked={selectedLogistics.includes(id)} onChange={() => toggleLogistic(id)}/>
+              </label>
+            })}
+          </div>
+
+          {!!shopeeCategoryId && <label className="commerce-field">
+            <span>Required attributes ของหมวดนี้</span>
+            <small>
+              {mandatoryAttributes.length
+                ? mandatoryAttributes.map((item) => `${item.name} (#${item.attribute_id})`).join(' • ')
+                : 'Shopee ไม่รายงาน mandatory attribute หรือยังโหลดไม่สำเร็จ'}
+            </small>
+            <textarea rows={4} value={attributeJson} onChange={(e) => setAttributeJson(e.target.value)} placeholder='[{"attribute_id":123,"attribute_value_list":[{"value_id":456,"original_value_name":"..."}]}]'/>
+            <small>ใส่เฉพาะค่า attribute ที่ Shopee ต้องการตาม Attribute Tree; ถ้าไม่มีให้ใช้ []</small>
+          </label>}
+
+          <button className="primary-button" type="button" onClick={() => void saveMapping()} disabled={busy}>
+            {busy ? <LoaderCircle className="spin" size={18}/> : <Save size={18}/>}
+            บันทึก Mapping + เริ่ม Auto Publish
+          </button>
+        </div>}
+      </>}
+    </>}
+  </section>
+}
+
 export function MerchantSettingsModal({ profile, onClose }: { profile: Profile; onClose: () => void }) {
   const [tab, setTab] = useState<'policy' | 'taxonomy'>('policy')
   const [settings, setSettings] = useState<CommerceStoreSettings | null>(null)
@@ -422,6 +777,8 @@ export function MerchantSettingsModal({ profile, onClose }: { profile: Profile; 
           </div>
           <div className={settings.purchaseEnabled ? 'commerce-lock-card checkout-live' : 'commerce-lock-card'}><ShieldCheck/><div><strong>{settings.purchaseEnabled ? 'Purchase flow: LIVE' : 'Purchase flow: OFF'}</strong><small>เปิดได้เมื่อ Shipping + Return policy + Turnstile และอย่างน้อยหนึ่งช่องทางชำระเงินจริงพร้อม ระบบ Order ล็อก SKU แบบ atomic ที่ฐานข้อมูล</small></div></div>
         </section>
+
+        {isAdmin && <ShopeeSettingsPanel />}
 
         <section className="commerce-section auto-publish-config">
           <div className="commerce-section-title"><CheckCircle2/><div><strong>ลงสินค้าในเว็บไซต์อัตโนมัติ</strong><small>เมื่อรูป สเปก และข้อมูลขายครบ ระบบจะรอให้ข้อมูลนิ่งก่อนขึ้น AMPHON SHOP เอง</small></div></div>
