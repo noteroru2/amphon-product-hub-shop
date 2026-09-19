@@ -3,6 +3,7 @@ import fs from 'node:fs'
 const required = [
   'supabase/migrations/20260919163000_ai_buyer_v1_foundation.sql',
   'supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql',
+  'supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql',
   'workers/ai-buyer/src/index.ts',
   'workers/ai-buyer/src/batcher.ts',
   'workers/ai-buyer/src/conversation-engine.ts',
@@ -20,6 +21,7 @@ const batcher = fs.readFileSync('workers/ai-buyer/src/batcher.ts', 'utf8')
 const engine = fs.readFileSync('workers/ai-buyer/src/conversation-engine.ts', 'utf8')
 const sql1 = fs.readFileSync('supabase/migrations/20260919163000_ai_buyer_v1_foundation.sql', 'utf8')
 const sql2 = fs.readFileSync('supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql', 'utf8')
+const sql3 = fs.readFileSync('supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql', 'utf8')
 const wrangler = fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8')
 
 for (const token of [
@@ -83,6 +85,22 @@ for (const token of [
   'enable row level security',
 ]) {
   if (!sql2.includes(token)) throw new Error(`AI Buyer checkpoint 2 schema invariant missing: ${token}`)
+}
+
+for (const token of [
+  'ai_buyer_conversations_customer_idx',
+  'ai_buyer_cases_customer_idx',
+  'ai_buyer_messages_webhook_event_idx',
+  'ai_buyer_images_message_idx',
+  'ai_buyer_images_analysis_run_idx',
+  'ai_buyer_analysis_conversation_idx',
+  'ai_buyer_pricing_version_idx',
+  'ai_buyer_pricing_entry_idx',
+  'ai_buyer_offers_case_idx',
+  'ai_buyer_tasks_case_idx',
+  'ai_buyer_overrides_case_idx',
+]) {
+  if (!sql3.includes(token)) throw new Error(`AI Buyer performance index missing: ${token}`)
 }
 
 for (const token of [
