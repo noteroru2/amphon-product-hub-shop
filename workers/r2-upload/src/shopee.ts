@@ -10,6 +10,7 @@ export interface ShopeeEnv {
   SHOPEE_AUTH_URL?: string
   SHOPEE_REDIRECT_URI?: string
   SHOPEE_HUB_REDIRECT_URL?: string
+  CHANNEL_SHOPEE_MODE?: string
 }
 
 type ShopeeProfile = {
@@ -146,7 +147,16 @@ async function serviceRpc<T>(
   })
 }
 
+function channelMode(env: ShopeeEnv): 'disabled' | 'direct_api' | 'partner_api' {
+  const mode = String(env.CHANNEL_SHOPEE_MODE || 'disabled').trim().toLowerCase()
+  if (mode === 'direct_api' || mode === 'partner_api') return mode
+  return 'disabled'
+}
+
 function requiredConfig(env: ShopeeEnv) {
+  if (channelMode(env) !== 'direct_api') {
+    throw new ShopeeError('SHOPEE_DIRECT_API_DISABLED', false)
+  }
   const partnerId = Number(env.SHOPEE_PARTNER_ID || 0)
   const partnerKey = String(env.SHOPEE_PARTNER_KEY || '')
   const redirectUri = String(
@@ -940,8 +950,18 @@ async function getConnectionStatus(env: ShopeeEnv) {
         'shopee_product_mappings?status=eq.PUBLISHED&select=id',
       ),
     ])
+  const mode = channelMode(env)
   return {
+    mode,
     configured: configured(env),
+    blockedReason:
+      mode === 'disabled'
+        ? 'DIRECT_API_NOT_AVAILABLE'
+        : mode === 'partner_api'
+          ? 'PARTNER_ADAPTER_NOT_CONFIGURED'
+          : configured(env)
+            ? null
+            : 'DIRECT_API_CREDENTIALS_MISSING',
     connections: connections.map((row) => ({
       id: row.id,
       shopId: Number(row.shop_id),
