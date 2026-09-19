@@ -29,6 +29,18 @@ values
   ('shopee','Shopee','disabled',false,false,true,true,'[]'::jsonb)
 on conflict (channel_key) do nothing;
 
+-- Direct Shopee API is currently not available to this seller account.
+-- Keep the already-installed Shopee runtime fail-closed and prevent queue growth.
+do $
+begin
+  if to_regclass('public.shopee_settings') is not null then
+    update public.shopee_settings
+       set auto_publish_enabled = false,
+           updated_at = now()
+     where id = 1;
+  end if;
+end $;
+
 create or replace function public.touch_sales_channel_row()
 returns trigger
 language plpgsql
