@@ -168,6 +168,10 @@ export type PriceGuardResult =
   | { allowed: true; hardMax: number; decision: PricingDecision }
   | { allowed: false; reason: string; hardMax?: number; decision?: PricingDecision }
 
+const PRICING_CATEGORIES: ProductCategory[] = [
+  'NOTEBOOK','MACBOOK','DESKTOP_PC','SMARTPHONE','TABLET','CAMERA','OTHER',
+]
+
 const COMPLEX_MARKET_TAGS: PricingTag[] = [
   'DEVICE_NOT_BOOTING',
   'LOCKED',
@@ -237,6 +241,19 @@ function safeJsonObject(value: unknown): Record<string, unknown> {
     : {}
 }
 
+function normalizeAdjustments(value: unknown) {
+  const source = safeJsonObject(value)
+  const output: Record<string, number> = {}
+  for (const [key, raw] of Object.entries(source)) {
+    const amount = Number(raw)
+    if (!Number.isFinite(amount) || Math.abs(amount) > 10000000) {
+      throw new Error('PRICE_ADJUSTMENT_INVALID:' + clean(key, 80))
+    }
+    output[clean(key, 80)] = Math.round(amount * 100) / 100
+  }
+  return output
+}
+
 function uniqueStrings(values: unknown[]) {
   return [...new Set(values.map((value) => clean(value, 500)).filter(Boolean))]
 }
@@ -301,7 +318,8 @@ function validatePercent(value: unknown, field: string) {
 function normalizeEntry(entry: PriceBookImportEntry) {
   const category = clean(entry.category, 40) as ProductCategory
   const model = clean(entry.model, 240)
-  if (!category || !model) throw new Error('PRICE_BOOK_ENTRY_IDENTITY_REQUIRED')
+  if (!PRICING_CATEGORIES.includes(category)) throw new Error('PRICE_BOOK_CATEGORY_INVALID')
+  if (!model) throw new Error('PRICE_BOOK_ENTRY_IDENTITY_REQUIRED')
 
   const opening = validateMoney(entry.opening_offer, 'opening_offer')
   const target = validateMoney(entry.target_buy, 'target_buy')
@@ -330,7 +348,7 @@ function normalizeEntry(entry: PriceBookImportEntry) {
     opening_offer: opening,
     target_buy: target,
     hard_max: hardMax,
-    adjustments: safeJsonObject(entry.adjustments),
+    adjustments: normalizeAdjustments(entry.adjustments),
     normalized_brand: normalizeLookup(brand) || null,
     normalized_model: normalizeLookup(model),
     normalized_model_code: normalizeLookup(modelCode) || null,
@@ -341,6 +359,7 @@ function normalizeEntry(entry: PriceBookImportEntry) {
 
 function normalizeRule(rule: PriceBookImportRule) {
   const category = clean(rule.category, 40) as ProductCategory
+  if (!PRICING_CATEGORIES.includes(category)) throw new Error('PRICE_RULE_CATEGORY_INVALID')
   const buyback = validatePercent(rule.buyback_percent, 'buyback_percent')
   const minBuyback = rule.min_buyback_percent == null ? Math.max(0.01, buyback - 0.10) : validatePercent(rule.min_buyback_percent, 'min_buyback_percent')
   const maxBuyback = rule.max_buyback_percent == null ? Math.min(0.99, buyback + 0.10) : validatePercent(rule.max_buyback_percent, 'max_buyback_percent')
@@ -361,7 +380,7 @@ function normalizeRule(rule: PriceBookImportRule) {
     rounding_step: Math.max(1, Math.min(10000, Math.floor(numberValue(rule.rounding_step, 100)))),
     min_market_comparables: Math.max(3, Math.min(12, Math.floor(numberValue(rule.min_market_comparables, 3)))),
     max_market_dispersion: Math.max(0.01, Math.min(1, numberValue(rule.max_market_dispersion, 0.35))),
-    adjustments: safeJsonObject(rule.adjustments),
+    adjustments: normalizeAdjustments(rule.adjustments),
     active: rule.active !== false,
   }
 }
@@ -384,6 +403,24 @@ export async function importPriceBook(env: PricingEnv, payload: PriceBookImportP
   const checksum = clean(payload.source_checksum, 240) || null
   const entries = Array.isArray(payload.entries) ? payload.entries.map(normalizeEntry) : []
   const rules = Array.isArray(payload.category_rules) ? payload.category_rules.map(normalizeRule) : []
+
+  const entryKeys = new Set<string>()
+  for (const entry of entries) {
+    const key = [
+      entry.category,
+      entry.normalized_model_code || entry.normalized_model,
+      clean(entry.condition_key, 80).toUpperCase(),
+      JSON.stringify(entry.spec_match),
+    ].join('|')
+    if (entryKeys.has(key)) throw new Error('PRICE_BOOK_DUPLICATE_ENTRY:' + key)
+    entryKeys.add(key)
+  }
+
+  const ruleCategories = new Set<string>()
+  for (const rule of rules) {
+    if (ruleCategories.has(rule.category)) throw new Error('PRICE_RULE_DUPLICATE_CATEGORY:' + rule.category)
+    ruleCategories.add(rule.category)
+  }
 
   if (!versionName) throw new Error('PRICE_BOOK_VERSION_REQUIRED')
   if (!entries.length) throw new Error('PRICE_BOOK_ENTRIES_REQUIRED')
