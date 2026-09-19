@@ -692,7 +692,7 @@ async function addShopeeItem(
     weight: Number(category.weight_kg),
     item_name: cleanText(product.title, 120),
     item_status: 'NORMAL',
-    normal_stock: projectedStock(product),
+    seller_stock: [{ stock: projectedStock(product) }],
     logistic_info: category.logistic_info,
     attribute_list: Array.isArray(category.attribute_list)
       ? category.attribute_list
@@ -727,7 +727,7 @@ async function addShopeeItem(
   return {
     itemId,
     price: Number(payload.original_price),
-    stock: Number(payload.normal_stock),
+    stock: projectedStock(product),
     response,
   }
 }
@@ -746,7 +746,10 @@ async function updateShopeeStock(
       method: 'POST',
       body: JSON.stringify({
         item_id: itemId,
-        stock_list: [{ model_id: 0, normal_stock: stock }],
+        stock_list: [{
+          model_id: 0,
+          seller_stock: [{ stock }],
+        }],
       }),
     },
   )
