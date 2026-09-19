@@ -279,7 +279,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
               </p>
               {settings?.purchaseEnabled ? (
                 <>
-                  <button id="add-to-cart" class="button button-secondary button-wide web-purchase-secondary" type="button" data-sku={product.sku}>ใส่ตะกร้า (ชำระผ่านเว็บ)</button>
+                  <button id="add-to-cart" class="button button-secondary button-wide web-purchase-secondary" type="button" data-sku={product.sku}>ใส่ตะกร้า</button>
                   <a class="button button-secondary button-wide web-purchase-secondary" href="/cart/">ไปตะกร้า / ชำระผ่านเว็บ</a>
                   <p id="cart-message" class="microcopy">การชำระผ่านเว็บเป็นทางเลือก ก่อนยืนยัน ร้านจะเช็กว่าสินค้ายังว่างให้อีกครั้ง</p>
                 </>
@@ -421,7 +421,7 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
     const cart = addCartSku(sku)
     if (message) message.textContent = `ใส่ตะกร้าแล้ว · ตอนนี้มี ${cart.length} รายการ`
     button.textContent = 'ใส่ตะกร้าแล้ว'
-    window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า (ชำระผ่านเว็บ)' }, 1400)
+    window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า' }, 1400)
   })
 
   const gallery = document.querySelector<HTMLElement>('[data-product-gallery]')
