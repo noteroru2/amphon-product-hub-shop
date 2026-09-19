@@ -8,7 +8,7 @@ Status: implemented foundation. This layer lets Product Hub treat Website, Faceb
 2. **AMPHON Product Hub** owns product enrichment, listing content, images and channel orchestration.
 3. **AMPHON SHOP / Website** is a native sales projection.
 4. **Facebook Page / Marketplace** are assisted channels today. Hub prepares content/images; staff performs the external publish/close action.
-5. **Shopee** is prepared as an adapter but is disabled by default while direct Seller API access is unavailable. It can later run as direct API or through an approved partner without changing Product Master.
+5. **Shopee** runs in assisted mode while direct Seller API access is unavailable. Hub prepares title, images, SKU, suggested category, stock guidance and a channel price at +18–20% from the Hub price; staff publishes manually in Seller Centre. It can later switch to direct API or an approved partner without changing Product Master.
 
 No external channel may become stock master.
 
@@ -46,7 +46,7 @@ Channel Orchestrator
   +-- Website adapter ----------> AMPHON SHOP
   +-- Facebook Page adapter ----> assisted package now / API later
   +-- Marketplace adapter ------> assisted package now / API later
-  +-- Shopee adapter -----------> disabled now / direct or partner later
+  +-- Shopee adapter -----------> assisted Seller Centre now / direct or partner later
 ```
 
 ## Channel contract
@@ -79,9 +79,9 @@ RESERVED and SOLD must never be turned back into channel stock by a marketplace 
 | Website | native | yes | AMPHON System |
 | Facebook Page | assisted | no | AMPHON System |
 | Facebook Marketplace | assisted | no | AMPHON System |
-| Shopee | disabled | no | AMPHON System |
+| Shopee | assisted | no | AMPHON System |
 
-Shopee direct runtime already exists behind the adapter boundary, but production must not require Shopee credentials while the seller account is ineligible for direct API access.
+Shopee direct runtime already exists behind the adapter boundary, but production does not require Shopee credentials while the seller account is ineligible for direct API access. The assisted workflow defaults to +20% pricing, allows staff to choose +18%, +19% or +20%, and rounds the resulting listing price upward to the next 10 THB. This is a store pricing policy, not an automatic calculation of Shopee fees or campaign costs.
 
 ## Future Shopee partner path
 
@@ -112,4 +112,4 @@ For now the Facebook adapters remain assisted. Hub continues to generate Faceboo
 - Automated publishers must be idempotent.
 - Missing credentials/mapping/capability must fail closed.
 - SOLD/RESERVED projects zero stock.
-- A disabled adapter must not enqueue or execute publish jobs.
+- Direct Shopee API remains disabled unless explicitly enabled with valid credentials; assisted/manual Shopee publishing never enqueues the direct API queue.
