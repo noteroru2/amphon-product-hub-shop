@@ -40,6 +40,7 @@ import { isBackendConfigured, supabase } from "./lib/supabase";
 import { buildSpecText, copyText } from "./lib/sales";
 import {
   buildContentForChannel,
+  buildShopeeContentParts,
   contentTemplates,
   type ContentChannel,
 } from "./lib/contentTemplates";
@@ -2771,6 +2772,7 @@ function SalesToolkit({
   const activeTemplate =
     contentTemplates.find((template) => template.id === channel) ??
     contentTemplates[0];
+  const shopeeParts = useMemo(() => buildShopeeContentParts(draft), [draft]);
   const remoteImageCount = draft.images.filter(
     (image) => image.publicUrl,
   ).length;
@@ -2834,7 +2836,7 @@ function SalesToolkit({
           <span>
             <strong>ผู้ช่วยลง Shopee</strong>
             <small>
-              ราคาอัตโนมัติ +18–20% · ชื่อ SKU สต๊อก รายละเอียด และ checklist
+              ราคา Shopee +18% ตายตัว · ชื่อ SKU สต๊อก รายละเอียด และ checklist
             </small>
           </span>
           <ChevronRight />
@@ -2878,20 +2880,72 @@ function SalesToolkit({
               </button>
             ))}
           </div>
-          <div className="content-preview-box">
-            <div className="content-preview-label">
-              <span>{activeTemplate.label}</span>
-              <button
-                type="button"
-                onClick={() =>
-                  void copy(content, `ก๊อป ${activeTemplate.shortLabel}`)
-                }
-              >
-                <ClipboardCopy size={15} /> ก๊อป
-              </button>
+          {channel === "shopee" ? (
+            <div className="content-preview-box shopee-content-preview">
+              <div className="content-preview-label">
+                <span>Shopee · ราคา +18%</span>
+                <button
+                  type="button"
+                  onClick={() => void copy(shopeeParts.all, "ก๊อป Shopee ทั้งหมด")}
+                >
+                  <ClipboardCopy size={15} /> ก๊อปทั้งหมด
+                </button>
+              </div>
+              <div className="shopee-content-part">
+                <div>
+                  <span>หัวข้อ</span>
+                  <button
+                    type="button"
+                    onClick={() => void copy(shopeeParts.title, "ก๊อปหัวข้อ Shopee")}
+                  >
+                    <ClipboardCopy size={14} /> ก๊อป
+                  </button>
+                </div>
+                <pre>{shopeeParts.title}</pre>
+              </div>
+              <div className="shopee-content-part shopee-price-part">
+                <div>
+                  <span>ราคา</span>
+                  <button
+                    type="button"
+                    onClick={() => void copy(String(shopeeParts.priceValue), "ก๊อปราคา Shopee")}
+                    disabled={!shopeeParts.priceValue}
+                  >
+                    <ClipboardCopy size={14} /> ก๊อป
+                  </button>
+                </div>
+                <pre>{shopeeParts.price}</pre>
+                <small>คำนวณจากราคา Hub +18% และปัดขึ้นหลักสิบ</small>
+              </div>
+              <div className="shopee-content-part">
+                <div>
+                  <span>เนื้อหาหลัก</span>
+                  <button
+                    type="button"
+                    onClick={() => void copy(shopeeParts.body, "ก๊อปเนื้อหา Shopee")}
+                  >
+                    <ClipboardCopy size={14} /> ก๊อป
+                  </button>
+                </div>
+                <pre>{shopeeParts.body}</pre>
+              </div>
             </div>
-            <pre>{content}</pre>
-          </div>
+          ) : (
+            <div className="content-preview-box">
+              <div className="content-preview-label">
+                <span>{activeTemplate.label}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void copy(content, `ก๊อป ${activeTemplate.shortLabel}`)
+                  }
+                >
+                  <ClipboardCopy size={15} /> ก๊อป
+                </button>
+              </div>
+              <pre>{content}</pre>
+            </div>
+          )}
         </div>
         <p className="toolkit-note">
           ZIP จะมีรูปทั้งหมด + spec.txt + Content สำหรับ Facebook, Marketplace,
