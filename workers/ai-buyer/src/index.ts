@@ -214,15 +214,16 @@ async function lineProfile(env: Env, userId: string) {
 
 async function upsertCustomer(env: Env, lineUserId: string) {
   const profile = await lineProfile(env, lineUserId)
+  const payload: Record<string, unknown> = { line_user_id: lineUserId }
+  if (profile) {
+    payload.display_name = profile.displayName || null
+    payload.picture_url = profile.pictureUrl || null
+    payload.language = profile.language || null
+  }
   const result = await supabaseRequest(env, 'ai_buyer_customers?on_conflict=line_user_id', {
     method: 'POST',
     headers: { prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify({
-      line_user_id: lineUserId,
-      display_name: profile?.displayName || null,
-      picture_url: profile?.pictureUrl || null,
-      language: profile?.language || null,
-    }),
+    body: JSON.stringify(payload),
   })
   const rows = await readRows<CustomerRow>(result)
   if (!rows[0]) throw new Error('CUSTOMER_UPSERT_EMPTY')
@@ -236,7 +237,6 @@ async function upsertConversation(env: Env, customer: CustomerRow, at: string) {
     body: JSON.stringify({
       customer_id: customer.id,
       line_user_id: customer.line_user_id,
-      status: 'ACTIVE',
       last_message_at: at,
     }),
   })
