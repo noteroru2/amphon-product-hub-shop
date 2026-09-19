@@ -5,10 +5,11 @@ const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFile(resolve(root, path), 'utf8')
 const dq = String.fromCharCode(36, 36)
 
-const [doc, channels, migration, shopee, workflow] = await Promise.all([
+const [doc, channels, migration, assistedMigration, shopee, workflow] = await Promise.all([
   read('docs/channel-architecture.md'),
   read('src/lib/channels.ts'),
   read('supabase/migrations/20260919193000_channel_architecture.sql'),
+  read('supabase/migrations/20260919204500_shopee_assisted_listing.sql'),
   read('workers/r2-upload/src/shopee.ts'),
   read('.github/workflows/store-worker-deploy.yml'),
 ])
@@ -17,8 +18,8 @@ const checks = [
   ['System remains canonical stock authority', doc.includes('AMPHON System') && doc.includes('No external channel may become stock master')],
   ['Stable Website/Facebook/Shopee keys exist', ['website','facebook_page','facebook_marketplace','shopee'].every((key) => channels.includes("'" + key + "'"))],
   ['Website is native auto channel', channels.includes("key: 'website'") && channels.includes("mode: 'native'") && channels.includes('autoPublish: true')],
-  ['Facebook is assisted, not auto-published', channels.includes("key: 'facebook_page'") && channels.includes("key: 'facebook_marketplace'") && channels.match(/mode: 'assisted'/g)?.length === 2],
-  ['Shopee defaults disabled', channels.includes("key: 'shopee'") && channels.includes("mode: 'disabled'") && shopee.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'")],
+  ['Facebook is assisted, not auto-published', channels.includes("key: 'facebook_page'") && channels.includes("key: 'facebook_marketplace'") && channels.includes("mode: 'assisted'")],
+  ['Shopee is assisted for staff while direct API stays disabled by default', channels.includes("key: 'shopee'") && channels.includes("mode: 'assisted'") && assistedMigration.includes("adapter_mode = 'assisted'") && assistedMigration.includes('auto_publish = false') && shopee.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'")],
   ['Stock projection is one only for IN_STOCK', channels.includes("oneAvailability === 'IN_STOCK' ? 1 : 0") && migration.includes("p.one_availability = 'IN_STOCK' then 1 else 0")],
   ['Generic registry and durable job tables exist', migration.includes('public.sales_channel_registry') && migration.includes('public.sales_channel_links') && migration.includes('public.sales_channel_jobs')],
   ['Migration DO block uses valid dollar quoting', migration.includes('do ' + dq) && migration.includes('end ' + dq + ';')],
@@ -33,4 +34,4 @@ if (failed.length) {
   console.error('CHANNEL ARCHITECTURE verification failed: ' + failed.map((entry) => entry[0]).join(', '))
   process.exit(1)
 }
-console.log('CHANNEL ARCHITECTURE verification PASS — Website native, Facebook assisted, Shopee optional, System stock authority preserved')
+console.log('CHANNEL ARCHITECTURE verification PASS — Website native, Facebook assisted, Shopee assisted/manual with direct API fail-closed, System stock authority preserved')
