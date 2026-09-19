@@ -1,6 +1,7 @@
 import type { ProductDraft } from '../types/product'
 import { MAX_ZIP_EXPORT_BYTES, prepareProductImageFiles } from './productImageExport'
 import type { SalesPostPackage } from './salesPostPackage'
+import { buildContentForChannel } from './contentTemplates'
 
 function safeFolder(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'sales-package'
@@ -19,6 +20,7 @@ export async function downloadSalesPostPackage(pkg: SalesPostPackage, draft: Pro
   entries[`${folder}/ข้อความขาย.txt`] = strToU8(pkg.captions.GENERAL)
   entries[`${folder}/marketplace.txt`] = strToU8(pkg.captions.MARKETPLACE)
   entries[`${folder}/facebook-page.txt`] = strToU8(pkg.captions.FACEBOOK_PAGE)
+  entries[`${folder}/shopee.txt`] = strToU8(buildContentForChannel(draft, 'shopee'))
   entries[`${folder}/line.txt`] = strToU8(pkg.captions.LINE)
 
   const zipped = zipSync(entries, { level: 6 })
