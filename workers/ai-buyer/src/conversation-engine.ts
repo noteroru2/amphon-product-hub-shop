@@ -1,3 +1,5 @@
+import { runPricingForCase } from './pricing-engine'
+
 export interface ConversationEngineEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
@@ -5,6 +7,7 @@ export interface ConversationEngineEnv {
   LINE_CHANNEL_ACCESS_TOKEN: string
   OPENAI_API_KEY: string
   OPENAI_VISION_MODEL?: string
+  OPENAI_PRICING_MODEL?: string
 }
 
 export type IntakeBatch = {
@@ -948,6 +951,20 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
       skippedImageIds: vision.skippedImageIds,
     }, vision.usage)
 
+    let pricingResult: unknown = null
+    if (transition.state === 'READY_TO_PRICE') {
+      try {
+        pricingResult = await runPricingForCase(env, batch.caseId)
+      } catch (pricingError) {
+        console.error('AI BUYER pricing engine failed', batch.caseId, pricingError)
+        pricingResult = {
+          ok: false,
+          reason: 'PRICING_ENGINE_ERROR',
+          error: clean((pricingError as Error)?.message || pricingError, 500),
+        }
+      }
+    }
+
     let sent = false
     if (reply) {
       try {
@@ -973,6 +990,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
       state: transition.state,
       category: result.category,
       requestedInputs: result.requested_inputs,
+      pricingResult,
       sent,
     }
   } catch (error) {
