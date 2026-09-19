@@ -1,4 +1,4 @@
-name: AI Buyer V1 Foundation
+name: AI Buyer V1 Checks
 
 on:
   pull_request:
