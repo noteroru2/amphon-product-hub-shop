@@ -685,7 +685,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function private.shopee_enqueue_stock_projection()
   from public, anon, authenticated;
