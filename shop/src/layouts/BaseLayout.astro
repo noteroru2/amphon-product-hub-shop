@@ -6,7 +6,7 @@ import '../styles/global.css'
 import '../styles/auth.css'
 import '../styles/mobile-first.css'
 import '../styles/storefront-human.css'
-import '../styles/line-first.css'
+import '../styles/line-first.css'\nimport '../styles/mobile-polish.css'
 
 interface Props {
   title: string
@@ -46,7 +46,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="amphon-deploy-verification" content="shop-line-og-20260918" />
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -168,7 +168,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
         if (addToCart) {
           addToCart.classList.remove('button-primary')
           addToCart.classList.add('button-secondary', 'web-purchase-secondary')
-          addToCart.textContent = 'ใส่ตะกร้า (ชำระผ่านเว็บ)'
+          addToCart.textContent = 'ใส่ตะกร้า'
         }
 
         const cartAction = purchaseActions.querySelector<HTMLAnchorElement>('a[href="/cart/"]')
