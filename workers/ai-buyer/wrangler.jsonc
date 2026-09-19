@@ -8,8 +8,24 @@
       "bucket_name": "amphon-product-images"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION_BATCHER",
+        "class_name": "ConversationBatcher"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationBatcher"]
+    }
+  ],
   "vars": {
     "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
-    "AI_BUYER_ENV": "production"
+    "AI_BUYER_ENV": "production",
+    "AI_BUYER_BATCH_DEBOUNCE_MS": "2500",
+    "OPENAI_VISION_MODEL": "gpt-5.6-sol"
   }
 }
