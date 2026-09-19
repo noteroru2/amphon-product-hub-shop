@@ -102,11 +102,8 @@ function appendRows(
   lines.push('', heading, ...selected.map((row) => '• ' + row.label + ': ' + row.value))
 }
 
-export function buildShopeeManualDescription(pkg: SalesPostPackage, shopeePrice: number) {
+export function buildShopeeManualDescription(pkg: SalesPostPackage) {
   const lines = [
-    pkg.title,
-    '',
-    'ราคาใน Shopee ' + money(shopeePrice) + ' บาท',
     'สินค้ามือสอง ตรวจเช็กการใช้งานและแจ้งสภาพตามจริง',
   ]
   appendRows(lines, 'รายละเอียดสเปก', pkg.specifications, 12)
@@ -169,7 +166,7 @@ export function buildShopeeManualListingDraft(
   if (!source.conditionPercent) warnings.push('ยังไม่มีเปอร์เซ็นต์สภาพ — ให้พนักงานตรวจสภาพใน Seller Centre')
   warnings.push('น้ำหนัก/ขนาดพัสดุต้องตรวจและกรอกใน Seller Centre ตามสินค้าจริง')
 
-  const description = buildShopeeManualDescription(pkg, shopeePrice)
+  const description = buildShopeeManualDescription(pkg)
   const checklist: ShopeeManualChecklistItem[] = [
     check('images', 'รูปสินค้า', pkg.imageCount > 0 && Boolean(cover), 'ไม่มีรูปพร้อมใช้'),
     check('image_export', 'ส่งออกรูป', imageReady, 'ใช้ ZIP fallback หาก Share รูปไม่ได้'),
