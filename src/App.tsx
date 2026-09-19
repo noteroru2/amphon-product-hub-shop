@@ -86,6 +86,9 @@ const SalesPostPackagePanel = lazy(
 const MarketplaceListingAssistant = lazy(
   () => import("./components/MarketplaceListingAssistant"),
 );
+const ShopeeListingAssistant = lazy(
+  () => import("./components/ShopeeListingAssistant"),
+);
 import type {
   DuplicateIdentifierMatch,
   EmployeeActivity,
@@ -2757,6 +2760,7 @@ function SalesToolkit({
   const [salesPackageOpen, setSalesPackageOpen] = useState(false);
   const [marketplaceAssistantOpen, setMarketplaceAssistantOpen] =
     useState(false);
+  const [shopeeAssistantOpen, setShopeeAssistantOpen] = useState(false);
   const [channel, setChannel] = useState<ContentChannel>("facebook");
   const imageExport = useProductImageExport(draft);
   const specs = useMemo(() => buildSpecText(draft), [draft]);
@@ -2821,6 +2825,20 @@ function SalesToolkit({
           </span>
           <ChevronRight />
         </button>
+        <button
+          type="button"
+          className="shopee-assistant-launch"
+          onClick={() => setShopeeAssistantOpen(true)}
+        >
+          <ShoppingBag size={20} />
+          <span>
+            <strong>ผู้ช่วยลง Shopee</strong>
+            <small>
+              ราคาอัตโนมัติ +18–20% · ชื่อ SKU สต๊อก รายละเอียด และ checklist
+            </small>
+          </span>
+          <ChevronRight />
+        </button>
         <ProductImageExportControls draft={draft} imageExport={imageExport} />
         <div className="toolkit-actions">
           <button type="button" onClick={() => void copy(specs, "ก๊อปสเปก")}>
@@ -2877,7 +2895,7 @@ function SalesToolkit({
         </div>
         <p className="toolkit-note">
           ZIP จะมีรูปทั้งหมด + spec.txt + Content สำหรับ Facebook, Marketplace,
-          WINNER IT และข้อความกลาง โดยไม่มีข้อมูลต้นทุน
+          Shopee, WINNER IT และข้อความกลาง โดยไม่มีข้อมูลต้นทุน
         </p>
         {salesPackageOpen && (
           <Suspense
@@ -2908,6 +2926,22 @@ function SalesToolkit({
               draft={draft}
               imageExport={imageExport}
               onClose={() => setMarketplaceAssistantOpen(false)}
+            />
+          </Suspense>
+        )}
+        {shopeeAssistantOpen && (
+          <Suspense
+            fallback={
+              <div className="sales-package-loading">
+                <LoaderCircle className="spin" />
+                กำลังเปิดผู้ช่วย Shopee...
+              </div>
+            }
+          >
+            <ShopeeListingAssistant
+              draft={draft}
+              imageExport={imageExport}
+              onClose={() => setShopeeAssistantOpen(false)}
             />
           </Suspense>
         )}
