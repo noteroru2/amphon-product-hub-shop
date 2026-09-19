@@ -1,0 +1,77 @@
+.shopee-content-preview {
+  border-color: #fed7aa;
+  background: #fffaf5;
+}
+
+.shopee-content-preview > .content-preview-label {
+  background: #fff7ed;
+  border-bottom-color: #fed7aa;
+}
+
+.shopee-content-part {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #ffedd5;
+  background: #fff;
+}
+
+.shopee-content-part:first-of-type {
+  border-top: 0;
+}
+
+.shopee-content-part > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shopee-content-part > div > span {
+  color: #9a3412;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.shopee-content-part button {
+  min-height: 34px;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.shopee-content-part button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.shopee-content-part pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 11px/1.7 Inter, "Noto Sans Thai", system-ui, sans-serif;
+  color: #334155;
+}
+
+.shopee-price-part {
+  background: #fff7ed;
+}
+
+.shopee-price-part pre {
+  color: #c2410c;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.shopee-price-part small {
+  color: #9a3412;
+  font-size: 8px;
+  line-height: 1.5;
+}
