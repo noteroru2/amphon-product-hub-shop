@@ -7,12 +7,10 @@ create or replace function public.ai_buyer_touch_updated_at()
 returns trigger
 language plpgsql
 set search_path = pg_catalog, public
-as $
-begin
+as 'begin
   new.updated_at = now();
   return new;
-end;
-$ai_buyer$;
+end;';
 
 create table if not exists public.ai_buyer_customers (
   id uuid primary key default gen_random_uuid(),
