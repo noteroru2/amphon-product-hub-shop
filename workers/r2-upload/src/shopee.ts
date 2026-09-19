@@ -1,6 +1,14 @@
+import {
+  confirmOne4SystemSale,
+  releaseOne4SystemStock,
+  reserveOne4SystemStock,
+  type One4SystemStockEnv,
+  type One4SystemStockResult,
+} from './one4-system-stock'
+
 type ShopeeRole = 'owner' | 'admin' | 'sales' | 'technician'
 
-export interface ShopeeEnv {
+export interface ShopeeEnv extends One4SystemStockEnv {
   SUPABASE_URL: string
   SUPABASE_PUBLISHABLE_KEY: string
   SUPABASE_SECRET_KEY: string
@@ -36,6 +44,33 @@ type ShopeeQueueClaim = {
   shop_id: number
   action: 'CREATE' | 'UPDATE' | 'STOCK_SYNC' | 'END'
   attempt_count: number
+}
+
+type ShopeeOrderEventClaim = {
+  id: string
+  shop_id: number
+  code: number
+  payload: any
+  attempt_count: number
+}
+
+type ShopeeOrderItem = {
+  item_sku?: string | null
+  model_sku?: string | null
+  model_quantity_purchased?: number | null
+  model_original_price?: number | null
+  model_discounted_price?: number | null
+}
+
+type ShopeeOrderDetail = {
+  order_sn: string
+  order_status: string
+  cod?: boolean
+  create_time?: number
+  update_time?: number
+  pay_time?: number
+  payment_method?: string | null
+  item_list?: ShopeeOrderItem[]
 }
 
 type ShopeeProduct = {
@@ -863,6 +898,307 @@ async function processQueueClaim(
   }
 
   throw new ShopeeError('SHOPEE_UPDATE_NOT_IMPLEMENTED', false)
+}
+
+
+function shopeeOrderSn(payload: any) {
+  return cleanText(
+    payload?.data?.ordersn
+      || payload?.data?.order_sn
+      || payload?.ordersn
+      || payload?.order_sn,
+    80,
+  )
+}
+
+async function fetchShopeeOrderDetail(
+  env: ShopeeEnv,
+  connection: ShopeeConnectionSecret,
+  orderSn: string,
+): Promise<ShopeeOrderDetail> {
+  const payload = await shopRequest(
+    env,
+    connection,
+    '/api/v2/order/get_order_detail',
+    { method: 'GET' },
+    {
+      order_sn_list: orderSn,
+      request_order_status_pending: 'true',
+      response_optional_fields:
+        'item_list,pay_time,payment_method,total_amount,shipping_carrier',
+    },
+  )
+  const order = Array.isArray(payload?.response?.order_list)
+    ? payload.response.order_list[0]
+    : null
+  if (!order?.order_sn) {
+    throw new ShopeeError('SHOPEE_ORDER_DETAIL_MISSING', true)
+  }
+  return order as ShopeeOrderDetail
+}
+
+function normalizeOrderItems(order: ShopeeOrderDetail) {
+  return (Array.isArray(order.item_list) ? order.item_list : [])
+    .map((item) => {
+      const sku = cleanText(item.model_sku || item.item_sku, 80).toUpperCase()
+      const quantity = Number(item.model_quantity_purchased || 1)
+      const unitPrice = Number(
+        item.model_discounted_price
+          || item.model_original_price
+          || 0,
+      )
+      return { sku, quantity, unitPrice }
+    })
+    .filter((item) => Boolean(item.sku))
+}
+
+async function publishedShopeeSkus(
+  env: ShopeeEnv,
+  shopId: number,
+) {
+  const rows = await serviceRest<Array<{
+    seller_sku: string
+    published_price?: number | string | null
+  }>>(
+    env,
+    `shopee_product_mappings?shop_id=eq.${shopId}&status=eq.PUBLISHED&select=seller_sku,published_price`,
+  )
+  return new Map(
+    rows.map((row) => [
+      cleanText(row.seller_sku, 80).toUpperCase(),
+      Number(row.published_price || 0),
+    ]),
+  )
+}
+
+function systemActionForOrder(status: string) {
+  const normalized = cleanText(status, 40).toUpperCase()
+  if (normalized === 'CANCELLED') return 'RELEASE' as const
+  if (normalized === 'COMPLETED') return 'CONFIRM_SOLD' as const
+  return 'RESERVE' as const
+}
+
+function assertSystemResult(
+  result: One4SystemStockResult,
+  action: 'RESERVE' | 'RELEASE' | 'CONFIRM_SOLD',
+) {
+  if (result.ok || result.duplicate) return
+  const permanent =
+    result.outcome === 'CONFLICT'
+    || result.outcome === 'REJECTED'
+  throw new ShopeeError(
+    `SHOPEE_SYSTEM_${action}_FAILED:${result.outcome || ''}:${result.errorCode || ''}`,
+    !permanent,
+  )
+}
+
+async function saveShopeeOrderSync(
+  env: ShopeeEnv,
+  input: {
+    shopId: number
+    orderSn: string
+    orderStatus: string
+    skus: string[]
+    systemAction: string
+    result: One4SystemStockResult
+    eventTime?: number | null
+  },
+) {
+  await serviceRest(
+    env,
+    'shopee_order_syncs?on_conflict=shop_id,order_sn',
+    {
+      method: 'POST',
+      headers: {
+        prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        shop_id: input.shopId,
+        order_sn: input.orderSn,
+        order_status: input.orderStatus,
+        skus: input.skus,
+        system_action: input.systemAction,
+        system_outcome: input.result.outcome || null,
+        system_response: input.result,
+        last_error: input.result.ok || input.result.duplicate
+          ? null
+          : input.result.errorCode || input.result.outcome || 'SYSTEM_FAILED',
+        last_event_at: input.eventTime
+          ? new Date(input.eventTime * 1000).toISOString()
+          : new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  )
+}
+
+async function processShopeeOrderEvent(
+  env: ShopeeEnv,
+  claim: ShopeeOrderEventClaim,
+) {
+  const orderSn = shopeeOrderSn(claim.payload)
+  if (!orderSn) {
+    throw new ShopeeError('SHOPEE_ORDER_SN_MISSING', false)
+  }
+
+  const connection = await getConnection(env, Number(claim.shop_id))
+  const order = await fetchShopeeOrderDetail(env, connection, orderSn)
+  const channelSkus = await publishedShopeeSkus(env, Number(claim.shop_id))
+  const items = normalizeOrderItems(order).filter((item) =>
+    channelSkus.has(item.sku),
+  )
+
+  if (!items.length) {
+    return {
+      ignored: true,
+      orderSn,
+      reason: 'NO_AMPHON_SKU',
+    }
+  }
+
+  const invalidQuantity = items.find((item) => item.quantity !== 1)
+  if (invalidQuantity) {
+    throw new ShopeeError(
+      `SHOPEE_ORDER_QUANTITY_INVALID:${invalidQuantity.sku}:${invalidQuantity.quantity}`,
+      false,
+    )
+  }
+
+  const skus = [...new Set(items.map((item) => item.sku))].sort()
+  const checkoutIdempotencyKey =
+    `shopee:${claim.shop_id}:${orderSn}`
+  const action = systemActionForOrder(order.order_status)
+  let result: One4SystemStockResult
+
+  if (action === 'RELEASE') {
+    result = await releaseOne4SystemStock(env, {
+      checkoutIdempotencyKey,
+      skus,
+      reason: 'SHOPEE_ORDER_CANCELLED',
+    })
+    assertSystemResult(result, action)
+  } else if (action === 'CONFIRM_SOLD') {
+    const reserveResult = await reserveOne4SystemStock(env, {
+      checkoutIdempotencyKey,
+      skus,
+      expiresAt: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    })
+    if (!reserveResult.ok && !reserveResult.duplicate) {
+      assertSystemResult(reserveResult, 'RESERVE')
+    }
+
+    result = await confirmOne4SystemSale(env, {
+      checkoutIdempotencyKey,
+      orderId: `shopee:${orderSn}`,
+      skus,
+      saleItems: items.map((item) => ({
+        sku: item.sku,
+        unitPrice:
+          item.unitPrice
+          || channelSkus.get(item.sku)
+          || 0,
+      })),
+      paymentProvider: 'SHOPEE',
+      paymentReference: orderSn,
+      paidAt: new Date(
+        Number(order.pay_time || order.update_time || order.create_time || Math.floor(Date.now() / 1000))
+          * 1000,
+      ).toISOString(),
+    })
+    assertSystemResult(result, action)
+  } else {
+    result = await reserveOne4SystemStock(env, {
+      checkoutIdempotencyKey,
+      skus,
+      expiresAt: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    })
+    assertSystemResult(result, action)
+  }
+
+  await saveShopeeOrderSync(env, {
+    shopId: Number(claim.shop_id),
+    orderSn,
+    orderStatus: cleanText(order.order_status, 40).toUpperCase(),
+    skus,
+    systemAction: action,
+    result,
+    eventTime:
+      Number(claim.payload?.data?.update_time || order.update_time || 0)
+      || null,
+  })
+
+  return {
+    ignored: false,
+    orderSn,
+    orderStatus: order.order_status,
+    action,
+    skus,
+    outcome: result.outcome,
+    duplicate: Boolean(result.duplicate),
+  }
+}
+
+export async function runShopeeOrderSweep(env: ShopeeEnv) {
+  if (!configured(env)) return { skipped: 'SHOPEE_NOT_CONFIGURED' }
+
+  const workerId = `shopee-order:${crypto.randomUUID()}`
+  const claims = await serviceRpc<ShopeeOrderEventClaim[]>(
+    env,
+    'claim_shopee_order_events',
+    { p_worker_id: workerId, p_limit: 10 },
+  )
+
+  let completed = 0
+  let ignored = 0
+  let failed = 0
+
+  for (const claim of Array.isArray(claims) ? claims : []) {
+    try {
+      const result = await processShopeeOrderEvent(env, claim)
+      await serviceRpc(env, 'complete_shopee_order_event', {
+        p_event_id: claim.id,
+        p_worker_id: workerId,
+        p_status: result.ignored ? 'IGNORED' : 'DONE',
+      })
+      if (result.ignored) ignored += 1
+      else completed += 1
+    } catch (error) {
+      failed += 1
+      const retryable =
+        error instanceof ShopeeError ? error.retryable : true
+      const message =
+        error instanceof Error ? error.message : String(error)
+
+      await serviceRpc(env, 'fail_shopee_order_event', {
+        p_event_id: claim.id,
+        p_worker_id: workerId,
+        p_error: message.slice(0, 1500),
+        p_retryable: retryable,
+      }).catch((markError) => {
+        console.error('SHOPEE order event fail marker error', {
+          eventId: claim.id,
+          markError,
+        })
+      })
+
+      console.error('SHOPEE order event failed', {
+        eventId: claim.id,
+        shopId: claim.shop_id,
+        error: message,
+      })
+    }
+  }
+
+  return {
+    claimed: Array.isArray(claims) ? claims.length : 0,
+    completed,
+    ignored,
+    failed,
+  }
 }
 
 export async function runShopeePublishSweep(env: ShopeeEnv) {
