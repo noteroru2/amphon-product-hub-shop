@@ -1,0 +1,43 @@
+name: AI Buyer V1 Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'workers/ai-buyer/**'
+      - 'supabase/migrations/*ai_buyer*'
+      - 'scripts/verify-ai-buyer-foundation.mjs'
+      - 'package.json'
+      - '.github/workflows/ai-buyer-foundation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'workers/ai-buyer/**'
+      - 'supabase/migrations/*ai_buyer*'
+      - 'scripts/verify-ai-buyer-foundation.mjs'
+      - 'package.json'
+      - '.github/workflows/ai-buyer-foundation.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify foundation invariants
+        run: npm run verify:ai-buyer
+
+      - name: Install AI Buyer worker dependencies
+        working-directory: workers/ai-buyer
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck AI Buyer worker
+        working-directory: workers/ai-buyer
+        run: npm run typecheck
