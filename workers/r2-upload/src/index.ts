@@ -1,5 +1,5 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
-import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
+import { handleShopeeRoutes, runShopeeOrderSweep, runShopeePublishSweep, type ShopeeEnv } from './shopee'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -2439,6 +2439,13 @@ export default {
         if (!('skipped' in result)) console.log('SHOPEE publish sweep', result)
       } catch (error) {
         console.error('SHOPEE publish sweep failed', error)
+      }
+
+      try {
+        const result = await runShopeeOrderSweep(env)
+        if (!('skipped' in result)) console.log('SHOPEE order authority sweep', result)
+      } catch (error) {
+        console.error('SHOPEE order authority sweep failed', error)
       }
     }
 
