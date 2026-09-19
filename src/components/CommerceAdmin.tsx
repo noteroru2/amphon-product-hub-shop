@@ -575,7 +575,7 @@ function ShopeeSettingsPanel() {
             {connection
               ? `สถานะ ${connection.status} • mapping ${status?.mappings?.categories ?? 0} หมวด • ลงแล้ว ${status?.mappings?.publishedProducts ?? 0} SKU • queue ${status?.queue?.pending ?? 0} • error ${status?.queue?.failed ?? 0}`
               : status?.mode === 'disabled'
-                ? 'พนักงานลง Shopee ผ่าน Sales Toolkit ได้ โดยระบบช่วยเตรียมราคา +18–20% ส่วน Direct API ยังไม่ยิงอัตโนมัติ'
+                ? 'พนักงานลง Shopee ผ่าน Sales Toolkit ได้ โดยระบบช่วยเตรียมราคา +18% ตายตัว ส่วน Direct API ยังไม่ยิงอัตโนมัติ'
                 : 'Partner key และ token อยู่ฝั่ง server เท่านั้น ไม่ส่งเข้า browser'}
           </small>
         </div>
