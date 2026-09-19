@@ -6,7 +6,8 @@ create extension if not exists pgcrypto;
 create or replace function public.ai_buyer_touch_updated_at()
 returns trigger
 language plpgsql
-as $$
+set search_path = pg_catalog, public
+as $
 begin
   new.updated_at = now();
   return new;
@@ -255,6 +256,41 @@ alter table public.ai_buyer_pricing_decisions enable row level security;
 alter table public.ai_buyer_offers enable row level security;
 alter table public.ai_buyer_admin_tasks enable row level security;
 alter table public.ai_buyer_human_overrides enable row level security;
+
+
+revoke all on table
+  public.ai_buyer_customers,
+  public.ai_buyer_conversations,
+  public.ai_buyer_valuation_cases,
+  public.ai_buyer_webhook_events,
+  public.ai_buyer_messages,
+  public.ai_buyer_case_images,
+  public.ai_buyer_product_observations,
+  public.ai_buyer_price_book_versions,
+  public.ai_buyer_price_book_entries,
+  public.ai_buyer_pricing_decisions,
+  public.ai_buyer_offers,
+  public.ai_buyer_admin_tasks,
+  public.ai_buyer_human_overrides
+from anon, authenticated;
+
+grant select, insert, update, delete on table
+  public.ai_buyer_customers,
+  public.ai_buyer_conversations,
+  public.ai_buyer_valuation_cases,
+  public.ai_buyer_webhook_events,
+  public.ai_buyer_messages,
+  public.ai_buyer_case_images,
+  public.ai_buyer_product_observations,
+  public.ai_buyer_price_book_versions,
+  public.ai_buyer_price_book_entries,
+  public.ai_buyer_pricing_decisions,
+  public.ai_buyer_offers,
+  public.ai_buyer_admin_tasks,
+  public.ai_buyer_human_overrides
+to service_role;
+
+revoke all on function public.ai_buyer_touch_updated_at() from public, anon, authenticated;
 
 comment on table public.ai_buyer_webhook_events is 'Idempotent LINE webhook inbox. Service-role only in V1.';
 comment on table public.ai_buyer_pricing_decisions is 'Auditable pricing snapshot. Conversation AI must never invent a price outside this decision.';
