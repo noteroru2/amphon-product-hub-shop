@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/verify-one0.mjs && node scripts/verify-one1.mjs && node scripts/verify-one1-storage.mjs && node scripts/verify-one1-security.mjs && node scripts/verify-one2a-contract.mjs && node scripts/verify-one2b.mjs && node scripts/verify-one2c.mjs && node scripts/verify-one2d.mjs && node scripts/verify-one2d-production-acceptance.mjs && node scripts/verify-one3a.mjs && node scripts/verify-one3c.mjs && node scripts/verify-one4a.mjs && node scripts/verify-one4b.mjs && node scripts/verify-one4c.mjs && node scripts/verify-one4d.mjs && node scripts/verify-one4e.mjs && node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/one-bridge/tsconfig.json && tsc -p workers/hub-outbox/tsconfig.json && node scripts/verify-auto-publish.mjs && node scripts/verify-merchant-shopee-foundation.mjs && node scripts/verify-shopee-auto-publish.mjs && node scripts/verify-channel-architecture.mjs && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
+    "build": "node scripts/verify-one0.mjs && node scripts/verify-one1.mjs && node scripts/verify-one1-storage.mjs && node scripts/verify-one1-security.mjs && node scripts/verify-one2a-contract.mjs && node scripts/verify-one2b.mjs && node scripts/verify-one2c.mjs && node scripts/verify-one2d.mjs && node scripts/verify-one2d-production-acceptance.mjs && node scripts/verify-one3a.mjs && node scripts/verify-one3c.mjs && node scripts/verify-one4a.mjs && node scripts/verify-one4b.mjs && node scripts/verify-one4c.mjs && node scripts/verify-one4d.mjs && node scripts/verify-one4e.mjs && node scripts/verify-hub-outbox-delivery.mjs && tsc -p workers/one-bridge/tsconfig.json && tsc -p workers/hub-outbox/tsconfig.json && node scripts/verify-auto-publish.mjs && node scripts/verify-merchant-shopee-foundation.mjs && node scripts/verify-shopee-auto-publish.mjs && node scripts/verify-channel-architecture.mjs && node scripts/verify-shopee-assisted-listing.mjs && node scripts/verify-hub-publish-center-ux.mjs && node scripts/verify-hub-ease.mjs && node scripts/verify-hub-runtime-safety.mjs && tsc -b && vite build",
     "deploy:hub": "npm run build && wrangler deploy",
     "deploy:one3c-prod": "node scripts/deploy-one3c-production.mjs",
     "preview": "vite preview",
@@ -42,7 +42,8 @@
     "verify:auto-publish": "node scripts/verify-auto-publish.mjs",
     "verify:channels": "node scripts/verify-merchant-shopee-foundation.mjs",
     "verify:shopee": "node scripts/verify-shopee-auto-publish.mjs",
-    "verify:channel-architecture": "node scripts/verify-channel-architecture.mjs"
+    "verify:channel-architecture": "node scripts/verify-channel-architecture.mjs",
+    "verify:shopee-assisted": "node scripts/verify-shopee-assisted-listing.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

@@ -63,6 +63,7 @@ export async function downloadProductZip(draft: ProductDraft) {
   entries['spec.txt'] = strToU8(buildSpecText(draft))
   entries['content-facebook.txt'] = strToU8(buildContentForChannel(draft, 'facebook'))
   entries['content-marketplace.txt'] = strToU8(buildContentForChannel(draft, 'marketplace'))
+  entries['content-shopee.txt'] = strToU8(buildContentForChannel(draft, 'shopee'))
   entries['content-winner-it.txt'] = strToU8(buildContentForChannel(draft, 'winnerit'))
   entries['content-generic.txt'] = strToU8(buildContentForChannel(draft, 'generic'))
   entries['sales-content.txt'] = strToU8(buildSalesContent(draft))

@@ -61,11 +61,11 @@ export const salesChannels: readonly SalesChannelDefinition[] = [
   {
     key: 'shopee',
     label: 'Shopee',
-    mode: 'disabled',
+    mode: 'assisted',
     autoPublish: false,
-    capabilities: [],
+    capabilities: ['publish', 'update_content', 'update_price', 'end_listing'],
     stockAuthority: 'AMPHON_SYSTEM',
-    note: 'Adapter is installed but disabled until direct or approved-partner access is available.',
+    note: 'Hub prepares listing data and +18–20% channel price; staff publishes manually in Seller Centre.',
   },
 ] as const
 

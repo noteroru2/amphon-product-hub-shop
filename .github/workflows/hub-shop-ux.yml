@@ -11,6 +11,8 @@ on:
       - 'scripts/verify-merchant-shopee-foundation.mjs'
       - 'scripts/verify-shopee-auto-publish.mjs'
       - 'scripts/verify-channel-architecture.mjs'
+      - 'scripts/verify-shopee-assisted-listing.mjs'
+      - 'scripts/verify-shopee-assisted-listing.mjs'
       - 'docs/shopee-integration-discovery.md'
       - 'docs/channel-architecture.md'
       - '.github/workflows/store-worker-deploy.yml'
@@ -56,6 +58,7 @@ jobs:
           node scripts/verify-merchant-shopee-foundation.mjs
           node scripts/verify-shopee-auto-publish.mjs
           node scripts/verify-channel-architecture.mjs
+          node scripts/verify-shopee-assisted-listing.mjs
           node scripts/verify-hub-publish-center-ux.mjs
           node scripts/verify-hub-ease.mjs
 

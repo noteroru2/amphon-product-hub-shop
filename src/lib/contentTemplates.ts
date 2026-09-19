@@ -1,7 +1,8 @@
 import type { ProductDraft } from '../types/product'
 import { getSpecRows, getSubtypeLabel } from './productSchemas'
+import { DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT, shopeeManualPrice } from './shopeePricing'
 
-export type ContentChannel = 'facebook' | 'marketplace' | 'winnerit' | 'generic'
+export type ContentChannel = 'facebook' | 'marketplace' | 'shopee' | 'winnerit' | 'generic'
 
 export interface ContentTemplate {
   id: ContentChannel
@@ -13,6 +14,7 @@ export interface ContentTemplate {
 export const contentTemplates: ContentTemplate[] = [
   { id: 'facebook', label: 'Facebook', shortLabel: 'Facebook', description: 'โพสต์อ่านง่าย เน้นจุดขายและความน่าเชื่อถือ' },
   { id: 'marketplace', label: 'Facebook Marketplace', shortLabel: 'Marketplace', description: 'ข้อความกระชับ เน้นรุ่น สเปก สภาพ ราคา และคำค้น' },
+  { id: 'shopee', label: 'Shopee', shortLabel: 'Shopee', description: 'ข้อความสำหรับ Shopee พร้อมราคาบวก 20% จากราคา Hub โดยไม่ใส่ลิงก์ภายนอก' },
   { id: 'winnerit', label: 'WINNER IT', shortLabel: 'WINNER IT', description: 'โพสต์ขายในโทนแบรนด์ WINNER IT' },
   { id: 'generic', label: 'ข้อความกลาง', shortLabel: 'ทั่วไป', description: 'ใช้กับ LINE แชต หรือช่องทางอื่น' },
 ]
@@ -110,6 +112,26 @@ function marketplaceContent(draft: ProductDraft) {
   return lines.join('\n').trim()
 }
 
+function shopeeContent(draft: ProductDraft) {
+  const title = titleOf(draft)
+  const specs = specRows(draft)
+  const shopeePrice = shopeeManualPrice(Number(draft.price || 0), DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT)
+  const lines = [title]
+  if (shopeePrice) lines.push('ราคา Shopee ' + formatPrice(shopeePrice) + ' บาท')
+
+  if (specs.length) {
+    lines.push('', 'รายละเอียดสเปก')
+    for (const [label, value] of specs.slice(0, 12)) lines.push('• ' + label + ': ' + value)
+  }
+
+  const condition = conditionLine(draft)
+  if (condition) lines.push('', condition)
+  if (draft.defects?.trim()) lines.push('ตำหนิ: ' + draft.defects.trim())
+  lines.push('', 'สินค้ามือสอง ตรวจเช็กก่อนขายและแจ้งสภาพตามจริง', 'กรุณาดูรูปสินค้าจริงประกอบการตัดสินใจ')
+  if (draft.sku) lines.push('รหัสสินค้า: ' + draft.sku)
+  return lines.join('\n').trim()
+}
+
 function winnerItContent(draft: ProductDraft) {
   const title = titleOf(draft)
   const specs = specRows(draft)
@@ -146,6 +168,7 @@ function genericContent(draft: ProductDraft) {
 export function buildContentForChannel(draft: ProductDraft, channel: ContentChannel) {
   if (channel === 'facebook') return facebookContent(draft)
   if (channel === 'marketplace') return marketplaceContent(draft)
+  if (channel === 'shopee') return shopeeContent(draft)
   if (channel === 'winnerit') return winnerItContent(draft)
   return genericContent(draft)
 }
