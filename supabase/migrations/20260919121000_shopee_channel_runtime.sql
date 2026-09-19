@@ -628,9 +628,12 @@ returns trigger
 language plpgsql
 security definer
 set search_path=''
-as $$
+as $
 declare
   v_map record;
+  v_conn record;
+  v_auto boolean := true;
+  v_delay integer := 60;
 begin
   if new.status is not distinct from old.status
      and new.one_availability is not distinct from old.one_availability
@@ -638,6 +641,34 @@ begin
     return new;
   end if;
 
+  -- Publication and product-status updates may commit in either order.
+  -- Re-check CREATE eligibility here as well as on Website publication so
+  -- whichever write happens second closes the gate. The queue unique index
+  -- makes the operation idempotent.
+  select auto_publish_enabled, publish_delay_seconds
+    into v_auto, v_delay
+    from public.shopee_settings
+   where id=1;
+
+  if new.status='published'
+     and coalesce(v_auto,true)
+     and private.shopee_product_is_eligible(new.id)
+  then
+    for v_conn in
+      select shop_id
+      from public.shopee_connections
+      where status='CONNECTED'
+    loop
+      perform private.enqueue_shopee_action(
+        new.id,
+        v_conn.shop_id,
+        'CREATE',
+        v_delay
+      );
+    end loop;
+  end if;
+
+  -- Existing external listings always follow AMPHON System's availability.
   for v_map in
     select shop_id
     from public.shopee_product_mappings
@@ -654,7 +685,7 @@ begin
 
   return new;
 end;
-$$;
+$;
 
 revoke all on function private.shopee_enqueue_stock_projection()
   from public, anon, authenticated;
