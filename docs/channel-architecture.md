@@ -8,7 +8,7 @@ Status: implemented foundation. This layer lets Product Hub treat Website, Faceb
 2. **AMPHON Product Hub** owns product enrichment, listing content, images and channel orchestration.
 3. **AMPHON SHOP / Website** is a native sales projection.
 4. **Facebook Page / Marketplace** are assisted channels today. Hub prepares content/images; staff performs the external publish/close action.
-5. **Shopee** runs in assisted mode while direct Seller API access is unavailable. Hub prepares title, images, SKU, suggested category, stock guidance and a channel price at +18–20% from the Hub price; staff publishes manually in Seller Centre. It can later switch to direct API or an approved partner without changing Product Master.
+5. **Shopee** runs in assisted mode while direct Seller API access is unavailable. Hub prepares title, images, SKU, suggested category, stock guidance and a channel price at a fixed +18% from the Hub price; staff publishes manually in Seller Centre. It can later switch to direct API or an approved partner without changing Product Master.
 
 No external channel may become stock master.
 
@@ -81,7 +81,7 @@ RESERVED and SOLD must never be turned back into channel stock by a marketplace 
 | Facebook Marketplace | assisted | no | AMPHON System |
 | Shopee | assisted | no | AMPHON System |
 
-Shopee direct runtime already exists behind the adapter boundary, but production does not require Shopee credentials while the seller account is ineligible for direct API access. The assisted workflow defaults to +20% pricing, allows staff to choose +18%, +19% or +20%, and rounds the resulting listing price upward to the next 10 THB. This is a store pricing policy, not an automatic calculation of Shopee fees or campaign costs.
+Shopee direct runtime already exists behind the adapter boundary, but production does not require Shopee credentials while the seller account is ineligible for direct API access. The assisted workflow uses a fixed +18% pricing rule for every Shopee listing and rounds the resulting listing price upward to the next 10 THB. This is a store pricing policy, not an automatic calculation of Shopee fees or campaign costs.
 
 ## Future Shopee partner path
 
