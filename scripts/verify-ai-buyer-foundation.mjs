@@ -4,9 +4,11 @@ const required = [
   'supabase/migrations/20260919163000_ai_buyer_v1_foundation.sql',
   'supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql',
   'supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql',
+  'supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql',
   'workers/ai-buyer/src/index.ts',
   'workers/ai-buyer/src/batcher.ts',
   'workers/ai-buyer/src/conversation-engine.ts',
+  'workers/ai-buyer/src/pricing-engine.ts',
   'workers/ai-buyer/wrangler.jsonc',
   'workers/ai-buyer/package.json',
   'workers/ai-buyer/tsconfig.json',
@@ -22,6 +24,8 @@ const engine = fs.readFileSync('workers/ai-buyer/src/conversation-engine.ts', 'u
 const sql1 = fs.readFileSync('supabase/migrations/20260919163000_ai_buyer_v1_foundation.sql', 'utf8')
 const sql2 = fs.readFileSync('supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql', 'utf8')
 const sql3 = fs.readFileSync('supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql', 'utf8')
+const sql4 = fs.readFileSync('supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql', 'utf8')
+const pricing = fs.readFileSync('workers/ai-buyer/src/pricing-engine.ts', 'utf8')
 const wrangler = fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8')
 
 for (const token of [
@@ -104,10 +108,42 @@ for (const token of [
 }
 
 for (const token of [
+  'ai_buyer_price_book_imports',
+  'ai_buyer_category_pricing_rules',
+  'ai_buyer_market_comparables',
+  'ai_buyer_activate_price_book',
+  'ai_buyer_guard_offer_insert',
+  'AI_BUYER_HARD_MAX_EXCEEDED',
+  'market_enabled boolean not null default false',
+  'revoke all on table',
+]) {
+  if (!sql4.includes(token)) throw new Error(`AI Buyer checkpoint 3 schema invariant missing: ${token}`)
+}
+
+for (const token of [
+  'normalizeLookup',
+  'importPriceBook',
+  'bestPriceBookEntry',
+  'MARKET_FALLBACK_DISABLED',
+  'web_search',
+  'web_search_call.action.sources',
+  'source_verified',
+  'min_market_comparables',
+  'max_market_dispersion',
+  'createDecision',
+  'guardOffer',
+  'createGuardedOffer',
+  'HARD_MAX_EXCEEDED',
+]) {
+  if (!pricing.includes(token)) throw new Error(`AI Buyer checkpoint 3 pricing invariant missing: ${token}`)
+}
+
+for (const token of [
   '"CONVERSATION_BATCHER"',
   '"new_sqlite_classes"',
   '"AI_BUYER_BATCH_DEBOUNCE_MS"',
   '"OPENAI_VISION_MODEL"',
+  '"OPENAI_PRICING_MODEL"',
 ]) {
   if (!wrangler.includes(token)) throw new Error(`AI Buyer runtime config missing: ${token}`)
 }
@@ -117,6 +153,7 @@ for (const forbidden of [
   'LINE_CHANNEL_ACCESS_TOKEN"',
   'SUPABASE_SECRET_KEY"',
   'OPENAI_API_KEY"',
+  'AI_BUYER_ADMIN_TOKEN"',
 ]) {
   if (wrangler.includes(forbidden)) throw new Error(`AI Buyer secret must not be committed in wrangler config: ${forbidden}`)
 }
