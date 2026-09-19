@@ -1,9 +1,15 @@
+export { ConversationBatcher } from './batcher'
+
 interface Env {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
   LINE_CHANNEL_SECRET: string
   LINE_CHANNEL_ACCESS_TOKEN: string
+  OPENAI_API_KEY: string
+  OPENAI_VISION_MODEL?: string
+  AI_BUYER_BATCH_DEBOUNCE_MS?: string
+  CONVERSATION_BATCHER: DurableObjectNamespace
   AI_BUYER_ENV?: string
 }
 
@@ -36,6 +42,7 @@ type LineMessage = {
 type LineWebhookEvent = {
   type: string
   webhookEventId?: string
+  replyToken?: string
   timestamp?: number
   source?: LineSource
   message?: LineMessage
@@ -401,6 +408,29 @@ async function storeImage(
   }
 }
 
+async function scheduleConversationIntake(
+  env: Env,
+  conversation: ConversationRow,
+  caseRow: CaseRow,
+  lineUserId: string,
+  event: LineWebhookEvent,
+) {
+  const id = env.CONVERSATION_BATCHER.idFromName(conversation.id)
+  const stub = env.CONVERSATION_BATCHER.get(id)
+  const result = await stub.fetch('https://batcher/touch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      conversationId: conversation.id,
+      caseId: caseRow.id,
+      lineUserId,
+      replyToken: event.replyToken || null,
+      touchedAt: Date.now(),
+    }),
+  })
+  if (!result.ok) throw new Error('BATCHER_SCHEDULE_' + result.status)
+}
+
 async function processEvent(env: Env, event: LineWebhookEvent) {
   const eventId = clean(event.webhookEventId, 200)
   if (!eventId) {
@@ -427,6 +457,12 @@ async function processEvent(env: Env, event: LineWebhookEvent) {
 
     if (event.message.type === 'image') {
       await storeImage(env, lineUserId, caseRow, dbMessage, event.message)
+    }
+
+    try {
+      await scheduleConversationIntake(env, conversation, caseRow, lineUserId, event)
+    } catch (scheduleError) {
+      console.error('AI BUYER batch scheduling failed', eventId, scheduleError)
     }
 
     await finishWebhook(env, eventId, 'PROCESSED')
@@ -474,6 +510,8 @@ export default {
           supabase: Boolean(env.SUPABASE_URL && env.SUPABASE_SECRET_KEY),
           line: Boolean(env.LINE_CHANNEL_SECRET && env.LINE_CHANNEL_ACCESS_TOKEN),
           images: Boolean(env.IMAGES),
+          vision: Boolean(env.OPENAI_API_KEY),
+          batcher: Boolean(env.CONVERSATION_BATCHER),
         },
         time: new Date().toISOString(),
       })
