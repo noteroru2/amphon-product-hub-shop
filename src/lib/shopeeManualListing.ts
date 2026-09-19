@@ -1,11 +1,9 @@
 import type { SalesPostPackage } from './salesPostPackage'
 import type { ProductCategory, ProductDraft, ProductStatus } from '../types/product'
 import {
-  DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
-  normalizeShopeeMarkup,
+  SHOPEE_MANUAL_MARKUP_PERCENT,
   shopeeManualPrice,
   shopeeMarkupAmount,
-  type ShopeeManualMarkupPercent,
 } from './shopeePricing'
 
 export const DEFAULT_SHOPEE_SELLER_URL = 'https://seller.shopee.co.th/'
@@ -39,7 +37,7 @@ export interface ShopeeManualListingDraft {
   sku: string
   title: string
   basePrice: number
-  markupPercent: ShopeeManualMarkupPercent
+  markupPercent: typeof SHOPEE_MANUAL_MARKUP_PERCENT
   markupAmount: number
   shopeePrice: number
   shopeePriceCopyValue: string
@@ -148,14 +146,13 @@ export function buildShopeeManualListingDraft(
     ProductDraft,
     'category' | 'specs' | 'status' | 'images' | 'conditionPercent'
   >,
-  markupPercent = DEFAULT_SHOPEE_MANUAL_MARKUP_PERCENT,
   imageReady = true,
 ): ShopeeManualListingDraft {
   // Public/manual projection only. Cost, serialNumber, notes and staff data never enter this object.
-  const markup = normalizeShopeeMarkup(Number(markupPercent))
+  const markup = SHOPEE_MANUAL_MARKUP_PERCENT
   const title = buildShopeeManualTitle(pkg, source)
-  const shopeePrice = shopeeManualPrice(pkg.price, markup)
-  const markupAmount = shopeeMarkupAmount(pkg.price, markup)
+  const shopeePrice = shopeeManualPrice(pkg.price)
+  const markupAmount = shopeeMarkupAmount(pkg.price)
   const categorySuggestion = source.category
     ? SHOPEE_CATEGORY_SUGGESTIONS[source.category]
     : 'ค้นหาหมวดหมู่ที่ตรงสินค้าใน Seller Centre'
