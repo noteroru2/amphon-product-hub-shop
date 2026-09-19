@@ -22,7 +22,7 @@ const checks = [
     migration.includes('vault.create_secret')
       && migration.includes('vault.update_secret')
       && migration.includes('vault.decrypted_secrets')
-      && !/access_token\\s+text/i.test(migration.match(/create table if not exists public\\.shopee_connections[\\s\\S]*?\\);/)?.[0] || '')],
+      && !/access_token\s+text/i.test(migration.match(/create table if not exists public\.shopee_connections[\s\S]*?\);/)?.[0] || '')],
   ['Token RPCs are service-role only',
     migration.includes('grant execute on function public.shopee_get_connection_secret(bigint)')
       && migration.includes('to service_role')
