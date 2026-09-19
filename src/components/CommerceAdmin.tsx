@@ -561,21 +561,27 @@ function ShopeeSettingsPanel() {
         <ShieldCheck/>
         <div>
           <strong>
-            {!status?.configured
-              ? 'ยังไม่ได้ตั้ง Shopee Partner credentials'
-              : connection
-                ? `เชื่อม Shopee Shop ${connection.shopId} แล้ว`
-                : 'Shopee API พร้อม — รอ authorize ร้าน'}
+            {status?.mode === 'disabled'
+              ? 'Shopee Direct API ปิดไว้ — โครง Channel พร้อมรอสิทธิ์หรือ Partner'
+              : status?.mode === 'partner_api'
+                ? 'Shopee ใช้โหมด Partner API — รอเชื่อม Provider'
+                : !status?.configured
+                  ? 'Shopee Direct API เปิดโหมดแล้ว แต่ยังไม่มี Partner credentials'
+                  : connection
+                    ? `เชื่อม Shopee Shop ${connection.shopId} แล้ว`
+                    : 'Shopee Direct API พร้อม — รอ authorize ร้าน'}
           </strong>
           <small>
             {connection
               ? `สถานะ ${connection.status} • mapping ${status?.mappings?.categories ?? 0} หมวด • ลงแล้ว ${status?.mappings?.publishedProducts ?? 0} SKU • queue ${status?.queue?.pending ?? 0} • error ${status?.queue?.failed ?? 0}`
-              : 'Partner key และ token อยู่ฝั่ง server เท่านั้น ไม่ส่งเข้า browser'}
+              : status?.mode === 'disabled'
+                ? 'ตอนนี้ Website ทำงานอัตโนมัติ ส่วน Facebook ใช้ Assisted Publish และ Shopee ยังไม่ยิง API'
+                : 'Partner key และ token อยู่ฝั่ง server เท่านั้น ไม่ส่งเข้า browser'}
           </small>
         </div>
       </div>
 
-      {status?.configured && !connection && (
+      {status?.mode === 'direct_api' && status?.configured && !connection && (
         <button className="primary-button" type="button" onClick={() => void connect()} disabled={busy}>
           {busy ? <LoaderCircle className="spin" size={18}/> : <ExternalLink size={18}/>}
           เชื่อมร้าน Shopee

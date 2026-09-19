@@ -19,7 +19,9 @@ export interface ShopeeConnectionStatus {
 }
 
 export interface ShopeeStatus {
+  mode: 'disabled' | 'direct_api' | 'partner_api'
   configured: boolean
+  blockedReason?: 'DIRECT_API_NOT_AVAILABLE' | 'PARTNER_ADAPTER_NOT_CONFIGURED' | 'DIRECT_API_CREDENTIALS_MISSING' | null
   connections: ShopeeConnectionStatus[]
   settings: {
     autoPublishEnabled: boolean

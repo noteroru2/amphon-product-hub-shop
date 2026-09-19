@@ -35,22 +35,16 @@ jobs:
         working-directory: workers/r2-upload
         run: npm run typecheck
 
-      - name: Require production deployment credentials
+      - name: Require Cloudflare deployment credential
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          SHOPEE_PARTNER_ID: ${{ secrets.SHOPEE_PARTNER_ID }}
-          SHOPEE_PARTNER_KEY: ${{ secrets.SHOPEE_PARTNER_KEY }}
         run: |
-          missing=0
-          for name in CLOUDFLARE_API_TOKEN SHOPEE_PARTNER_ID SHOPEE_PARTNER_KEY; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing repository secret $name"
-              missing=1
-            fi
-          done
-          exit "$missing"
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
 
-      - name: Sync Shopee Worker secrets
+      - name: Sync optional Shopee direct API secrets
         working-directory: workers/r2-upload
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -58,8 +52,13 @@ jobs:
           SHOPEE_PARTNER_KEY: ${{ secrets.SHOPEE_PARTNER_KEY }}
         shell: bash
         run: |
-          printf '%s' "$SHOPEE_PARTNER_ID" | npx wrangler secret put SHOPEE_PARTNER_ID --config wrangler.jsonc
-          printf '%s' "$SHOPEE_PARTNER_KEY" | npx wrangler secret put SHOPEE_PARTNER_KEY --config wrangler.jsonc
+          if [ -n "$SHOPEE_PARTNER_ID" ] && [ -n "$SHOPEE_PARTNER_KEY" ]; then
+            printf '%s' "$SHOPEE_PARTNER_ID" | npx wrangler secret put SHOPEE_PARTNER_ID --config wrangler.jsonc
+            printf '%s' "$SHOPEE_PARTNER_KEY" | npx wrangler secret put SHOPEE_PARTNER_KEY --config wrangler.jsonc
+            echo "Shopee direct API credentials synced"
+          else
+            echo "Shopee direct API disabled: no Partner credentials configured"
+          fi
 
       - name: Deploy amphon-product-images
         working-directory: workers/r2-upload

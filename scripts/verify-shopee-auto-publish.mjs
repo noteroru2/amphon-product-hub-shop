@@ -4,8 +4,9 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFile(resolve(root, path), 'utf8')
 
-const [migration, runtime, worker, wrangler, hubClient, hubAdmin, deploy] = await Promise.all([
+const [migration, channelMigration, runtime, worker, wrangler, hubClient, hubAdmin, deploy] = await Promise.all([
   read('supabase/migrations/20260919121000_shopee_channel_runtime.sql'),
+  read('supabase/migrations/20260919193000_channel_architecture.sql'),
   read('workers/r2-upload/src/shopee.ts'),
   read('workers/r2-upload/src/index.ts'),
   read('workers/r2-upload/wrangler.jsonc'),
@@ -15,9 +16,10 @@ const [migration, runtime, worker, wrangler, hubClient, hubAdmin, deploy] = awai
 ])
 
 const checks = [
-  ['Shopee auto publish defaults ON but is mapping-gated',
+  ['Shopee runtime stays mapping-gated and current channel policy disables auto publish',
     migration.includes('auto_publish_enabled boolean not null default true')
-      && migration.includes('private.shopee_mapping_for_product(p.id) is not null')],
+      && migration.includes('private.shopee_mapping_for_product(p.id) is not null')
+      && channelMigration.includes('set auto_publish_enabled = false')],
   ['Shopee tokens are stored in Supabase Vault, not plaintext connection columns',
     migration.includes('vault.create_secret')
       && migration.includes('vault.update_secret')
@@ -38,6 +40,10 @@ const checks = [
   ['System authority drives Shopee stock projection',
     runtime.includes("product.one_availability === 'IN_STOCK' ? 1 : 0")
       && migration.includes("p.one_availability is distinct from 'SOLD'")],
+  ['Shopee adapter defaults fail-closed until direct API is explicitly enabled',
+    runtime.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'")
+      && runtime.includes("channelMode(env) !== 'direct_api'")
+      && runtime.includes("SHOPEE_DIRECT_API_DISABLED")],
   ['Missing mapping fails closed before Shopee add-item',
     runtime.includes("throw new ShopeeError('SHOPEE_CATEGORY_MAPPING_REQUIRED', false)")
       && runtime.includes("throw new ShopeeError('SHOPEE_MAPPING_INCOMPLETE', false)")],
@@ -73,10 +79,12 @@ const checks = [
       && hubClient.includes('saveShopeeCategoryMapping')
       && hubAdmin.includes('เชื่อมร้าน Shopee')
       && hubAdmin.includes('ตั้ง Mapping สำหรับ Auto Publish')],
-  ['Production deploy syncs Shopee secrets without echoing their values',
+  ['Production deploy treats Shopee credentials as optional and never echoes values',
     deploy.includes('wrangler secret put SHOPEE_PARTNER_ID')
       && deploy.includes('wrangler secret put SHOPEE_PARTNER_KEY')
-      && deploy.includes('secrets.SHOPEE_PARTNER_KEY')],
+      && deploy.includes('secrets.SHOPEE_PARTNER_KEY')
+      && deploy.includes('Shopee direct API disabled')
+      && deploy.includes('if [ -n "$SHOPEE_PARTNER_ID" ]')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
