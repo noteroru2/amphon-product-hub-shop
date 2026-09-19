@@ -1,0 +1,339 @@
+/*
+ * SHOP mobile polish — 2026-09-19
+ * Final override layer for the customer-facing storefront.
+ * Keeps commerce logic unchanged while making product pages usable in
+ * narrow mobile and Facebook in-app browsers.
+ */
+
+@media (max-width: 720px) {
+  html {
+    scroll-padding-top: 112px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    background: #fff;
+  }
+
+  .site-header {
+    background: rgba(255,255,255,.98);
+    border-bottom-color: #ececec;
+  }
+
+  .header-row {
+    width: min(calc(100% - 20px), 1180px);
+    grid-template-columns: minmax(0,1fr) auto;
+    column-gap: 8px;
+    row-gap: 7px;
+    padding: 8px 0 7px;
+  }
+
+  .logo {
+    min-width: 0;
+    gap: 7px;
+    font-size: .9rem;
+  }
+
+  .logo-mark {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: 9px;
+  }
+
+  .logo > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .header-line-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 40px;
+    padding: 0 10px;
+    border-radius: 12px;
+    font-size: 0;
+    line-height: 1;
+  }
+
+  .header-line-link::after {
+    content: "LINE";
+    font-size: .74rem;
+    font-weight: 900;
+    letter-spacing: .01em;
+  }
+
+  .account-link,
+  .cart-link {
+    min-height: 40px;
+    padding: 0 6px;
+    font-size: .78rem;
+  }
+
+  .cart-link {
+    gap: 5px;
+    padding-right: 1px;
+  }
+
+  .cart-link span {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+  }
+
+  .nav {
+    gap: 6px;
+    padding: 0 0 3px;
+    scroll-padding-inline: 2px;
+  }
+
+  .nav a {
+    min-height: 34px;
+    padding: 0 12px;
+    border-color: #e8e8e8;
+    background: #fafafa;
+    font-size: .8rem;
+  }
+
+  .breadcrumbs {
+    padding-top: 12px;
+    font-size: .78rem;
+  }
+
+  .product-detail {
+    gap: 12px;
+    padding-top: 12px;
+    padding-bottom: 28px;
+  }
+
+  .product-gallery .gallery-main-photo {
+    border-radius: 16px;
+    box-shadow: none;
+  }
+
+  .product-gallery .gallery-main-photo img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+  }
+
+  .product-gallery .gallery-caption {
+    padding: 8px 11px;
+    font-size: .75rem;
+  }
+
+  .gallery-nav {
+    width: 40px;
+    height: 40px;
+    top: calc(50% - 20px);
+  }
+
+  .gallery-thumbnails {
+    grid-auto-columns: minmax(72px, 84px);
+    gap: 7px;
+    padding-top: 8px;
+  }
+
+  .buy-panel {
+    position: static;
+    padding: 4px 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .status-row {
+    justify-content: flex-start;
+    gap: 7px;
+  }
+
+  .product-h1 {
+    margin: 10px 0 6px;
+    font-size: 1.55rem;
+    line-height: 1.24;
+    letter-spacing: -.025em;
+  }
+
+  .buy-panel > .muted {
+    font-size: .82rem;
+  }
+
+  .price-large {
+    margin: 12px 0 14px;
+    font-size: 2.05rem;
+    line-height: 1.05;
+  }
+
+  .trust-summary-grid {
+    gap: 7px;
+    margin: 12px 0;
+  }
+
+  .trust-summary-grid > div {
+    min-width: 0;
+    padding: 11px;
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .trust-summary-grid span {
+    font-size: .72rem;
+  }
+
+  .trust-summary-grid strong {
+    font-size: .88rem;
+    line-height: 1.35;
+  }
+
+  .product-quick-links {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 7px;
+    margin-top: 12px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .product-quick-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .product-quick-links .button {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 13px;
+    border-radius: 11px;
+    font-size: .82rem;
+  }
+
+  /*
+   * Mobile purchase bar: only the actionable controls belong in the fixed bar.
+   * The previous 2-column CSS placed the LINE explanation in column 2, which
+   * created the oversized green/text blocks visible in the screenshots.
+   */
+  .buy-panel .purchase-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin: 0;
+    padding:
+      9px max(12px, env(safe-area-inset-right))
+      calc(9px + env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    border-top: 1px solid #e8e8e8;
+    background: rgba(255,255,255,.985);
+    box-shadow: 0 -8px 28px rgba(0,0,0,.10);
+    backdrop-filter: blur(16px);
+  }
+
+  .buy-panel .purchase-actions .line-purchase-note,
+  .buy-panel .purchase-actions .microcopy,
+  .buy-panel .purchase-actions a[href="/cart/"] {
+    display: none !important;
+  }
+
+  .buy-panel .purchase-actions .line-primary-purchase {
+    order: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 12px;
+    border-radius: 13px;
+    white-space: nowrap;
+    font-size: .92rem;
+    box-shadow: 0 7px 20px rgba(6,199,85,.20);
+  }
+
+  .buy-panel .purchase-actions #add-to-cart {
+    order: 1;
+    flex: 0 0 104px;
+    width: auto;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 10px;
+    border-radius: 13px;
+    font-size: .84rem;
+    line-height: 1.2;
+  }
+
+  .buy-panel .purchase-actions > .button-secondary:not(#add-to-cart):not([href="/cart/"]) {
+    flex: 0 0 104px;
+    width: auto;
+    min-width: 0;
+  }
+
+  main:has(.buy-panel .purchase-actions) {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+
+  .trust-section {
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .trust-card,
+  .spec-panel,
+  .disclosure-panel {
+    border-radius: 15px;
+  }
+}
+
+@media (max-width: 410px) {
+  .logo > span:last-child {
+    max-width: 92px;
+    white-space: nowrap;
+  }
+
+  .header-line-link {
+    min-width: 40px;
+    height: 38px;
+    padding-inline: 8px;
+  }
+
+  .account-link,
+  .cart-link {
+    min-height: 38px;
+    padding-inline: 5px;
+    font-size: .75rem;
+  }
+
+  .product-h1 {
+    font-size: 1.45rem;
+  }
+
+  .price-large {
+    font-size: 1.95rem;
+  }
+
+  .buy-panel .purchase-actions .line-primary-purchase {
+    font-size: .84rem;
+    padding-inline: 9px;
+  }
+
+  .buy-panel .purchase-actions #add-to-cart,
+  .buy-panel .purchase-actions > .button-secondary:not(#add-to-cart):not([href="/cart/"]) {
+    flex-basis: 92px;
+    font-size: .8rem;
+    padding-inline: 7px;
+  }
+}
