@@ -709,6 +709,7 @@ async function updateCase(
   currentCase: CaseRow,
   result: IntakeResult,
   runId: string,
+  reply: string,
 ) {
   const transition = nextState(result)
   const metadata = {
@@ -717,6 +718,11 @@ async function updateCase(
     lastRequestedInputs: result.requested_inputs,
     lastFlags: result.flags,
     lastIntent: result.intent,
+    pendingReply: reply ? {
+      text: reply,
+      action: result.action,
+      createdAt: new Date().toISOString(),
+    } : null,
   }
 
   await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), {
@@ -738,7 +744,29 @@ async function updateCase(
       { control_mode: 'HUMAN_REQUIRED' },
     )
   }
-  return transition
+  return { ...transition, metadata }
+}
+
+function pendingReply(metadata: Record<string, unknown> | null) {
+  const value = metadata?.pendingReply
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const pending = value as Record<string, unknown>
+  const text = clean(pending.text, 4500)
+  const actions: IntakeAction[] = ['ASK_PRODUCT_TYPE','ASK_MORE_INFO','READY_TO_PRICE','HUMAN_REVIEW','NO_ACTION']
+  const action = actions.includes(pending.action as IntakeAction)
+    ? pending.action as IntakeAction
+    : 'NO_ACTION'
+  return text ? { text, action } : null
+}
+
+async function clearPendingReply(
+  env: ConversationEngineEnv,
+  caseId: string,
+  metadata: Record<string, unknown> | null,
+) {
+  await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId), {
+    metadata: { ...(metadata || {}), pendingReply: null },
+  })
 }
 
 async function markMessagesConsumed(env: ConversationEngineEnv, ids: string[]) {
@@ -837,16 +865,32 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
   const currentCase = await loadCase(env, batch.caseId)
   if (!conversation || !currentCase) return { ok: false, skipped: true, reason: 'CASE_NOT_FOUND' }
 
-  if (conversation.control_mode === 'HUMAN_ACTIVE' || currentCase.control_mode === 'HUMAN_ACTIVE') {
-    return { ok: true, skipped: true, reason: 'HUMAN_ACTIVE' }
-  }
-
   const [recentMessages, unconsumedMessages, readyImages, observations] = await Promise.all([
     loadRecentMessages(env, batch.caseId),
     loadUnconsumedMessages(env, batch.caseId),
     loadReadyImages(env, batch.caseId),
     loadPriorObservations(env, batch.caseId),
   ])
+
+  const pending = pendingReply(currentCase.metadata)
+  if (!unconsumedMessages.length && !readyImages.length && pending) {
+    try {
+      await sendLineText(env, batch, pending.text, pending.action)
+      await clearPendingReply(env, currentCase.id, currentCase.metadata)
+      return { ok: true, skipped: false, resentPendingReply: true }
+    } catch (error) {
+      return {
+        ok: false,
+        skipped: false,
+        deliveryOnly: true,
+        error: clean((error as Error)?.message || error, 500),
+      }
+    }
+  }
+
+  if (conversation.control_mode !== 'AUTO' || currentCase.control_mode !== 'AUTO') {
+    return { ok: true, skipped: true, reason: 'HUMAN_CONTROL' }
+  }
 
   if (!unconsumedMessages.length && !readyImages.length) {
     return { ok: true, skipped: true, reason: 'NOTHING_NEW' }
@@ -865,8 +909,9 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     const vision = await callVision(env, recentMessages, observations, readyImages)
     const result = vision.result
 
+    const reply = composeReply(result, currentCase)
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
-    const transition = await updateCase(env, batch, currentCase, result, run.id)
+    const transition = await updateCase(env, batch, currentCase, result, run.id, reply)
     await markMessagesConsumed(env, messageIds)
 
     if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
@@ -879,8 +924,23 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
       skippedImageIds: vision.skippedImageIds,
     }, vision.usage)
 
-    const reply = composeReply(result, currentCase)
-    const sent = reply ? await sendLineText(env, batch, reply, result.action) : false
+    let sent = false
+    if (reply) {
+      try {
+        sent = await sendLineText(env, batch, reply, result.action)
+        if (sent) await clearPendingReply(env, currentCase.id, transition.metadata)
+      } catch (deliveryError) {
+        console.error('AI BUYER LINE delivery failed after successful analysis', batch.caseId, deliveryError)
+        return {
+          ok: false,
+          skipped: false,
+          deliveryOnly: true,
+          caseId: batch.caseId,
+          state: transition.state,
+          error: clean((deliveryError as Error)?.message || deliveryError, 500),
+        }
+      }
+    }
 
     return {
       ok: true,
