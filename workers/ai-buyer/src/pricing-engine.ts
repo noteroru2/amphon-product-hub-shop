@@ -1035,6 +1035,12 @@ export async function runPricingForCase(env: PricingEnv, caseId: string) {
         0.99,
         0.78 + row.score * 0.16 + clamp01(caseRow.condition_completeness) * 0.05,
       )
+      if (prices.hardMax <= 0) {
+        return escalatePricing(env, caseRow, 'PRICE_BOOK_VALUE_NONPOSITIVE', {
+          matchScore: row.score,
+          adjustmentDelta: adjust.delta,
+        })
+      }
       if (confidence < 0.85) {
         return escalatePricing(env, caseRow, 'PRICE_BOOK_CONFIDENCE_LOW', {
           matchScore: row.score,
