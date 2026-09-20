@@ -1,0 +1,38 @@
+name: AI Buyer Reprocess Fixed Cases
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - '.github/workflows/ai-buyer-reprocess-fix-cases.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reprocess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reprocess PC and ASUS cases
+        env:
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$AI_BUYER_ADMIN_TOKEN" ]; then
+            echo "::error::Missing AI_BUYER_ADMIN_TOKEN"
+            exit 1
+          fi
+          for case_id in             6ed54ba9-b84f-49c2-8cb9-15dd16141aef             fc75ebe4-4a91-4614-9dda-f28ab18914bd
+          do
+            body_file="$(mktemp)"
+            status="$(curl -sS -o "$body_file" -w '%{http_code}'               -X POST 'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/case/reprocess'               -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN"               -H 'content-type: application/json'               --data "{"caseId":"$case_id"}")"
+            cat "$body_file"
+            echo
+            if [ "$status" != "202" ] || ! grep -q '"ok":true' "$body_file"; then
+              echo "::error::Reprocess failed for $case_id (HTTP $status)"
+              exit 1
+            fi
+          done
