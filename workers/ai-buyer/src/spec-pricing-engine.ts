@@ -863,12 +863,13 @@ export async function runSpecPricingForCase(
     return { handled: true, result: { ok: false, reason: 'CASE_NOT_READY' } }
   }
 
-  if (numberValue(caseRow.identity_confidence) < 0.90 || numberValue(caseRow.condition_completeness) < 0.75) {
+  if (numberValue(caseRow.identity_confidence) < 0.90) {
     return {
       handled: true,
       result: await escalate(env, caseRow, 'PRICING_GATE_NOT_MET', {
         identityConfidence: caseRow.identity_confidence,
         conditionCompleteness: caseRow.condition_completeness,
+        policy: 'SPEC_COMPLETE_CAN_PRICE_WITH_CONDITION_UNKNOWN',
       }),
     }
   }
@@ -978,7 +979,11 @@ export async function runSpecPricingForCase(
       sourceName: version.source_name,
       sourceChecksum: version.source_checksum,
       liquidityFactor: built.liquidityFactor,
-      notes: built.notes,
+      notes: [
+        ...built.notes,
+        ...(numberValue(caseRow.condition_completeness) < 0.75 ? ['CONDITION_NOT_FULLY_VERIFIED'] : []),
+      ],
+      conditionCompleteness: numberValue(caseRow.condition_completeness),
       formula: {
         baseValue: setting.base_value,
         targetBuyPercent: setting.target_buy_percent,
