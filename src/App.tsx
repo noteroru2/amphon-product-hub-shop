@@ -2883,7 +2883,7 @@ function SalesToolkit({
           {channel === "shopee" ? (
             <div className="content-preview-box shopee-content-preview">
               <div className="content-preview-label">
-                <span>Shopee · ราคา +18%</span>
+                <span>Shopee · หัวข้อ / ราคา / เนื้อหาหลัก · +18%</span>
                 <button
                   type="button"
                   onClick={() => void copy(shopeeParts.all, "ก๊อป Shopee ทั้งหมด")}
