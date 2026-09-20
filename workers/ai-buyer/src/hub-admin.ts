@@ -1,7 +1,6 @@
 export interface HubAdminEnv {
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
-  SUPABASE_PUBLISHABLE_KEY: string
   AI_BUYER_HUB_ORIGINS?: string
 }
 
@@ -36,7 +35,7 @@ function clean(value: unknown, max = 500) {
 }
 
 function origins(env: HubAdminEnv) {
-  return clean(env.AI_BUYER_HUB_ORIGINS || 'https://hub.amphon.co.th', 1000)
+  return clean(env.AI_BUYER_HUB_ORIGINS || 'https://hub.amphon.co.th,http://localhost:5173,http://127.0.0.1:5173', 1000)
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
@@ -108,12 +107,10 @@ async function serviceRows<T>(env: HubAdminEnv, path: string): Promise<T[]> {
 async function authenticateAdmin(request: Request, env: HubAdminEnv) {
   const authorization = request.headers.get('authorization') || ''
   if (!authorization.startsWith('Bearer ')) throw new Error('AUTH_REQUIRED')
-  if (!env.SUPABASE_PUBLISHABLE_KEY) throw new Error('AUTH_SERVER_NOT_CONFIGURED')
-
   const userResponse = await fetch(env.SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/user', {
     headers: {
       authorization,
-      apikey: env.SUPABASE_PUBLISHABLE_KEY,
+      apikey: env.SUPABASE_SECRET_KEY,
       accept: 'application/json',
     },
   })
