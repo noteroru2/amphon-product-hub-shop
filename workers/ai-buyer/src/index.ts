@@ -496,6 +496,59 @@ async function requireAdmin(request: Request, env: Env) {
   return constantTimeEqual(await sha256(expected), await sha256(provided))
 }
 
+async function handleCaseReprocess(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  let payload: { caseId?: string }
+  try {
+    payload = await request.json() as { caseId?: string }
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+
+  const caseId = clean(payload.caseId, 100)
+  if (!caseId) return response({ ok: false, error: 'CASE_ID_REQUIRED' }, 400)
+
+  const cases = await readRows<Array<{ id: string; conversation_id: string; state: string }> extends Array<infer T> ? T : never>(
+    await supabaseRequest(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=id,conversation_id,state&limit=1',
+    ),
+  )
+  const caseRow = cases[0]
+  if (!caseRow) return response({ ok: false, error: 'CASE_NOT_FOUND' }, 404)
+
+  const conversations = await readRows<ConversationRow>(
+    await supabaseRequest(
+      env,
+      'ai_buyer_conversations?id=eq.' + encodeURIComponent(caseRow.conversation_id)
+        + '&select=id,customer_id,line_user_id&limit=1',
+    ),
+  )
+  const conversation = conversations[0]
+  if (!conversation?.line_user_id) {
+    return response({ ok: false, error: 'CONVERSATION_NOT_FOUND' }, 404)
+  }
+
+  await scheduleConversationIntake(
+    env,
+    conversation,
+    { id: caseRow.id, state: caseRow.state },
+    conversation.line_user_id,
+    { type: 'manual-reprocess' },
+  )
+
+  return response({
+    ok: true,
+    scheduled: true,
+    caseId: caseRow.id,
+    conversationId: conversation.id,
+  }, 202)
+}
+
 async function handlePriceBookImport(request: Request, env: Env) {
   if (!(await requireAdmin(request, env))) {
     return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
@@ -721,6 +774,10 @@ export default {
 
     if (url.pathname === '/v1/hub/admin/dashboard' && request.method === 'GET') {
       return handleHubAdminDashboard(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/case/reprocess' && request.method === 'POST') {
+      return handleCaseReprocess(request, env)
     }
 
     if (url.pathname === '/v1/admin/price-book/import' && request.method === 'POST') {
