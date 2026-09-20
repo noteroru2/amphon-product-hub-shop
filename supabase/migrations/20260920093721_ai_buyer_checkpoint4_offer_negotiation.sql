@@ -53,14 +53,11 @@ create table if not exists public.ai_buyer_negotiation_events (
 create index if not exists ai_buyer_negotiation_case_idx
   on public.ai_buyer_negotiation_events(case_id, created_at desc);
 create index if not exists ai_buyer_negotiation_decision_idx
-  on public.ai_buyer_negotiation_events(pricing_decision_id)
-  where pricing_decision_id is not null;
+  on public.ai_buyer_negotiation_events(pricing_decision_id);
 create index if not exists ai_buyer_negotiation_offer_idx
-  on public.ai_buyer_negotiation_events(offer_id)
-  where offer_id is not null;
+  on public.ai_buyer_negotiation_events(offer_id);
 create index if not exists ai_buyer_negotiation_message_idx
-  on public.ai_buyer_negotiation_events(inbound_message_id)
-  where inbound_message_id is not null;
+  on public.ai_buyer_negotiation_events(inbound_message_id);
 
 create table if not exists public.ai_buyer_outbound_actions (
   id uuid primary key default gen_random_uuid(),
@@ -81,9 +78,10 @@ create table if not exists public.ai_buyer_outbound_actions (
 
 create index if not exists ai_buyer_outbound_case_status_idx
   on public.ai_buyer_outbound_actions(case_id, status, created_at desc);
+create index if not exists ai_buyer_outbound_conversation_idx
+  on public.ai_buyer_outbound_actions(conversation_id);
 create index if not exists ai_buyer_outbound_offer_idx
-  on public.ai_buyer_outbound_actions(offer_id)
-  where offer_id is not null;
+  on public.ai_buyer_outbound_actions(offer_id);
 
 create table if not exists public.ai_buyer_fulfillment_details (
   case_id uuid primary key references public.ai_buyer_valuation_cases(id) on delete cascade,
