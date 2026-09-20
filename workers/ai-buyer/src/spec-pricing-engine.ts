@@ -195,6 +195,30 @@ function hzTokens(value: unknown) {
   return tokens(value).filter((token) => /^\d+hz$/.test(token))
 }
 
+function nominalStorageGb(value: unknown) {
+  const raw = clean(value, 1000).toLocaleLowerCase('en-US')
+  const match = raw.match(/(\d{2,4}(?:\.\d+)?)\s*(?:gb|g\b)/)
+  if (!match) return null
+  const gb = Number(match[1])
+  if (!Number.isFinite(gb)) return null
+  if (gb >= 110 && gb <= 130) return 128
+  if (gb >= 220 && gb <= 260) return 256
+  if (gb >= 450 && gb <= 520) return 512
+  if (gb >= 900 && gb <= 1050) return 1024
+  if (gb >= 1800 && gb <= 2100) return 2048
+  return Math.round(gb)
+}
+
+function isIntegratedGpuText(value: unknown) {
+  const raw = clean(value, 1000).toLocaleLowerCase('en-US')
+  return /\biris\s*xe\b|\bintel\s+uhd\b|\bintegrated\b|\bigpu\b|\bradeon\s+(?:vega\s*\d*|graphics)\b/.test(raw)
+}
+
+function psuWatt(value: unknown) {
+  const match = clean(value, 1000).toLocaleLowerCase('en-US').match(/(\d{3,4})\s*w\b/)
+  return match ? Number(match[1]) : null
+}
+
 function semanticComponentScore(type: string, explicitValue: string, lookupKey: string) {
   const explicitTokens = tokens(explicitValue)
   const keyTokens = tokens(lookupKey)
@@ -203,7 +227,10 @@ function semanticComponentScore(type: string, explicitValue: string, lookupKey: 
   if (['RAM','SSD','STORAGE'].includes(type)) {
     const explicitCapacity = capacityTokens(explicitValue)
     const keyCapacity = capacityTokens(lookupKey)
-    if (!explicitCapacity.length || !keyCapacity.some((token) => explicitCapacity.includes(token))) return 0
+    const explicitNominal = type === 'RAM' ? null : nominalStorageGb(explicitValue)
+    const keyNominal = type === 'RAM' ? null : nominalStorageGb(lookupKey)
+    const nominalMatch = explicitNominal != null && keyNominal != null && explicitNominal === keyNominal
+    if (!nominalMatch && (!explicitCapacity.length || !keyCapacity.some((token) => explicitCapacity.includes(token)))) return 0
 
     if (type === 'RAM') {
       const explicitDdr = explicitTokens.find((token) => /^ddr\d$/.test(token))
@@ -218,7 +245,13 @@ function semanticComponentScore(type: string, explicitValue: string, lookupKey: 
       const explicitKind = explicitTokens.includes('hdd') ? 'hdd' : 'ssd'
       if (keyKind !== explicitKind) return 0
     }
+    if (nominalMatch) return 73500 + String(keyNominal).length
     return 72000 + Math.max(...keyCapacity.filter((token) => explicitCapacity.includes(token)).map((token) => token.length))
+  }
+
+  if (type === 'GPU') {
+    const lookupIntegrated = /integrated|igpu/i.test(clean(lookupKey))
+    if (lookupIntegrated && isIntegratedGpuText(explicitValue)) return 76000
   }
 
   if (type === 'DISPLAY') {
@@ -516,6 +549,16 @@ function pcBroadMatch(entries: SpecEntryRow[], type: string, explicit: string) {
   if (direct) return direct
   const normalized = normalize(explicit)
   if (!normalized) return null
+
+  if (type === 'PSU') {
+    const raw = clean(explicit).toLocaleLowerCase('en-US')
+    const watt = psuWatt(explicit)
+    const rated = /bronze|gold|platinum|titanium|80\s*plus|80\+/.test(raw)
+    if (watt && !rated) {
+      const unknown = findByKey(entries, 'PSU', 'No-name / unknown')
+      if (unknown) return { entry: unknown, reason: 'PSU_UNRATED_CONSERVATIVE' }
+    }
+  }
 
   const candidates = componentRows(entries, type).map((entry) => {
     const label = clean(entry.lookup_key)
