@@ -811,6 +811,10 @@ async function collectFulfillment(
   }
 }
 
+function latestMessageId(messages: OfferFlowMessage[]) {
+  return messages.filter((message) => message.direction === 'INBOUND').at(-1)?.id || 'none'
+}
+
 export async function handleOfferFlow(
   env: OfferFlowEnv,
   caseId: string,
@@ -833,11 +837,20 @@ export async function handleOfferFlow(
       reason: 'CUSTOMER_MESSAGE_WHILE_PRICE_PENDING',
       rollout_mode: rollout.mode,
     })
+    const pendingText = 'รับข้อมูลแล้วครับ เดี๋ยวแอดมินเช็กราคาและแจ้งกลับให้ครับ'
+    const pendingAction = await createOutboundAction(env, {
+      conversationId: caseRow.conversation_id,
+      caseId,
+      actionType: 'NEGOTIATION_REPLY',
+      idempotencyKey: 'pricing-pending:' + latestMessageId(messages),
+      text: pendingText,
+    })
     return {
       handled: true,
       state: 'PRICING',
-      reply: 'รับข้อมูลแล้วครับ เดี๋ยวแอดมินเช็กราคาและแจ้งกลับให้ครับ',
+      reply: pendingText,
       action: 'PRICING_PENDING',
+      outboundActionId: pendingAction.id,
       mode: rollout.mode,
     }
   }
@@ -860,11 +873,8 @@ export async function handleOfferFlow(
     const accepted = await acceptOffer(env, caseId, currentOffer.id, latest.id)
     const refreshed = await loadCase(env, caseId)
     if (!refreshed) throw new Error('CASE_MISSING_AFTER_ACCEPT')
-    const fulfillmentResult = await collectFulfillment(env, refreshed, messages)
-    if (fulfillmentResult.reply) {
-      fulfillmentResult.reply = 'ตกลงครับ รับที่ ' + baht(accepted.agreed_price) + ' บาทครับ\n' + fulfillmentResult.reply
-    }
-    return fulfillmentResult
+    void accepted
+    return collectFulfillment(env, refreshed, messages)
   }
 
   if (isExplicitDecline(text)) {
@@ -882,11 +892,20 @@ export async function handleOfferFlow(
       event_type: 'DECLINE',
       shop_amount: currentOffer.amount,
     })
+    const declineText = 'ได้ครับ หากต้องการประเมินใหม่ภายหลังทักมาได้เลยครับ'
+    const declineAction = await createOutboundAction(env, {
+      conversationId: caseRow.conversation_id,
+      caseId,
+      actionType: 'NEGOTIATION_REPLY',
+      idempotencyKey: 'decline-ack:' + latest.id,
+      text: declineText,
+    })
     return {
       handled: true,
       state: 'CUSTOMER_DECLINED',
-      reply: 'ได้ครับ หากต้องการประเมินใหม่ภายหลังทักมาได้เลยครับ',
+      reply: declineText,
       action: 'DECLINE_ACK',
+      outboundActionId: declineAction.id,
     }
   }
 
@@ -907,22 +926,42 @@ export async function handleOfferFlow(
   }
 
   if (counter == null && !wantsIncrease) {
+    const reminderText = 'ราคาที่เสนอไว้ ' + baht(currentOffer.amount) + ' บาทครับ ถ้าสะดวกราคานี้แจ้งตกลงได้เลยครับ'
+    const reminderAction = await createOutboundAction(env, {
+      conversationId: caseRow.conversation_id,
+      caseId,
+      offerId: currentOffer.id,
+      actionType: 'NEGOTIATION_REPLY',
+      idempotencyKey: 'offer-reminder:' + latest.id,
+      text: reminderText,
+    })
     return {
       handled: true,
       state: caseRow.state,
-      reply: 'ราคาที่เสนอไว้ ' + baht(currentOffer.amount) + ' บาทครับ ถ้าสะดวกราคานี้แจ้งตกลงได้เลยครับ',
+      reply: reminderText,
       action: 'OFFER_REMINDER',
       offerId: currentOffer.id,
+      outboundActionId: reminderAction.id,
     }
   }
 
   if (counter != null && counter <= currentOffer.amount) {
+    const withinText = 'ได้ครับ ราคาที่เสนอ ' + baht(currentOffer.amount) + ' บาทรับได้ครับ ถ้าตกลงแจ้งได้เลยครับ'
+    const withinAction = await createOutboundAction(env, {
+      conversationId: caseRow.conversation_id,
+      caseId,
+      offerId: currentOffer.id,
+      actionType: 'NEGOTIATION_REPLY',
+      idempotencyKey: 'counter-within:' + latest.id,
+      text: withinText,
+    })
     return {
       handled: true,
       state: caseRow.state,
-      reply: 'ได้ครับ ราคาที่เสนอ ' + baht(currentOffer.amount) + ' บาทรับได้ครับ ถ้าตกลงแจ้งได้เลยครับ',
+      reply: withinText,
       action: 'COUNTER_WITHIN_CURRENT',
       offerId: currentOffer.id,
+      outboundActionId: withinAction.id,
     }
   }
 
@@ -936,12 +975,22 @@ export async function handleOfferFlow(
     100,
   )
   if (nextAmount <= currentOffer.amount) {
+    const holdText = 'ตอนนี้เต็มที่ที่เสนอได้คือ ' + baht(currentOffer.amount) + ' บาทครับ ถ้าสะดวกราคานี้รับได้เลยครับ'
+    const holdAction = await createOutboundAction(env, {
+      conversationId: caseRow.conversation_id,
+      caseId,
+      offerId: currentOffer.id,
+      actionType: 'NEGOTIATION_REPLY',
+      idempotencyKey: 'hold-offer:' + latest.id,
+      text: holdText,
+    })
     return {
       handled: true,
       state: caseRow.state,
-      reply: 'ตอนนี้เต็มที่ที่เสนอได้คือ ' + baht(currentOffer.amount) + ' บาทครับ ถ้าสะดวกราคานี้รับได้เลยครับ',
+      reply: holdText,
       action: 'HOLD_OFFER',
       offerId: currentOffer.id,
+      outboundActionId: holdAction.id,
     }
   }
 
