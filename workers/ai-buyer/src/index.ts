@@ -1,5 +1,6 @@
 export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
+import { runPricingForCase } from './pricing-router'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
 import { handleHubAdminDashboard, handleHubAdminPreflight } from './hub-admin'
 
@@ -496,6 +497,102 @@ async function requireAdmin(request: Request, env: Env) {
   return constantTimeEqual(await sha256(expected), await sha256(provided))
 }
 
+async function handleCaseRetryPricing(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  let payload: { caseId?: string }
+  try {
+    payload = await request.json() as { caseId?: string }
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+
+  const caseId = clean(payload.caseId, 100)
+  if (!caseId) return response({ ok: false, error: 'CASE_ID_REQUIRED' }, 400)
+
+  const cases = await readRows<Array<{
+    id: string
+    conversation_id: string
+    state: string
+    control_mode: string
+    metadata: Record<string, unknown> | null
+  }> extends Array<infer T> ? T : never>(
+    await supabaseRequest(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=id,conversation_id,state,control_mode,metadata&limit=1',
+    ),
+  )
+  const caseRow = cases[0]
+  if (!caseRow) return response({ ok: false, error: 'CASE_NOT_FOUND' }, 404)
+
+  const reviewReason = clean(caseRow.metadata?.pricingReviewReason, 120)
+  const retryable = [
+    'SPEC_REQUIRED_COMPONENT_MISSING',
+    'SPEC_COMPONENT_UNMAPPED',
+    'SPEC_LOW_CONFIDENCE_COMPONENT',
+    'SPEC_PRICING_CONFIDENCE_LOW',
+    'PRICING_GATE_NOT_MET',
+  ].includes(reviewReason)
+  if (caseRow.state === 'HUMAN_REVIEW' && !retryable) {
+    return response({
+      ok: false,
+      error: 'CASE_REVIEW_NOT_RETRYABLE',
+      reason: reviewReason || null,
+    }, 409)
+  }
+
+  const nextMetadata = { ...(caseRow.metadata || {}) }
+  delete nextMetadata.pricingReviewReason
+  delete nextMetadata.pricingReviewDetail
+
+  const casePatch = await supabaseRequest(
+    env,
+    'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId),
+    {
+      method: 'PATCH',
+      headers: { prefer: 'return=minimal' },
+      body: JSON.stringify({
+        state: 'READY_TO_PRICE',
+        control_mode: 'AUTO',
+        metadata: nextMetadata,
+      }),
+    },
+  )
+  if (!casePatch.ok) return response({ ok: false, error: 'CASE_RESET_FAILED' }, 500)
+
+  await supabaseRequest(
+    env,
+    'ai_buyer_conversations?id=eq.' + encodeURIComponent(caseRow.conversation_id),
+    {
+      method: 'PATCH',
+      headers: { prefer: 'return=minimal' },
+      body: JSON.stringify({ control_mode: 'AUTO' }),
+    },
+  )
+
+  const pricing = await runPricingForCase(env, caseId)
+  const pricingOk = Boolean(
+    pricing
+    && typeof pricing === 'object'
+    && (pricing as { ok?: boolean }).ok,
+  )
+
+  let offerFlow: unknown = null
+  if (pricingOk) {
+    offerFlow = await startOfferAfterPricing(env, caseId)
+  }
+
+  return response({
+    ok: pricingOk,
+    caseId,
+    pricing,
+    offerFlow,
+  }, pricingOk ? 200 : 409)
+}
+
 async function handleCaseReprocess(request: Request, env: Env) {
   if (!(await requireAdmin(request, env))) {
     return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
@@ -778,6 +875,10 @@ export default {
 
     if (url.pathname === '/v1/admin/case/reprocess' && request.method === 'POST') {
       return handleCaseReprocess(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/case/retry-pricing' && request.method === 'POST') {
+      return handleCaseRetryPricing(request, env)
     }
 
     if (url.pathname === '/v1/admin/price-book/import' && request.method === 'POST') {
