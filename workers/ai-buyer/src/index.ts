@@ -1,5 +1,6 @@
 export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
+import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
 
 interface Env {
   IMAGES: R2Bucket
@@ -542,6 +543,124 @@ async function handlePriceGuardCheck(request: Request, env: Env) {
   return response({ ok: true, result })
 }
 
+async function handleAutomationMode(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  if (request.method === 'GET') {
+    const url = new URL(request.url)
+    const category = clean(url.searchParams.get('category'), 40)
+    const path = category
+      ? 'ai_buyer_category_automation_modes?category=eq.' + encodeURIComponent(category)
+        + '&select=category,mode,max_negotiation_rounds,active,metadata,updated_at&limit=1'
+      : 'ai_buyer_category_automation_modes?select=category,mode,max_negotiation_rounds,active,metadata,updated_at&order=category.asc'
+    const rows = await readRows<Record<string, unknown>>(await supabaseRequest(env, path))
+    return response({ ok: true, modes: rows })
+  }
+
+  let payload: { category?: string; mode?: string; maxNegotiationRounds?: number; active?: boolean }
+  try {
+    payload = await request.json() as typeof payload
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+  const category = clean(payload.category, 40)
+  const mode = clean(payload.mode, 20)
+  const categories = ['NOTEBOOK','MACBOOK','DESKTOP_PC','SMARTPHONE','TABLET','CAMERA','OTHER']
+  const modes = ['SHADOW','APPROVAL','AUTO']
+  if (!categories.includes(category) || !modes.includes(mode)) {
+    return response({ ok: false, error: 'AUTOMATION_MODE_INVALID' }, 400)
+  }
+  const rounds = payload.maxNegotiationRounds == null
+    ? 4
+    : Math.max(1, Math.min(10, Math.floor(Number(payload.maxNegotiationRounds) || 4)))
+  const rows = await readRows<Record<string, unknown>>(await supabaseRequest(
+    env,
+    'ai_buyer_category_automation_modes?on_conflict=category',
+    {
+      method: 'POST',
+      headers: { prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({
+        category,
+        mode,
+        max_negotiation_rounds: rounds,
+        active: payload.active !== false,
+      }),
+    },
+  ))
+  return response({ ok: true, mode: rows[0] || null })
+}
+
+async function handleApproveOffer(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+  let payload: { caseId?: string; offerId?: string }
+  try {
+    payload = await request.json() as { caseId?: string; offerId?: string }
+  } catch {
+    return response({ ok: false, error: 'JSON_INVALID' }, 400)
+  }
+  const caseId = clean(payload.caseId, 100)
+  const offerId = clean(payload.offerId, 100)
+  if (!caseId || !offerId) return response({ ok: false, error: 'APPROVAL_INPUT_INVALID' }, 400)
+
+  try {
+    const flow = await approvePreparedOffer(env, caseId, offerId)
+    if (!flow.handled || !flow.reply || !flow.lineUserId) {
+      return response({ ok: false, error: flow.reason || 'OFFER_NOT_APPROVABLE' }, 400)
+    }
+
+    const sent = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: flow.lineUserId,
+        messages: [{ type: 'text', text: flow.reply }],
+      }),
+    })
+    if (!sent.ok) {
+      const detail = await sent.text().catch(() => '')
+      await markOfferFlowFailure(env, flow.outboundActionId, 'LINE_PUSH_' + sent.status + ':' + detail)
+        .catch(() => undefined)
+      return response({ ok: false, error: 'LINE_PUSH_' + sent.status }, 502)
+    }
+
+    await markOfferFlowDelivery(env, {
+      offerId: flow.offerId,
+      outboundActionId: flow.outboundActionId,
+    })
+
+    const cases = await readRows<{ conversation_id: string }>(await supabaseRequest(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=conversation_id&limit=1',
+    ))
+    if (cases[0]) {
+      await supabaseRequest(env, 'ai_buyer_messages', {
+        method: 'POST',
+        headers: { prefer: 'return=minimal' },
+        body: JSON.stringify({
+          conversation_id: cases[0].conversation_id,
+          case_id: caseId,
+          direction: 'OUTBOUND',
+          message_type: 'TEXT',
+          text_content: flow.reply,
+          metadata: { source: 'ADMIN_APPROVAL', action: 'OFFER', offerId },
+          line_timestamp: new Date().toISOString(),
+        }),
+      })
+    }
+    return response({ ok: true, sent: true, caseId, offerId, amountGuarded: true })
+  } catch (error) {
+    return response({ ok: false, error: clean((error as Error)?.message || error, 1000) }, 400)
+  }
+}
+
 async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext) {
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > MAX_BODY_BYTES) return response({ ok: false, error: 'BODY_TOO_LARGE' }, 413)
@@ -599,6 +718,14 @@ export default {
 
     if (url.pathname === '/v1/admin/price-guard/check' && request.method === 'POST') {
       return handlePriceGuardCheck(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/automation-mode' && (request.method === 'GET' || request.method === 'POST')) {
+      return handleAutomationMode(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/offer/approve' && request.method === 'POST') {
+      return handleApproveOffer(request, env)
     }
 
     return response({ ok: false, error: 'NOT_FOUND' }, 404)
