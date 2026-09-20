@@ -5,10 +5,13 @@ const required = [
   'supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql',
   'supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql',
   'supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql',
+  'supabase/migrations/20260920085454_ai_buyer_checkpoint35_spec_pricing.sql',
   'workers/ai-buyer/src/index.ts',
   'workers/ai-buyer/src/batcher.ts',
   'workers/ai-buyer/src/conversation-engine.ts',
   'workers/ai-buyer/src/pricing-engine.ts',
+  'workers/ai-buyer/src/spec-pricing-engine.ts',
+  'workers/ai-buyer/src/pricing-router.ts',
   'workers/ai-buyer/wrangler.jsonc',
   'workers/ai-buyer/package.json',
   'workers/ai-buyer/tsconfig.json',
@@ -25,7 +28,10 @@ const sql1 = fs.readFileSync('supabase/migrations/20260919163000_ai_buyer_v1_fou
 const sql2 = fs.readFileSync('supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql', 'utf8')
 const sql3 = fs.readFileSync('supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql', 'utf8')
 const sql4 = fs.readFileSync('supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql', 'utf8')
+const sql5 = fs.readFileSync('supabase/migrations/20260920085454_ai_buyer_checkpoint35_spec_pricing.sql', 'utf8')
 const pricing = fs.readFileSync('workers/ai-buyer/src/pricing-engine.ts', 'utf8')
+const specPricing = fs.readFileSync('workers/ai-buyer/src/spec-pricing-engine.ts', 'utf8')
+const pricingRouter = fs.readFileSync('workers/ai-buyer/src/pricing-router.ts', 'utf8')
 const wrangler = fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8')
 
 for (const token of [
@@ -63,6 +69,9 @@ for (const token of [
   'identity_confidence >= 0.9',
   'HUMAN_ACTIVE',
   'Never quote, estimate, infer, mention, or suggest a purchase price',
+  "from './pricing-router'",
+  'canonical keys whenever known',
+  'KEYBOARD_DEFECT',
 ]) {
   if (!engine.includes(token)) throw new Error(`AI Buyer conversation/vision invariant missing: ${token}`)
 }
@@ -138,6 +147,36 @@ for (const token of [
   if (!pricing.includes(token)) throw new Error(`AI Buyer checkpoint 3 pricing invariant missing: ${token}`)
 }
 
+
+for (const token of [
+  'ai_buyer_spec_price_entries',
+  'ai_buyer_spec_price_settings',
+  'ai_buyer_price_calibrations',
+  'enable row level security',
+  'grant select, insert, update, delete on table',
+]) {
+  if (!sql5.includes(token)) throw new Error(`AI Buyer checkpoint 3.5 schema invariant missing: ${token}`)
+}
+
+for (const token of [
+  'runSpecPricingForCase',
+  'SPEC_REQUIRED_COMPONENT_MISSING',
+  'SPEC_COMPLEX_CONDITION_REQUIRES_ADMIN',
+  'SPEC_PRICING_CONFIDENCE_LOW',
+  'SPEC_COMPONENTS_V1',
+  'price_book_version_id',
+  'current_authorized_offer',
+]) {
+  if (!specPricing.includes(token)) throw new Error(`AI Buyer checkpoint 3.5 spec pricing invariant missing: ${token}`)
+}
+
+for (const token of [
+  'runSpecPricingForCase',
+  'runLegacyPricingForCase',
+]) {
+  if (!pricingRouter.includes(token)) throw new Error(`AI Buyer pricing router invariant missing: ${token}`)
+}
+
 for (const token of [
   '"CONVERSATION_BATCHER"',
   '"new_sqlite_classes"',
@@ -158,4 +197,4 @@ for (const forbidden of [
   if (wrangler.includes(forbidden)) throw new Error(`AI Buyer secret must not be committed in wrangler config: ${forbidden}`)
 }
 
-console.log('AI BUYER V1 CHECKPOINT 1+2: PASS')
+console.log('AI BUYER V1 CHECKPOINT 1+2+3+3.5: PASS')
