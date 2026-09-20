@@ -6,12 +6,14 @@ const required = [
   'supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql',
   'supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql',
   'supabase/migrations/20260920085454_ai_buyer_checkpoint35_spec_pricing.sql',
+  'supabase/migrations/20260920093721_ai_buyer_checkpoint4_offer_negotiation.sql',
   'workers/ai-buyer/src/index.ts',
   'workers/ai-buyer/src/batcher.ts',
   'workers/ai-buyer/src/conversation-engine.ts',
   'workers/ai-buyer/src/pricing-engine.ts',
   'workers/ai-buyer/src/spec-pricing-engine.ts',
   'workers/ai-buyer/src/pricing-router.ts',
+  'workers/ai-buyer/src/negotiation-engine.ts',
   'workers/ai-buyer/wrangler.jsonc',
   'workers/ai-buyer/package.json',
   'workers/ai-buyer/tsconfig.json',
@@ -29,9 +31,11 @@ const sql2 = fs.readFileSync('supabase/migrations/20260919170000_ai_buyer_checkp
 const sql3 = fs.readFileSync('supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql', 'utf8')
 const sql4 = fs.readFileSync('supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql', 'utf8')
 const sql5 = fs.readFileSync('supabase/migrations/20260920085454_ai_buyer_checkpoint35_spec_pricing.sql', 'utf8')
+const sql6 = fs.readFileSync('supabase/migrations/20260920093721_ai_buyer_checkpoint4_offer_negotiation.sql', 'utf8')
 const pricing = fs.readFileSync('workers/ai-buyer/src/pricing-engine.ts', 'utf8')
 const specPricing = fs.readFileSync('workers/ai-buyer/src/spec-pricing-engine.ts', 'utf8')
 const pricingRouter = fs.readFileSync('workers/ai-buyer/src/pricing-router.ts', 'utf8')
+const negotiation = fs.readFileSync('workers/ai-buyer/src/negotiation-engine.ts', 'utf8')
 const wrangler = fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8')
 
 for (const token of [
@@ -175,6 +179,54 @@ for (const token of [
   'runLegacyPricingForCase',
 ]) {
   if (!pricingRouter.includes(token)) throw new Error(`AI Buyer pricing router invariant missing: ${token}`)
+}
+
+
+for (const token of [
+  'ai_buyer_category_automation_modes',
+  'ai_buyer_negotiation_events',
+  'ai_buyer_outbound_actions',
+  'ai_buyer_fulfillment_details',
+  'ai_buyer_create_guarded_offer',
+  'AI_BUYER_OFFER_MUST_BE_MONOTONIC',
+  'ai_buyer_accept_offer',
+  "mode text not null default 'SHADOW'",
+  'enable row level security',
+]) {
+  if (!sql6.includes(token)) throw new Error(`AI Buyer checkpoint 4 schema invariant missing: ${token}`)
+}
+
+for (const token of [
+  'startOfferAfterPricing',
+  'handleOfferFlow',
+  'approvePreparedOffer',
+  'parseCounterAmount',
+  'isExplicitAcceptance',
+  'computeConcession',
+  'COLLECTING_FULFILLMENT',
+  'PURCHASE_PICKUP',
+  'SHADOW',
+  'APPROVAL',
+  'AUTO',
+]) {
+  if (!negotiation.includes(token)) throw new Error(`AI Buyer checkpoint 4 negotiation invariant missing: ${token}`)
+}
+
+for (const token of [
+  "from './negotiation-engine'",
+  'markOfferFlowDelivery',
+  'offerFlowStates',
+  'startOfferAfterPricing',
+]) {
+  if (!engine.includes(token)) throw new Error(`AI Buyer checkpoint 4 conversation wiring missing: ${token}`)
+}
+
+for (const token of [
+  '/v1/admin/automation-mode',
+  '/v1/admin/offer/approve',
+  'approvePreparedOffer',
+]) {
+  if (!worker.includes(token)) throw new Error(`AI Buyer checkpoint 4 admin invariant missing: ${token}`)
 }
 
 for (const token of [
