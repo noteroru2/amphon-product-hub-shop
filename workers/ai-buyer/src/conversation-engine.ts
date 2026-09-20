@@ -1,4 +1,5 @@
 import { runPricingForCase } from './pricing-router'
+import { handleOfferFlow, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 
 export interface ConversationEngineEnv {
   IMAGES: R2Bucket
@@ -805,11 +806,30 @@ function pendingReply(metadata: Record<string, unknown> | null) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const pending = value as Record<string, unknown>
   const text = clean(pending.text, 4500)
-  const actions: IntakeAction[] = ['ASK_PRODUCT_TYPE','ASK_MORE_INFO','READY_TO_PRICE','HUMAN_REVIEW','NO_ACTION']
-  const action = actions.includes(pending.action as IntakeAction)
-    ? pending.action as IntakeAction
-    : 'NO_ACTION'
-  return text ? { text, action } : null
+  const action = clean(pending.action, 80) || 'NO_ACTION'
+  const offerId = clean(pending.offerId, 80) || null
+  const outboundActionId = clean(pending.outboundActionId, 80) || null
+  return text ? { text, action, offerId, outboundActionId } : null
+}
+
+async function setPendingReply(
+  env: ConversationEngineEnv,
+  caseId: string,
+  metadata: Record<string, unknown> | null,
+  pending: { text: string; action: string; offerId?: string | null; outboundActionId?: string | null },
+) {
+  const nextMetadata = {
+    ...(metadata || {}),
+    pendingReply: {
+      text: clean(pending.text, 4500),
+      action: clean(pending.action, 80),
+      offerId: pending.offerId || null,
+      outboundActionId: pending.outboundActionId || null,
+      createdAt: new Date().toISOString(),
+    },
+  }
+  await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId), { metadata: nextMetadata })
+  return nextMetadata
 }
 
 async function clearPendingReply(
@@ -886,7 +906,7 @@ async function sendLineText(
   env: ConversationEngineEnv,
   batch: IntakeBatch,
   text: string,
-  action: IntakeAction,
+  action: string,
 ) {
   const trimmed = clean(text, 4500)
   if (!trimmed) return false
@@ -966,7 +986,13 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
   const pending = pendingReply(currentCase.metadata)
   if (!unconsumedMessages.length && !readyImages.length && pending) {
     try {
-      await sendLineText(env, batch, pending.text, pending.action)
+      const resent = await sendLineText(env, batch, pending.text, pending.action)
+      if (resent && (pending.offerId || pending.outboundActionId)) {
+        await markOfferFlowDelivery(env, {
+          offerId: pending.offerId,
+          outboundActionId: pending.outboundActionId,
+        })
+      }
       await clearPendingReply(env, currentCase.id, currentCase.metadata)
       return { ok: true, skipped: false, resentPendingReply: true }
     } catch (error) {
@@ -981,6 +1007,62 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
 
   if (conversation.control_mode !== 'AUTO' || currentCase.control_mode !== 'AUTO') {
     return { ok: true, skipped: true, reason: 'HUMAN_CONTROL' }
+  }
+
+  const offerFlowStates = ['PRICING','OFFERED','NEGOTIATING','ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED','COMPLETED']
+  if (unconsumedMessages.length && offerFlowStates.includes(currentCase.state)) {
+    const messageIds = unconsumedMessages.map((message) => message.id)
+    try {
+      const flow = await handleOfferFlow(env, currentCase.id, unconsumedMessages)
+      if (flow.handled) {
+        await markMessagesConsumed(env, messageIds)
+        let sent = false
+        if (flow.reply) {
+          const pendingMetadata = await setPendingReply(env, currentCase.id, currentCase.metadata, {
+            text: flow.reply,
+            action: flow.action || 'OFFER_FLOW',
+            offerId: flow.offerId,
+            outboundActionId: flow.outboundActionId,
+          })
+          try {
+            sent = await sendLineText(env, batch, flow.reply, flow.action || 'OFFER_FLOW')
+            if (sent) {
+              await markOfferFlowDelivery(env, {
+                offerId: flow.offerId,
+                outboundActionId: flow.outboundActionId,
+              })
+              await clearPendingReply(env, currentCase.id, pendingMetadata)
+            }
+          } catch (deliveryError) {
+            await markOfferFlowFailure(env, flow.outboundActionId, deliveryError).catch(() => undefined)
+            return {
+              ok: false,
+              skipped: false,
+              deliveryOnly: true,
+              caseId: batch.caseId,
+              state: flow.state || currentCase.state,
+              error: clean((deliveryError as Error)?.message || deliveryError, 500),
+            }
+          }
+        }
+        return {
+          ok: true,
+          skipped: false,
+          caseId: batch.caseId,
+          state: flow.state || currentCase.state,
+          offerFlow: flow,
+          sent,
+        }
+      }
+    } catch (flowError) {
+      console.error('AI BUYER offer flow failed', batch.caseId, flowError)
+      return {
+        ok: false,
+        skipped: false,
+        caseId: batch.caseId,
+        error: clean((flowError as Error)?.message || flowError, 500),
+      }
+    }
   }
 
   if (!unconsumedMessages.length && !readyImages.length) {
@@ -1000,7 +1082,10 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     const vision = await callVision(env, recentMessages, observations, readyImages)
     const result = vision.result
 
-    const reply = composeReply(result, currentCase)
+    let reply = composeReply(result, currentCase)
+    let replyAction: string = result.action
+    let flowOfferId: string | null = null
+    let flowOutboundActionId: string | null = null
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     const transition = await updateCase(env, batch, currentCase, result, run.id, reply)
     await markMessagesConsumed(env, messageIds)
@@ -1019,6 +1104,15 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     if (transition.state === 'READY_TO_PRICE') {
       try {
         pricingResult = await runPricingForCase(env, batch.caseId)
+        if (pricingResult && typeof pricingResult === 'object' && (pricingResult as { ok?: boolean }).ok) {
+          const offerFlow = await startOfferAfterPricing(env, batch.caseId)
+          if (offerFlow.reply) {
+            reply = offerFlow.reply
+            replyAction = offerFlow.action || 'OFFER'
+            flowOfferId = offerFlow.offerId || null
+            flowOutboundActionId = offerFlow.outboundActionId || null
+          }
+        }
       } catch (pricingError) {
         console.error('AI BUYER pricing engine failed', batch.caseId, pricingError)
         await escalatePricingSystemFailure(env, batch, currentCase, pricingError).catch((escalationError) => {
@@ -1035,10 +1129,26 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
 
     let sent = false
     if (reply) {
+      let pendingMetadata = transition.metadata
+      if (flowOutboundActionId || flowOfferId) {
+        pendingMetadata = await setPendingReply(env, currentCase.id, transition.metadata, {
+          text: reply,
+          action: replyAction,
+          offerId: flowOfferId,
+          outboundActionId: flowOutboundActionId,
+        })
+      }
       try {
-        sent = await sendLineText(env, batch, reply, result.action)
-        if (sent) await clearPendingReply(env, currentCase.id, transition.metadata)
+        sent = await sendLineText(env, batch, reply, replyAction)
+        if (sent && (flowOfferId || flowOutboundActionId)) {
+          await markOfferFlowDelivery(env, {
+            offerId: flowOfferId,
+            outboundActionId: flowOutboundActionId,
+          })
+        }
+        if (sent) await clearPendingReply(env, currentCase.id, pendingMetadata)
       } catch (deliveryError) {
+        await markOfferFlowFailure(env, flowOutboundActionId, deliveryError).catch(() => undefined)
         console.error('AI BUYER LINE delivery failed after successful analysis', batch.caseId, deliveryError)
         return {
           ok: false,
