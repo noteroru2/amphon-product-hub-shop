@@ -33,7 +33,7 @@ jobs:
 
       - name: Install AI Buyer dependencies
         working-directory: workers/ai-buyer
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck AI Buyer Worker
         working-directory: workers/ai-buyer
