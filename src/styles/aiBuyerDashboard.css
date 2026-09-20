@@ -531,3 +531,17 @@
     border-bottom: 1px solid #e5e7eb;
   }
 }
+
+.ai-buyer-home-launch {
+  background: linear-gradient(135deg, #111827 0%, #312e81 100%);
+  color: #fff;
+  border-color: #312e81;
+}
+
+.ai-buyer-home-launch small {
+  color: #c7d2fe;
+}
+
+.ai-buyer-home-launch > svg {
+  color: #c7d2fe;
+}
