@@ -902,6 +902,55 @@ async function markImages(
   await patchRows(env, 'ai_buyer_case_images?id=in.(' + ids.map((id) => clean(id, 80)).join(',') + ')', body)
 }
 
+type OutboundAutomationGate = {
+  allowed: boolean
+  category: ProductCategory | 'OTHER'
+  mode: 'SHADOW' | 'APPROVAL' | 'AUTO'
+  active: boolean
+  reason: string
+}
+
+async function outboundAutomationGate(
+  env: ConversationEngineEnv,
+  batch: IntakeBatch,
+): Promise<OutboundAutomationGate> {
+  // Fail closed: no automated LINE output is allowed unless the current
+  // category rollout row explicitly says active AUTO.
+  try {
+    const cases = await readRows<{ category: ProductCategory | null }>(await supabaseRequest(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(batch.caseId)
+        + '&select=category&limit=1',
+    ))
+    const rawCategory = cases[0]?.category
+    const category = rawCategory && rawCategory !== 'UNKNOWN' ? rawCategory : 'OTHER'
+    const rows = await readRows<{
+      category: string
+      mode: 'SHADOW' | 'APPROVAL' | 'AUTO'
+      active: boolean
+    }>(await supabaseRequest(
+      env,
+      'ai_buyer_category_automation_modes?category=eq.' + encodeURIComponent(category)
+        + '&select=category,mode,active&limit=1',
+    ))
+    const rollout = rows[0]
+
+    if (!rollout) {
+      return { allowed: false, category, mode: 'SHADOW', active: false, reason: 'ROLLOUT_MISSING' }
+    }
+    if (rollout.active !== true) {
+      return { allowed: false, category, mode: rollout.mode, active: false, reason: 'ROLLOUT_INACTIVE' }
+    }
+    if (rollout.mode !== 'AUTO') {
+      return { allowed: false, category, mode: rollout.mode, active: true, reason: 'MODE_' + rollout.mode }
+    }
+    return { allowed: true, category, mode: rollout.mode, active: true, reason: 'AUTO_ALLOWED' }
+  } catch (error) {
+    console.error('AI BUYER outbound automation gate failed closed', batch.caseId, error)
+    return { allowed: false, category: 'OTHER', mode: 'SHADOW', active: false, reason: 'GATE_ERROR' }
+  }
+}
+
 async function sendLineText(
   env: ConversationEngineEnv,
   batch: IntakeBatch,
@@ -910,6 +959,19 @@ async function sendLineText(
 ) {
   const trimmed = clean(text, 4500)
   if (!trimmed) return false
+
+  const gate = await outboundAutomationGate(env, batch)
+  if (!gate.allowed) {
+    console.warn(
+      'AI BUYER outbound suppressed by automation gate',
+      batch.caseId,
+      gate.category,
+      gate.mode,
+      gate.reason,
+      action,
+    )
+    return false
+  }
 
   const requestBody = batch.replyToken
     ? { replyToken: batch.replyToken, messages: [{ type: 'text', text: trimmed }] }
@@ -993,8 +1055,13 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
           outboundActionId: pending.outboundActionId,
         })
       }
-      await clearPendingReply(env, currentCase.id, currentCase.metadata)
-      return { ok: true, skipped: false, resentPendingReply: true }
+      if (resent) await clearPendingReply(env, currentCase.id, currentCase.metadata)
+      return {
+        ok: true,
+        skipped: false,
+        resentPendingReply: resent,
+        outboundSuppressed: !resent,
+      }
     } catch (error) {
       return {
         ok: false,
