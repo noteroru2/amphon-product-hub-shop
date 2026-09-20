@@ -177,6 +177,64 @@ function normalizedFactKey(value: unknown) {
     .replace(/[\s_-]+/g, '')
 }
 
+function tokens(value: unknown) {
+  return clean(value, 1000)
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function capacityTokens(value: unknown) {
+  return tokens(value).filter((token) => /^\d+(?:gb|tb)$/.test(token))
+}
+
+function hzTokens(value: unknown) {
+  return tokens(value).filter((token) => /^\d+hz$/.test(token))
+}
+
+function semanticComponentScore(type: string, explicitValue: string, lookupKey: string) {
+  const explicitTokens = tokens(explicitValue)
+  const keyTokens = tokens(lookupKey)
+  if (!explicitTokens.length || !keyTokens.length) return 0
+
+  if (['RAM','SSD','STORAGE'].includes(type)) {
+    const explicitCapacity = capacityTokens(explicitValue)
+    const keyCapacity = capacityTokens(lookupKey)
+    if (!explicitCapacity.length || !keyCapacity.some((token) => explicitCapacity.includes(token))) return 0
+
+    if (type === 'RAM') {
+      const explicitDdr = explicitTokens.find((token) => /^ddr\d$/.test(token))
+      const keyDdr = keyTokens.find((token) => /^ddr\d$/.test(token))
+      if (explicitDdr && keyDdr && explicitDdr !== keyDdr) return 0
+    }
+
+    const storageKey = keyTokens.some((token) => ['ssd','hdd'].includes(token))
+    const explicitStorage = explicitTokens.some((token) => ['ssd','hdd','nvme','m2'].includes(token))
+    if (type === 'STORAGE' && storageKey && explicitStorage) {
+      const keyKind = keyTokens.includes('hdd') ? 'hdd' : 'ssd'
+      const explicitKind = explicitTokens.includes('hdd') ? 'hdd' : 'ssd'
+      if (keyKind !== explicitKind) return 0
+    }
+    return 72000 + Math.max(...keyCapacity.filter((token) => explicitCapacity.includes(token)).map((token) => token.length))
+  }
+
+  if (type === 'DISPLAY') {
+    const explicitHz = hzTokens(explicitValue)
+    const keyHz = hzTokens(lookupKey)
+    if (explicitHz.length && keyHz.length && !keyHz.some((token) => explicitHz.includes(token))) {
+      const raw = clean(lookupKey).toLocaleLowerCase('en-US')
+      if (!explicitHz.some((token) => raw.includes(token.replace('hz', '')))) return 0
+    }
+    const shared = keyTokens.filter((token) => explicitTokens.includes(token) && token.length >= 3)
+    return shared.length >= 1 ? 70000 + shared.reduce((sum, token) => sum + token.length, 0) : 0
+  }
+
+  return 0
+}
+
 function supabaseHeaders(env: PricingEnv, extra: Record<string, string> = {}) {
   return {
     apikey: env.SUPABASE_SECRET_KEY,
@@ -281,8 +339,9 @@ function aggregateFacts(caseRow: CaseRow, observations: ObservationRow[]) {
     ...Object.values(confirmed).map((value) => clean(value, 500)),
   ].filter(Boolean).join(' ')
 
-  const tags = Array.isArray(caseRow.metadata?.lastPricingTags)
-    ? caseRow.metadata.lastPricingTags.map((tag) => clean(tag, 100)).filter(Boolean)
+  const rawTags = caseRow.metadata?.lastPricingTags
+  const tags = Array.isArray(rawTags)
+    ? rawTags.map((tag) => clean(tag, 100)).filter(Boolean)
     : []
 
   return { confirmed, modelName, modelCode, searchText, tags }
@@ -335,7 +394,14 @@ function matchEntry(
     } else if (explicit && type === 'SERIES' && series && explicit.includes(series)) {
       score = 76000 + series.length + (brand && search.includes(brand) ? 500 : 0)
       reason = 'SERIES_EXPLICIT'
-    } else if (options.searchFallback && entryKey && search.includes(entryKey)) {
+    } else if (explicit) {
+      const semantic = semanticComponentScore(type, explicitValue, entry.lookup_key)
+      if (semantic > 0) {
+        score = semantic
+        reason = 'SEMANTIC_COMPONENT_MATCH'
+      }
+    }
+    if (!score && options.searchFallback && entryKey && search.includes(entryKey)) {
       score = 60000 + entryKey.length
       reason = 'SEARCH_KEY'
     } else if (options.searchFallback && type === 'SERIES' && series && search.includes(series)) {
@@ -505,6 +571,15 @@ function buildNotebook(
     trace(warranty, 'WARRANTY'),
   ].filter(Boolean) as ComponentTrace[]
 
+  const lowCore = traces.filter((item) => ['CPU','GPU'].includes(item.type) && item.confidence === 'LOW')
+  if (lowCore.length) {
+    return {
+      ok: false as const,
+      reason: 'SPEC_LOW_CONFIDENCE_COMPONENT',
+      detail: { components: lowCore.map((item) => ({ type: item.type, key: item.key })) },
+    }
+  }
+
   const conditionEntries: SpecEntryRow[] = []
   for (const tag of facts.tags) {
     const mapped = CONDITION_TAG_MAP[tag]
@@ -620,6 +695,15 @@ function buildDesktop(
     trace(cooler, 'COOLER'),
     trace(systemClass, 'SYSTEM_CLASS'),
   ].filter(Boolean) as ComponentTrace[]
+
+  const lowCore = traces.filter((item) => ['CPU','GPU'].includes(item.type) && item.confidence === 'LOW')
+  if (lowCore.length) {
+    return {
+      ok: false as const,
+      reason: 'SPEC_LOW_CONFIDENCE_COMPONENT',
+      detail: { components: lowCore.map((item) => ({ type: item.type, key: item.key })) },
+    }
+  }
 
   const explicitCondition = factValue(facts.confirmed, 'condition')
   const condition = explicitCondition
