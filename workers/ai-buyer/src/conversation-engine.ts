@@ -1086,9 +1086,9 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     let replyAction: string = result.action
     let flowOfferId: string | null = null
     let flowOutboundActionId: string | null = null
-    let responseState = transition.state
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     const transition = await updateCase(env, batch, currentCase, result, run.id, reply)
+    let responseState = transition.state
     await markMessagesConsumed(env, messageIds)
 
     if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
@@ -1132,7 +1132,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
 
     let sent = false
     if (reply) {
-      let pendingMetadata = transition.metadata
+      let pendingMetadata: Record<string, unknown> = transition.metadata
       if (flowOutboundActionId || flowOfferId) {
         pendingMetadata = await setPendingReply(env, currentCase.id, transition.metadata, {
           text: reply,
