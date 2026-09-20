@@ -1262,6 +1262,8 @@ export async function createGuardedOffer(
     amount: number
     actor: 'AI' | 'ADMIN'
     messageId?: string | null
+    idempotencyKey?: string | null
+    roundNo?: number
   },
 ) {
   const guard = await guardOffer(env, input)
@@ -1269,18 +1271,29 @@ export async function createGuardedOffer(
     throw new Error('PRICE_GUARD_BLOCKED:' + guard.reason)
   }
 
-  const rows = await readRows<{ id: string; amount: number }>(await supabaseRequest(env, 'ai_buyer_offers', {
-    method: 'POST',
-    headers: { prefer: 'return=representation' },
-    body: JSON.stringify({
-      case_id: input.caseId,
-      pricing_decision_id: input.decisionId,
-      amount: Math.round(input.amount),
-      actor: input.actor,
-      status: 'PROPOSED',
-      message_id: input.messageId || null,
-    }),
-  }))
+  const amount = Math.round(input.amount)
+  const idempotencyKey = clean(
+    input.idempotencyKey
+      || ['offer', input.caseId, input.decisionId, input.actor, amount].join(':'),
+    500,
+  )
+  const rows = await readRows<{ id: string; amount: number }>(await supabaseRequest(
+    env,
+    'rpc/ai_buyer_create_guarded_offer',
+    {
+      method: 'POST',
+      headers: { prefer: 'return=representation' },
+      body: JSON.stringify({
+        p_case_id: input.caseId,
+        p_decision_id: input.decisionId,
+        p_amount: amount,
+        p_actor: input.actor,
+        p_idempotency_key: idempotencyKey,
+        p_round_no: Math.max(0, Math.floor(numberValue(input.roundNo, 0))),
+        p_message_id: input.messageId || null,
+      }),
+    },
+  ))
   if (!rows[0]) throw new Error('GUARDED_OFFER_CREATE_EMPTY')
   return { ok: true, offer: rows[0], guard }
 }
