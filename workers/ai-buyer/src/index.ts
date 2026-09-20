@@ -1,7 +1,7 @@
 export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
 import { runPricingForCase } from './pricing-router'
-import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
+import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 import { handleHubAdminDashboard, handleHubAdminPreflight } from './hub-admin'
 
 interface Env {
