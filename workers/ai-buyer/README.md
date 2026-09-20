@@ -309,3 +309,101 @@ The V2.3 data baseline is loaded and active in Supabase. It contains:
 This does **not** mean LINE automatic buying is live. The Worker code remains on
 the feature branch until deployment is explicitly approved, and Checkpoint 4 is
 still responsible for guarded offer delivery, negotiation and acceptance.
+
+
+## Checkpoint 4 — Offer + Negotiation + Acceptance + Fulfillment
+
+Checkpoint 4 turns a guarded Pricing Decision into an auditable purchase conversation.
+
+### Rollout control
+
+Every category has an explicit mode in `ai_buyer_category_automation_modes`:
+
+- `SHADOW` — calculate/create the guarded offer for review, but do not send a numeric price.
+- `APPROVAL` — prepare the guarded offer and create an `OFFER_APPROVAL` admin task; an admin must approve before LINE push.
+- `AUTO` — send the guarded opening offer and allow deterministic negotiation.
+
+All categories default to **SHADOW**. Deployment alone cannot turn automatic buying on.
+
+Admin endpoints:
+
+- `GET /v1/admin/automation-mode`
+- `POST /v1/admin/automation-mode`
+- `POST /v1/admin/offer/approve`
+
+All require `x-ai-buyer-admin-token`.
+
+### Offer safety
+
+Shop-originated offers now use the transactional RPC
+`ai_buyer_create_guarded_offer`.
+
+It enforces:
+
+- Pricing Decision belongs to the case.
+- pricing confidence >= 0.85.
+- amount <= `hard_max`.
+- concessions are monotonic; the AI cannot lower a previously authorized offer.
+- an idempotency key is mandatory.
+- accepted/terminal cases cannot reopen negotiation.
+
+The original database hard-max trigger remains as a second independent guard.
+
+### Negotiation policy
+
+Negotiation is deterministic and does not give an LLM authority to choose money.
+
+The engine parses explicit customer counters and uses a bounded concession ladder:
+
+1. midpoint from current offer toward target
+2. target buy
+3. midpoint from target toward hard max
+4. hard max
+
+The configured maximum number of rounds is stored per category. A shop offer can
+never exceed hard max.
+
+The engine does not use fake buyers, fake deadlines, fake scarcity or invented
+market claims.
+
+### Acceptance
+
+Explicit Thai acceptance phrases such as `ตกลง`, `โอเค`, `ขายครับ`,
+`เอาราคานี้`, `ได้ตามนั้น` and `มารับได้เลย` are recognized only when they
+do not conflict with a different numeric counter.
+
+`ai_buyer_accept_offer` atomically accepts only a **delivered** current shop
+offer. Once accepted:
+
+- the offer becomes `ACCEPTED`
+- other proposed offers become `SUPERSEDED`
+- `accepted_price` / `accepted_at` are frozen on the case
+- state moves to `COLLECTING_FULFILLMENT`
+- price negotiation cannot reopen
+
+### Fulfillment handoff
+
+After acceptance the engine collects only missing fulfillment fields:
+
+- seller name
+- phone
+- method: `PICKUP`, `SHIP`, or `STORE_DROP`
+- address or LINE location when required
+
+When complete, the case moves to `ACTION_REQUIRED` and creates a
+`PURCHASE_PICKUP` admin task containing the agreed price, pricing snapshot,
+customer/contact details, fulfillment data, images, and recent important messages.
+
+### Duplicate-send protection
+
+`ai_buyer_outbound_actions` stores an idempotency key and delivery state for
+offer, negotiation, and fulfillment messages. Pending replies carry their
+offer/action IDs so a retry can mark the same offer delivered rather than
+creating a new price.
+
+### Database migration
+
+`supabase/migrations/20260920093721_ai_buyer_checkpoint4_offer_negotiation.sql`
+
+The migration is applied to production, but all rollout modes remain SHADOW.
+The Cloudflare Worker is still not considered live until deployment is explicitly approved.
