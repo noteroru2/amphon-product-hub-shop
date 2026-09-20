@@ -91,6 +91,59 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy --config wrangler.jsonc
 
+      - name: Ensure LINE webhook endpoint and verify delivery path
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          desired="https://amphon-ai-buyer.noteroru2.workers.dev/v1/webhooks/line"
+          current="$(curl -fsS --max-time 15 \
+            'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" || true)"
+          echo "LINE webhook before sync: $current"
+
+          current_endpoint="$(CURRENT_JSON="$current" node -e "try{const x=JSON.parse(process.env.CURRENT_JSON||'{}');process.stdout.write(String(x.endpoint||''))}catch{}")"
+          if [ "$current_endpoint" != "$desired" ]; then
+            echo "Synchronizing LINE webhook endpoint to AI Buyer Worker"
+            curl -fsS --max-time 15 -X PUT \
+              'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+              -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data "{\"endpoint\":\"$desired\"}"
+            echo
+          fi
+
+          test_body="$(curl -fsS --max-time 20 -X POST \
+            'https://api.line.me/v2/bot/channel/webhook/test' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "{\"endpoint\":\"$desired\"}")"
+          echo "LINE webhook test: $test_body"
+          TEST_JSON="$test_body" node - <<'NODE'
+          const x = JSON.parse(process.env.TEST_JSON || '{}')
+          if (x.success !== true || Number(x.statusCode) !== 200) {
+            console.error('LINE webhook communication test failed:', JSON.stringify(x))
+            process.exit(1)
+          }
+          NODE
+
+          final="$(curl -fsS --max-time 15 \
+            'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN")"
+          echo "LINE webhook after sync: $final"
+          FINAL_JSON="$final" DESIRED="$desired" node - <<'NODE'
+          const x = JSON.parse(process.env.FINAL_JSON || '{}')
+          if (x.endpoint !== process.env.DESIRED) {
+            console.error('LINE webhook endpoint mismatch:', JSON.stringify(x))
+            process.exit(1)
+          }
+          if (x.active !== true) {
+            console.error('LINE Use webhook is disabled. Enable Use webhook in LINE Developers Console / OA Manager.')
+            process.exit(1)
+          }
+          console.log('LINE webhook endpoint + active status PASS')
+          NODE
+
       - name: Health smoke test
         shell: bash
         run: |
