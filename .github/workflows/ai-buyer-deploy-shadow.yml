@@ -1,0 +1,138 @@
+name: AI Buyer Production Deploy (SHADOW)
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - '.github/workflows/ai-buyer-deploy-shadow.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-buyer-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workers/ai-buyer/package-lock.json
+
+      - name: Verify AI Buyer invariants
+        run: npm run verify:ai-buyer
+
+      - name: Install AI Buyer dependencies
+        working-directory: workers/ai-buyer
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck AI Buyer Worker
+        working-directory: workers/ai-buyer
+        run: npm run typecheck
+
+      - name: Require all production credentials before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          missing=0
+          for key in CLOUDFLARE_API_TOKEN SUPABASE_SECRET_KEY LINE_CHANNEL_SECRET LINE_CHANNEL_ACCESS_TOKEN OPENAI_API_KEY AI_BUYER_ADMIN_TOKEN; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing repository secret $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All required production credentials are present"
+
+      - name: Deploy Worker code
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Sync AI Buyer Worker secrets
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          printf '%s' "$SUPABASE_SECRET_KEY" | npx wrangler secret put SUPABASE_SECRET_KEY --config wrangler.jsonc
+          printf '%s' "$LINE_CHANNEL_SECRET" | npx wrangler secret put LINE_CHANNEL_SECRET --config wrangler.jsonc
+          printf '%s' "$LINE_CHANNEL_ACCESS_TOKEN" | npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --config wrangler.jsonc
+          printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY --config wrangler.jsonc
+          printf '%s' "$AI_BUYER_ADMIN_TOKEN" | npx wrangler secret put AI_BUYER_ADMIN_TOKEN --config wrangler.jsonc
+
+      - name: Final deploy with bindings and secrets preserved
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Health smoke test
+        shell: bash
+        run: |
+          url="https://amphon-ai-buyer.noteroru2.workers.dev/v1/health"
+          for i in 1 2 3 4 5 6 7 8; do
+            body="$(curl -fsS --max-time 15 "$url" || true)"
+            if echo "$body" | grep -q '"ok":true' \
+              && echo "$body" | grep -q '"supabase":true' \
+              && echo "$body" | grep -q '"line":true' \
+              && echo "$body" | grep -q '"images":true' \
+              && echo "$body" | grep -q '"vision":true' \
+              && echo "$body" | grep -q '"admin":true' \
+              && echo "$body" | grep -q '"batcher":true'; then
+              echo "AI Buyer health PASS"
+              echo "$body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::AI Buyer health endpoint did not become fully configured"
+          exit 1
+
+      - name: Verify all categories remain SHADOW
+        env:
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          body="$(curl -fsS --max-time 15 \
+            'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/automation-mode' \
+            -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN")"
+          MODES_JSON="$body" node - <<'NODE'
+          const body = JSON.parse(process.env.MODES_JSON || '{}')
+          const modes = Array.isArray(body.modes) ? body.modes : []
+          if (modes.length !== 7) {
+            console.error('Expected 7 rollout categories, got', modes.length)
+            process.exit(1)
+          }
+          const bad = modes.filter(x => x.mode !== 'SHADOW' || x.active !== true)
+          if (bad.length) {
+            console.error('Non-SHADOW rollout detected:', JSON.stringify(bad))
+            process.exit(1)
+          }
+          console.log('SHADOW verification PASS:', modes.map(x => x.category).sort().join(', '))
+          NODE
