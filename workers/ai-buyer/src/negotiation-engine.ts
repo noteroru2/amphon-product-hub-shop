@@ -858,9 +858,22 @@ export async function handleOfferFlow(
   const decision = await loadDecision(env, caseId)
   const currentOffer = await loadLatestShopOffer(env, caseId, true)
   if (!decision || !currentOffer) {
-    await ensureAdminTask(env, caseId, 'NEGOTIATION_REVIEW', {
-      reason: !decision ? 'DECISION_NOT_FOUND' : 'DELIVERED_OFFER_NOT_FOUND',
-    }, 'HIGH')
+    const reason = !decision ? 'DECISION_NOT_FOUND' : 'DELIVERED_OFFER_NOT_FOUND'
+    await ensureAdminTask(env, caseId, 'NEGOTIATION_REVIEW', { reason }, 'HIGH')
+    await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId), {
+      state: 'HUMAN_REVIEW',
+      control_mode: 'HUMAN_REQUIRED',
+    })
+    await patchRows(env, 'ai_buyer_conversations?id=eq.' + encodeURIComponent(caseRow.conversation_id), {
+      control_mode: 'HUMAN_REQUIRED',
+    })
+    await createEvent(env, {
+      case_id: caseId,
+      pricing_decision_id: decision?.id || null,
+      offer_id: currentOffer?.id || null,
+      event_type: 'HUMAN_HANDOFF',
+      metadata: { reason },
+    })
     return { handled: true, state: 'HUMAN_REVIEW', reason: 'NEGOTIATION_CONTEXT_MISSING' }
   }
 
