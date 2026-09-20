@@ -76,6 +76,9 @@ for (const token of [
   "from './pricing-router'",
   'canonical keys whenever known',
   'KEYBOARD_DEFECT',
+  'outboundAutomationGate',
+  "rollout.mode !== 'AUTO'",
+  'AI BUYER outbound suppressed by automation gate',
 ]) {
   if (!engine.includes(token)) throw new Error(`AI Buyer conversation/vision invariant missing: ${token}`)
 }
