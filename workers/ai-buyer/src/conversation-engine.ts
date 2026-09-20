@@ -1086,6 +1086,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     let replyAction: string = result.action
     let flowOfferId: string | null = null
     let flowOutboundActionId: string | null = null
+    let responseState = transition.state
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     const transition = await updateCase(env, batch, currentCase, result, run.id, reply)
     await markMessagesConsumed(env, messageIds)
@@ -1106,6 +1107,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
         pricingResult = await runPricingForCase(env, batch.caseId)
         if (pricingResult && typeof pricingResult === 'object' && (pricingResult as { ok?: boolean }).ok) {
           const offerFlow = await startOfferAfterPricing(env, batch.caseId)
+          responseState = offerFlow.state || 'PRICING'
           if (offerFlow.reply) {
             reply = offerFlow.reply
             replyAction = offerFlow.action || 'OFFER'
@@ -1118,6 +1120,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
         await escalatePricingSystemFailure(env, batch, currentCase, pricingError).catch((escalationError) => {
           console.error('AI BUYER pricing escalation failed', batch.caseId, escalationError)
         })
+        responseState = 'HUMAN_REVIEW'
         pricingResult = {
           ok: false,
           humanReview: true,
@@ -1155,7 +1158,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
           skipped: false,
           deliveryOnly: true,
           caseId: batch.caseId,
-          state: transition.state,
+          state: responseState,
           error: clean((deliveryError as Error)?.message || deliveryError, 500),
         }
       }
@@ -1165,7 +1168,7 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
       ok: true,
       skipped: false,
       caseId: batch.caseId,
-      state: transition.state,
+      state: responseState,
       category: result.category,
       requestedInputs: result.requested_inputs,
       pricingResult,
