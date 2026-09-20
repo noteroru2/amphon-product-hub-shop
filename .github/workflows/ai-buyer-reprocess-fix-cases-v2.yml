@@ -1,4 +1,4 @@
-name: AI Buyer Reprocess Fixed Cases V2
+name: AI Buyer Retry Pricing Fixed Cases
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Reprocess stalled cases
+      - name: Retry pricing for fixed cases
         env:
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash
@@ -25,9 +25,9 @@ jobs:
           for case_id in 6ed54ba9-b84f-49c2-8cb9-15dd16141aef fc75ebe4-4a91-4614-9dda-f28ab18914bd; do
             payload="$(printf '{"caseId":"%s"}' "$case_id")"
             body_file="$(mktemp)"
-            status="$(curl -sS -o "$body_file" -w '%{http_code}'               -X POST 'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/case/reprocess'               -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN"               -H 'content-type: application/json'               --data-binary "$payload")"
+            status="$(curl -sS -o "$body_file" -w '%{http_code}'               -X POST 'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/case/retry-pricing'               -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN"               -H 'content-type: application/json'               --data-binary "$payload")"
             cat "$body_file"
             echo
-            test "$status" = "202"
+            test "$status" = "200"
             grep -q '"ok":true' "$body_file"
           done
