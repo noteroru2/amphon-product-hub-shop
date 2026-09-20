@@ -1,4 +1,4 @@
-import { runPricingForCase } from './pricing-engine'
+import { runPricingForCase } from './pricing-router'
 
 export interface ConversationEngineEnv {
   IMAGES: R2Bucket
@@ -112,10 +112,33 @@ type PricingTag =
   | 'LOCKED'
   | 'MISSING_ACCESSORY'
   | 'MAJOR_DAMAGE'
+  | 'KEYBOARD_DEFECT'
+  | 'KEYBOARD_BACKLIGHT_DEFECT'
+  | 'TOUCHPAD_DEFECT'
+  | 'USB_PORT_DEFECT'
+  | 'SPEAKER_DEFECT'
+  | 'WEBCAM_DEFECT'
+  | 'MIC_DEFECT'
+  | 'AUDIO_JACK_DEFECT'
+  | 'WIFI_BT_DEFECT'
+  | 'FINGERPRINT_DEFECT'
+  | 'CHARGING_PORT_DEFECT'
+  | 'FAN_ABNORMAL'
+  | 'THERMAL_OVERHEAT'
+  | 'KEY_MISSING'
+  | 'PORT_MULTIPLE_DEFECT'
+  | 'LIQUID_DAMAGE_HISTORY'
+  | 'BOARD_REPAIR_HISTORY'
+  | 'INTERMITTENT_POWER'
 
 const PRICING_TAGS: PricingTag[] = [
   'NO_CHARGER','BATTERY_BAD','SCREEN_DEFECT','BODY_HEAVY','HINGE_ISSUE',
   'NO_BOX','DEVICE_NOT_BOOTING','LOCKED','MISSING_ACCESSORY','MAJOR_DAMAGE',
+  'KEYBOARD_DEFECT','KEYBOARD_BACKLIGHT_DEFECT','TOUCHPAD_DEFECT','USB_PORT_DEFECT',
+  'SPEAKER_DEFECT','WEBCAM_DEFECT','MIC_DEFECT','AUDIO_JACK_DEFECT','WIFI_BT_DEFECT',
+  'FINGERPRINT_DEFECT','CHARGING_PORT_DEFECT','FAN_ABNORMAL','THERMAL_OVERHEAT',
+  'KEY_MISSING','PORT_MULTIPLE_DEFECT','LIQUID_DAMAGE_HISTORY','BOARD_REPAIR_HISTORY',
+  'INTERMITTENT_POWER',
 ]
 
 type IntakeResult = {
@@ -231,6 +254,9 @@ const SYSTEM_PROMPT = [
   'If the customer explicitly asks for a human/admin, set handoff_requested=true.',
   'If the customer asks whether this is AI/bot/automatic, set asked_if_ai=true.',
   'Product categories are strictly NOTEBOOK, MACBOOK, DESKTOP_PC, SMARTPHONE, TABLET, CAMERA, OTHER, UNKNOWN.',
+  'For NOTEBOOK and DESKTOP_PC, put confirmed pricing facts under canonical keys whenever known: brand, series, cpu, gpu, ram, storage, display, motherboard, psu, case, cooler, system_class, condition, warranty, defects.',
+  'For detailed notebook defects, use the matching pricing tag when directly supported: KEYBOARD_DEFECT, KEYBOARD_BACKLIGHT_DEFECT, TOUCHPAD_DEFECT, USB_PORT_DEFECT, SPEAKER_DEFECT, WEBCAM_DEFECT, MIC_DEFECT, AUDIO_JACK_DEFECT, WIFI_BT_DEFECT, FINGERPRINT_DEFECT, CHARGING_PORT_DEFECT, FAN_ABNORMAL, THERMAL_OVERHEAT, KEY_MISSING, PORT_MULTIPLE_DEFECT, LIQUID_DAMAGE_HISTORY, BOARD_REPAIR_HISTORY, INTERMITTENT_POWER.',
+  'Never mark a component as confirmed only from model-family assumptions. CPU/GPU/RAM/storage and PSU/motherboard must come from readable labels, system screens, or explicit customer text.',
   'Be conservative. Unknown is better than guessing.',
 ].join('\n')
 
