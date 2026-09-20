@@ -5,6 +5,7 @@ on:
     branches:
       - feat/ai-buyer-v1-foundation
     paths:
+      - 'workers/ai-buyer/**'
       - '.github/workflows/ai-buyer-deploy-shadow.yml'
   workflow_dispatch:
 
