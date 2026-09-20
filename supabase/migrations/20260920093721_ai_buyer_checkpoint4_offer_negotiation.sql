@@ -134,9 +134,9 @@ begin
   if p_amount is null or p_amount < 0 then raise exception 'AI_BUYER_OFFER_AMOUNT_INVALID'; end if;
   if coalesce(trim(p_idempotency_key),'') = '' then raise exception 'AI_BUYER_OFFER_IDEMPOTENCY_REQUIRED'; end if;
 
-  select state, accepted_at into v_case_state, v_case_accepted_at
-  from public.ai_buyer_valuation_cases
-  where ai_buyer_valuation_cases.id = p_case_id
+  select vc.state, vc.accepted_at into v_case_state, v_case_accepted_at
+  from public.ai_buyer_valuation_cases vc
+  where vc.id = p_case_id
   for update;
 
   if not found then raise exception 'AI_BUYER_CASE_NOT_FOUND'; end if;
@@ -144,10 +144,10 @@ begin
      or v_case_state in ('ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED','COMPLETED','CUSTOMER_DECLINED','EXPIRED','CANCELLED')
   then raise exception 'AI_BUYER_NEGOTIATION_CLOSED'; end if;
 
-  select case_id, hard_max, current_authorized_offer, pricing_confidence
+  select pd.case_id, pd.hard_max, pd.current_authorized_offer, pd.pricing_confidence
   into v_decision_case, v_hard_max, v_current, v_confidence
-  from public.ai_buyer_pricing_decisions
-  where ai_buyer_pricing_decisions.id = p_decision_id
+  from public.ai_buyer_pricing_decisions pd
+  where pd.id = p_decision_id
   for update;
 
   if not found or v_decision_case is distinct from p_case_id then raise exception 'AI_BUYER_PRICING_DECISION_INVALID'; end if;
@@ -155,7 +155,9 @@ begin
   if p_amount > v_hard_max then raise exception 'AI_BUYER_HARD_MAX_EXCEEDED'; end if;
   if p_amount < v_current then raise exception 'AI_BUYER_OFFER_MUST_BE_MONOTONIC'; end if;
 
-  select * into v_existing from public.ai_buyer_offers where idempotency_key = p_idempotency_key;
+  select o.* into v_existing
+  from public.ai_buyer_offers o
+  where o.idempotency_key = p_idempotency_key;
   if found then
     if v_existing.case_id <> p_case_id
        or v_existing.pricing_decision_id <> p_decision_id
@@ -174,13 +176,15 @@ begin
   )
   returning * into v_offer;
 
-  update public.ai_buyer_offers
+  update public.ai_buyer_offers o
   set status = 'SUPERSEDED'
-  where case_id = p_case_id and status = 'PROPOSED' and id <> v_offer.id;
+  where o.case_id = p_case_id
+    and o.status = 'PROPOSED'
+    and o.id <> v_offer.id;
 
-  update public.ai_buyer_pricing_decisions
-  set current_authorized_offer = greatest(current_authorized_offer, round(p_amount))
-  where ai_buyer_pricing_decisions.id = p_decision_id;
+  update public.ai_buyer_pricing_decisions pd
+  set current_authorized_offer = greatest(pd.current_authorized_offer, round(p_amount))
+  where pd.id = p_decision_id;
 
   return query select v_offer.id, v_offer.amount;
 end;
