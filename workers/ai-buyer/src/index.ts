@@ -1,11 +1,14 @@
 export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
+import { handleHubAdminDashboard, handleHubAdminPreflight } from './hub-admin'
 
 interface Env {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
+  SUPABASE_PUBLISHABLE_KEY: string
+  AI_BUYER_HUB_ORIGINS?: string
   LINE_CHANNEL_SECRET: string
   LINE_CHANNEL_ACCESS_TOKEN: string
   OPENAI_API_KEY: string
@@ -703,6 +706,7 @@ export default {
           pricing: Boolean(env.OPENAI_API_KEY),
           admin: Boolean(env.AI_BUYER_ADMIN_TOKEN),
           batcher: Boolean(env.CONVERSATION_BATCHER),
+          hubAdmin: Boolean(env.SUPABASE_PUBLISHABLE_KEY),
         },
         time: new Date().toISOString(),
       })
@@ -710,6 +714,14 @@ export default {
 
     if (url.pathname === '/v1/webhooks/line' && request.method === 'POST') {
       return handleWebhook(request, env, ctx)
+    }
+
+    if (url.pathname === '/v1/hub/admin/dashboard' && request.method === 'OPTIONS') {
+      return handleHubAdminPreflight(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/dashboard' && request.method === 'GET') {
+      return handleHubAdminDashboard(request, env)
     }
 
     if (url.pathname === '/v1/admin/price-book/import' && request.method === 'POST') {
