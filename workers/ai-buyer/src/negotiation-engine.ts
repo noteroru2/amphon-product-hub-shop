@@ -3,6 +3,8 @@ import { createGuardedOffer } from './pricing-engine'
 export interface OfferFlowEnv {
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
+  OPENAI_API_KEY: string
+  OPENAI_PRICING_MODEL?: string
 }
 
 export type OfferFlowMessage = {
