@@ -249,7 +249,10 @@ const SYSTEM_PROMPT = [
   'Ask only for information still missing and materially useful for exact identity, important spec, condition, or accessories.',
   'Do not request something already visible or explicitly answered in the conversation.',
   'requested_inputs must contain at most 3 items, most useful first.',
-  'READY_TO_PRICE means enough identity/spec/condition evidence exists for the separate Pricing Engine. It does not mean you know a price.',
+  'READY_TO_PRICE means enough evidence exists for the separate Pricing Engine. It does not mean you know a price.',
+  'AMPHON business rule: for NOTEBOOK and DESKTOP_PC, complete confirmed pricing specs are sufficient to price even when extra condition photos are still unavailable. Do not keep asking for photos solely to improve condition once core pricing specs are complete.',
+  'Desktop core pricing specs are CPU, GPU, RAM, storage, motherboard and PSU. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
+  'When those core specs are explicitly confirmed and identity_confidence is at least 0.90, choose READY_TO_PRICE, clear requested_inputs, and leave unknown condition/defects as unknown. Later disclosed defects can adjust the price.',
   'Use HUMAN_REVIEW for rare products, complex damage, contradictory identity, or persistent ambiguity.',
   'For pricing_tags, use only directly supported condition/accessory tags. Do not infer damage from weak visual evidence.',
   'If the customer explicitly asks for a human/admin, set handoff_requested=true.',
@@ -492,6 +495,41 @@ function validRequestedInputs(value: unknown): RequestedInput[] {
   ).slice(0, 3)
 }
 
+function hasConfirmedFact(result: IntakeResult, key: string) {
+  const normalized = normalizeFactKey(key)
+  return result.confirmed.some((fact) => normalizeFactKey(fact.key) === normalized && clean(fact.value, 500))
+}
+
+function specCompleteForPricing(result: IntakeResult) {
+  if (result.category === 'DESKTOP_PC') {
+    return ['cpu','gpu','ram','storage','motherboard','psu']
+      .every((key) => hasConfirmedFact(result, key))
+  }
+  if (result.category === 'NOTEBOOK') {
+    return ['brand','series','cpu','gpu','ram','storage']
+      .every((key) => hasConfirmedFact(result, key))
+  }
+  return false
+}
+
+function applyIntakeBusinessRules(result: IntakeResult): IntakeResult {
+  if (
+    result.identity_confidence >= 0.9
+    && specCompleteForPricing(result)
+    && !result.handoff_requested
+    && result.action !== 'HUMAN_REVIEW'
+  ) {
+    return {
+      ...result,
+      action: 'READY_TO_PRICE',
+      requested_inputs: [],
+      pricing_readiness: Math.max(result.pricing_readiness, 0.9),
+      flags: Array.from(new Set([...result.flags, 'SPEC_COMPLETE_PHOTOS_OPTIONAL'])).slice(0, 12),
+    }
+  }
+  return result
+}
+
 function normalizeIntake(value: unknown): IntakeResult {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('VISION_OUTPUT_NOT_OBJECT')
   const raw = value as Record<string, unknown>
@@ -507,7 +545,7 @@ function normalizeIntake(value: unknown): IntakeResult {
     }).filter((fact) => fact.key && fact.value)
     : []
 
-  return {
+  const normalized: IntakeResult = {
     intent,
     category,
     product_title: clean(raw.product_title, 240),
@@ -531,6 +569,7 @@ function normalizeIntake(value: unknown): IntakeResult {
       : [],
     flags: Array.isArray(raw.flags) ? raw.flags.map((item) => clean(item, 100)).filter(Boolean).slice(0, 12) : [],
   }
+  return applyIntakeBusinessRules(normalized)
 }
 
 async function callVision(
@@ -690,7 +729,7 @@ function composeReply(result: IntakeResult, currentCase: CaseRow) {
   } else if (
     result.action === 'READY_TO_PRICE'
     && result.identity_confidence >= 0.9
-    && result.condition_completeness >= 0.75
+    && (result.condition_completeness >= 0.75 || specCompleteForPricing(result))
   ) {
     operational = 'ข้อมูลพอเช็กราคาแล้วครับ เดี๋ยวขอเช็กราคาให้ครับ'
   } else if (result.action === 'HUMAN_REVIEW') {
@@ -717,7 +756,7 @@ function nextState(result: IntakeResult) {
   if (
     result.action === 'READY_TO_PRICE'
     && result.identity_confidence >= 0.9
-    && result.condition_completeness >= 0.75
+    && (result.condition_completeness >= 0.75 || specCompleteForPricing(result))
   ) {
     return { state: 'READY_TO_PRICE', controlMode: 'AUTO' as const }
   }
@@ -1033,7 +1072,11 @@ async function failAnalysis(
   if (runId) await completeAnalysisRun(env, runId, 'FAILED', null, null, message).catch(() => undefined)
 }
 
-export async function runConversationIntake(env: ConversationEngineEnv, batch: IntakeBatch) {
+export async function runConversationIntake(
+  env: ConversationEngineEnv,
+  batch: IntakeBatch,
+  drainDepth = 0,
+) {
   const conversation = await loadConversation(env, batch.conversationId)
   const currentCase = await loadCase(env, batch.caseId)
   if (!conversation || !currentCase) return { ok: false, skipped: true, reason: 'CASE_NOT_FOUND' }
@@ -1149,17 +1192,29 @@ export async function runConversationIntake(env: ConversationEngineEnv, batch: I
     const vision = await callVision(env, recentMessages, observations, readyImages)
     const result = vision.result
 
+    await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
+    if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
+    if (vision.skippedImageIds.length) await markImages(env, vision.skippedImageIds, 'FAILED', run.id)
+
+    const remainingReadyImages = await loadReadyImages(env, batch.caseId)
+    if (remainingReadyImages.length && drainDepth < 7) {
+      await completeAnalysisRun(env, run.id, 'SUCCEEDED', {
+        ...result,
+        deferredForMoreImages: true,
+        remainingReadyImageCount: remainingReadyImages.length,
+        includedImageIds: vision.includedImageIds,
+        skippedImageIds: vision.skippedImageIds,
+      }, vision.usage)
+      return runConversationIntake(env, batch, drainDepth + 1)
+    }
+
     let reply = composeReply(result, currentCase)
     let replyAction: string = result.action
     let flowOfferId: string | null = null
     let flowOutboundActionId: string | null = null
-    await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     const transition = await updateCase(env, batch, currentCase, result, run.id, reply)
     let responseState = transition.state
     await markMessagesConsumed(env, messageIds)
-
-    if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
-    if (vision.skippedImageIds.length) await markImages(env, vision.skippedImageIds, 'FAILED', run.id)
 
     await completeAnalysisRun(env, run.id, 'SUCCEEDED', {
       ...result,
