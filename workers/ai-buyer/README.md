@@ -54,6 +54,9 @@ Apply in order:
 ```text
 supabase/migrations/20260919163000_ai_buyer_v1_foundation.sql
 supabase/migrations/20260919170000_ai_buyer_checkpoint2_vision.sql
+supabase/migrations/20260919173000_ai_buyer_checkpoint2_indexes.sql
+supabase/migrations/20260919180000_ai_buyer_checkpoint3_pricing.sql
+supabase/migrations/20260920085454_ai_buyer_checkpoint35_spec_pricing.sql
 ```
 
 AI Buyer tables use RLS with no browser policies at this stage. The Worker uses the Supabase secret key server-side.
@@ -249,3 +252,60 @@ the percentage and enable each category.
 
 This endpoint is protected by the same admin token and can verify an amount against
 an existing Pricing Decision before Checkpoint 4 is enabled.
+
+
+## Checkpoint 3.5 — AMPHON V2.3 Spec Pricing Integration
+
+Checkpoint 3.5 adopts the temporarily approved business baseline:
+
+`AMPHON Master Price Book V2.3`
+
+Source checksum:
+
+`5f6578b5d6e5219c2d2a7e527beaeecb1e3ffcb18a79a8bf95c7f0e372663067`
+
+The repository records its runtime manifest at:
+
+`workers/ai-buyer/data/amphon-price-book-v2.3.manifest.json`
+
+### Pricing strategy by category
+
+- NOTEBOOK: spec-based
+- DESKTOP_PC: spec/component-based
+- MACBOOK: model-based
+- SMARTPHONE: model-based
+- TABLET: model-based
+- CAMERA: model-based
+
+Notebook pricing uses base chassis + CPU + GPU + RAM + SSD + display +
+brand/series + controlled condition/defect/warranty adjustments, then a series
+liquidity factor.
+
+Desktop pricing uses CPU + GPU + motherboard + RAM + storage + PSU + case +
+cooler + system-class modifier, then a system liquidity factor.
+
+### Safety behavior
+
+- CPU/GPU with LOW component confidence require Human Review.
+- Missing required spec keys require Human Review.
+- High-risk defects still require Human Review.
+- REVIEW model rows from V2.3 are stored inactive for automatic model matching.
+- Market fallback remains disabled unless explicitly configured.
+- Every spec-based Pricing Decision records the active version, workbook checksum,
+  formula settings, component trace and liquidity factor.
+- Existing application Price Guard and PostgreSQL hard-max trigger remain unchanged.
+
+### Production data state
+
+The V2.3 data baseline is loaded and active in Supabase. It contains:
+
+- 275 notebook/desktop component and modifier rows
+- 2 spec-pricing settings rows
+- 45 model-based rows
+- 27 model rows eligible for automatic model matching
+- 18 model rows retained as REVIEW/inactive
+- owner calibration evidence stored separately
+
+This does **not** mean LINE automatic buying is live. The Worker code remains on
+the feature branch until deployment is explicitly approved, and Checkpoint 4 is
+still responsible for guarded offer delivery, negotiation and acceptance.
