@@ -7,7 +7,6 @@ interface Env {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
-  SUPABASE_PUBLISHABLE_KEY: string
   AI_BUYER_HUB_ORIGINS?: string
   LINE_CHANNEL_SECRET: string
   LINE_CHANNEL_ACCESS_TOKEN: string
@@ -706,7 +705,7 @@ export default {
           pricing: Boolean(env.OPENAI_API_KEY),
           admin: Boolean(env.AI_BUYER_ADMIN_TOKEN),
           batcher: Boolean(env.CONVERSATION_BATCHER),
-          hubAdmin: Boolean(env.SUPABASE_PUBLISHABLE_KEY),
+          hubAdmin: Boolean(env.SUPABASE_URL && env.SUPABASE_SECRET_KEY),
         },
         time: new Date().toISOString(),
       })
