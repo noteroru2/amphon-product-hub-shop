@@ -71,7 +71,7 @@ jobs:
       - name: Verify live deployment
         shell: bash
         run: |
-          bundle_path="$(grep -oE '/assets/index-[^"]+\\.js' dist/index.html | head -n 1)"
+          bundle_path="$(grep -m 1 -oE '/assets/index-[^"]+\\.js' dist/index.html)"
           if [ -z "$bundle_path" ] || [ ! -f "dist$bundle_path" ]; then
             echo "::error::Unable to resolve built Hub bundle from dist/index.html"
             exit 1
