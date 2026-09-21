@@ -2,6 +2,7 @@ export interface HubAdminEnv {
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
   AI_BUYER_HUB_ORIGINS?: string
+  OPENAI_ADMIN_KEY?: string
 }
 
 type HubUser = { id: string; email?: string | null }
@@ -28,6 +29,229 @@ type CaseRow = {
   accepted_at: string | null
   created_at: string
   updated_at: string
+}
+
+
+type OpenAICostBucket = {
+  start_time: number
+  end_time: number
+  results?: Array<{
+    amount?: { value?: number | string; currency?: string }
+    line_item?: string | null
+    project_id?: string | null
+  }>
+}
+
+type OpenAIUsageBucket = {
+  start_time: number
+  end_time: number
+  results?: Array<{
+    input_tokens?: number
+    output_tokens?: number
+    input_cached_tokens?: number
+    num_model_requests?: number
+    model?: string | null
+  }>
+}
+
+type OpenAIPage<T> = {
+  data?: T[]
+  has_more?: boolean
+  next_page?: string | null
+}
+
+function utcDayStartSeconds(now = new Date()) {
+  return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000)
+}
+
+function utcMonthStartSeconds(now = new Date()) {
+  return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000)
+}
+
+async function openAIOrganizationPages<T>(
+  env: HubAdminEnv,
+  path: string,
+  params: Record<string, string>,
+): Promise<T[]> {
+  const adminKey = clean(env.OPENAI_ADMIN_KEY, 3000)
+  if (!adminKey) throw new Error('OPENAI_ADMIN_KEY_NOT_CONFIGURED')
+
+  const rows: T[] = []
+  let page: string | null = null
+  for (let index = 0; index < 10; index += 1) {
+    const url = new URL('https://api.openai.com' + path)
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
+    if (page) url.searchParams.set('page', page)
+
+    const result = await fetch(url.toString(), {
+      headers: {
+        authorization: 'Bearer ' + adminKey,
+        accept: 'application/json',
+      },
+    })
+    const raw = await result.text()
+    if (!result.ok) {
+      throw new Error('OPENAI_ORG_' + result.status + ':' + raw.slice(0, 300))
+    }
+    const body = raw ? JSON.parse(raw) as OpenAIPage<T> : {}
+    if (Array.isArray(body.data)) rows.push(...body.data)
+    if (!body.has_more || !body.next_page) break
+    page = body.next_page
+  }
+  return rows
+}
+
+function blankOpenAISpend(status: 'not_configured' | 'unavailable', error?: string) {
+  return {
+    status,
+    scope: 'organization' as const,
+    currency: 'usd',
+    timezone: 'UTC',
+    today: null,
+    last7Days: null,
+    monthToDate: null,
+    requestsMonthToDate: null,
+    tokensMonthToDate: {
+      input: null,
+      cachedInput: null,
+      output: null,
+      total: null,
+    },
+    byModel: [] as Array<{
+      model: string
+      requests: number
+      inputTokens: number
+      cachedInputTokens: number
+      outputTokens: number
+      totalTokens: number
+    }>,
+    daily: [] as Array<{ date: string; amount: number }>,
+    updatedAt: new Date().toISOString(),
+    error: error ? clean(error, 300) : null,
+  }
+}
+
+async function loadOpenAISpend(env: HubAdminEnv) {
+  if (!clean(env.OPENAI_ADMIN_KEY, 3000)) return blankOpenAISpend('not_configured')
+
+  const now = new Date()
+  const todayStart = utcDayStartSeconds(now)
+  const monthStart = utcMonthStartSeconds(now)
+  const last7Start = todayStart - (6 * 86400)
+  const costStart = Math.min(monthStart, last7Start)
+  const endTime = Math.floor(now.getTime() / 1000) + 1
+
+  try {
+    const costBuckets = await openAIOrganizationPages<OpenAICostBucket>(
+      env,
+      '/v1/organization/costs',
+      {
+        start_time: String(costStart),
+        end_time: String(endTime),
+        bucket_width: '1d',
+        limit: '60',
+      },
+    )
+
+    const daily = costBuckets.map((bucket) => ({
+      date: new Date(bucket.start_time * 1000).toISOString().slice(0, 10),
+      startTime: bucket.start_time,
+      amount: (bucket.results || []).reduce((sum, item) => {
+        const value = Number(item.amount?.value ?? 0)
+        return sum + (Number.isFinite(value) ? value : 0)
+      }, 0),
+    }))
+
+    const sumSince = (start: number) => daily
+      .filter((item) => item.startTime >= start)
+      .reduce((sum, item) => sum + item.amount, 0)
+
+    let requests = 0
+    let inputTokens = 0
+    let cachedInputTokens = 0
+    let outputTokens = 0
+    const modelMap = new Map<string, {
+      model: string
+      requests: number
+      inputTokens: number
+      cachedInputTokens: number
+      outputTokens: number
+      totalTokens: number
+    }>()
+
+    try {
+      const usageBuckets = await openAIOrganizationPages<OpenAIUsageBucket>(
+        env,
+        '/v1/organization/usage/completions',
+        {
+          start_time: String(monthStart),
+          end_time: String(endTime),
+          bucket_width: '1d',
+          limit: '31',
+          group_by: 'model',
+        },
+      )
+      for (const bucket of usageBuckets) {
+        for (const item of bucket.results || []) {
+          const model = clean(item.model, 120) || 'unknown'
+          const requestCount = Number(item.num_model_requests || 0)
+          const input = Number(item.input_tokens || 0)
+          const cached = Number(item.input_cached_tokens || 0)
+          const output = Number(item.output_tokens || 0)
+          requests += Number.isFinite(requestCount) ? requestCount : 0
+          inputTokens += Number.isFinite(input) ? input : 0
+          cachedInputTokens += Number.isFinite(cached) ? cached : 0
+          outputTokens += Number.isFinite(output) ? output : 0
+
+          const current = modelMap.get(model) || {
+            model,
+            requests: 0,
+            inputTokens: 0,
+            cachedInputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          }
+          current.requests += Number.isFinite(requestCount) ? requestCount : 0
+          current.inputTokens += Number.isFinite(input) ? input : 0
+          current.cachedInputTokens += Number.isFinite(cached) ? cached : 0
+          current.outputTokens += Number.isFinite(output) ? output : 0
+          current.totalTokens = current.inputTokens + current.outputTokens
+          modelMap.set(model, current)
+        }
+      }
+    } catch (usageError) {
+      console.warn('AI BUYER OpenAI usage read failed', usageError)
+    }
+
+    return {
+      status: 'live' as const,
+      scope: 'organization' as const,
+      currency: 'usd',
+      timezone: 'UTC',
+      today: sumSince(todayStart),
+      last7Days: sumSince(last7Start),
+      monthToDate: sumSince(monthStart),
+      requestsMonthToDate: requests,
+      tokensMonthToDate: {
+        input: inputTokens,
+        cachedInput: cachedInputTokens,
+        output: outputTokens,
+        total: inputTokens + outputTokens,
+      },
+      byModel: Array.from(modelMap.values()).sort((a, b) => b.totalTokens - a.totalTokens),
+      daily: daily
+        .filter((item) => item.startTime >= monthStart)
+        .map(({ date, amount }) => ({ date, amount })),
+      updatedAt: new Date().toISOString(),
+      error: null,
+    }
+  } catch (error) {
+    console.error('AI BUYER OpenAI cost read failed', error)
+    return blankOpenAISpend(
+      'unavailable',
+      String((error as Error)?.message || error).replace(/Bearer\s+\S+/gi, 'Bearer [redacted]'),
+    )
+  }
 }
 
 function clean(value: unknown, max = 500) {
@@ -168,13 +392,15 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       env,
       'ai_buyer_category_automation_modes?select=category,mode,max_negotiation_rounds,active,updated_at&order=category.asc',
     )
+    const openAIPromise = loadOpenAISpend(env)
 
     if (!caseIds.length) {
-      const modes = await modesPromise
+      const [modes, openai] = await Promise.all([modesPromise, openAIPromise])
       return hubAdminResponse(request, env, {
         ok: true,
         viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
         summary: { total: 0, priced: 0, humanReview: 0, actionRequired: 0, accepted: 0 },
+        openai,
         modes,
         cases: [],
         generatedAt: new Date().toISOString(),
@@ -184,7 +410,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
     const inCases = caseIds.join(',')
     const inCustomers = customerIds.join(',')
 
-    const [customers, pricing, offers, tasks, images, messages, modes] = await Promise.all([
+    const [customers, pricing, offers, tasks, images, messages, modes, openai] = await Promise.all([
       customerIds.length
         ? serviceRows<any>(env,
           'ai_buyer_customers?id=in.(' + inCustomers + ')&select=id,display_name,picture_url,phone')
@@ -208,6 +434,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
           + '&select=id,case_id,message_type,text_content,created_at'
           + '&order=created_at.desc&limit=400'),
       modesPromise,
+      openAIPromise,
     ])
 
     const customerById = new Map(customers.map((row: any) => [String(row.id), row]))
@@ -291,6 +518,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
         actionRequired: items.filter((item) => item.state === 'ACTION_REQUIRED' || item.task?.status === 'ACTION_REQUIRED').length,
         accepted: items.filter((item) => item.acceptedPrice != null).length,
       },
+      openai,
       modes,
       cases: items,
       generatedAt: new Date().toISOString(),

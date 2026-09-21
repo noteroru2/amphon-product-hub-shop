@@ -12,6 +12,7 @@ interface Env {
   LINE_CHANNEL_SECRET: string
   LINE_CHANNEL_ACCESS_TOKEN: string
   OPENAI_API_KEY: string
+  OPENAI_ADMIN_KEY?: string
   OPENAI_VISION_MODEL?: string
   OPENAI_PRICING_MODEL?: string
   AI_BUYER_ADMIN_TOKEN: string

@@ -76,6 +76,7 @@ jobs:
           LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash
         run: |
@@ -83,6 +84,12 @@ jobs:
           printf '%s' "$LINE_CHANNEL_SECRET" | npx wrangler secret put LINE_CHANNEL_SECRET --config wrangler.jsonc
           printf '%s' "$LINE_CHANNEL_ACCESS_TOKEN" | npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --config wrangler.jsonc
           printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY --config wrangler.jsonc
+          if [ -n "$OPENAI_ADMIN_KEY" ]; then
+            printf '%s' "$OPENAI_ADMIN_KEY" | npx wrangler secret put OPENAI_ADMIN_KEY --config wrangler.jsonc
+            echo "OPENAI_ADMIN_KEY synced for live cost reporting"
+          else
+            echo "OPENAI_ADMIN_KEY is not configured; Hub cost panel will show not connected"
+          fi
           printf '%s' "$AI_BUYER_ADMIN_TOKEN" | npx wrangler secret put AI_BUYER_ADMIN_TOKEN --config wrangler.jsonc
 
       - name: Final deploy with bindings and secrets preserved
