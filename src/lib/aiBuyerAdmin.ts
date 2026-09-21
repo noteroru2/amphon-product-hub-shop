@@ -68,6 +68,35 @@ export type AiBuyerDashboardCase = {
   updatedAt: string
 }
 
+
+export type AiBuyerOpenAISpend = {
+  status: 'live' | 'not_configured' | 'unavailable'
+  scope: 'organization'
+  currency: string
+  timezone: string
+  today: number | null
+  last7Days: number | null
+  monthToDate: number | null
+  requestsMonthToDate: number | null
+  tokensMonthToDate: {
+    input: number | null
+    cachedInput: number | null
+    output: number | null
+    total: number | null
+  }
+  byModel: Array<{
+    model: string
+    requests: number
+    inputTokens: number
+    cachedInputTokens: number
+    outputTokens: number
+    totalTokens: number
+  }>
+  daily: Array<{ date: string; amount: number }>
+  updatedAt: string
+  error: string | null
+}
+
 export type AiBuyerDashboardData = {
   ok: true
   viewer: { displayName: string; role: 'owner' | 'admin' }
@@ -78,6 +107,7 @@ export type AiBuyerDashboardData = {
     actionRequired: number
     accepted: number
   }
+  openai?: AiBuyerOpenAISpend
   modes: AiBuyerRolloutMode[]
   cases: AiBuyerDashboardCase[]
   generatedAt: string

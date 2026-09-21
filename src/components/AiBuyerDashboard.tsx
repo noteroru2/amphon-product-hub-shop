@@ -19,6 +19,7 @@ import {
   loadAiBuyerDashboard,
   type AiBuyerDashboardCase,
   type AiBuyerDashboardData,
+  type AiBuyerOpenAISpend,
 } from '../lib/aiBuyerAdmin'
 import '../styles/aiBuyerDashboard.css'
 
@@ -32,6 +33,25 @@ function money(value: number | null | undefined) {
   return new Intl.NumberFormat('th-TH', {
     maximumFractionDigits: 0,
   }).format(Number(value)) + ' ฿'
+}
+
+
+function usd(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return '—'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Number(value) > 0 && Number(value) < 0.01 ? 4 : 2,
+  }).format(Number(value))
+}
+
+function compactNumber(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(Number(value))) return '—'
+  return new Intl.NumberFormat('th-TH', {
+    notation: Number(value) >= 1000 ? 'compact' : 'standard',
+    maximumFractionDigits: 1,
+  }).format(Number(value))
 }
 
 function percent(value: number | null | undefined) {
@@ -107,6 +127,98 @@ function confidenceTone(value: number | null | undefined) {
   if (value >= 0.9) return 'good'
   if (value >= 0.75) return 'mid'
   return 'low'
+}
+
+
+function OpenAICostPanel({ spend }: { spend: AiBuyerOpenAISpend | undefined }) {
+  const live = spend?.status === 'live'
+
+  return (
+    <section className="ai-cost-panel" aria-label="ค่าใช้จ่าย OpenAI API">
+      <div className="ai-cost-head">
+        <div className="ai-cost-title">
+          <CircleDollarSign size={22} />
+          <div>
+            <strong>ค่า OpenAI API</strong>
+            <span>ยอดจริงจาก OpenAI · {spend?.timezone || 'UTC'}</span>
+          </div>
+        </div>
+        <span className={`ai-cost-status ai-cost-status-${spend?.status || 'loading'}`}>
+          {live ? 'LIVE' : spend?.status === 'not_configured' ? 'NOT CONNECTED' : spend ? 'UNAVAILABLE' : 'LOADING'}
+        </span>
+      </div>
+
+      {live && spend ? (
+        <>
+          <div className="ai-cost-hero">
+            <span>เดือนนี้</span>
+            <strong>{usd(spend.monthToDate)}</strong>
+            <small>Organization total · USD</small>
+          </div>
+
+          <div className="ai-cost-metrics">
+            <div>
+              <span>วันนี้</span>
+              <strong>{usd(spend.today)}</strong>
+            </div>
+            <div>
+              <span>7 วันล่าสุด</span>
+              <strong>{usd(spend.last7Days)}</strong>
+            </div>
+            <div>
+              <span>Requests เดือนนี้</span>
+              <strong>{compactNumber(spend.requestsMonthToDate)}</strong>
+            </div>
+            <div>
+              <span>Tokens เดือนนี้</span>
+              <strong>{compactNumber(spend.tokensMonthToDate.total)}</strong>
+            </div>
+          </div>
+
+          {spend.byModel.length > 0 && (
+            <div className="ai-cost-models">
+              <span>การใช้งานตามโมเดล</span>
+              <div>
+                {spend.byModel.slice(0, 3).map((item) => (
+                  <span className="ai-cost-model-chip" key={item.model}>
+                    <strong>{item.model}</strong>
+                    <small>{compactNumber(item.requests)} req · {compactNumber(item.totalTokens)} tokens</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="ai-cost-foot">
+            <span>
+              Input {compactNumber(spend.tokensMonthToDate.input)}
+              {' · '}Cached {compactNumber(spend.tokensMonthToDate.cachedInput)}
+              {' · '}Output {compactNumber(spend.tokensMonthToDate.output)}
+            </span>
+            <span>อัปเดต {relativeTime(spend.updatedAt)}</span>
+          </div>
+        </>
+      ) : (
+        <div className="ai-cost-empty">
+          <CircleDollarSign size={28} />
+          <div>
+            <strong>
+              {spend?.status === 'not_configured'
+                ? 'ยังไม่ได้เชื่อม Cost API'
+                : spend?.status === 'unavailable'
+                  ? 'ดึงค่าใช้จ่าย OpenAI ไม่สำเร็จ'
+                  : 'กำลังเชื่อมข้อมูลค่าใช้จ่าย'}
+            </strong>
+            <span>
+              {spend?.status === 'not_configured'
+                ? 'เพิ่ม OPENAI_ADMIN_KEY ที่ระบบ Deploy แล้วหน้านี้จะแสดงยอดจริงอัตโนมัติ'
+                : 'ข้อมูล AI Buyer ส่วนอื่นยังใช้งานได้ตามปกติ'}
+            </span>
+          </div>
+        </div>
+      )}
+    </section>
+  )
 }
 
 function CaseCard({ item }: { item: AiBuyerDashboardCase }) {
@@ -356,6 +468,8 @@ export function AiBuyerDashboard({ profile, onBack }: Props) {
           <button onClick={() => void load()}>ลองใหม่</button>
         </div>
       )}
+
+      <OpenAICostPanel spend={data?.openai} />
 
       <div className="ai-kpi-grid">
         <div className="ai-kpi">
