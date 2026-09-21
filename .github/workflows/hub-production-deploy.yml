@@ -71,14 +71,31 @@ jobs:
       - name: Verify live deployment
         shell: bash
         run: |
-          for i in 1 2 3 4 5 6 7 8; do
-            release="$(curl -fsS --max-time 15 https://hub.amphon.co.th/release.json || true)"
+          bundle_path="$(grep -oE '/assets/index-[^"]+\\.js' dist/index.html | head -n 1)"
+          if [ -z "$bundle_path" ] || [ ! -f "dist$bundle_path" ]; then
+            echo "::error::Unable to resolve built Hub bundle from dist/index.html"
+            exit 1
+          fi
+          expected_sha="$(sha256sum "dist$bundle_path" | awk '{print $1}')"
+          echo "Verifying exact deployed bundle: $bundle_path ($expected_sha)"
+
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            tmp="$(mktemp)"
             home="$(curl -fsS --max-time 15 https://hub.amphon.co.th/ || true)"
-            if echo "$release" | grep -q "$GITHUB_SHA" && echo "$home" | grep -q "AMPHON Product Hub"; then
+            if curl -fsS --max-time 20 "https://hub.amphon.co.th$bundle_path" -o "$tmp"; then
+              live_sha="$(sha256sum "$tmp" | awk '{print $1}')"
+            else
+              live_sha=""
+            fi
+            rm -f "$tmp"
+
+            if [ "$live_sha" = "$expected_sha" ] && echo "$home" | grep -q "AMPHON Product Hub"; then
               echo "Hub production deploy PASS: $GITHUB_SHA"
+              echo "Exact bundle checksum is live: $live_sha"
               exit 0
             fi
+            echo "Attempt $i: expected=$expected_sha live=${live_sha:-missing}"
             sleep 5
           done
-          echo "::error::hub.amphon.co.th did not expose the expected release SHA"
+          echo "::error::hub.amphon.co.th did not expose the exact deployed bundle"
           exit 1
