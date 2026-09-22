@@ -92,6 +92,30 @@
       "name": "Custom PC with CPU/GPU/RAM/storage; motherboard/PSU use conservative defaults",
       "expectedBucket": "A_PRICE_NOW",
       "expectedReason": "READY_BY_COMPLETE_SPEC"
+    },
+    {
+      "caseId": "62464ce6-ed44-468d-a41a-1f573d649c2e",
+      "name": "MacBook Air M5 24/512 full customer-text identity",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_IDENTITY"
+    },
+    {
+      "caseId": "4de94388-958a-45ea-9494-0c906aa457eb",
+      "name": "DJI Osmo Action 3 exact text identity",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "37ad57bc-cefe-41c2-aca2-ab7398ecb019",
+      "name": "Insta360 ONE X2 exact text identity",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "6331de6d-e521-42b7-8b08-532c482b141a",
+      "name": "Dell Precision 5820 complete four-core spec path",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_COMPLETE_SPEC"
     }
   ]
 }
