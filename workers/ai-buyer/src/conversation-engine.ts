@@ -695,9 +695,53 @@ function modelCategoryReadyForPricing(result: IntakeResult) {
   return result.spec_completeness >= 0.75 || Boolean(result.model_code && storage)
 }
 
+const HARD_REVIEW_PRICING_TAGS = new Set<PricingTag>([
+  'LOCKED',
+  'MAJOR_DAMAGE',
+  'DEVICE_NOT_BOOTING',
+  'LIQUID_DAMAGE_HISTORY',
+  'BOARD_REPAIR_HISTORY',
+  'INTERMITTENT_POWER',
+  'PORT_MULTIPLE_DEFECT',
+])
+
+function hasHumanRiskFlag(flags: string[]) {
+  const text = flags.join(' ').toLocaleUpperCase('en-US')
+  return /MULTIPLE_(DEVICES|PRODUCTS)|SPEC_TO_DEVICE_MAPPING_AMBIGUOUS|IDENTITY_CONFLICT|MODEL_SPEC_CONFLICT|PAWN_TICKET|OWNERSHIP|ACTIVE_INSTALLMENT|FINANCE_STATUS/.test(text)
+}
+
+function applyStoredCaseRiskGuard(result: IntakeResult, currentCase: CaseRow): IntakeResult {
+  const priorTags = Array.isArray(currentCase.metadata?.lastPricingTags)
+    ? currentCase.metadata.lastPricingTags
+      .map((tag) => clean(tag, 100))
+      .filter((tag): tag is PricingTag => PRICING_TAGS.includes(tag as PricingTag))
+    : []
+
+  const pricingTags = Array.from(new Set([...priorTags, ...result.pricing_tags])).slice(0, 10) as PricingTag[]
+  const hardTag = pricingTags.find((tag) => HARD_REVIEW_PRICING_TAGS.has(tag))
+  const riskyFlags = hasHumanRiskFlag(result.flags)
+
+  if (!hardTag && !riskyFlags) {
+    return { ...result, pricing_tags: pricingTags }
+  }
+
+  return {
+    ...result,
+    action: 'HUMAN_REVIEW',
+    pricing_tags: pricingTags,
+    pricing_readiness: Math.min(result.pricing_readiness, 0.49),
+    flags: Array.from(new Set([
+      ...result.flags,
+      hardTag ? 'DETERMINISTIC_HARD_REVIEW_TAG:' + hardTag : 'DETERMINISTIC_RISK_FLAG_REVIEW',
+    ])).slice(0, 12),
+  }
+}
+
 function pricingReadyByPolicy(result: IntakeResult) {
   if (result.action !== 'READY_TO_PRICE') return false
   if (result.handoff_requested) return false
+  if (result.pricing_tags.some((tag) => HARD_REVIEW_PRICING_TAGS.has(tag))) return false
+  if (hasHumanRiskFlag(result.flags)) return false
 
   if (specCompleteForPricing(result) && result.identity_confidence >= specIdentityThreshold(result)) return true
   if (modelCategoryReadyForPricing(result)) return true
@@ -1398,7 +1442,7 @@ export async function runConversationIntake(
     runId = run.id
 
     const vision = await callVision(env, recentMessages, observations, readyImages)
-    const result = vision.result
+    const result = applyStoredCaseRiskGuard(vision.result, currentCase)
 
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
