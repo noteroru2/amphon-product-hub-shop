@@ -652,6 +652,49 @@ function entryStorageGb(entry: EntryRow) {
   return modelCapacity || null
 }
 
+function appleIPhoneVariant(value: unknown) {
+  const text = normalizeTokenText(value)
+  const generation = text.match(/\biphone\s*(\d{1,2})\b/)
+  if (!generation) return null
+
+  let variant = 'BASE'
+  if (/\bpro\s*max\b/.test(text)) variant = 'PRO_MAX'
+  else if (/\bpro\b/.test(text)) variant = 'PRO'
+  else if (/\bplus\b/.test(text)) variant = 'PLUS'
+  else if (/\bmini\b/.test(text)) variant = 'MINI'
+
+  return { generation: generation[1], variant }
+}
+
+function highImpactVariantConflict(
+  entry: EntryRow,
+  identity: ReturnType<typeof aggregateIdentity>,
+) {
+  const actual = appleIPhoneVariant(identity.modelName || identity.searchText)
+  const row = appleIPhoneVariant(entry.model)
+  if (actual && row && actual.generation === row.generation && actual.variant !== row.variant) {
+    return true
+  }
+
+  const actualText = normalizeTokenText(identity.modelName || identity.searchText)
+  const rowText = normalizeTokenText(entry.model)
+  const pairedVariants: Array<[RegExp, RegExp]> = [
+    [/\bultra\b/, /\bultra\b/],
+    [/\bpro\s*max\b/, /\bpro\s*max\b/],
+    [/\bplus\b/, /\bplus\b/],
+    [/\bmini\b/, /\bmini\b/],
+  ]
+  for (const [actualPattern, rowPattern] of pairedVariants) {
+    if (actualPattern.test(actualText) !== rowPattern.test(rowText)) {
+      const actualTokens = actualText.split(/\s+/).filter(Boolean)
+      const rowTokens = rowText.split(/\s+/).filter(Boolean)
+      const shared = rowTokens.filter((token) => actualTokens.includes(token)).length
+      if (shared >= 2) return true
+    }
+  }
+  return false
+}
+
 function priceBookMatchScore(
   entry: EntryRow,
   identity: ReturnType<typeof aggregateIdentity>,
@@ -698,6 +741,10 @@ function priceBookMatchScore(
   const rowStorage = entryStorageGb(entry)
   if (actualStorage && rowStorage && actualStorage !== rowStorage) {
     return { score: 0, reason: 'STORAGE_VARIANT_CONFLICT' }
+  }
+
+  if (highImpactVariantConflict(entry, identity)) {
+    return { score: 0, reason: 'MODEL_VARIANT_CONFLICT' }
   }
 
   const wantedCondition = desiredConditionKey(identity.tags)
