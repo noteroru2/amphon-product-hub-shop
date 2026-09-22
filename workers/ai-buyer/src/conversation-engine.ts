@@ -253,8 +253,8 @@ const SYSTEM_PROMPT = [
   'requested_inputs must contain at most 3 items, most useful first.',
   'READY_TO_PRICE means enough evidence exists for the separate Pricing Engine. It does not mean you know a price.',
   'AMPHON business rule: for NOTEBOOK and DESKTOP_PC, complete confirmed pricing specs are sufficient to price even when extra condition photos are still unavailable. Do not keep asking for photos solely to improve condition once core pricing specs are complete.',
-  'Desktop core pricing specs are CPU, GPU, RAM, storage, motherboard and PSU. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
-  'A custom DESKTOP_PC does not need an exact commercial model name. If the six core components are explicitly confirmed, identity_confidence 0.65+ is enough to continue to spec pricing unless evidence conflicts.',
+  'Desktop core pricing specs are CPU, GPU, RAM and storage. Motherboard and PSU improve accuracy but are not hard prerequisites; if missing, the Pricing Engine must use conservative default values. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
+  'A custom DESKTOP_PC does not need an exact commercial model name. If CPU, GPU, RAM and storage are explicitly confirmed, identity_confidence 0.65+ is enough to continue to conservative spec pricing unless evidence conflicts.',
   'For NOTEBOOK, complete confirmed core pricing specs with identity_confidence 0.80+ are enough to continue to spec pricing.',
   'For NOTEBOOK, MACBOOK, SMARTPHONE, TABLET and CAMERA, a clearly readable model/model-code plus the important variant details already visible or stated is enough to attempt pricing. Notebook pricing still prefers complete specs, but an exact readable notebook model code may fall back to verified market comparables instead of waiting forever for more photos.',
   'A readable model number, product label, About screen or system-information screen in an image is valid direct identity/spec evidence. If it is already readable, never ask the customer to send the same evidence again.',
@@ -509,7 +509,7 @@ function hasConfirmedFact(result: IntakeResult, key: string) {
 
 function specCompleteForPricing(result: IntakeResult) {
   if (result.category === 'DESKTOP_PC') {
-    return ['cpu','gpu','ram','storage','motherboard','psu']
+    return ['cpu','gpu','ram','storage']
       .every((key) => hasConfirmedFact(result, key))
   }
   if (result.category === 'NOTEBOOK') {
@@ -760,6 +760,7 @@ function applyStoredCaseRiskGuard(result: IntakeResult, currentCase: CaseRow): I
 }
 
 function pricingReadyByPolicy(result: IntakeResult) {
+  if (result.intent !== 'SELL_ITEM') return false
   if (result.action !== 'READY_TO_PRICE') return false
   if (result.handoff_requested) return false
   if (result.pricing_tags.some((tag) => HARD_REVIEW_PRICING_TAGS.has(tag))) return false
@@ -778,7 +779,8 @@ function applyIntakeBusinessRules(result: IntakeResult): IntakeResult {
   const modelReady = modelCategoryReadyForPricing(result)
 
   if (
-    (specReady || modelReady)
+    result.intent === 'SELL_ITEM'
+    && (specReady || modelReady)
     && !result.handoff_requested
     && result.action !== 'HUMAN_REVIEW'
   ) {
