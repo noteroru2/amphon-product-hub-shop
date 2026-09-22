@@ -262,7 +262,6 @@ for (const token of [
 for (const token of [
   'ai_buyer_prepare_manual_reply',
   'ai_buyer_finalize_manual_reply',
-  'OWNER_MANUAL',
   'ai_buyer_case_outcomes',
   'ai_buyer_deal_ledger',
   'needsFinalLabel',
