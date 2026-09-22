@@ -13,10 +13,17 @@ if (policy.version !== 'AMPHON_AI_BUYER_OPTIMIZATION_V1') throw new Error('Optim
 if (policy.runtime?.aiPausedDuringOptimization !== true) throw new Error('Optimization policy must keep AI paused')
 if (policy.global?.rules?.neverAskForSameEvidenceTwice !== true) throw new Error('Duplicate evidence guard missing')
 if (policy.global?.rules?.photosAreOptionalWhenPricingEvidenceSufficient !== true) throw new Error('Photo optionality rule missing')
+if (policy.global?.rules?.sellIntentRequiredForPricing !== true) throw new Error('SELL_ITEM pricing gate missing')
+if (policy.global?.rules?.oneActiveCasePerConversation !== true) throw new Error('Atomic active-case policy missing')
 if (policy.batteryPolicy?.badThresholdPercentExclusive !== 80) throw new Error('Battery threshold must remain 80')
 
 for (const category of ['NOTEBOOK','DESKTOP_PC','SMARTPHONE','TABLET','MACBOOK','CAMERA','OTHER']) {
   if (!policy.categories?.[category]) throw new Error('Missing category optimization rule: ' + category)
+}
+
+const desktopRequired = policy.categories.DESKTOP_PC?.readiness?.primaryPath?.required || []
+if (JSON.stringify(desktopRequired) !== JSON.stringify(['cpu','gpu_or_integrated','ram','storage'])) {
+  throw new Error('Desktop four-core readiness contract mismatch')
 }
 
 if (policy.categories.NOTEBOOK.adjustmentsThb.BATTERY_BAD !== -800) throw new Error('Notebook battery adjustment mismatch')
