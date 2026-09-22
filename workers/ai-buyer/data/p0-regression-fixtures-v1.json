@@ -71,8 +71,9 @@
     },
     {
       "caseId": "674717f3-c2a3-4b21-904f-ba75c7790cb0",
-      "name": "iPad Air 4 model/storage known but identity confidence below gate",
-      "expectedBucket": "B_NEEDS_INFO"
+      "name": "iPad Air 4 256GB Wi-Fi clear customer-text identity",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_IDENTITY"
     },
     {
       "caseId": "ef468402-261b-4d37-b181-757a7de69fa6",
