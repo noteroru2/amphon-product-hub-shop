@@ -962,6 +962,21 @@ export async function runSpecPricingForCase(
     : buildDesktop(entries, setting, facts)
 
   if (!built.ok) {
+    const marketFallbackReasons = new Set([
+      'SPEC_REQUIRED_COMPONENT_MISSING',
+      'SPEC_COMPONENT_UNMAPPED',
+      'SPEC_LOW_CONFIDENCE_COMPONENT',
+    ])
+    const strongMarketIdentity = numberValue(caseRow.identity_confidence) >= 0.90
+      && Boolean(facts.modelCode || facts.modelName || caseRow.title)
+
+    // If we know the exact commercial model but cannot fully map every component,
+    // let the legacy pricing engine use the category market fallback instead of
+    // forcing the customer to keep sending photos indefinitely.
+    if (marketFallbackReasons.has(built.reason) && strongMarketIdentity) {
+      return { handled: false as const }
+    }
+
     return {
       handled: true,
       result: await escalate(env, caseRow, built.reason, built.detail),
