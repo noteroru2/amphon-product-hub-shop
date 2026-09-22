@@ -1,0 +1,127 @@
+{
+  "version": "P0_PRICING_COVERAGE_V1",
+  "expectedActivePriceBook": "AMPHON Master Price Book V2.4 P0 Coverage",
+  "directPriceBookCases": [
+    {
+      "caseId": "6b50df44-5b7e-4aff-8cfe-b45f5bad2910",
+      "entryModel": "Digital IXUS 70",
+      "expected": {
+        "opening": 2500,
+        "target": 2700,
+        "hardMax": 3100
+      }
+    },
+    {
+      "caseId": "cb30cab5-d7bb-40f8-9a1c-d52a079196e5",
+      "entryModel": "PowerShot A3200 IS",
+      "expected": {
+        "opening": 2500,
+        "target": 2700,
+        "hardMax": 3100
+      }
+    },
+    {
+      "caseId": "a6747df7-ffec-4bd2-8951-80c8e9b11401",
+      "entryModel": "Osmo Action 4",
+      "expected": {
+        "opening": 2300,
+        "target": 2500,
+        "hardMax": 2900
+      }
+    },
+    {
+      "caseId": "7d4fa572-8069-486c-acca-ec30eaaf2653",
+      "entryModel": "Instax Mini Evo",
+      "expected": {
+        "opening": 2600,
+        "target": 2900,
+        "hardMax": 3300
+      }
+    },
+    {
+      "caseId": "0d3ccb0f-9bde-4ce9-b8fe-414e4b51e8aa",
+      "entryModel": "MacBook Pro 16-inch 2019 i7 32GB 512GB",
+      "expected": {
+        "opening": 7600,
+        "target": 8100,
+        "hardMax": 9000
+      }
+    },
+    {
+      "caseId": "254f5381-e4e4-4c9f-b7dd-831bb8285af1",
+      "entryModel": "ExpertBook B3402FE i5",
+      "expected": {
+        "opening": 5500,
+        "target": 5900,
+        "hardMax": 6400
+      }
+    },
+    {
+      "caseId": "eb31cd76-f511-4ca3-824f-72a63d5a6431",
+      "entryModel": "Aspire Go 15 AG15-72P Core 5 120U 16GB",
+      "expected": {
+        "opening": 6600,
+        "target": 7100,
+        "hardMax": 7600
+      }
+    },
+    {
+      "caseId": "a4ecf322-cf4f-452e-aad1-a9125f289417",
+      "entryModel": "iPhone 11",
+      "requiredTag": "BATTERY_BAD",
+      "expected": {
+        "opening": 1300,
+        "target": 1500,
+        "hardMax": 1800
+      }
+    },
+    {
+      "caseId": "80741cac-5a1a-479f-b862-b5f449fe9872",
+      "entryModel": "iPhone 15 Pro Max",
+      "derivedTag": "BACK_PANEL_REPLACED",
+      "expected": {
+        "opening": 11200,
+        "target": 12100,
+        "hardMax": 13700
+      }
+    },
+    {
+      "caseId": "1f441860-498e-47be-b64f-0a40d784c1ef",
+      "entryModel": "MatePad T10s 3GB/64GB LTE",
+      "expected": {
+        "opening": 1500,
+        "target": 1600,
+        "hardMax": 1800
+      }
+    },
+    {
+      "caseId": "1fcae414-f315-4154-bc49-f7284e2363a0",
+      "entryModel": "Pad 7 Pro 12GB/512GB",
+      "expected": {
+        "opening": 6600,
+        "target": 7100,
+        "hardMax": 8000
+      }
+    }
+  ],
+  "guardedFallbackCases": [
+    {
+      "caseId": "dec53a55-dfbd-4fa3-9152-190472e1a8bb",
+      "name": "Chinon CM-3 + separate 135mm lens",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    },
+    {
+      "caseId": "b6f1dd88-a645-4c69-bf8a-c6f35c12ce42",
+      "name": "Pentax K-r + two-lens bundle",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    },
+    {
+      "caseId": "b3c7f82d-b85f-4944-8099-22289cfc3b03",
+      "name": "Sony DSC-TX300 thin Thai comparable coverage",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    }
+  ],
+  "alreadyPricedCount": 3,
+  "expectedDeterministicPriceCoverage": 14,
+  "totalEvidenceReady": 17
+}
