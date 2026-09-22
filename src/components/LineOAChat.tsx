@@ -13,12 +13,14 @@ import {
 } from "lucide-react";
 import type { Profile } from "../types/product";
 import {
-  loadAiBuyerCase,
-  loadAiBuyerDashboard,
+  loadAiBuyerChatCase,
+  loadAiBuyerChatList,
   loadAiBuyerImageBlob,
   sendAiBuyerManualReply,
-  type AiBuyerCaseDetail,
-  type AiBuyerDashboardCase,
+  type AiBuyerChatCaseDetail,
+  type AiBuyerChatCaseSummary,
+  type AiBuyerChatImage,
+  type AiBuyerChatMessage,
 } from "../lib/aiBuyerAdmin";
 import "../styles/lineOAChat.css";
 
@@ -47,7 +49,10 @@ function dateTime(value?: string | null) {
 function money(value: unknown) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(n) + " บาท";
+  return (
+    new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(n) +
+    " บาท"
+  );
 }
 
 function numeric(value: string) {
@@ -67,7 +72,7 @@ function ConversationItem({
   active,
   onClick,
 }: {
-  item: AiBuyerDashboardCase;
+  item: AiBuyerChatCaseSummary;
   active: boolean;
   onClick: () => void;
 }) {
@@ -84,7 +89,7 @@ function ConversationItem({
     >
       <div className="lineoa-avatar">
         {item.customer?.pictureUrl ? (
-          <img src={item.customer.pictureUrl} alt="" />
+          <img src={item.customer.pictureUrl} alt="" loading="lazy" />
         ) : (
           <span>{initials(customer)}</span>
         )}
@@ -92,7 +97,7 @@ function ConversationItem({
       <div className="lineoa-thread-copy">
         <div className="lineoa-thread-head">
           <strong>{customer}</strong>
-          <time>{timeOnly(item.lastMessage?.createdAt || item.updatedAt)}</time>
+          <time>{timeOnly(item.lastMessage?.createdAt || item.lastActivityAt)}</time>
         </div>
         <b>{item.title || "ยังไม่ระบุสินค้า"}</b>
         <p>{preview}</p>
@@ -107,15 +112,96 @@ function ConversationItem({
   );
 }
 
+function LazyChatImage({
+  image,
+  onOpen,
+}: {
+  image: AiBuyerChatImage;
+  onOpen: (url: string) => void;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const node = hostRef.current;
+    if (!node || url || failed) return;
+
+    let objectUrl = "";
+    let cancelled = false;
+    let loading = false;
+
+    const load = async () => {
+      if (loading) return;
+      loading = true;
+      try {
+        const blob = await loadAiBuyerImageBlob(image.id);
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      void load();
+      return () => {
+        cancelled = true;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          void load();
+        }
+      },
+      { rootMargin: "320px 0px" },
+    );
+    observer.observe(node);
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [failed, image.id, url]);
+
+  return (
+    <div ref={hostRef} className="lineoa-image-slot">
+      {url ? (
+        <button
+          type="button"
+          className="lineoa-image-thumb"
+          onClick={() => onOpen(url)}
+        >
+          <img src={url} alt="รูปจากลูกค้า" loading="lazy" decoding="async" />
+        </button>
+      ) : failed ? (
+        <div className="lineoa-image-missing">
+          <ImageIcon />
+          <span>เปิดรูปไม่ได้</span>
+        </div>
+      ) : (
+        <div className="lineoa-image-loading">
+          <LoaderCircle className="spin" />
+          <span>กำลังโหลดรูป</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatBubble({
   message,
   images,
-  imageUrls,
   onOpenImage,
 }: {
-  message: AiBuyerCaseDetail["messages"][number];
-  images: AiBuyerCaseDetail["images"];
-  imageUrls: Record<string, string>;
+  message: AiBuyerChatMessage;
+  images: AiBuyerChatImage[];
   onOpenImage: (url: string) => void;
 }) {
   const outbound = message.direction === "OUTBOUND";
@@ -135,34 +221,22 @@ function ChatBubble({
       <div className="lineoa-bubble-wrap">
         {outbound && (
           <small className="lineoa-speaker">
-            {source === "OWNER_MANUAL" ? "คุณ" : source === "AI" || source === "AI_BUYER" ? "AI" : "ร้าน"}
+            {source === "OWNER_MANUAL"
+              ? "คุณ"
+              : source === "AI" || source === "AI_BUYER"
+                ? "AI"
+                : "ร้าน"}
           </small>
         )}
         <div className={"lineoa-bubble " + (outbound ? "shop" : "customer")}>
-          {message.message_type === "TEXT" && (
-            <p>{message.text_content || "—"}</p>
-          )}
+          {message.message_type === "TEXT" && <p>{message.text_content || "—"}</p>}
 
           {message.message_type === "IMAGE" && (
             <div className="lineoa-image-grid">
               {linkedImages.length ? (
-                linkedImages.map((image) => {
-                  const url = imageUrls[image.id];
-                  return url ? (
-                    <button
-                      key={image.id}
-                      type="button"
-                      className="lineoa-image-thumb"
-                      onClick={() => onOpenImage(url)}
-                    >
-                      <img src={url} alt="รูปจากลูกค้า" />
-                    </button>
-                  ) : (
-                    <div key={image.id} className="lineoa-image-loading">
-                      <LoaderCircle className="spin" />
-                    </div>
-                  );
-                })
+                linkedImages.map((image) => (
+                  <LazyChatImage key={image.id} image={image} onOpen={onOpenImage} />
+                ))
               ) : (
                 <div className="lineoa-image-missing">
                   <ImageIcon />
@@ -182,57 +256,87 @@ function ChatBubble({
   );
 }
 
-export function LineOAChat({
-  profile,
-}: {
-  profile: Profile;
-}) {
-  const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof loadAiBuyerDashboard>> | null>(null);
+export function LineOAChat({ profile }: { profile: Profile }) {
+  const [chatList, setChatList] = useState<AiBuyerChatCaseSummary[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [detail, setDetail] = useState<AiBuyerCaseDetail | null>(null);
+  const [detail, setDetail] = useState<AiBuyerChatCaseDetail | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState("");
   const [offer, setOffer] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [viewer, setViewer] = useState<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-
+  const messageListRef = useRef<HTMLDivElement | null>(null);
   const canAccess = privilegedRoles.has(profile.role);
 
-  async function refreshDashboard(keep = true) {
+  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+    const node = messageListRef.current;
+    if (!node) return;
+    node.scrollTo({ top: node.scrollHeight, behavior });
+  };
+
+  useEffect(() => {
+    document.body.classList.add("lineoa-active");
+    const viewport = window.visualViewport;
+    const syncViewport = () => {
+      const height = viewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty(
+        "--lineoa-viewport-height",
+        `${Math.round(height)}px`,
+      );
+    };
+    syncViewport();
+    viewport?.addEventListener("resize", syncViewport);
+    viewport?.addEventListener("scroll", syncViewport);
+    window.addEventListener("resize", syncViewport);
+    return () => {
+      document.body.classList.remove("lineoa-active", "lineoa-chat-open");
+      document.documentElement.style.removeProperty("--lineoa-viewport-height");
+      viewport?.removeEventListener("resize", syncViewport);
+      viewport?.removeEventListener("scroll", syncViewport);
+      window.removeEventListener("resize", syncViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("lineoa-chat-open", Boolean(selectedId));
+    return () => document.body.classList.remove("lineoa-chat-open");
+  }, [selectedId]);
+
+  async function refreshList(silent = false) {
     if (!canAccess) return;
-    setLoading(true);
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
-      const next = await loadAiBuyerDashboard(200);
-      setDashboard(next);
-      const nextId =
-        keep && selectedId && next.cases.some((item) => item.id === selectedId)
-          ? selectedId
-          : next.cases[0]?.id || "";
-      if (nextId && nextId !== selectedId) setSelectedId(nextId);
+      const next = await loadAiBuyerChatList(120);
+      setChatList(next.cases);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
-  async function refreshDetail(caseId = selectedId) {
+  async function refreshDetail(caseId = selectedId, silent = false) {
     if (!caseId || !canAccess) {
       setDetail(null);
       return;
     }
-    setDetailLoading(true);
+    if (!silent) {
+      setDetail(null);
+      setDetailLoading(true);
+    }
     setError(null);
     try {
-      const next = await loadAiBuyerCase(caseId);
+      const next = await loadAiBuyerChatCase(caseId);
       setDetail(next);
+      window.requestAnimationFrame(() => scrollToBottom("auto"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -241,53 +345,21 @@ export function LineOAChat({
   }
 
   useEffect(() => {
-    void refreshDashboard(false);
+    void refreshList(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, profile.role]);
 
   useEffect(() => {
-    if (selectedId) void refreshDetail(selectedId);
+    if (selectedId) void refreshDetail(selectedId, false);
+    else setDetail(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   useEffect(() => {
-    const urls: string[] = [];
-    let cancelled = false;
-
-    async function loadImages() {
-      const images = detail?.images || [];
-      if (!images.length) {
-        setImageUrls({});
-        return;
-      }
-      const next: Record<string, string> = {};
-      await Promise.all(
-        images.map(async (image) => {
-          try {
-            const blob = await loadAiBuyerImageBlob(image.id);
-            if (cancelled) return;
-            const url = URL.createObjectURL(blob);
-            urls.push(url);
-            next[image.id] = url;
-          } catch {
-            // Keep the message visible even if one image fails.
-          }
-        }),
-      );
-      if (!cancelled) setImageUrls(next);
-    }
-
-    void loadImages();
-    return () => {
-      cancelled = true;
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [detail?.case.id, detail?.images.length]);
-
-  useEffect(() => {
     if (!detail) return;
-    window.setTimeout(() => chatEndRef.current?.scrollIntoView({ block: "end" }), 80);
-  }, [detail?.messages.length, imageUrls]);
+    const timer = window.setTimeout(() => scrollToBottom("auto"), 40);
+    return () => window.clearTimeout(timer);
+  }, [detail?.case.id, detail?.messages.length]);
 
   useEffect(() => {
     if (!notice) return;
@@ -297,26 +369,20 @@ export function LineOAChat({
 
   const cases = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (dashboard?.cases || [])
-      .filter((item) => {
-        if (!q) return true;
-        return [
-          item.customer?.displayName,
-          item.title,
-          item.category,
-          item.lastMessage?.text,
-        ]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(q));
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.lastMessage?.createdAt || b.updatedAt).getTime() -
-          new Date(a.lastMessage?.createdAt || a.updatedAt).getTime(),
-      );
-  }, [dashboard, query]);
+    if (!q) return chatList;
+    return chatList.filter((item) =>
+      [
+        item.customer?.displayName,
+        item.title,
+        item.category,
+        item.lastMessage?.text,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q)),
+    );
+  }, [chatList, query]);
 
-  const selected = dashboard?.cases.find((item) => item.id === selectedId) || null;
+  const selected = chatList.find((item) => item.id === selectedId) || null;
   const offerAmount = numeric(offer);
   const canSend = Boolean(text.trim()) || offerAmount != null;
 
@@ -325,22 +391,22 @@ export function LineOAChat({
     setSending(true);
     setError(null);
     try {
-      const result = await sendAiBuyerManualReply({
+      const currentOffer = offerAmount;
+      await sendAiBuyerManualReply({
         caseId: selectedId,
         text: text.trim(),
-        offerAmount,
+        offerAmount: currentOffer,
       });
       setText("");
       setOffer("");
       setNotice(
-        offerAmount != null
-          ? `ส่งราคา ${money(offerAmount)} และบันทึกเป็น Manual Price แล้ว`
+        currentOffer != null
+          ? `ส่งราคา ${money(currentOffer)} และบันทึก Manual Price แล้ว`
           : "ส่งข้อความ LINE แล้ว",
       );
-      await Promise.all([refreshDetail(selectedId), refreshDashboard()]);
-      if (result.sentText) {
-        window.setTimeout(() => chatEndRef.current?.scrollIntoView({ block: "end" }), 80);
-      }
+      await refreshDetail(selectedId, true);
+      void refreshList(true);
+      window.requestAnimationFrame(() => scrollToBottom("smooth"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -368,8 +434,12 @@ export function LineOAChat({
             <small>AMPHON · LINE OA</small>
             <h1>แชท</h1>
           </div>
-          <button type="button" onClick={() => void refreshDashboard()} disabled={loading}>
-            <RefreshCw className={loading ? "spin" : ""} />
+          <button
+            type="button"
+            onClick={() => void refreshList(true)}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={loading || refreshing ? "spin" : ""} />
           </button>
         </header>
 
@@ -383,7 +453,7 @@ export function LineOAChat({
         </label>
 
         <div className="lineoa-thread-list">
-          {loading && !dashboard ? (
+          {loading && !chatList.length ? (
             <div className="lineoa-loading">
               <LoaderCircle className="spin" /> กำลังโหลดแชท
             </div>
@@ -407,7 +477,7 @@ export function LineOAChat({
           <div className="lineoa-chat-empty">
             <MessageCircle />
             <strong>เลือกแชทเพื่อเริ่มตอบลูกค้า</strong>
-            <span>ข้อความที่ส่งจากหน้านี้จะถูกเก็บเป็น OWNER_MANUAL</span>
+            <span>โหลดเฉพาะข้อมูลแชท จึงเปิดได้เร็วกว่าเดิม</span>
           </div>
         ) : detailLoading && !detail ? (
           <div className="lineoa-loading">
@@ -439,8 +509,8 @@ export function LineOAChat({
                 <strong>
                   {selected?.offer?.amount != null
                     ? money(selected.offer.amount)
-                    : detail.pricing[0]?.current_authorized_offer != null
-                      ? money(detail.pricing[0].current_authorized_offer)
+                    : detail.pricing?.current_authorized_offer != null
+                      ? money(detail.pricing.current_authorized_offer)
                       : "—"}
                 </strong>
               </div>
@@ -449,23 +519,30 @@ export function LineOAChat({
             {error && (
               <div className="lineoa-error">
                 <span>{error}</span>
-                <button type="button" onClick={() => setError(null)}>ปิด</button>
+                <button type="button" onClick={() => setError(null)}>
+                  ปิด
+                </button>
               </div>
             )}
             {notice && <div className="lineoa-notice">{notice}</div>}
 
-            <div className="lineoa-message-list">
-              <div className="lineoa-day-divider"><span>บทสนทนาล่าสุด</span></div>
+            <div ref={messageListRef} className="lineoa-message-list">
+              {detail.hasMore && (
+                <div className="lineoa-history-note">
+                  แสดง 120 ข้อความล่าสุด เพื่อให้เปิดแชทเร็วและลื่น
+                </div>
+              )}
+              <div className="lineoa-day-divider">
+                <span>บทสนทนาล่าสุด</span>
+              </div>
               {detail.messages.map((message) => (
                 <ChatBubble
                   key={message.id}
                   message={message}
                   images={detail.images}
-                  imageUrls={imageUrls}
                   onOpenImage={setViewer}
                 />
               ))}
-              <div ref={chatEndRef} />
             </div>
 
             <div className="lineoa-composer">
@@ -477,6 +554,9 @@ export function LineOAChat({
                     inputMode="numeric"
                     value={offer}
                     onChange={(event) => setOffer(event.target.value)}
+                    onFocus={() =>
+                      window.setTimeout(() => scrollToBottom("smooth"), 120)
+                    }
                     placeholder="เช่น 5,200"
                   />
                 </label>
@@ -487,9 +567,12 @@ export function LineOAChat({
                 <textarea
                   value={text}
                   onChange={(event) => setText(event.target.value)}
+                  onFocus={() =>
+                    window.setTimeout(() => scrollToBottom("smooth"), 120)
+                  }
                   placeholder={
                     offerAmount != null
-                      ? "พิมพ์ข้อความเพิ่มเติมได้ หรือส่งราคาอย่างเดียว"
+                      ? "พิมพ์ข้อความเพิ่ม หรือส่งราคาอย่างเดียว"
                       : "พิมพ์ข้อความถึงลูกค้า…"
                   }
                   rows={2}
@@ -504,7 +587,11 @@ export function LineOAChat({
                     }
                   }}
                 />
-                <button type="button" disabled={!canSend || sending} onClick={() => void send()}>
+                <button
+                  type="button"
+                  disabled={!canSend || sending}
+                  onClick={() => void send()}
+                >
                   {sending ? <LoaderCircle className="spin" /> : <Send />}
                   <span>{offerAmount != null ? "ส่งราคา" : "ส่ง"}</span>
                 </button>
@@ -512,9 +599,8 @@ export function LineOAChat({
 
               {offerAmount != null && (
                 <p className="lineoa-offer-preview">
-                  ระบบจะบันทึก {money(offerAmount)} เป็น Manual Price และส่งข้อความ
-                  <b> “ราคาที่เสนอรับซื้อ: {money(offerAmount)}” </b>
-                  ไปใน LINE ด้วย
+                  บันทึก {money(offerAmount)} เป็น Manual Price และส่งราคาเข้าแชท
+                  LINE พร้อมกัน
                 </p>
               )}
             </div>
@@ -529,8 +615,14 @@ export function LineOAChat({
 
       {viewer && (
         <div className="lineoa-image-viewer" onClick={() => setViewer(null)}>
-          <button type="button" onClick={() => setViewer(null)}><X /></button>
-          <img src={viewer} alt="รูปจาก LINE" onClick={(event) => event.stopPropagation()} />
+          <button type="button" onClick={() => setViewer(null)}>
+            <X />
+          </button>
+          <img
+            src={viewer}
+            alt="รูปจาก LINE"
+            onClick={(event) => event.stopPropagation()}
+          />
         </div>
       )}
     </section>
