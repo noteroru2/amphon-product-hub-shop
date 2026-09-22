@@ -582,9 +582,13 @@ function applyDeterministicConditionTags(result: IntakeResult) {
   )
 
   if (!batteryBad || result.pricing_tags.includes('BATTERY_BAD')) return result
+  const pricingTags: PricingTag[] = [
+    ...result.pricing_tags,
+    'BATTERY_BAD',
+  ].slice(0, 10)
   return {
     ...result,
-    pricing_tags: [...result.pricing_tags, 'BATTERY_BAD'].slice(0, 10),
+    pricing_tags: pricingTags,
     flags: Array.from(new Set([...result.flags, 'BATTERY_BAD_DETERMINISTIC'])).slice(0, 12),
   }
 }
@@ -616,7 +620,7 @@ function modelCategoryReadyForPricing(result: IntakeResult) {
 
 function pricingReadyByPolicy(result: IntakeResult) {
   if (result.action !== 'READY_TO_PRICE') return false
-  if (result.handoff_requested || result.action === 'HUMAN_REVIEW') return false
+  if (result.handoff_requested) return false
 
   if (specCompleteForPricing(result) && result.identity_confidence >= specIdentityThreshold(result)) return true
   if (modelCategoryReadyForPricing(result)) return true
