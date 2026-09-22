@@ -1,4 +1,5 @@
 export interface HubAdminEnv {
+  IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
   AI_BUYER_HUB_ORIGINS?: string
@@ -453,7 +454,7 @@ export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEn
       serviceRows<any>(
         env,
         'ai_buyer_case_images?case_id=eq.' + encodeURIComponent(caseId)
-          + '&select=id,storage_key,mime_type,byte_size,analysis_status,created_at&order=created_at.asc',
+          + '&select=id,message_id,line_message_id,storage_key,mime_type,byte_size,analysis_status,created_at&order=created_at.asc',
       ),
       serviceRows<any>(
         env,
@@ -493,6 +494,59 @@ export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEn
   }
 }
 
+export async function handleHubAdminImage(request: Request, env: HubAdminEnv) {
+  try {
+    await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+    const imageId = clean(url.searchParams.get('id'), 100)
+    if (!validUuid(imageId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'IMAGE_ID_INVALID' }, 400)
+    }
+
+    const rows = await serviceRows<{
+      id: string
+      storage_key: string
+      mime_type: string | null
+      byte_size: number | null
+    }>(
+      env,
+      'ai_buyer_case_images?id=eq.' + encodeURIComponent(imageId)
+        + '&select=id,storage_key,mime_type,byte_size&limit=1',
+    )
+    const row = rows[0]
+    if (!row?.storage_key) {
+      return hubAdminResponse(request, env, { ok: false, error: 'IMAGE_NOT_FOUND' }, 404)
+    }
+
+    const object = await env.IMAGES.get(row.storage_key)
+    if (!object) {
+      return hubAdminResponse(request, env, { ok: false, error: 'IMAGE_OBJECT_NOT_FOUND' }, 404)
+    }
+
+    const origin = corsOrigin(request, env)
+    const headers = new Headers({
+      'content-type': row.mime_type || object.httpMetadata?.contentType || 'image/jpeg',
+      'cache-control': 'private, max-age=300',
+      'x-content-type-options': 'nosniff',
+      'content-disposition': 'inline',
+      'vary': 'Origin',
+    })
+    if (origin) headers.set('access-control-allow-origin', origin)
+    if (row.byte_size) headers.set('content-length', String(row.byte_size))
+    if (object.httpEtag) headers.set('etag', object.httpEtag)
+
+    return new Response(object.body, { status: 200, headers })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminManualReply(request: Request, env: HubAdminEnv) {
   try {
     const { user, profile } = await authenticateAdmin(request, env)
@@ -509,7 +563,7 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
     }
 
     const caseId = clean(body.caseId, 100)
-    const text = clean(body.text, 4500)
+    const text = clean(body.text, 4200)
     const offerAmount = moneyValue(body.offerAmount)
     const idempotencyKey = validUuid(clean(body.idempotencyKey, 100))
       ? clean(body.idempotencyKey, 100)
@@ -518,12 +572,22 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
     if (!validUuid(caseId)) {
       return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
     }
-    if (!text) {
-      return hubAdminResponse(request, env, { ok: false, error: 'MANUAL_REPLY_TEXT_REQUIRED' }, 400)
-    }
     if (body.offerAmount != null && offerAmount == null) {
       return hubAdminResponse(request, env, { ok: false, error: 'OFFER_AMOUNT_INVALID' }, 400)
     }
+    if (!text && offerAmount == null) {
+      return hubAdminResponse(request, env, { ok: false, error: 'MANUAL_REPLY_TEXT_OR_OFFER_REQUIRED' }, 400)
+    }
+
+    const offerLine = offerAmount == null
+      ? ''
+      : 'ราคาที่เสนอรับซื้อ: ' + Math.round(offerAmount).toLocaleString('th-TH') + ' บาท'
+    const finalText = clean(
+      offerLine
+        ? (text ? text + '\n\n' + offerLine : offerLine)
+        : text,
+      4500,
+    )
 
     const prepared = await serviceWrite<any>(
       env,
@@ -535,7 +599,7 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
           p_case_id: caseId,
           p_actor_user_id: user.id,
           p_actor_name: profile.display_name || 'Owner',
-          p_text: text,
+          p_text: finalText,
           p_offer_amount: offerAmount,
           p_idempotency_key: idempotencyKey,
         }),
@@ -564,7 +628,7 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
       },
       body: JSON.stringify({
         to: prep.line_user_id,
-        messages: [{ type: 'text', text }],
+        messages: [{ type: 'text', text: finalText }],
       }),
     })
 
@@ -616,6 +680,7 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
       actionId: prep.action_id,
       lineMessageId: lineMessageId || null,
       offerAmount,
+      sentText: finalText,
       capture: finalized[0]?.ai_buyer_finalize_manual_reply || null,
     })
   } catch (error) {
