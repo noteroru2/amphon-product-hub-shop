@@ -160,6 +160,14 @@ async function loadDecision(env: OfferFlowEnv, caseId: string) {
   return rows[0] || null
 }
 
+async function loadActivePriceBookVersionId(env: OfferFlowEnv) {
+  const rows = await readRows<{ id: string }>(await supabaseRequest(
+    env,
+    'ai_buyer_price_book_versions?status=eq.ACTIVE&select=id&order=activated_at.desc&limit=1',
+  ))
+  return rows[0]?.id || null
+}
+
 async function loadRollout(env: OfferFlowEnv, category: ProductCategory | null): Promise<RolloutRow> {
   if (!category) return { category: 'OTHER', mode: 'SHADOW', max_negotiation_rounds: 4, active: true }
   const rows = await readRows<RolloutRow>(await supabaseRequest(
@@ -625,6 +633,34 @@ export async function startOfferAfterPricing(env: OfferFlowEnv, caseId: string):
   if (!caseRow || !caseRow.category) return { handled: false, reason: 'CASE_NOT_FOUND' }
   const decision = await loadDecision(env, caseId)
   if (!decision) return { handled: false, reason: 'DECISION_NOT_FOUND' }
+
+  if (decision.price_source === 'PRICE_BOOK' && decision.price_book_version_id) {
+    const activeVersionId = await loadActivePriceBookVersionId(env)
+    if (activeVersionId && activeVersionId !== decision.price_book_version_id) {
+      await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId), {
+        state: 'READY_TO_PRICE',
+        metadata: {
+          ...(caseRow.metadata || {}),
+          pricingReviewReason: 'STALE_PRICING_DECISION_REPRICE_REQUIRED',
+          stalePricingDecisionId: decision.id,
+          stalePriceBookVersionId: decision.price_book_version_id,
+          activePriceBookVersionId: activeVersionId,
+        },
+      })
+      await ensureAdminTask(env, caseId, 'REPRICE_REQUIRED', {
+        pricing_decision_id: decision.id,
+        stale_price_book_version_id: decision.price_book_version_id,
+        active_price_book_version_id: activeVersionId,
+      }, 'HIGH')
+      return {
+        handled: true,
+        state: 'READY_TO_PRICE',
+        mode: 'SHADOW',
+        reason: 'STALE_PRICING_DECISION_REPRICE_REQUIRED',
+      }
+    }
+  }
+
   const rollout = await loadRollout(env, caseRow.category)
   if (!rollout.active) return { handled: true, mode: 'SHADOW', reason: 'ROLLOUT_DISABLED' }
 
