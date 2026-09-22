@@ -221,5 +221,6 @@
       "caseId": "501518b1-80a7-47cc-b9fe-08c9035f6f09",
       "expectedState": "READY_TO_PRICE"
     }
-  ]
+  ],
+  "coverageCaseCountExpected": 19
 }
