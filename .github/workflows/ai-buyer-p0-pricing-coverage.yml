@@ -9,6 +9,10 @@ on:
       - 'scripts/verify-ai-buyer-p0-pricing-coverage.mjs'
       - '.github/workflows/ai-buyer-p0-pricing-coverage.yml'
       - 'supabase/migrations/20260922130000_ai_buyer_p0_pricing_coverage_v24.sql'
+      - 'supabase/migrations/20260922134500_ai_buyer_p0_conservative_v25.sql'
+      - 'supabase/migrations/20260922141000_ai_buyer_conservative_spec_settings.sql'
+      - 'supabase/migrations/20260922142500_ai_buyer_invalidate_stale_shadow_pricing.sql'
+      - 'workers/ai-buyer/src/negotiation-engine.ts'
   workflow_dispatch:
 
 permissions:
