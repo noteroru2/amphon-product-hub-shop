@@ -254,7 +254,7 @@ const SYSTEM_PROMPT = [
   'Desktop core pricing specs are CPU, GPU, RAM, storage, motherboard and PSU. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
   'A custom DESKTOP_PC does not need an exact commercial model name. If the six core components are explicitly confirmed, identity_confidence 0.65+ is enough to continue to spec pricing unless evidence conflicts.',
   'For NOTEBOOK, complete confirmed core pricing specs with identity_confidence 0.80+ are enough to continue to spec pricing.',
-  'For model-priced MACBOOK, SMARTPHONE, TABLET and CAMERA, a clearly readable model/model-code plus the important variant details already visible or stated is enough to continue. Do not require cosmetic, battery, accessory or extra angle photos merely as a prerequisite to produce a price.',
+  'For NOTEBOOK, MACBOOK, SMARTPHONE, TABLET and CAMERA, a clearly readable model/model-code plus the important variant details already visible or stated is enough to attempt pricing. Notebook pricing still prefers complete specs, but an exact readable notebook model code may fall back to verified market comparables instead of waiting forever for more photos.',
   'A readable model number, product label, About screen or system-information screen in an image is valid direct identity/spec evidence. If it is already readable, never ask the customer to send the same evidence again.',
   'If battery health is explicitly below 80%, or the device says significantly degraded/service recommended, include pricing tag BATTERY_BAD. Never price a known degraded battery as normal condition.',
   'When evidence is sufficient under these rules, choose READY_TO_PRICE, clear requested_inputs, and leave still-unknown condition details as unknown. Later disclosed defects must adjust or re-price the case.',
@@ -599,12 +599,19 @@ function specIdentityThreshold(result: IntakeResult) {
 }
 
 function modelCategoryReadyForPricing(result: IntakeResult) {
-  if (!['MACBOOK','SMARTPHONE','TABLET','CAMERA'].includes(result.category)) return false
+  if (!['NOTEBOOK','MACBOOK','SMARTPHONE','TABLET','CAMERA'].includes(result.category)) return false
   if (result.identity_confidence < 0.90) return false
 
   const hasModel = Boolean(result.model_code || result.model_name || confirmedFactValue(result, 'model', 'model_code'))
   if (!hasModel) return false
 
+  // A readable notebook model code (for example B3402FE / AG15-72P) is enough
+  // to attempt market pricing when the component price book cannot fully map it.
+  // We still prefer complete spec pricing whenever those facts are available.
+  if (result.category === 'NOTEBOOK') {
+    return Boolean(result.model_code) && result.spec_completeness >= 0.35
+      || Boolean(result.model_name) && result.spec_completeness >= 0.60
+  }
   if (result.category === 'CAMERA') {
     return result.spec_completeness >= 0.65 || Boolean(result.model_code)
   }
