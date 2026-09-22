@@ -1,6 +1,6 @@
 {
   "version": "P0_PRICING_COVERAGE_V1",
-  "expectedActivePriceBook": "AMPHON Master Price Book V2.5 Conservative",
+  "expectedActivePriceBook": "AMPHON Master Price Book V2.6 Expanded Coverage",
   "directPriceBookCases": [
     {
       "caseId": "6b50df44-5b7e-4aff-8cfe-b45f5bad2910",
@@ -103,6 +103,57 @@
         "target": 6500,
         "hardMax": 7300
       }
+    },
+    {
+      "caseId": "4de94388-958a-45ea-9494-0c906aa457eb",
+      "entryModel": "Osmo Action 3",
+      "entryModelCode": "ACTION3",
+      "expected": {
+        "opening": 2500,
+        "target": 2800,
+        "hardMax": 3200
+      }
+    },
+    {
+      "caseId": "37ad57bc-cefe-41c2-aca2-ab7398ecb019",
+      "entryModel": "ONE X2",
+      "entryModelCode": "X2",
+      "expected": {
+        "opening": 2800,
+        "target": 3100,
+        "hardMax": 3500
+      }
+    },
+    {
+      "caseId": "674717f3-c2a3-4b21-904f-ba75c7790cb0",
+      "entryModel": "iPad Air 4 Wi-Fi 256GB",
+      "entryModelCode": "AIR4-WIFI-256",
+      "expected": {
+        "opening": 3400,
+        "target": 3700,
+        "hardMax": 4200
+      }
+    },
+    {
+      "caseId": "62464ce6-ed44-468d-a41a-1f573d649c2e",
+      "entryModel": "MacBook Air 13-inch M5 24GB 512GB",
+      "entryModelCode": "M5-13-512",
+      "requiredTag": "NO_BOX",
+      "expected": {
+        "opening": 17200,
+        "target": 18200,
+        "hardMax": 20200
+      }
+    },
+    {
+      "caseId": "6331de6d-e521-42b7-8b08-532c482b141a",
+      "entryModel": "Precision 5820 W-2223 RTX A2000",
+      "entryModelCode": "PRECISION5820-W2223-A2000",
+      "expected": {
+        "opening": 9500,
+        "target": 10500,
+        "hardMax": 12000
+      }
     }
   ],
   "guardedFallbackCases": [
@@ -122,9 +173,9 @@
       "route": "MARKET_OR_HUMAN_REVIEW"
     }
   ],
-  "alreadyPricedCount": 3,
-  "expectedDeterministicPriceCoverage": 14,
-  "totalEvidenceReady": 17,
+  "alreadyPricedCount": 5,
+  "expectedDeterministicPriceCoverage": 21,
+  "totalEvidenceReady": 24,
   "specPricingPreviews": [
     {
       "caseId": "6ed54ba9-b84f-49c2-8cb9-15dd16141aef",
