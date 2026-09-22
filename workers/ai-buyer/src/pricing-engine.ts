@@ -617,6 +617,40 @@ function desiredConditionKey(tags: PricingTag[]) {
   return 'NORMAL'
 }
 
+function capacityGb(value: unknown) {
+  const raw = clean(value, 500).toLocaleLowerCase('en-US')
+  const tb = raw.match(/(\d+(?:\.\d+)?)\s*tb\b/)
+  if (tb) {
+    const n = Number(tb[1])
+    return Number.isFinite(n) ? Math.round(n * 1024) : null
+  }
+  const gb = raw.match(/(\d{2,4})\s*gb\b/)
+  if (gb) {
+    const n = Number(gb[1])
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
+function confirmedStorageGb(confirmed: Record<string, unknown>) {
+  for (const [key, value] of Object.entries(confirmed)) {
+    const normalizedKey = normalizeTokenText(key).replace(/\s+/g, '')
+    if (!/(?:storage|capacity|ssd|rom|ความจุ)/i.test(normalizedKey)) continue
+    const n = capacityGb(value)
+    if (n) return n
+  }
+  return null
+}
+
+function entryStorageGb(entry: EntryRow) {
+  const code = clean(entry.model_code, 200)
+  const suffix = code.match(/(?:^|[-_])(64|128|256|512|1024|2048)$/i)
+  if (suffix) return Number(suffix[1])
+
+  const modelCapacity = capacityGb(entry.model)
+  return modelCapacity || null
+}
+
 function priceBookMatchScore(
   entry: EntryRow,
   identity: ReturnType<typeof aggregateIdentity>,
@@ -658,6 +692,12 @@ function priceBookMatchScore(
 
   const spec = specCompatibility(entry, identity.confirmed)
   if (!spec.compatible) return { score: 0, reason: 'SPEC_CONFLICT' }
+
+  const actualStorage = confirmedStorageGb(identity.confirmed)
+  const rowStorage = entryStorageGb(entry)
+  if (actualStorage && rowStorage && actualStorage !== rowStorage) {
+    return { score: 0, reason: 'STORAGE_VARIANT_CONFLICT' }
+  }
 
   const wantedCondition = desiredConditionKey(identity.tags)
   const entryCondition = clean(entry.condition_key, 80).toUpperCase() || 'NORMAL'
