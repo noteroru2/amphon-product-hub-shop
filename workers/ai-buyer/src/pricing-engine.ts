@@ -3,6 +3,7 @@ export interface PricingEnv {
   SUPABASE_SECRET_KEY: string
   OPENAI_API_KEY: string
   OPENAI_PRICING_MODEL?: string
+  AI_BUYER_PAUSED?: string
 }
 
 type ProductCategory =
@@ -1070,6 +1071,10 @@ async function storeMarketComparables(
 }
 
 export async function runPricingForCase(env: PricingEnv, caseId: string) {
+  if (clean(env.AI_BUYER_PAUSED, 20).toLocaleLowerCase('en-US') === 'true') {
+    return { ok: false as const, paused: true as const, reason: 'AI_BUYER_PAUSED' }
+  }
+
   const caseRow = await loadCase(env, caseId)
   if (!caseRow) return { ok: false as const, reason: 'CASE_NOT_FOUND' }
   if (caseRow.state !== 'READY_TO_PRICE' && caseRow.state !== 'PRICING') {
