@@ -33,6 +33,7 @@ import {
   Pencil,
   CalendarDays,
   ImageDown,
+  Bot,
 } from "lucide-react";
 import { db } from "./lib/db";
 import { compressImage } from "./lib/image";
@@ -54,6 +55,7 @@ import { PublishCenter } from "./components/PublishCenter";
 import { ProductImageExportControls } from "./components/ProductImageExportActions";
 import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
+import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -112,7 +114,8 @@ type Tab =
   | "add"
   | "scanner"
   | "profile"
-  | "employees";
+  | "employees"
+  | "ai-buyer";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
@@ -766,6 +769,7 @@ function App() {
             onProducts={() => setTab("products")}
             onPublish={() => setTab("publish")}
             onOrders={() => setTab("orders")}
+            onAiBuyer={() => setTab("ai-buyer")}
             onEdit={openEdit}
           />
         )}
@@ -827,6 +831,7 @@ function App() {
           <ProfileScreen
             profile={profile}
             onEmployees={() => setTab("employees")}
+            onAiBuyer={() => setTab("ai-buyer")}
             onSignOut={() => void supabase?.auth.signOut()}
           />
         )}
@@ -838,8 +843,17 @@ function App() {
               onBack={() => setTab("profile")}
             />
           )}
+        {tab === "ai-buyer" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <AiBuyerAdmin
+              profile={profile}
+              products={products}
+              onBack={() => setTab("home")}
+            />
+          )}
       </main>
-      {tab !== "add" && tab !== "employees" && (
+      {tab !== "add" && tab !== "employees" && tab !== "ai-buyer" && (
         <BottomNav tab={tab} setTab={setTab} onAdd={openAdd} />
       )}
     </div>
@@ -1094,6 +1108,7 @@ function HomeScreen({
   onProducts,
   onPublish,
   onOrders,
+  onAiBuyer,
   onEdit,
 }: {
   profile: Profile;
@@ -1105,6 +1120,7 @@ function HomeScreen({
   onProducts: () => void;
   onPublish: () => void;
   onOrders: () => void;
+  onAiBuyer: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
   const publishedCount = products.filter(
@@ -1158,6 +1174,23 @@ function HomeScreen({
               <strong>Online Orders</strong>
               <small>
                 ตรวจยอด แพ็กสินค้า Tracking และปิดคำสั่งซื้อจาก AMPHON SHOP
+              </small>
+            </span>
+          </div>
+          <ChevronRight />
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <button
+          className="publish-center-launch ai-buyer-launch"
+          onClick={onAiBuyer}
+        >
+          <div>
+            <Bot size={21} />
+            <span>
+              <strong>AI Buyer Admin</strong>
+              <small>
+                ตอบ LINE · ปิดผลดีล · บันทึกราคาซื้อจริงและกำไร
               </small>
             </span>
           </div>
@@ -3634,10 +3667,12 @@ function employeeActionText(item: EmployeeActivity) {
 function ProfileScreen({
   profile,
   onEmployees,
+  onAiBuyer,
   onSignOut,
 }: {
   profile: Profile;
   onEmployees: () => void;
+  onAiBuyer: () => void;
   onSignOut: () => void;
 }) {
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -3661,6 +3696,14 @@ function ProfileScreen({
           <button onClick={onEmployees}>
             <span>
               <Users size={18} /> จัดการพนักงาน
+            </span>
+            <ChevronRight />
+          </button>
+        )}
+        {["owner", "admin"].includes(profile.role) && (
+          <button onClick={onAiBuyer}>
+            <span>
+              <Bot size={18} /> AI Buyer Admin
             </span>
             <ChevronRight />
           </button>
