@@ -252,7 +252,12 @@ const SYSTEM_PROMPT = [
   'READY_TO_PRICE means enough evidence exists for the separate Pricing Engine. It does not mean you know a price.',
   'AMPHON business rule: for NOTEBOOK and DESKTOP_PC, complete confirmed pricing specs are sufficient to price even when extra condition photos are still unavailable. Do not keep asking for photos solely to improve condition once core pricing specs are complete.',
   'Desktop core pricing specs are CPU, GPU, RAM, storage, motherboard and PSU. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
-  'When those core specs are explicitly confirmed and identity_confidence is at least 0.90, choose READY_TO_PRICE, clear requested_inputs, and leave unknown condition/defects as unknown. Later disclosed defects can adjust the price.',
+  'A custom DESKTOP_PC does not need an exact commercial model name. If the six core components are explicitly confirmed, identity_confidence 0.65+ is enough to continue to spec pricing unless evidence conflicts.',
+  'For NOTEBOOK, complete confirmed core pricing specs with identity_confidence 0.80+ are enough to continue to spec pricing.',
+  'For model-priced MACBOOK, SMARTPHONE, TABLET and CAMERA, a clearly readable model/model-code plus the important variant details already visible or stated is enough to continue. Do not require cosmetic, battery, accessory or extra angle photos merely as a prerequisite to produce a price.',
+  'A readable model number, product label, About screen or system-information screen in an image is valid direct identity/spec evidence. If it is already readable, never ask the customer to send the same evidence again.',
+  'If battery health is explicitly below 80%, or the device says significantly degraded/service recommended, include pricing tag BATTERY_BAD. Never price a known degraded battery as normal condition.',
+  'When evidence is sufficient under these rules, choose READY_TO_PRICE, clear requested_inputs, and leave still-unknown condition details as unknown. Later disclosed defects must adjust or re-price the case.',
   'Use HUMAN_REVIEW for rare products, complex damage, contradictory identity, or persistent ambiguity.',
   'For pricing_tags, use only directly supported condition/accessory tags. Do not infer damage from weak visual evidence.',
   'If the customer explicitly asks for a human/admin, set handoff_requested=true.',
@@ -512,10 +517,121 @@ function specCompleteForPricing(result: IntakeResult) {
   return false
 }
 
+function confirmedFactValue(result: IntakeResult, ...keys: string[]) {
+  const wanted = new Set(keys.map(normalizeFactKey))
+  for (const fact of result.confirmed) {
+    if (wanted.has(normalizeFactKey(fact.key))) return clean(fact.value, 500)
+  }
+  return ''
+}
+
+function mergePriorObservations(result: IntakeResult, observations: ObservationRow[]) {
+  const facts = new Map<string, Fact>()
+  for (const observation of [...observations].reverse()) {
+    for (const [key, value] of Object.entries(observation.confirmed || {})) {
+      const normalized = normalizeFactKey(key)
+      const cleaned = clean(value, 500)
+      if (normalized && cleaned) {
+        facts.set(normalized, { key, value: cleaned, evidence: 'previous structured observation' })
+      }
+    }
+  }
+  for (const fact of result.confirmed) {
+    const normalized = normalizeFactKey(fact.key)
+    if (normalized) facts.set(normalized, fact)
+  }
+
+  let priorModelName = ''
+  let priorModelCode = ''
+  let priorCategory: ProductCategory | null = null
+  let priorIdentity = 0
+  for (const observation of observations) {
+    if (observation.model_name) priorModelName = clean(observation.model_name, 200)
+    if (observation.model_code) priorModelCode = clean(observation.model_code, 120)
+    if (CATEGORIES.includes(observation.category as ProductCategory)) {
+      priorCategory = observation.category as ProductCategory
+    }
+    priorIdentity = Math.max(priorIdentity, clamp01(observation.identity_confidence))
+  }
+
+  const confirmed = Array.from(facts.values())
+  const knownKeys = new Set(confirmed.map((fact) => normalizeFactKey(fact.key)))
+  return {
+    ...result,
+    category: result.category === 'UNKNOWN' && priorCategory ? priorCategory : result.category,
+    model_name: result.model_name || priorModelName,
+    model_code: result.model_code || priorModelCode,
+    confirmed,
+    unknown_fields: result.unknown_fields.filter((key) => !knownKeys.has(normalizeFactKey(key))),
+    identity_confidence: Math.max(result.identity_confidence, priorIdentity),
+  }
+}
+
+function applyDeterministicConditionTags(result: IntakeResult) {
+  const batteryText = [
+    confirmedFactValue(result, 'battery_health', 'batteryhealth'),
+    confirmedFactValue(result, 'battery_condition', 'batterycondition'),
+    confirmedFactValue(result, 'defects', 'condition'),
+  ].join(' ').toLocaleLowerCase('en-US')
+
+  const percentMatch = batteryText.match(/(\d{1,3})\s*%/)
+  const batteryPercent = percentMatch ? Number(percentMatch[1]) : null
+  const batteryBad = (
+    (batteryPercent != null && batteryPercent >= 0 && batteryPercent < 80)
+    || /significantly\s+degraded|service\s+recommended|battery\s+(?:bad|degraded|worn)|แบต(?:เตอรี่)?(?:เสื่อม|ไม่เก็บไฟ|หมดไว)/i.test(batteryText)
+  )
+
+  if (!batteryBad || result.pricing_tags.includes('BATTERY_BAD')) return result
+  return {
+    ...result,
+    pricing_tags: [...result.pricing_tags, 'BATTERY_BAD'].slice(0, 10),
+    flags: Array.from(new Set([...result.flags, 'BATTERY_BAD_DETERMINISTIC'])).slice(0, 12),
+  }
+}
+
+function specIdentityThreshold(result: IntakeResult) {
+  if (result.category === 'DESKTOP_PC') return 0.65
+  if (result.category === 'NOTEBOOK') return 0.80
+  return 0.90
+}
+
+function modelCategoryReadyForPricing(result: IntakeResult) {
+  if (!['MACBOOK','SMARTPHONE','TABLET','CAMERA'].includes(result.category)) return false
+  if (result.identity_confidence < 0.90) return false
+
+  const hasModel = Boolean(result.model_code || result.model_name || confirmedFactValue(result, 'model', 'model_code'))
+  if (!hasModel) return false
+
+  if (result.category === 'CAMERA') {
+    return result.spec_completeness >= 0.65 || Boolean(result.model_code)
+  }
+  if (result.category === 'MACBOOK') {
+    const storage = confirmedFactValue(result, 'storage', 'ssd')
+    const memory = confirmedFactValue(result, 'ram', 'memory')
+    return result.spec_completeness >= 0.65 && Boolean(storage || memory || result.model_code)
+  }
+  const storage = confirmedFactValue(result, 'storage', 'capacity')
+  return result.spec_completeness >= 0.75 || Boolean(result.model_code && storage)
+}
+
+function pricingReadyByPolicy(result: IntakeResult) {
+  if (result.action !== 'READY_TO_PRICE') return false
+  if (result.handoff_requested || result.action === 'HUMAN_REVIEW') return false
+
+  if (specCompleteForPricing(result) && result.identity_confidence >= specIdentityThreshold(result)) return true
+  if (modelCategoryReadyForPricing(result)) return true
+  return result.identity_confidence >= 0.90 && result.condition_completeness >= 0.75
+}
+
 function applyIntakeBusinessRules(result: IntakeResult): IntakeResult {
+  const specReady = (
+    specCompleteForPricing(result)
+    && result.identity_confidence >= specIdentityThreshold(result)
+  )
+  const modelReady = modelCategoryReadyForPricing(result)
+
   if (
-    result.identity_confidence >= 0.9
-    && specCompleteForPricing(result)
+    (specReady || modelReady)
     && !result.handoff_requested
     && result.action !== 'HUMAN_REVIEW'
   ) {
@@ -523,8 +639,11 @@ function applyIntakeBusinessRules(result: IntakeResult): IntakeResult {
       ...result,
       action: 'READY_TO_PRICE',
       requested_inputs: [],
-      pricing_readiness: Math.max(result.pricing_readiness, 0.9),
-      flags: Array.from(new Set([...result.flags, 'SPEC_COMPLETE_PHOTOS_OPTIONAL'])).slice(0, 12),
+      pricing_readiness: Math.max(result.pricing_readiness, specReady ? 0.90 : 0.85),
+      flags: Array.from(new Set([
+        ...result.flags,
+        specReady ? 'SPEC_COMPLETE_PHOTOS_OPTIONAL' : 'MODEL_IDENTITY_SUFFICIENT_PHOTOS_OPTIONAL',
+      ])).slice(0, 12),
     }
   }
   return result
@@ -569,7 +688,7 @@ function normalizeIntake(value: unknown): IntakeResult {
       : [],
     flags: Array.isArray(raw.flags) ? raw.flags.map((item) => clean(item, 100)).filter(Boolean).slice(0, 12) : [],
   }
-  return applyIntakeBusinessRules(normalized)
+  return normalized
 }
 
 async function callVision(
@@ -627,9 +746,14 @@ async function callVision(
     throw new Error('OPENAI_OUTPUT_JSON_INVALID')
   }
 
+  const normalized = normalizeIntake(parsed)
+  const merged = mergePriorObservations(normalized, observations)
+  const conditioned = applyDeterministicConditionTags(merged)
+  const result = applyIntakeBusinessRules(conditioned)
+
   return {
     model,
-    result: normalizeIntake(parsed),
+    result,
     usage: response.usage || {},
     includedImageIds: prepared.includedIds,
     skippedImageIds: prepared.skippedIds,
@@ -726,11 +850,7 @@ function composeReply(result: IntakeResult, currentCase: CaseRow) {
     } else {
       operational = 'ขอข้อมูลหรือรูปเพิ่มอีกนิดครับ จะได้เช็กให้ตรงรุ่นครับ'
     }
-  } else if (
-    result.action === 'READY_TO_PRICE'
-    && result.identity_confidence >= 0.9
-    && (result.condition_completeness >= 0.75 || specCompleteForPricing(result))
-  ) {
+  } else if (pricingReadyByPolicy(result)) {
     operational = 'ข้อมูลพอเช็กราคาแล้วครับ เดี๋ยวขอเช็กราคาให้ครับ'
   } else if (result.action === 'HUMAN_REVIEW') {
     operational = 'ตัวนี้ขอเช็กเพิ่มนิดนึงครับ เดี๋ยวแอดมินดูให้ครับ'
@@ -753,11 +873,7 @@ function nextState(result: IntakeResult) {
   if (result.category === 'UNKNOWN' || result.action === 'ASK_PRODUCT_TYPE') {
     return { state: 'IDENTIFYING_PRODUCT', controlMode: 'AUTO' as const }
   }
-  if (
-    result.action === 'READY_TO_PRICE'
-    && result.identity_confidence >= 0.9
-    && (result.condition_completeness >= 0.75 || specCompleteForPricing(result))
-  ) {
+  if (pricingReadyByPolicy(result)) {
     return { state: 'READY_TO_PRICE', controlMode: 'AUTO' as const }
   }
   if (result.action === 'ASK_MORE_INFO') {
@@ -809,7 +925,12 @@ async function updateCase(
     lastAnalysisRunId: runId,
     lastRequestedInputs: result.requested_inputs,
     lastFlags: result.flags,
-    lastPricingTags: result.pricing_tags,
+    lastPricingTags: Array.from(new Set([
+      ...(Array.isArray(currentCase.metadata?.lastPricingTags)
+        ? currentCase.metadata.lastPricingTags.map((tag) => clean(tag, 80)).filter(Boolean)
+        : []),
+      ...result.pricing_tags,
+    ])).slice(0, 10),
     lastIntent: result.intent,
     pendingReply: reply ? {
       text: reply,
