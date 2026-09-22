@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import BuybackCTA from '../../components/BuybackCTA.astro'
 import { primaryLineId, primaryLineUrl } from '../../lib/contact'
 import { getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
 import {
@@ -383,6 +384,8 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
           </div>
         </div>
       </section>
+
+      <BuybackCTA categorySlug={product.categorySlug} />
 
       {relatedProducts.length > 0 && <section class="section related-section">
         <div class="container">
