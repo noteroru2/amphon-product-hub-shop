@@ -261,29 +261,20 @@ async function upsertConversation(env: Env, customer: CustomerRow, at: string) {
 }
 
 async function activeCase(env: Env, conversation: ConversationRow, customer: CustomerRow) {
-  const terminal = TERMINAL_STATES.join(',')
-  const path = [
-    'ai_buyer_valuation_cases?select=id,state',
-    `conversation_id=eq.${encodeURIComponent(conversation.id)}`,
-    `state=not.in.(${terminal})`,
-    'order=updated_at.desc',
-    'limit=1',
-  ].join('&')
-  const existing = await readRows<CaseRow>(await supabaseRequest(env, path))
-  if (existing[0]) return existing[0]
-
-  const created = await readRows<CaseRow>(await supabaseRequest(env, 'ai_buyer_valuation_cases', {
-    method: 'POST',
-    headers: { prefer: 'return=representation' },
-    body: JSON.stringify({
-      conversation_id: conversation.id,
-      customer_id: customer.id,
-      state: 'NEW',
-      control_mode: 'AUTO',
-    }),
-  }))
-  if (!created[0]) throw new Error('CASE_CREATE_EMPTY')
-  return created[0]
+  const rows = await readRows<CaseRow>(await supabaseRequest(
+    env,
+    'rpc/ai_buyer_get_or_create_active_case',
+    {
+      method: 'POST',
+      headers: { prefer: 'return=representation' },
+      body: JSON.stringify({
+        p_conversation_id: conversation.id,
+        p_customer_id: customer.id,
+      }),
+    },
+  ))
+  if (!rows[0]) throw new Error('CASE_GET_OR_CREATE_EMPTY')
+  return rows[0]
 }
 
 function lineTimestamp(timestamp?: number) {
