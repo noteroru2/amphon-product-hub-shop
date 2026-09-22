@@ -21,6 +21,10 @@ const required = [
   'docs/ai-buyer/A_IMPLEMENTATION_SPEC.md',
   'docs/ai-buyer/B_CATEGORY_RULES.md',
   'scripts/verify-ai-buyer-optimization-policy.mjs',
+  'supabase/migrations/20260922121500_ai_buyer_p0_offline_replay.sql',
+  'workers/ai-buyer/data/p0-regression-fixtures-v1.json',
+  'scripts/run-ai-buyer-p0-offline-replay.mjs',
+  'docs/ai-buyer/P0_REGRESSION_OFFLINE_REPLAY_REPORT.md',
 ]
 
 for (const file of required) {
