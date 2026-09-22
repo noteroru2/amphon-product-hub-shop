@@ -826,6 +826,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
           purchased: 0,
           sold: 0,
           grossProfit: 0,
+          needsFinalLabel: 0,
         },
         openai,
         modes,
@@ -949,6 +950,10 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
           outcomeAt: outcome.outcome_at,
           verified: Boolean(outcome.verified),
         } : null,
+        needsFinalLabel: !outcome && [
+          'ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED',
+          'COMPLETED','CUSTOMER_DECLINED','EXPIRED','CANCELLED',
+        ].includes(row.state),
         deal: deal ? {
           ledgerLines: Number(deal.ledger_lines || 0),
           purchaseTotal: numberValue(deal.purchase_total),
@@ -977,6 +982,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
         purchased: items.filter((item) => item.finalOutcome?.label === 'PURCHASED').length,
         sold: items.reduce((sum, item) => sum + Number(item.deal?.soldLines || 0), 0),
         grossProfit: items.reduce((sum, item) => sum + Number(item.deal?.grossProfit || 0), 0),
+        needsFinalLabel: items.filter((item) => item.needsFinalLabel).length,
       },
       openai,
       modes,
