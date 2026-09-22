@@ -50,8 +50,10 @@ for(const f of fixture.directPriceBookCases){
   const c=caseById.get(f.caseId)
   const o=latest.get(f.caseId)
   if(!c||!o){ failures.push({caseId:f.caseId,error:'CASE_OR_OBSERVATION_MISSING'}); continue }
-  const matches=entries.filter(e=>e.category===c.category && e.model===f.entryModel)
-  if(matches.length!==1){ failures.push({caseId:f.caseId,error:'ENTRY_MATCH_COUNT',count:matches.length,entryModel:f.entryModel}); continue }
+  const matches=entries.filter(e=>e.category===c.category
+    && e.model===f.entryModel
+    && (!f.entryModelCode || e.model_code===f.entryModelCode))
+  if(matches.length!==1){ failures.push({caseId:f.caseId,error:'ENTRY_MATCH_COUNT',count:matches.length,entryModel:f.entryModel,entryModelCode:f.entryModelCode||null}); continue }
   const e=matches[0]
 
   const confirmedText=JSON.stringify(o.confirmed||{}).toLowerCase().replace(/[^a-z0-9ก-๙]+/g,'')
