@@ -1,0 +1,35 @@
+{
+  "name": "amphon-ai-buyer",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "amphon-product-images"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION_BATCHER",
+        "class_name": "ConversationBatcher"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationBatcher"]
+    }
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://mfpdtlxwdbxitgfzdape.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-",
+    "AI_BUYER_HUB_ORIGINS": "https://hub.amphon.co.th,http://localhost:5173,http://127.0.0.1:5173",
+    "AI_BUYER_ENV": "production",
+    "AI_BUYER_PAUSED": "true",
+    "AI_BUYER_BATCH_DEBOUNCE_MS": "2500",
+    "OPENAI_VISION_MODEL": "gpt-5.6-sol",
+    "OPENAI_PRICING_MODEL": "gpt-5.6-sol"
+  }
+}

@@ -1,0 +1,33 @@
+name: AI Buyer LINE Learning Capture
+
+on:
+  schedule:
+    # 00:20 Asia/Bangkok each day; captures the previous Bangkok calendar day.
+    - cron: '20 17 * * *'
+  workflow_dispatch:
+    inputs:
+      stat_date:
+        description: 'Optional Bangkok date YYYY-MM-DD'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/ai-buyer-v1-foundation
+
+      - name: Capture LINE delivery audit
+        env:
+          SUPABASE_URL: https://mfpdtlxwdbxitgfzdape.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          STAT_DATE: ${{ inputs.stat_date }}
+        run: node scripts/capture-line-learning-delivery.mjs

@@ -1,0 +1,52 @@
+{
+  "versionName": "AMPHON Master Price Book V2.3",
+  "versionKey": "AMPHON_PRICE_BOOK_V2_3_2026_09_20",
+  "sourceFile": "AMPHON_Master_Price_Book_V2_3_Calibrated_2026-09-20.xlsx",
+  "sourceSha256": "5f6578b5d6e5219c2d2a7e527beaeecb1e3ffcb18a79a8bf95c7f0e372663067",
+  "sourceDate": "2026-09-20",
+  "status": "TEMPORARY_APPROVED_BASELINE",
+  "runtime": {
+    "specPricing": {
+      "NOTEBOOK": {
+        "componentRows": 175,
+        "baseValue": 4500,
+        "targetBuyPercent": 0.58,
+        "hardMaxPercent": 0.62,
+        "openingDiscountPercent": 0.06,
+        "riskReserve": 400,
+        "roundingStep": 100,
+        "confidenceGate": 0.90
+      },
+      "DESKTOP_PC": {
+        "componentRows": 100,
+        "baseValue": 0,
+        "targetBuyPercent": 0.54,
+        "hardMaxPercent": 0.59,
+        "openingDiscountPercent": 0.07,
+        "riskReserve": 600,
+        "roundingStep": 100,
+        "confidenceGate": 0.90
+      }
+    },
+    "modelPricing": {
+      "totalRows": 45,
+      "activeAutoRows": 27,
+      "reviewRows": 18
+    },
+    "calibration": {
+      "notebookCases": 8,
+      "notebookMae": 0.0259,
+      "notebookMaxAbsError": 0.0454,
+      "pcCases": 5,
+      "pcMae": 0.0529,
+      "pcMaxAbsError": 0.1029
+    }
+  },
+  "notes": [
+    "Notebook and desktop PC use spec-based pricing.",
+    "MacBook, smartphone, tablet, and camera retain model-based pricing.",
+    "Rows marked REVIEW in the workbook are stored inactive for model-based auto-pricing.",
+    "Market fallback remains disabled unless explicitly configured.",
+    "Price Guard and database hard-max trigger remain authoritative."
+  ]
+}

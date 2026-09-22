@@ -1,0 +1,226 @@
+{
+  "version": "P0_PRICING_COVERAGE_V1",
+  "expectedActivePriceBook": "AMPHON Master Price Book V2.6 Expanded Coverage",
+  "directPriceBookCases": [
+    {
+      "caseId": "6b50df44-5b7e-4aff-8cfe-b45f5bad2910",
+      "entryModel": "Digital IXUS 70",
+      "expected": {
+        "opening": 2100,
+        "target": 2300,
+        "hardMax": 2600
+      }
+    },
+    {
+      "caseId": "cb30cab5-d7bb-40f8-9a1c-d52a079196e5",
+      "entryModel": "PowerShot A3200 IS",
+      "expected": {
+        "opening": 2100,
+        "target": 2300,
+        "hardMax": 2600
+      }
+    },
+    {
+      "caseId": "a6747df7-ffec-4bd2-8951-80c8e9b11401",
+      "entryModel": "Osmo Action 4",
+      "expected": {
+        "opening": 2000,
+        "target": 2200,
+        "hardMax": 2500
+      }
+    },
+    {
+      "caseId": "7d4fa572-8069-486c-acca-ec30eaaf2653",
+      "entryModel": "Instax Mini Evo",
+      "expected": {
+        "opening": 2200,
+        "target": 2500,
+        "hardMax": 2800
+      }
+    },
+    {
+      "caseId": "0d3ccb0f-9bde-4ce9-b8fe-414e4b51e8aa",
+      "entryModel": "MacBook Pro 16-inch 2019 i7 32GB 512GB",
+      "expected": {
+        "opening": 6800,
+        "target": 7300,
+        "hardMax": 8000
+      }
+    },
+    {
+      "caseId": "254f5381-e4e4-4c9f-b7dd-831bb8285af1",
+      "entryModel": "ExpertBook B3402FE i5",
+      "expected": {
+        "opening": 4900,
+        "target": 5300,
+        "hardMax": 5700
+      }
+    },
+    {
+      "caseId": "eb31cd76-f511-4ca3-824f-72a63d5a6431",
+      "entryModel": "Aspire Go 15 AG15-72P Core 5 120U 16GB",
+      "expected": {
+        "opening": 5900,
+        "target": 6300,
+        "hardMax": 6800
+      }
+    },
+    {
+      "caseId": "a4ecf322-cf4f-452e-aad1-a9125f289417",
+      "entryModel": "iPhone 11",
+      "requiredTag": "BATTERY_BAD",
+      "expected": {
+        "opening": 1100,
+        "target": 1300,
+        "hardMax": 1600
+      },
+      "entryModelCode": "IPHONE11-64"
+    },
+    {
+      "caseId": "80741cac-5a1a-479f-b862-b5f449fe9872",
+      "entryModel": "iPhone 15 Pro Max",
+      "derivedTag": "BACK_PANEL_REPLACED",
+      "expected": {
+        "opening": 9500,
+        "target": 10500,
+        "hardMax": 12000
+      }
+    },
+    {
+      "caseId": "1f441860-498e-47be-b64f-0a40d784c1ef",
+      "entryModel": "MatePad T10s 3GB/64GB LTE",
+      "expected": {
+        "opening": 1200,
+        "target": 1400,
+        "hardMax": 1600
+      }
+    },
+    {
+      "caseId": "1fcae414-f315-4154-bc49-f7284e2363a0",
+      "entryModel": "Pad 7 Pro 12GB/512GB",
+      "expected": {
+        "opening": 6000,
+        "target": 6500,
+        "hardMax": 7300
+      }
+    },
+    {
+      "caseId": "4de94388-958a-45ea-9494-0c906aa457eb",
+      "entryModel": "Osmo Action 3",
+      "entryModelCode": "ACTION3",
+      "expected": {
+        "opening": 2500,
+        "target": 2800,
+        "hardMax": 3200
+      }
+    },
+    {
+      "caseId": "37ad57bc-cefe-41c2-aca2-ab7398ecb019",
+      "entryModel": "ONE X2",
+      "entryModelCode": "X2",
+      "expected": {
+        "opening": 2800,
+        "target": 3100,
+        "hardMax": 3500
+      }
+    },
+    {
+      "caseId": "674717f3-c2a3-4b21-904f-ba75c7790cb0",
+      "entryModel": "iPad Air 4 Wi-Fi 256GB",
+      "entryModelCode": "AIR4-WIFI-256",
+      "expected": {
+        "opening": 3400,
+        "target": 3700,
+        "hardMax": 4200
+      }
+    },
+    {
+      "caseId": "62464ce6-ed44-468d-a41a-1f573d649c2e",
+      "entryModel": "MacBook Air 13-inch M5 24GB 512GB",
+      "entryModelCode": "M5-13-512",
+      "requiredTag": "NO_BOX",
+      "expected": {
+        "opening": 17200,
+        "target": 18200,
+        "hardMax": 20200
+      }
+    },
+    {
+      "caseId": "6331de6d-e521-42b7-8b08-532c482b141a",
+      "entryModel": "Precision 5820 W-2223 RTX A2000",
+      "entryModelCode": "PRECISION5820-W2223-A2000",
+      "expected": {
+        "opening": 9500,
+        "target": 10500,
+        "hardMax": 12000
+      }
+    }
+  ],
+  "guardedFallbackCases": [
+    {
+      "caseId": "dec53a55-dfbd-4fa3-9152-190472e1a8bb",
+      "name": "Chinon CM-3 + separate 135mm lens",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    },
+    {
+      "caseId": "b6f1dd88-a645-4c69-bf8a-c6f35c12ce42",
+      "name": "Pentax K-r + two-lens bundle",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    },
+    {
+      "caseId": "b3c7f82d-b85f-4944-8099-22289cfc3b03",
+      "name": "Sony DSC-TX300 thin Thai comparable coverage",
+      "route": "MARKET_OR_HUMAN_REVIEW"
+    }
+  ],
+  "alreadyPricedCount": 5,
+  "expectedDeterministicPriceCoverage": 21,
+  "totalEvidenceReady": 24,
+  "specPricingPreviews": [
+    {
+      "caseId": "6ed54ba9-b84f-49c2-8cb9-15dd16141aef",
+      "category": "DESKTOP_PC",
+      "estimatedResale": 9900,
+      "expected": {
+        "opening": 3900,
+        "target": 4200,
+        "hardMax": 4700
+      }
+    },
+    {
+      "caseId": "fc75ebe4-4a91-4614-9dda-f28ab18914bd",
+      "category": "NOTEBOOK",
+      "estimatedResale": 12600,
+      "expected": {
+        "opening": 5600,
+        "target": 6000,
+        "hardMax": 6600
+      }
+    },
+    {
+      "caseId": "501518b1-80a7-47cc-b9fe-08c9035f6f09",
+      "category": "NOTEBOOK",
+      "estimatedResale": 16400,
+      "expected": {
+        "opening": 7500,
+        "target": 8000,
+        "hardMax": 8800
+      }
+    }
+  ],
+  "staleDecisionSafety": [
+    {
+      "caseId": "6ed54ba9-b84f-49c2-8cb9-15dd16141aef",
+      "expectedState": "READY_TO_PRICE"
+    },
+    {
+      "caseId": "fc75ebe4-4a91-4614-9dda-f28ab18914bd",
+      "expectedState": "READY_TO_PRICE"
+    },
+    {
+      "caseId": "501518b1-80a7-47cc-b9fe-08c9035f6f09",
+      "expectedState": "READY_TO_PRICE"
+    }
+  ],
+  "coverageCaseCountExpected": 19
+}

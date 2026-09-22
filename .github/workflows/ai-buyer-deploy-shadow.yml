@@ -1,0 +1,222 @@
+name: AI Buyer Production Deploy (SHADOW)
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - 'workers/ai-buyer/**'
+      - '.github/workflows/ai-buyer-deploy-shadow.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-buyer-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify AI Buyer invariants
+        run: npm run verify:ai-buyer
+
+      - name: Install AI Buyer dependencies
+        working-directory: workers/ai-buyer
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck AI Buyer Worker
+        working-directory: workers/ai-buyer
+        run: npm run typecheck
+
+      - name: Require all production credentials before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          missing=0
+          for key in CLOUDFLARE_API_TOKEN SUPABASE_SECRET_KEY LINE_CHANNEL_SECRET LINE_CHANNEL_ACCESS_TOKEN OPENAI_API_KEY OPENAI_ADMIN_KEY AI_BUYER_ADMIN_TOKEN; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing repository secret $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All required production credentials are present"
+
+      - name: Verify OpenAI organization cost access
+        env:
+          OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+        shell: bash
+        run: |
+          start_time="$(date -u -d '2 days ago' +%s)"
+          body_file="$(mktemp)"
+          status="$(curl -sS -o "$body_file" -w '%{http_code}' --max-time 20 \
+            "https://api.openai.com/v1/organization/costs?start_time=$start_time&limit=1" \
+            -H "Authorization: Bearer $OPENAI_ADMIN_KEY" \
+            -H 'Content-Type: application/json')"
+          if [ "$status" != "200" ]; then
+            echo "::error::OpenAI Costs API check failed with HTTP $status"
+            sed -E 's/sk-[A-Za-z0-9_-]+/[REDACTED]/g' "$body_file" | head -c 500
+            echo
+            exit 1
+          fi
+          if ! grep -q '"data"' "$body_file"; then
+            echo "::error::OpenAI Costs API returned an unexpected response"
+            exit 1
+          fi
+          rm -f "$body_file"
+          echo "OpenAI Costs API access PASS"
+
+      - name: Deploy Worker code
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Sync AI Buyer Worker secrets
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          printf '%s' "$SUPABASE_SECRET_KEY" | npx wrangler secret put SUPABASE_SECRET_KEY --config wrangler.jsonc
+          printf '%s' "$LINE_CHANNEL_SECRET" | npx wrangler secret put LINE_CHANNEL_SECRET --config wrangler.jsonc
+          printf '%s' "$LINE_CHANNEL_ACCESS_TOKEN" | npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN --config wrangler.jsonc
+          printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY --config wrangler.jsonc
+          if [ -n "$OPENAI_ADMIN_KEY" ]; then
+            printf '%s' "$OPENAI_ADMIN_KEY" | npx wrangler secret put OPENAI_ADMIN_KEY --config wrangler.jsonc
+            echo "OPENAI_ADMIN_KEY synced for live cost reporting"
+          else
+            echo "OPENAI_ADMIN_KEY is not configured; Hub cost panel will show not connected"
+          fi
+          printf '%s' "$AI_BUYER_ADMIN_TOKEN" | npx wrangler secret put AI_BUYER_ADMIN_TOKEN --config wrangler.jsonc
+
+      - name: Final deploy with bindings and secrets preserved
+        working-directory: workers/ai-buyer
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Ensure LINE webhook endpoint and verify delivery path
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          desired="https://amphon-ai-buyer.noteroru2.workers.dev/v1/webhooks/line"
+          current="$(curl -fsS --max-time 15 \
+            'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" || true)"
+          echo "LINE webhook before sync: $current"
+
+          current_endpoint="$(CURRENT_JSON="$current" node -e "try{const x=JSON.parse(process.env.CURRENT_JSON||'{}');process.stdout.write(String(x.endpoint||''))}catch{}")"
+          if [ "$current_endpoint" != "$desired" ]; then
+            echo "Synchronizing LINE webhook endpoint to AI Buyer Worker"
+            curl -fsS --max-time 15 -X PUT \
+              'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+              -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data "{\"endpoint\":\"$desired\"}"
+            echo
+          fi
+
+          test_body="$(curl -fsS --max-time 20 -X POST \
+            'https://api.line.me/v2/bot/channel/webhook/test' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "{\"endpoint\":\"$desired\"}")"
+          echo "LINE webhook test: $test_body"
+          TEST_JSON="$test_body" node - <<'NODE'
+          const x = JSON.parse(process.env.TEST_JSON || '{}')
+          if (x.success !== true || Number(x.statusCode) !== 200) {
+            console.error('LINE webhook communication test failed:', JSON.stringify(x))
+            process.exit(1)
+          }
+          NODE
+
+          final="$(curl -fsS --max-time 15 \
+            'https://api.line.me/v2/bot/channel/webhook/endpoint' \
+            -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN")"
+          echo "LINE webhook after sync: $final"
+          FINAL_JSON="$final" DESIRED="$desired" node - <<'NODE'
+          const x = JSON.parse(process.env.FINAL_JSON || '{}')
+          if (x.endpoint !== process.env.DESIRED) {
+            console.error('LINE webhook endpoint mismatch:', JSON.stringify(x))
+            process.exit(1)
+          }
+          if (x.active !== true) {
+            console.error('LINE Use webhook is disabled. Enable Use webhook in LINE Developers Console / OA Manager.')
+            process.exit(1)
+          }
+          console.log('LINE webhook endpoint + active status PASS')
+          NODE
+
+      - name: Health smoke test
+        shell: bash
+        run: |
+          url="https://amphon-ai-buyer.noteroru2.workers.dev/v1/health"
+          for i in 1 2 3 4 5 6 7 8; do
+            body="$(curl -fsS --max-time 15 "$url" || true)"
+            if echo "$body" | grep -q '"ok":true' \
+              && echo "$body" | grep -q '"supabase":true' \
+              && echo "$body" | grep -q '"line":true' \
+              && echo "$body" | grep -q '"images":true' \
+              && echo "$body" | grep -q '"vision":true' \
+              && echo "$body" | grep -q '"admin":true' \
+              && echo "$body" | grep -q '"batcher":true'; then
+              echo "AI Buyer health PASS"
+              echo "$body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::AI Buyer health endpoint did not become fully configured"
+          exit 1
+
+      - name: Verify all categories remain SHADOW
+        env:
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          body="$(curl -fsS --max-time 15 \
+            'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/automation-mode' \
+            -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN")"
+          MODES_JSON="$body" node - <<'NODE'
+          const body = JSON.parse(process.env.MODES_JSON || '{}')
+          const modes = Array.isArray(body.modes) ? body.modes : []
+          if (modes.length !== 7) {
+            console.error('Expected 7 rollout categories, got', modes.length)
+            process.exit(1)
+          }
+          const bad = modes.filter(x => x.mode !== 'SHADOW' || x.active !== true)
+          if (bad.length) {
+            console.error('Non-SHADOW rollout detected:', JSON.stringify(bad))
+            process.exit(1)
+          }
+          console.log('SHADOW verification PASS:', modes.map(x => x.category).sort().join(', '))
+          NODE

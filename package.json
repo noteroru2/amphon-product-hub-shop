@@ -43,7 +43,8 @@
     "verify:channels": "node scripts/verify-merchant-shopee-foundation.mjs",
     "verify:shopee": "node scripts/verify-shopee-auto-publish.mjs",
     "verify:channel-architecture": "node scripts/verify-channel-architecture.mjs",
-    "verify:shopee-assisted": "node scripts/verify-shopee-assisted-listing.mjs"
+    "verify:shopee-assisted": "node scripts/verify-shopee-assisted-listing.mjs",
+    "verify:ai-buyer": "node scripts/verify-ai-buyer-foundation.mjs && node scripts/verify-ai-buyer-optimization-policy.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

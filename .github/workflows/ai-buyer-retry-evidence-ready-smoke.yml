@@ -1,0 +1,34 @@
+name: AI Buyer Retry Evidence Ready Smoke
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - '.github/workflows/ai-buyer-retry-evidence-ready-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Retry two evidence-ready cases
+        env:
+          AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for case_id in             b8b678a1-317c-4ab4-b426-13af9972a621             a4ecf322-cf4f-452e-aad1-a9125f289417
+          do
+            payload="$(printf '{"caseId":"%s"}' "$case_id")"
+            body_file="$(mktemp)"
+            status="$(curl -sS -o "$body_file" -w '%{http_code}'               -X POST 'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/case/retry-pricing'               -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN"               -H 'content-type: application/json'               --data-binary "$payload")"
+            echo "CASE $case_id HTTP $status"
+            cat "$body_file"
+            echo
+            test "$status" = "200"
+            grep -q '"ok":true' "$body_file"
+          done
