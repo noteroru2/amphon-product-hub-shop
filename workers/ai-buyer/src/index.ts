@@ -4,6 +4,8 @@ import { runPricingForCase } from './pricing-router'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 import {
   handleHubAdminCaseDetail,
+  handleHubAdminChatCase,
+  handleHubAdminChatList,
   handleHubAdminDashboard,
   handleHubAdminDealLedger,
   handleHubAdminFinalOutcome,
@@ -1483,8 +1485,16 @@ export default {
       return handleHubAdminImage(request, env)
     }
 
+    if (url.pathname === '/v1/hub/admin/chat-list' && request.method === 'GET') {
+      return handleHubAdminChatList(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/chat-case' && request.method === 'GET') {
+      return handleHubAdminChatCase(request, env)
+    }
+
     if (
-      ['/v1/hub/admin/case','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
