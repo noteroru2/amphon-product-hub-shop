@@ -334,13 +334,15 @@ function deterministicStorage(text: string) {
 
 function deterministicConditionTags(text: string) {
   const tags: string[] = []
-  if (/จอแตก|หน้าจอแตก|screen\s*(?:is\s*)?(?:cracked|broken)/i.test(text)) tags.push('SCREEN_DEFECT')
+  if (/จอแตก|หน้าจอแตก|จอดำ|black\s*screen|screen\s*(?:is\s*)?(?:cracked|broken)/i.test(text)) tags.push('SCREEN_DEFECT')
   if (/เปิดไม่ติด|เครื่องไม่ติด|บูตไม่ขึ้น|เปิดเครื่องไม่ได้|does\s*not\s*boot|not\s*booting/i.test(text)) {
     tags.push('DEVICE_NOT_BOOTING')
   }
   if (/โดนน้ำ|น้ำเข้า|น้ำหก|liquid\s*damage|water\s*damage/i.test(text)) tags.push('LIQUID_DAMAGE_HISTORY')
   if ((/ติด\s*i?cloud|icloud\s*(?:lock|locked)/i.test(text)) && !/ไม่ติด\s*i?cloud/i.test(text)) tags.push('LOCKED')
   if (/แบตเสื่อม|แบตไม่เก็บ|แบตหมดไว|battery\s*(?:bad|degraded)/i.test(text)) tags.push('BATTERY_BAD')
+  const batteryPercent = text.match(/(?:battery|แบต)[^0-9]{0,24}(\d{1,3})\s*%/i)
+  if (batteryPercent && Number(batteryPercent[1]) < 80) tags.push('BATTERY_BAD')
   return Array.from(new Set(tags))
 }
 
@@ -480,6 +482,78 @@ function deterministicTextHint(input: string): DeterministicTextHint | null {
       unknownFields:storage ? [] : ['storage'],
       identityConfidence:0.98,
       specCompleteness:storage ? 0.90 : 0.68,
+      pricingReadiness:storage ? 0.92 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/iphone\s*11\s*pro\s*max|ไอโฟน\s*11\s*pro\s*max/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'iPhone 11 Pro Max' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('SMARTPHONE','Apple iPhone 11 Pro Max',{
+      modelName:'iPhone 11 Pro Max',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.99,
+      specCompleteness:storage ? 0.90 : 0.68,
+      conditionCompleteness:pricingTags.length ? 0.90 : 0.30,
+      pricingReadiness:storage ? 0.93 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/galaxy\s*s23\s*ultra|s23\s*ultra|s23ul/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Samsung', model:'Galaxy S23 Ultra' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('SMARTPHONE','Samsung Galaxy S23 Ultra',{
+      modelName:'Galaxy S23 Ultra',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.90 : 0.68,
+      conditionCompleteness:pricingTags.length ? 0.90 : 0.30,
+      pricingReadiness:storage ? 0.92 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/galaxy\s*s25\s*ultra|s25\s*ultra/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Samsung', model:'Galaxy S25 Ultra' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('SMARTPHONE','Samsung Galaxy S25 Ultra',{
+      modelName:'Galaxy S25 Ultra',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.90 : 0.68,
+      conditionCompleteness:pricingTags.length ? 0.85 : 0.35,
+      pricingReadiness:storage ? 0.92 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/xiaomi\s*13t|เสี่ยวหมี่\s*13t/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Xiaomi', model:'Xiaomi 13T' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('SMARTPHONE','Xiaomi 13T',{
+      modelName:'Xiaomi 13T',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.90 : 0.68,
+      conditionCompleteness:pricingTags.length ? 0.85 : 0.30,
       pricingReadiness:storage ? 0.92 : 0.52,
       state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
       requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
