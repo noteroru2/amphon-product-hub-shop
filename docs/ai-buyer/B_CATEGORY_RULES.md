@@ -15,9 +15,9 @@ Human review / high-risk deductions: hinge -1,500, screen -2,000, charging port 
 
 ## Desktop PC
 
-Ready by spec when CPU, GPU/integrated graphics, RAM, storage, motherboard and PSU are confirmed. Minimum identity confidence 0.65 because custom PCs often do not have a commercial model name.
+Ready by spec when CPU, GPU/integrated graphics, RAM and storage are confirmed. Minimum identity confidence 0.65 because custom PCs often do not have a commercial model name. Motherboard, PSU and system class improve precision but are optional; if absent, the pricing engine applies conservative defaults (including unknown-PSU penalty).
 
-Do not ask for a full-case photo when these six pricing components are already confirmed unless there is a mapping conflict or more than one machine is being discussed.
+Do not ask for a full-case/interior photo merely to discover motherboard or PSU once the four core pricing components are confirmed, unless there is a device-mapping conflict or a material safety/condition issue.
 
 Automatic: rough condition -800 THB. Human review: instability -2,500, major damage -3,500, PSU risk -800, low SSD health -500 THB.
 
@@ -70,3 +70,10 @@ A known defect is sticky. It cannot disappear because a later message or image o
 ## Price safety
 
 All deductions are applied before creating opening/target/hard-max values. No conversational path can exceed hard max. Market fallback requires verified comparable sources and must fail to Human Review if source count or dispersion is unsafe.
+
+
+## Cross-category intent and case integrity
+
+Pricing requires explicit SELL_ITEM intent. Shopping/general inquiries must never be promoted to READY_TO_PRICE.
+
+A conversation can have only one non-terminal valuation case. Parallel image/text webhook events must atomically reuse that active case rather than creating duplicate shells.
