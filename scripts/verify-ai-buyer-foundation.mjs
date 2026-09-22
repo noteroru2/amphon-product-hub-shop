@@ -17,6 +17,10 @@ const required = [
   'workers/ai-buyer/wrangler.jsonc',
   'workers/ai-buyer/package.json',
   'workers/ai-buyer/tsconfig.json',
+  'workers/ai-buyer/data/optimization-policy-v1.json',
+  'docs/ai-buyer/A_IMPLEMENTATION_SPEC.md',
+  'docs/ai-buyer/B_CATEGORY_RULES.md',
+  'scripts/verify-ai-buyer-optimization-policy.mjs',
 ]
 
 for (const file of required) {
@@ -238,6 +242,7 @@ for (const token of [
   '"AI_BUYER_BATCH_DEBOUNCE_MS"',
   '"OPENAI_VISION_MODEL"',
   '"OPENAI_PRICING_MODEL"',
+  '"AI_BUYER_PAUSED": "true"',
 ]) {
   if (!wrangler.includes(token)) throw new Error(`AI Buyer runtime config missing: ${token}`)
 }
