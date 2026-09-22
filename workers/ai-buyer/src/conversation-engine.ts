@@ -582,10 +582,9 @@ function applyDeterministicConditionTags(result: IntakeResult) {
   )
 
   if (!batteryBad || result.pricing_tags.includes('BATTERY_BAD')) return result
-  const pricingTags: PricingTag[] = [
-    ...result.pricing_tags,
-    'BATTERY_BAD',
-  ].slice(0, 10)
+  const pricingTags: PricingTag[] = result.pricing_tags
+    .concat('BATTERY_BAD' as PricingTag)
+    .slice(0, 10)
   return {
     ...result,
     pricing_tags: pricingTags,
