@@ -73,7 +73,8 @@
         "opening": 1300,
         "target": 1500,
         "hardMax": 1800
-      }
+      },
+      "entryModelCode": "IPHONE11-64"
     },
     {
       "caseId": "80741cac-5a1a-479f-b862-b5f449fe9872",
