@@ -336,6 +336,38 @@ button:active:not(:disabled) {
   margin-top: -3px;
 }
 
+.bottom-nav.with-lineoa {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.bottom-nav.with-lineoa button {
+  font-size: 9px;
+}
+
+.bottom-nav.with-lineoa .lineoa-nav-item.active {
+  color: #06c755;
+}
+
+.bottom-nav.with-lineoa .lineoa-nav-item.active svg {
+  color: #06c755;
+}
+
+@media (max-width: 390px) {
+  .bottom-nav.with-lineoa button {
+    font-size: 8px;
+  }
+
+  .bottom-nav.with-lineoa button svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .bottom-nav.with-lineoa .fab svg {
+    width: 42px;
+    height: 42px;
+  }
+}
+
 /* Add/Edit: reduce cognitive load and keep readiness obvious */
 .add-header {
   height: 64px;
