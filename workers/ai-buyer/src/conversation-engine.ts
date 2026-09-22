@@ -9,6 +9,7 @@ export interface ConversationEngineEnv {
   OPENAI_API_KEY: string
   OPENAI_VISION_MODEL?: string
   OPENAI_PRICING_MODEL?: string
+  AI_BUYER_PAUSED?: string
 }
 
 export type IntakeBatch = {
@@ -1208,6 +1209,10 @@ export async function runConversationIntake(
   batch: IntakeBatch,
   drainDepth = 0,
 ) {
+  if (clean(env.AI_BUYER_PAUSED, 20).toLocaleLowerCase('en-US') === 'true') {
+    return { ok: true, skipped: true, reason: 'AI_BUYER_PAUSED' }
+  }
+
   const conversation = await loadConversation(env, batch.conversationId)
   const currentCase = await loadCase(env, batch.caseId)
   if (!conversation || !currentCase) return { ok: false, skipped: true, reason: 'CASE_NOT_FOUND' }
