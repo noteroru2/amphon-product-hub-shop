@@ -453,7 +453,7 @@ export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEn
       serviceRows<any>(
         env,
         'ai_buyer_case_images?case_id=eq.' + encodeURIComponent(caseId)
-          + '&select=id,object_key,analysis_status,created_at&order=created_at.asc',
+          + '&select=id,storage_key,mime_type,byte_size,analysis_status,created_at&order=created_at.asc',
       ),
       serviceRows<any>(
         env,
