@@ -248,6 +248,7 @@ export type AiBuyerCaseDetail = {
   } | null;
   messages: Array<{
     id: string;
+    line_message_id?: string | null;
     direction: "INBOUND" | "OUTBOUND" | "SYSTEM";
     message_type: string;
     text_content?: string | null;
