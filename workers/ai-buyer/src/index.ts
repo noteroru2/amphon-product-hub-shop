@@ -502,7 +502,7 @@ function deterministicTextHint(input: string): DeterministicTextHint | null {
     }))
   }
 
-  if (/apple\s*watch|แอ[ป๊]?เปิ้ล.*watch|นาฬิกา.*(?:apple|แอ[ป๊]?เปิ้ล)|smart\s*watch/i.test(lower)) {
+  if (/apple\s*watch|แอ[^\n]{0,20}เปิ้ล[^\n]{0,20}watc+h|นาฬิกา|smart\s*watch|watc+h|watcch/i.test(lower)) {
     const series10 = /series\s*10/i.test(lower)
     return make('OTHER',series10 ? 'Apple Watch Series 10' : 'Smartwatch',{
       modelName:series10 ? 'Apple Watch Series 10' : undefined,
