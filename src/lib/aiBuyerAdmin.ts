@@ -98,6 +98,94 @@ async function request<T>(
   return body as T;
 }
 
+export type AiBuyerChatCaseSummary = {
+  id: string;
+  title: string;
+  category: string | null;
+  state: string;
+  controlMode: string;
+  customer: {
+    displayName?: string | null;
+    pictureUrl?: string | null;
+    phone?: string | null;
+  } | null;
+  imageCount: number;
+  lastMessage?: {
+    type: string;
+    text?: string | null;
+    createdAt?: string | null;
+  } | null;
+  offer?: {
+    amount?: number | null;
+    status?: string | null;
+    createdAt?: string | null;
+  } | null;
+  updatedAt: string;
+  lastActivityAt: string;
+};
+
+export type AiBuyerChatMessage = {
+  id: string;
+  line_message_id?: string | null;
+  direction: "INBOUND" | "OUTBOUND" | "SYSTEM";
+  message_type: string;
+  text_content?: string | null;
+  metadata?: Record<string, unknown>;
+  line_timestamp?: string | null;
+  created_at: string;
+};
+
+export type AiBuyerChatImage = {
+  id: string;
+  message_id?: string | null;
+  line_message_id?: string | null;
+  storage_key?: string | null;
+  mime_type?: string | null;
+  byte_size?: number | null;
+  analysis_status?: string | null;
+  created_at: string;
+};
+
+export type AiBuyerChatCaseDetail = {
+  ok: true;
+  case: {
+    id: string;
+    conversation_id: string;
+    customer_id: string;
+    state: string;
+    category?: string | null;
+    title?: string | null;
+    control_mode: string;
+    accepted_price?: number | null;
+    accepted_at?: string | null;
+    updated_at: string;
+  };
+  customer?: {
+    id: string;
+    display_name?: string | null;
+    picture_url?: string | null;
+    phone?: string | null;
+  } | null;
+  messages: AiBuyerChatMessage[];
+  pricing?: {
+    id: string;
+    current_authorized_offer?: number | null;
+    target_buy?: number | null;
+    hard_max?: number | null;
+    created_at?: string | null;
+  } | null;
+  images: AiBuyerChatImage[];
+  hasMore: boolean;
+  oldestMessageAt?: string | null;
+  generatedAt: string;
+};
+
+export type AiBuyerChatListData = {
+  ok: true;
+  cases: AiBuyerChatCaseSummary[];
+  generatedAt: string;
+};
+
 export type AiBuyerDashboardCase = {
   id: string;
   title: string;
@@ -347,6 +435,18 @@ export type AiBuyerDealSummary = {
 export async function loadAiBuyerDashboard(limit = 150) {
   return request<AiBuyerDashboardData>(
     `/v1/hub/admin/dashboard?limit=${Math.max(10, Math.min(200, limit))}`,
+  );
+}
+
+export async function loadAiBuyerChatList(limit = 120) {
+  return request<AiBuyerChatListData>(
+    `/v1/hub/admin/chat-list?limit=${Math.max(20, Math.min(200, limit))}`,
+  );
+}
+
+export async function loadAiBuyerChatCase(caseId: string) {
+  return request<AiBuyerChatCaseDetail>(
+    `/v1/hub/admin/chat-case?caseId=${encodeURIComponent(caseId)}`,
   );
 }
 
