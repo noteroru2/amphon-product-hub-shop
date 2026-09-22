@@ -55,7 +55,7 @@ import { PublishCenter } from "./components/PublishCenter";
 import { ProductImageExportControls } from "./components/ProductImageExportActions";
 import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
-import { AiBuyerDashboard } from "./components/AiBuyerDashboard";
+import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -804,7 +804,11 @@ function App() {
         {tab === "ai-buyer" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
-            <AiBuyerDashboard profile={profile} onBack={() => setTab("home")} />
+            <AiBuyerAdmin
+              profile={profile}
+              products={products}
+              onBack={() => setTab("home")}
+            />
           )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
@@ -836,6 +840,7 @@ function App() {
           <ProfileScreen
             profile={profile}
             onEmployees={() => setTab("employees")}
+            onAiBuyer={() => setTab("ai-buyer")}
             onSignOut={() => void supabase?.auth.signOut()}
           />
         )}
@@ -1185,7 +1190,7 @@ function HomeScreen({
             <span>
               <strong>AI Buyer</strong>
               <small>
-                ดูผลตีราคา Shadow, Confidence, Hard Max และเคสที่ต้องตรวจเอง
+                ตอบ LINE · ปิดผลดีล · ราคาซื้อจริง · Profit Ledger
               </small>
             </span>
           </div>
@@ -3662,10 +3667,12 @@ function employeeActionText(item: EmployeeActivity) {
 function ProfileScreen({
   profile,
   onEmployees,
+  onAiBuyer,
   onSignOut,
 }: {
   profile: Profile;
   onEmployees: () => void;
+  onAiBuyer: () => void;
   onSignOut: () => void;
 }) {
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -3689,6 +3696,14 @@ function ProfileScreen({
           <button onClick={onEmployees}>
             <span>
               <Users size={18} /> จัดการพนักงาน
+            </span>
+            <ChevronRight />
+          </button>
+        )}
+        {["owner", "admin"].includes(profile.role) && (
+          <button onClick={onAiBuyer}>
+            <span>
+              <Bot size={18} /> AI Buyer Admin
             </span>
             <ChevronRight />
           </button>
