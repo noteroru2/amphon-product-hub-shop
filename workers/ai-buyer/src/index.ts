@@ -73,9 +73,30 @@ type ConversationRow = {
   line_user_id: string
 }
 
+type ProductCategory = 'NOTEBOOK' | 'MACBOOK' | 'DESKTOP_PC' | 'SMARTPHONE' | 'TABLET' | 'CAMERA' | 'OTHER'
+
 type CaseRow = {
   id: string
   state: string
+}
+
+type DeterministicTextHint = {
+  category: ProductCategory
+  title: string
+  modelName?: string
+  modelCode?: string
+  confirmed: Record<string, string>
+  unknownFields: string[]
+  identityConfidence: number
+  specCompleteness: number
+  conditionCompleteness: number
+  pricingReadiness: number
+  state: 'IDENTIFYING_PRODUCT' | 'NEED_MORE_INFO' | 'READY_TO_PRICE' | 'HUMAN_REVIEW'
+  controlMode: 'AUTO' | 'HUMAN_REQUIRED'
+  requestedInputs: string[]
+  pricingTags: string[]
+  flags: string[]
+  readinessReason: string
 }
 
 type MessageRow = {
@@ -294,6 +315,412 @@ function normalizedMessageType(type: string) {
   return 'OTHER'
 }
 
+function deterministicStorage(text: string) {
+  const matches = [...text.matchAll(/(?:^|\D)(32|64|128|256|512|1024)\s*(?:gb|g\b)/gi)]
+  return matches.length ? matches[matches.length - 1][1] + ' GB' : ''
+}
+
+function deterministicConditionTags(text: string) {
+  const tags: string[] = []
+  if (/จอแตก|หน้าจอแตก|screen\s*(?:is\s*)?(?:cracked|broken)/i.test(text)) tags.push('SCREEN_DEFECT')
+  if (/เปิดไม่ติด|เครื่องไม่ติด|บูตไม่ขึ้น|เปิดเครื่องไม่ได้|does\s*not\s*boot|not\s*booting/i.test(text)) {
+    tags.push('DEVICE_NOT_BOOTING')
+  }
+  if (/โดนน้ำ|น้ำเข้า|น้ำหก|liquid\s*damage|water\s*damage/i.test(text)) tags.push('LIQUID_DAMAGE_HISTORY')
+  if ((/ติด\s*i?cloud|icloud\s*(?:lock|locked)/i.test(text)) && !/ไม่ติด\s*i?cloud/i.test(text)) tags.push('LOCKED')
+  if (/แบตเสื่อม|แบตไม่เก็บ|แบตหมดไว|battery\s*(?:bad|degraded)/i.test(text)) tags.push('BATTERY_BAD')
+  return Array.from(new Set(tags))
+}
+
+function deterministicTextHint(input: string): DeterministicTextHint | null {
+  const text = clean(input, 12000)
+  const lower = text.toLocaleLowerCase('en-US')
+  const pricingTags = deterministicConditionTags(text)
+  const hardReview = pricingTags.some((tag) => [
+    'DEVICE_NOT_BOOTING','LIQUID_DAMAGE_HISTORY','LOCKED','MAJOR_DAMAGE',
+  ].includes(tag))
+
+  const make = (
+    category: ProductCategory,
+    title: string,
+    options: Partial<DeterministicTextHint> = {},
+  ): DeterministicTextHint => ({
+    category,
+    title,
+    confirmed: {},
+    unknownFields: [],
+    identityConfidence: 0.82,
+    specCompleteness: 0.20,
+    conditionCompleteness: pricingTags.length ? 0.70 : 0.20,
+    pricingReadiness: 0.20,
+    state: 'IDENTIFYING_PRODUCT',
+    controlMode: 'AUTO',
+    requestedInputs: ['MODEL'],
+    pricingTags,
+    flags: ['DETERMINISTIC_TEXT_CLASSIFICATION'],
+    readinessReason: 'MISSING_MODEL',
+    ...options,
+  })
+
+  const withRisk = (hint: DeterministicTextHint) => {
+    if (!hardReview) return hint
+    return {
+      ...hint,
+      state: 'HUMAN_REVIEW' as const,
+      controlMode: 'HUMAN_REQUIRED' as const,
+      pricingReadiness: Math.min(hint.pricingReadiness, 0.49),
+      requestedInputs: [],
+      readinessReason: pricingTags.includes('DEVICE_NOT_BOOTING')
+        ? 'DEVICE_NOT_BOOTING'
+        : pricingTags.includes('LOCKED')
+          ? 'LOCKED'
+          : 'HUMAN_REVIEW_REQUIRED',
+      flags: Array.from(new Set([...hint.flags, 'DETERMINISTIC_HARD_REVIEW'])),
+    }
+  }
+
+  if (/dell\s+precision\s+5820/i.test(text)) {
+    const confirmed: Record<string, string> = {
+      brand: 'Dell',
+      model: 'Precision 5820',
+      series: 'Precision',
+    }
+    if (/w-2223/i.test(text)) confirmed.cpu = 'Intel Xeon W-2223'
+    if (/32\s*gb/i.test(text)) confirmed.ram = '32 GB'
+    if (/256\s*gb/i.test(text) && /2\s*tb/i.test(text)) confirmed.storage = '256 GB NVMe + 2 TB NVMe'
+    if (/a2000/i.test(text)) confirmed.gpu = 'NVIDIA Quadro RTX A2000 6GB'
+    return withRisk(make('DESKTOP_PC','Dell Precision 5820',{
+      modelName:'Dell Precision 5820',
+      modelCode:'5820',
+      confirmed,
+      unknownFields:['motherboard','psu'],
+      identityConfidence:0.99,
+      specCompleteness:0.86,
+      conditionCompleteness:0.20,
+      pricingReadiness:0.92,
+      state:'READY_TO_PRICE',
+      requestedInputs:[],
+      readinessReason:'READY_BY_MODEL_CODE',
+      flags:['DETERMINISTIC_TEXT_CLASSIFICATION','COMMERCIAL_DESKTOP_MODEL_EXACT'],
+    }))
+  }
+
+  if (/ipad\s*air\s*5|ไอแพด\s*air\s*5/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'iPad Air 5' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('TABLET','Apple iPad Air 5',{
+      modelName:'iPad Air 5',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.99,
+      specCompleteness:storage ? 0.92 : 0.72,
+      conditionCompleteness:pricingTags.length ? 0.90 : 0.30,
+      pricingReadiness:storage ? 0.94 : 0.55,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/ipad\s*(?:gen\s*)?9|ไอแพด\s*(?:gen\s*)?9/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'iPad 9th Gen' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('TABLET','Apple iPad 9th Gen',{
+      modelName:'iPad 9th Gen',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.90 : 0.68,
+      pricingReadiness:storage ? 0.92 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/matepad\s*t\s*10s|matepad\s*t10s/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Huawei', model:'MatePad T10s' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('TABLET','Huawei MatePad T10s',{
+      modelName:'Huawei MatePad T10s',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.90 : 0.68,
+      pricingReadiness:storage ? 0.92 : 0.52,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/iphone\s*xr|ไอโฟน\s*xr/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'iPhone XR' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('SMARTPHONE','Apple iPhone XR',{
+      modelName:'iPhone XR',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.99,
+      specCompleteness:storage ? 0.90 : 0.65,
+      pricingReadiness:storage ? 0.93 : 0.50,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
+  if (/insta\s*360\s*(?:one\s*)?x2/i.test(lower)) {
+    return withRisk(make('CAMERA','Insta360 ONE X2',{
+      modelName:'Insta360 ONE X2',
+      modelCode:'X2',
+      confirmed:{ brand:'Insta360', model:'ONE X2' },
+      identityConfidence:0.99,
+      specCompleteness:0.86,
+      pricingReadiness:0.92,
+      state:'READY_TO_PRICE',
+      requestedInputs:[],
+      readinessReason:'READY_BY_MODEL_CODE',
+    }))
+  }
+
+  if (/dji\s*(?:osmo\s*)?action\s*3/i.test(lower)) {
+    return withRisk(make('CAMERA','DJI Osmo Action 3',{
+      modelName:'DJI Osmo Action 3',
+      modelCode:'ACTION3',
+      confirmed:{ brand:'DJI', model:'Osmo Action 3' },
+      identityConfidence:0.99,
+      specCompleteness:0.86,
+      pricingReadiness:0.92,
+      state:'READY_TO_PRICE',
+      requestedInputs:[],
+      readinessReason:'READY_BY_MODEL_CODE',
+    }))
+  }
+
+  if (/apple\s*watch|แอ[ป๊]?เปิ้ล.*watch|นาฬิกา.*(?:apple|แอ[ป๊]?เปิ้ล)|smart\s*watch/i.test(lower)) {
+    const series10 = /series\s*10/i.test(lower)
+    return make('OTHER',series10 ? 'Apple Watch Series 10' : 'Smartwatch',{
+      modelName:series10 ? 'Apple Watch Series 10' : undefined,
+      confirmed:series10 ? { brand:'Apple', model:'Watch Series 10' } : {},
+      identityConfidence:series10 ? 0.98 : 0.82,
+      specCompleteness:series10 ? 0.60 : 0.20,
+      pricingReadiness:0.10,
+      state:'HUMAN_REVIEW',
+      controlMode:'HUMAN_REQUIRED',
+      requestedInputs:[],
+      readinessReason:'UNSUPPORTED_CATEGORY',
+    })
+  }
+
+  if (/เครื่องเกม|nintendo|นินเท|playstation|xbox/i.test(lower)) {
+    return make('OTHER','Game console',{
+      identityConfidence:0.86,pricingReadiness:0.10,state:'HUMAN_REVIEW',
+      controlMode:'HUMAN_REQUIRED',requestedInputs:[],readinessReason:'UNSUPPORTED_CATEGORY',
+    })
+  }
+  if (/จอพกพา|portable\s*monitor|รับซื้อทีวี|\btv\b|โทรทัศน์/i.test(lower)) {
+    return make('OTHER',/จอพกพา|portable\s*monitor/i.test(lower) ? 'Portable monitor' : 'Television',{
+      identityConfidence:0.88,pricingReadiness:0.10,state:'HUMAN_REVIEW',
+      controlMode:'HUMAN_REQUIRED',requestedInputs:[],readinessReason:'UNSUPPORTED_CATEGORY',
+    })
+  }
+  if (/กล้องส่องทางไกล|binocular/i.test(lower)) {
+    return make('OTHER','Binoculars',{
+      identityConfidence:0.92,pricingReadiness:0.10,state:'HUMAN_REVIEW',
+      controlMode:'HUMAN_REQUIRED',requestedInputs:[],readinessReason:'UNSUPPORTED_CATEGORY',
+    })
+  }
+  if (/เหล้า|whisk(?:y|ey)|cognac|บรั่นดี|\bxo\b/i.test(lower)) {
+    return make('OTHER','Alcoholic beverage',{
+      identityConfidence:0.90,pricingReadiness:0.05,state:'HUMAN_REVIEW',
+      controlMode:'HUMAN_REQUIRED',requestedInputs:[],readinessReason:'UNSUPPORTED_CATEGORY',
+      flags:['DETERMINISTIC_TEXT_CLASSIFICATION','REGULATED_OR_UNSUPPORTED_PRODUCT'],
+    })
+  }
+
+  if (/macbook/i.test(lower)) {
+    return make('MACBOOK','Apple MacBook',{
+      confirmed:{brand:'Apple'},identityConfidence:0.88,requestedInputs:['MODEL','STORAGE_VARIANT'],
+      readinessReason:'MISSING_MODEL',
+    })
+  }
+  if (/iphone|ไอโฟน/i.test(lower)) {
+    return make('SMARTPHONE','Apple iPhone',{
+      confirmed:{brand:'Apple'},identityConfidence:0.86,requestedInputs:['MODEL','STORAGE_VARIANT'],
+      readinessReason:'MISSING_MODEL',
+    })
+  }
+  if (/ipad|ไอแพด|tablet|แท็บเล็ต|matepad|galaxy\s*tab/i.test(lower)) {
+    return make('TABLET','Tablet',{
+      identityConfidence:0.84,requestedInputs:['MODEL','STORAGE_VARIANT'],readinessReason:'MISSING_MODEL',
+    })
+  }
+  if (/notebook|โน้ตบุ๊ก|โน๊ตบุ๊ค|laptop/i.test(lower)) {
+    return make('NOTEBOOK','Notebook',{
+      identityConfidence:0.82,requestedInputs:['MODEL','CORE_SPEC'],readinessReason:'MISSING_MODEL',
+    })
+  }
+  if (/workstation|desktop|คอมตั้งโต๊ะ|คอมพิวเตอร์|precision\s+\d{4}/i.test(lower)) {
+    return make('DESKTOP_PC','Desktop PC',{
+      identityConfidence:0.82,requestedInputs:['MODEL','CORE_SPEC'],readinessReason:'MISSING_MODEL',
+    })
+  }
+  if (/กล้อง|camera|cyber-shot|powershot|instax|dji\s*(?:osmo\s*)?action/i.test(lower)) {
+    return make('CAMERA','Camera',{
+      identityConfidence:0.82,requestedInputs:['MODEL'],readinessReason:'MISSING_MODEL',
+    })
+  }
+  return null
+}
+
+async function applyDeterministicTextEvidence(
+  env: Env,
+  conversation: ConversationRow,
+  caseRow: CaseRow,
+  messageId: string,
+) {
+  const messageRows = await readRows<Array<{ id: string; text_content: string | null; created_at: string }> extends Array<infer T> ? T : never>(
+    await supabaseRequest(
+      env,
+      'ai_buyer_messages?conversation_id=eq.' + encodeURIComponent(conversation.id)
+        + '&direction=eq.INBOUND&message_type=eq.TEXT&text_content=not.is.null'
+        + '&select=id,text_content,created_at&order=created_at.desc&limit=30',
+    ),
+  )
+  const chronological = [...messageRows].reverse()
+  const combined = chronological.map((row) => clean(row.text_content, 4000)).filter(Boolean).join('\n')
+  const hint = deterministicTextHint(combined)
+  if (!hint) return
+
+  const cases = await readRows<Array<{
+    id: string
+    state: string
+    category: ProductCategory | null
+    title: string | null
+    control_mode: string
+    identity_confidence: number | null
+    spec_completeness: number | null
+    condition_completeness: number | null
+    pricing_readiness: number | null
+    metadata: Record<string, unknown> | null
+  }> extends Array<infer T> ? T : never>(
+    await supabaseRequest(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseRow.id)
+        + '&select=id,state,category,title,control_mode,identity_confidence,spec_completeness,condition_completeness,pricing_readiness,metadata&limit=1',
+    ),
+  )
+  const current = cases[0]
+  if (!current || TERMINAL_STATES.includes(current.state)) return
+
+  const currentConfidence = Number(current.identity_confidence || 0)
+  const canPromote = !current.category
+    || ['NEW','IDENTIFYING_PRODUCT','NEED_MORE_INFO'].includes(current.state)
+    || hint.identityConfidence > currentConfidence
+
+  const oldTags = Array.isArray(current.metadata?.lastPricingTags)
+    ? current.metadata.lastPricingTags.map((tag) => clean(tag, 100)).filter(Boolean)
+    : []
+  const oldFlags = Array.isArray(current.metadata?.lastFlags)
+    ? current.metadata.lastFlags.map((flag) => clean(flag, 300)).filter(Boolean)
+    : []
+  const mergedTags = Array.from(new Set([...oldTags, ...hint.pricingTags])).slice(0, 16)
+  const mergedFlags = Array.from(new Set([...oldFlags, ...hint.flags])).slice(0, 20)
+  const hardReview = mergedTags.some((tag) => [
+    'DEVICE_NOT_BOOTING','LIQUID_DAMAGE_HISTORY','LOCKED','MAJOR_DAMAGE',
+  ].includes(tag))
+
+  if (canPromote) {
+    const observation = await supabaseRequest(env, 'ai_buyer_product_observations', {
+      method: 'POST',
+      headers: { prefer: 'return=minimal' },
+      body: JSON.stringify({
+        case_id: current.id,
+        source: 'CUSTOMER_TEXT',
+        confirmed: hint.confirmed,
+        inferred: {},
+        unknown_fields: hint.unknownFields,
+        evidence: [{
+          type: 'DETERMINISTIC_TEXT',
+          message_id: messageId,
+          message_ids: chronological.map((row) => row.id),
+        }],
+        model_name: hint.modelName || null,
+        model_code: hint.modelCode || null,
+        category: hint.category,
+        identity_confidence: hint.identityConfidence,
+      }),
+    })
+    if (!observation.ok) {
+      const detail = await observation.text().catch(() => '')
+      throw new Error('DETERMINISTIC_OBSERVATION_' + observation.status + ':' + detail.slice(0, 300))
+    }
+  }
+
+  const nextCategory = current.category || hint.category
+  const nextState = hardReview
+    ? 'HUMAN_REVIEW'
+    : canPromote
+      ? hint.state
+      : current.state
+  const nextControlMode = hardReview || nextCategory === 'OTHER'
+    ? 'HUMAN_REQUIRED'
+    : current.control_mode
+
+  const metadata = {
+    ...(current.metadata || {}),
+    lastRequestedInputs: canPromote ? hint.requestedInputs : (current.metadata?.lastRequestedInputs || []),
+    lastPricingTags: mergedTags,
+    lastFlags: mergedFlags,
+    readinessReason: hardReview ? hint.readinessReason : (canPromote ? hint.readinessReason : current.metadata?.readinessReason),
+    deterministicTextEvidenceAt: new Date().toISOString(),
+  }
+
+  const patch = await supabaseRequest(
+    env,
+    'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(current.id),
+    {
+      method: 'PATCH',
+      headers: { prefer: 'return=minimal' },
+      body: JSON.stringify({
+        state: nextState,
+        category: nextCategory,
+        title: current.title || hint.title,
+        control_mode: nextControlMode,
+        identity_confidence: Math.max(currentConfidence, hint.identityConfidence),
+        spec_completeness: Math.max(Number(current.spec_completeness || 0), hint.specCompleteness),
+        condition_completeness: Math.max(Number(current.condition_completeness || 0), hint.conditionCompleteness),
+        pricing_readiness: hardReview
+          ? Math.min(Math.max(Number(current.pricing_readiness || 0), hint.pricingReadiness), 0.49)
+          : Math.max(Number(current.pricing_readiness || 0), hint.pricingReadiness),
+        metadata,
+      }),
+    },
+  )
+  if (!patch.ok) {
+    const detail = await patch.text().catch(() => '')
+    throw new Error('DETERMINISTIC_CASE_PATCH_' + patch.status + ':' + detail.slice(0, 300))
+  }
+
+  if (nextControlMode === 'HUMAN_REQUIRED') {
+    await supabaseRequest(
+      env,
+      'ai_buyer_conversations?id=eq.' + encodeURIComponent(conversation.id),
+      {
+        method: 'PATCH',
+        headers: { prefer: 'return=minimal' },
+        body: JSON.stringify({ control_mode: 'HUMAN_REQUIRED' }),
+      },
+    )
+  }
+}
+
+
 async function storeMessage(
   env: Env,
   conversation: ConversationRow,
@@ -453,6 +880,14 @@ async function processEvent(env: Env, event: LineWebhookEvent) {
     const conversation = await upsertConversation(env, customer, at)
     const caseRow = await activeCase(env, conversation, customer)
     const dbMessage = await storeMessage(env, conversation, caseRow, event)
+
+    if (event.message.type === 'text') {
+      try {
+        await applyDeterministicTextEvidence(env, conversation, caseRow, dbMessage.id)
+      } catch (deterministicError) {
+        console.error('AI BUYER deterministic text classification failed', eventId, deterministicError)
+      }
+    }
 
     if (event.message.type === 'image') {
       await storeImage(env, lineUserId, caseRow, dbMessage, event.message)
