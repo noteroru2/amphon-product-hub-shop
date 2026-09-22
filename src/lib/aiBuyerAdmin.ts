@@ -50,6 +50,26 @@ async function accessToken() {
   return token;
 }
 
+
+async function requestBlob(path: string): Promise<Blob> {
+  const token = await accessToken();
+  const response = await fetch(AI_BUYER_API + path, {
+    headers: { authorization: "Bearer " + token },
+  });
+  if (!response.ok) {
+    const raw = await response.text().catch(() => "");
+    let message = raw;
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      message = parsed?.error || raw;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(message || `AI_BUYER_IMAGE_${response.status}`);
+  }
+  return response.blob();
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -228,6 +248,7 @@ export type AiBuyerCaseDetail = {
   } | null;
   messages: Array<{
     id: string;
+    line_message_id?: string | null;
     direction: "INBOUND" | "OUTBOUND" | "SYSTEM";
     message_type: string;
     text_content?: string | null;
@@ -262,7 +283,11 @@ export type AiBuyerCaseDetail = {
   dealSummary?: AiBuyerDealSummary | null;
   images: Array<{
     id: string;
-    object_key?: string | null;
+    message_id?: string | null;
+    line_message_id?: string | null;
+    storage_key?: string | null;
+    mime_type?: string | null;
+    byte_size?: number | null;
     analysis_status?: string | null;
     created_at: string;
   }>;
@@ -331,6 +356,12 @@ export async function loadAiBuyerCase(caseId: string) {
   );
 }
 
+export async function loadAiBuyerImageBlob(imageId: string) {
+  return requestBlob(
+    `/v1/hub/admin/image?id=${encodeURIComponent(imageId)}`,
+  );
+}
+
 export async function sendAiBuyerManualReply(input: {
   caseId: string;
   text: string;
@@ -342,6 +373,7 @@ export async function sendAiBuyerManualReply(input: {
     actionId: string;
     lineMessageId?: string | null;
     offerAmount?: number | null;
+    sentText?: string | null;
   }>("/v1/hub/admin/manual-reply", {
     method: "POST",
     body: JSON.stringify({

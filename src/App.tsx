@@ -34,6 +34,7 @@ import {
   CalendarDays,
   ImageDown,
   Bot,
+  MessageCircle,
 } from "lucide-react";
 import { db } from "./lib/db";
 import { compressImage } from "./lib/image";
@@ -56,6 +57,7 @@ import { ProductImageExportControls } from "./components/ProductImageExportActio
 import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
+import { LineOAChat } from "./components/LineOAChat";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -115,7 +117,8 @@ type Tab =
   | "scanner"
   | "profile"
   | "employees"
-  | "ai-buyer";
+  | "ai-buyer"
+  | "line-chat";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
@@ -810,6 +813,11 @@ function App() {
               onBack={() => setTab("home")}
             />
           )}
+        {tab === "line-chat" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <LineOAChat profile={profile} />
+          )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
         )}
@@ -853,8 +861,13 @@ function App() {
             />
           )}
       </main>
-      {tab !== "add" && tab !== "employees" && tab !== "ai-buyer" && (
-        <BottomNav tab={tab} setTab={setTab} onAdd={openAdd} />
+      {tab !== "add" && tab !== "employees" && (
+        <BottomNav
+          tab={tab}
+          setTab={setTab}
+          onAdd={openAdd}
+          showLineOA={Boolean(profile && ["owner", "admin"].includes(profile.role))}
+        />
       )}
     </div>
   );
@@ -3805,13 +3818,15 @@ function BottomNav({
   tab,
   setTab,
   onAdd,
+  showLineOA,
 }: {
   tab: Tab;
   setTab: (tab: Tab) => void;
   onAdd: () => void;
+  showLineOA: boolean;
 }) {
   return (
-    <nav className="bottom-nav">
+    <nav className={"bottom-nav" + (showLineOA ? " with-lineoa" : "")}>
       <button
         className={tab === "home" ? "active" : ""}
         onClick={() => setTab("home")}
@@ -3834,6 +3849,15 @@ function BottomNav({
         <CirclePlus />
         <span>เพิ่ม</span>
       </button>
+      {showLineOA && (
+        <button
+          className={tab === "line-chat" ? "active lineoa-nav-item" : "lineoa-nav-item"}
+          onClick={() => setTab("line-chat")}
+        >
+          <MessageCircle />
+          <span>LINE OA</span>
+        </button>
+      )}
       <button
         className={tab === "scanner" ? "active" : ""}
         onClick={() => setTab("scanner")}

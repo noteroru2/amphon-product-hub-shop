@@ -23,7 +23,6 @@ import {
   loadAiBuyerDashboard,
   saveAiBuyerFinalOutcome,
   saveAiBuyerLedgerLine,
-  sendAiBuyerManualReply,
   type AiBuyerCaseDetail,
   type AiBuyerDashboardCase,
   type AiBuyerDealSummary,
@@ -212,38 +211,6 @@ function CaseListItem({
   );
 }
 
-function MessageBubble({
-  message,
-}: {
-  message: AiBuyerCaseDetail["messages"][number];
-}) {
-  const outbound = message.direction === "OUTBOUND";
-  const source = String(message.metadata?.source || "");
-  return (
-    <div className={"ai-message-row " + (outbound ? "outbound" : "inbound")}>
-      <div className="ai-message-bubble">
-        <small>
-          {outbound
-            ? source === "OWNER_MANUAL"
-              ? "คุณ · Manual"
-              : source === "AI_BUYER" || source === "AI"
-                ? "AI"
-                : "ร้าน"
-            : "ลูกค้า"}
-        </small>
-        {message.message_type === "TEXT" ? (
-          <p>{message.text_content || "—"}</p>
-        ) : (
-          <p className="ai-message-media">
-            {message.message_type === "IMAGE" ? "📷 รูปภาพ" : message.message_type}
-          </p>
-        )}
-        <time>{when(message.line_timestamp || message.created_at)}</time>
-      </div>
-    </div>
-  );
-}
-
 function PriceStrip({ detail }: { detail: AiBuyerCaseDetail }) {
   const pricing = detail.pricing[0];
   if (!pricing) {
@@ -292,9 +259,6 @@ export function AiBuyerAdmin({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  const [reply, setReply] = useState("");
-  const [replyAmount, setReplyAmount] = useState("");
 
   const [outcome, setOutcome] = useState("");
   const [agreedPrice, setAgreedPrice] = useState("");
@@ -422,27 +386,6 @@ export function AiBuyerAdmin({
         </div>
       </section>
     );
-  }
-
-  async function sendReply() {
-    if (!selectedId || !reply.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await sendAiBuyerManualReply({
-        caseId: selectedId,
-        text: reply.trim(),
-        offerAmount: numberOrNull(replyAmount),
-      });
-      setReply("");
-      setReplyAmount("");
-      setNotice("ส่ง LINE และเก็บเป็น OWNER_MANUAL แล้ว");
-      await Promise.all([refreshDetail(selectedId), refreshDashboard()]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
   }
 
   async function saveOutcome(label = outcome) {
@@ -703,52 +646,9 @@ export function AiBuyerAdmin({
                   )}
                 </div>
                 <PriceStrip detail={detail} />
-              </section>
-
-              <section className="ai-panel">
-                <div className="ai-panel-head">
-                  <div><MessageCircle /><strong>แชต LINE</strong></div>
-                  <small>{detail.messages.length} ข้อความ</small>
-                </div>
-                <div className="ai-chat-log">
-                  {detail.messages.length ? (
-                    detail.messages.map((message) => (
-                      <MessageBubble key={message.id} message={message} />
-                    ))
-                  ) : (
-                    <div className="ai-empty-mini">ยังไม่มีข้อความ</div>
-                  )}
-                </div>
-                <div className="ai-reply-composer">
-                  <textarea
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    placeholder="พิมพ์ตอบลูกค้าในสไตล์ของคุณ…"
-                    rows={3}
-                  />
-                  <div className="ai-reply-row">
-                    <label>
-                      <Banknote size={16} />
-                      <input
-                        inputMode="numeric"
-                        value={replyAmount}
-                        onChange={(event) => setReplyAmount(event.target.value)}
-                        placeholder="ราคาเสนอ (ถ้ามี)"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="ai-primary-action"
-                      disabled={busy || !reply.trim()}
-                      onClick={() => void sendReply()}
-                    >
-                      <Send size={17} /> {busy ? "กำลังส่ง…" : "ส่ง LINE"}
-                    </button>
-                  </div>
-                  <small>
-                    ข้อความนี้จะถูกเก็บเป็น <b>OWNER_MANUAL</b> เพื่อใช้เรียนรู้วิธีคุยและปิดงานของคุณ
-                  </small>
-                </div>
+                <p className="ai-chat-moved-note">
+                  แชทถูกย้ายไปเมนู <b>LINE OA Chat</b> ด้านล่างแล้ว เพื่อให้ตอบลูกค้าและดูรูปได้สะดวกกว่า
+                </p>
               </section>
 
               <section className="ai-panel">
