@@ -404,6 +404,138 @@ function countByCase<T extends { case_id: string }>(rows: T[]) {
   return map
 }
 
+export async function handleHubAdminChatList(request: Request, env: HubAdminEnv) {
+  try {
+    await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+    const rawLimit = Number(url.searchParams.get('limit') || 120)
+    const limit = Math.max(20, Math.min(200, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 120))
+
+    const rows = await serviceRows<any>(
+      env,
+      'ai_buyer_chat_list_v?select=*'
+        + '&order=last_activity_at.desc'
+        + '&limit=' + limit,
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      cases: rows.map((row) => ({
+        id: row.case_id,
+        title: row.title || 'ยังไม่ระบุสินค้า',
+        category: row.category || null,
+        state: row.state,
+        controlMode: row.control_mode,
+        customer: {
+          displayName: row.display_name || null,
+          pictureUrl: row.picture_url || null,
+          phone: row.phone || null,
+        },
+        imageCount: Number(row.image_count || 0),
+        lastMessage: row.last_message_type ? {
+          type: row.last_message_type,
+          text: row.last_message_text || null,
+          createdAt: row.last_message_at || null,
+        } : null,
+        offer: row.latest_offer_amount != null ? {
+          amount: numberValue(row.latest_offer_amount),
+          status: row.latest_offer_status || null,
+          createdAt: row.latest_offer_at || null,
+        } : null,
+        updatedAt: row.updated_at,
+        lastActivityAt: row.last_activity_at || row.updated_at,
+      })),
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+export async function handleHubAdminChatCase(request: Request, env: HubAdminEnv) {
+  try {
+    await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+    const caseId = clean(url.searchParams.get('caseId'), 100)
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+
+    const cases = await serviceRows<any>(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=id,conversation_id,customer_id,state,category,title,control_mode,accepted_price,accepted_at,updated_at&limit=1',
+    )
+    const caseRow = cases[0]
+    if (!caseRow) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_NOT_FOUND' }, 404)
+    }
+
+    const [customers, rawMessages, pricing, images] = await Promise.all([
+      serviceRows<any>(
+        env,
+        'ai_buyer_customers?id=eq.' + encodeURIComponent(caseRow.customer_id)
+          + '&select=id,display_name,picture_url,phone&limit=1',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_messages?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,line_message_id,direction,message_type,text_content,metadata,line_timestamp,created_at'
+          + '&order=created_at.desc&limit=121',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_pricing_decisions?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,current_authorized_offer,target_buy,hard_max,created_at'
+          + '&order=created_at.desc&limit=1',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_case_images?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,message_id,line_message_id,storage_key,mime_type,byte_size,analysis_status,created_at'
+          + '&order=created_at.desc&limit=200',
+      ),
+    ])
+
+    const hasMore = rawMessages.length > 120
+    const messages = rawMessages.slice(0, 120).reverse()
+    const messageIds = new Set(messages.map((m: any) => m.id))
+    const lineIds = new Set(messages.map((m: any) => m.line_message_id).filter(Boolean))
+    const visibleImages = images
+      .filter((img: any) =>
+        (img.message_id && messageIds.has(img.message_id))
+        || (img.line_message_id && lineIds.has(img.line_message_id)),
+      )
+      .reverse()
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      case: caseRow,
+      customer: customers[0] || null,
+      messages,
+      pricing: pricing[0] || null,
+      images: visibleImages,
+      hasMore,
+      oldestMessageAt: messages[0]?.created_at || null,
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEnv) {
   try {
     await authenticateAdmin(request, env)
