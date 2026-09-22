@@ -1,0 +1,46 @@
+name: Hub AI Buyer UI Check
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/hub-ai-buyer-ui-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hub-ai-buyer-ui-check
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      VITE_SUPABASE_URL: https://mfpdtlxwdbxitgfzdape.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-
+      VITE_R2_UPLOAD_API: https://amphon-product-images.noteroru2.workers.dev
+      VITE_PUBLIC_APP_URL: https://hub.amphon.co.th
+      VITE_SALES_SITE_URL: https://shop.amphon.co.th
+      VITE_AI_BUYER_API: https://amphon-ai-buyer.noteroru2.workers.dev
+      VITE_ALLOW_SIGNUP: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Hub
+        run: npm run build
