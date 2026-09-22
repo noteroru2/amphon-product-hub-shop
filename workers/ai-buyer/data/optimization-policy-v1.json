@@ -1,0 +1,351 @@
+{
+  "version": "AMPHON_AI_BUYER_OPTIMIZATION_V1",
+  "effectiveDate": "2026-09-22",
+  "runtime": {
+    "aiPausedDuringOptimization": true,
+    "lineWebhookCollectionContinues": true,
+    "outboundAiRepliesAllowed": false,
+    "objective": "Do not block pricing on non-essential photos. Price from sufficient model/spec evidence, preserve defects, and escalate only material ambiguity/risk."
+  },
+  "global": {
+    "evidencePriority": [
+      "CONFIRMED_TEXT",
+      "READABLE_MODEL_LABEL",
+      "ABOUT_OR_SYSTEM_SCREEN",
+      "CONFIRMED_IMAGE",
+      "INFERRED"
+    ],
+    "rules": {
+      "neverAskForSameEvidenceTwice": true,
+      "photosAreOptionalWhenPricingEvidenceSufficient": true,
+      "unknownConditionDoesNotEraseKnownDefects": true,
+      "knownDefectMustAdjustOrEscalate": true,
+      "multipleDeviceAmbiguityRequiresReview": true,
+      "conflictingModelOrSpecRequiresReview": true,
+      "priceBookFirst": true,
+      "marketFallbackWhenNoReliablePriceBookMatch": true,
+      "priceGuardHardMaxAlwaysAuthoritative": true
+    },
+    "reasonCodes": [
+      "READY_BY_COMPLETE_SPEC",
+      "READY_BY_MODEL_IDENTITY",
+      "READY_BY_MODEL_CODE",
+      "MISSING_PRODUCT_TYPE",
+      "MISSING_MODEL",
+      "MISSING_STORAGE_VARIANT",
+      "MISSING_CORE_SPEC",
+      "MODEL_SPEC_CONFLICT",
+      "MULTIPLE_DEVICES_AMBIGUOUS",
+      "MODEL_VARIANT_AMBIGUOUS",
+      "BATTERY_BAD",
+      "KNOWN_DEFECT_ADJUSTED",
+      "MAJOR_DAMAGE",
+      "DEVICE_NOT_BOOTING",
+      "LOCKED",
+      "MARKET_COMPARABLES_INSUFFICIENT",
+      "HUMAN_REVIEW_REQUIRED"
+    ]
+  },
+  "categories": {
+    "NOTEBOOK": {
+      "readiness": {
+        "primaryPath": {
+          "type": "SPEC",
+          "minIdentityConfidence": 0.8,
+          "required": [
+            "brand",
+            "series_or_model",
+            "cpu",
+            "gpu_or_integrated",
+            "ram",
+            "storage"
+          ]
+        },
+        "fallbackPath": {
+          "type": "MODEL_MARKET",
+          "minIdentityConfidence": 0.9,
+          "requiresExactModelCode": true,
+          "minSpecCompletenessWithModelCode": 0.35,
+          "minSpecCompletenessWithModelNameOnly": 0.6
+        },
+        "nonBlocking": [
+          "charger_photo",
+          "accessories_photo",
+          "battery_health",
+          "cosmetic_angles"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "model_or_series",
+        "cpu",
+        "gpu",
+        "ram",
+        "storage"
+      ],
+      "adjustmentsThb": {
+        "BATTERY_BAD": -800,
+        "NO_CHARGER": -500,
+        "ROUGH": -1000,
+        "KEY_MISSING": -800,
+        "KEYBOARD_BACKLIGHT_DEFECT": -300,
+        "KEYBOARD_DEFECT": -1500,
+        "TOUCHPAD_DEFECT": -800,
+        "SPEAKER_DEFECT": -500,
+        "WEBCAM_DEFECT": -400,
+        "MIC_DEFECT": -300,
+        "AUDIO_JACK_DEFECT": -300,
+        "USB_PORT_DEFECT": -600,
+        "WIFI_BT_DEFECT": -700,
+        "FINGERPRINT_DEFECT": -300,
+        "FAN_ABNORMAL": -700
+      },
+      "humanReview": {
+        "HINGE_ISSUE": -1500,
+        "SCREEN_DEFECT": -2000,
+        "CHARGING_PORT_DEFECT": -1200,
+        "THERMAL_OVERHEAT": -1200,
+        "PORT_MULTIPLE_DEFECT": -1500,
+        "BOARD_REPAIR_HISTORY": -2500,
+        "LIQUID_DAMAGE_HISTORY": -3000,
+        "INTERMITTENT_POWER": -3500,
+        "MAJOR_DAMAGE": -4000,
+        "DEVICE_NOT_BOOTING": -5000
+      }
+    },
+    "DESKTOP_PC": {
+      "readiness": {
+        "primaryPath": {
+          "type": "SPEC",
+          "minIdentityConfidence": 0.65,
+          "required": [
+            "cpu",
+            "gpu_or_integrated",
+            "ram",
+            "storage",
+            "motherboard",
+            "psu"
+          ]
+        },
+        "fallbackPath": {
+          "type": "MODEL_MARKET",
+          "minIdentityConfidence": 0.9,
+          "requiresExactCommercialModel": true
+        },
+        "nonBlocking": [
+          "full_case_photo",
+          "accessories_photo",
+          "cosmetic_angles"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "cpu",
+        "gpu",
+        "ram",
+        "storage",
+        "motherboard",
+        "psu"
+      ],
+      "adjustmentsThb": {
+        "ROUGH": -800
+      },
+      "humanReview": {
+        "INSTABILITY": -2500,
+        "MAJOR_DAMAGE": -3500,
+        "PSU_RISK": -800,
+        "SSD_HEALTH_LOW": -500
+      }
+    },
+    "SMARTPHONE": {
+      "readiness": {
+        "primaryPath": {
+          "type": "MODEL",
+          "minIdentityConfidence": 0.9,
+          "required": [
+            "brand",
+            "model",
+            "storage_variant"
+          ]
+        },
+        "nonBlocking": [
+          "battery_health",
+          "front_photo",
+          "back_photo",
+          "frame_photo",
+          "box",
+          "accessories"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "model",
+        "storage_variant"
+      ],
+      "adjustmentsThb": {
+        "BATTERY_BAD": -800,
+        "NO_BOX": -200,
+        "BODY_HEAVY": -700,
+        "SCREEN_DEFECT": -2000,
+        "MISSING_ACCESSORY": -200
+      },
+      "humanReview": [
+        "LOCKED",
+        "DEVICE_NOT_BOOTING",
+        "MAJOR_DAMAGE",
+        "MODEL_VARIANT_AMBIGUOUS"
+      ]
+    },
+    "TABLET": {
+      "readiness": {
+        "primaryPath": {
+          "type": "MODEL",
+          "minIdentityConfidence": 0.9,
+          "required": [
+            "brand",
+            "model",
+            "storage_variant"
+          ]
+        },
+        "nonBlocking": [
+          "battery_health",
+          "full_device_photo",
+          "frame_photo",
+          "box",
+          "accessories"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "model",
+        "storage_variant"
+      ],
+      "adjustmentsThb": {
+        "BATTERY_BAD": -800,
+        "NO_CHARGER": -300,
+        "NO_BOX": -200,
+        "BODY_HEAVY": -700,
+        "SCREEN_DEFECT": -1800,
+        "MISSING_ACCESSORY": -300
+      },
+      "humanReview": [
+        "LOCKED",
+        "DEVICE_NOT_BOOTING",
+        "MAJOR_DAMAGE",
+        "MODEL_VARIANT_AMBIGUOUS"
+      ]
+    },
+    "MACBOOK": {
+      "readiness": {
+        "primaryPath": {
+          "type": "MODEL",
+          "minIdentityConfidence": 0.9,
+          "required": [
+            "model_or_model_code",
+            "chip_or_year",
+            "storage"
+          ],
+          "preferred": [
+            "ram"
+          ]
+        },
+        "nonBlocking": [
+          "battery_health",
+          "charger_photo",
+          "box",
+          "cosmetic_angles"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "model_or_model_code",
+        "chip_or_year",
+        "storage"
+      ],
+      "adjustmentsThb": {
+        "BATTERY_BAD": -1500,
+        "NO_CHARGER": -500,
+        "NO_BOX": -300,
+        "BODY_HEAVY": -1000,
+        "SCREEN_DEFECT": -2500,
+        "HINGE_ISSUE": -1500,
+        "MISSING_ACCESSORY": -300
+      },
+      "humanReview": [
+        "LOCKED",
+        "DEVICE_NOT_BOOTING",
+        "MAJOR_DAMAGE",
+        "MODEL_VARIANT_AMBIGUOUS"
+      ]
+    },
+    "CAMERA": {
+      "readiness": {
+        "primaryPath": {
+          "type": "MODEL",
+          "minIdentityConfidence": 0.9,
+          "required": [
+            "brand",
+            "exact_model"
+          ],
+          "bundleRequiredWhenApplicable": [
+            "body_only_or_lens_bundle"
+          ]
+        },
+        "nonBlocking": [
+          "serial_label",
+          "box",
+          "accessories",
+          "extra_angles"
+        ]
+      },
+      "askOnlyWhenMissing": [
+        "exact_model",
+        "body_or_lens_bundle"
+      ],
+      "adjustmentsThb": {
+        "BATTERY_BAD": -500,
+        "NO_CHARGER": -500,
+        "NO_BOX": -200,
+        "BODY_HEAVY": -700,
+        "SCREEN_DEFECT": -1000,
+        "MISSING_ACCESSORY": -500
+      },
+      "humanReview": [
+        "DEVICE_NOT_BOOTING",
+        "MAJOR_DAMAGE",
+        "MODEL_VARIANT_AMBIGUOUS",
+        "MULTIPLE_DEVICES_AMBIGUOUS"
+      ]
+    },
+    "OTHER": {
+      "readiness": {
+        "primaryPath": {
+          "type": "HUMAN_REVIEW_BY_DEFAULT"
+        },
+        "autoPricingEnabled": false
+      },
+      "askOnlyWhenMissing": [
+        "product_type",
+        "brand",
+        "model"
+      ],
+      "humanReview": [
+        "ALL_UNSUPPORTED_OR_RARE_ITEMS"
+      ]
+    }
+  },
+  "batteryPolicy": {
+    "badThresholdPercentExclusive": 80,
+    "textualSignals": [
+      "significantly degraded",
+      "service recommended",
+      "แบตเสื่อม",
+      "ไม่เก็บไฟ",
+      "หมดไว"
+    ],
+    "rule": "If known bad, BATTERY_BAD must survive future analyses and price must be adjusted or escalated."
+  },
+  "acceptance": {
+    "completeSpecStillWaitingForPhoto": 0,
+    "clearModelStillUnidentified": 0,
+    "knownBatteryBadPricedAsNormal": 0,
+    "duplicateEvidenceRequests": 0,
+    "targetAutoPriceRateMin": 0.4,
+    "targetHumanReviewRateMax": 0.3
+  }
+}
