@@ -83,6 +83,9 @@ type IntakeAction =
 
 type RequestedInput =
   | 'PRODUCT_TYPE'
+  | 'MODEL'
+  | 'STORAGE_VARIANT'
+  | 'CORE_SPEC'
   | 'FULL_DEVICE'
   | 'FRONT_OPEN'
   | 'KEYBOARD'
@@ -180,7 +183,7 @@ const CATEGORIES: ProductCategory[] = [
 ]
 
 const REQUESTED_INPUTS: RequestedInput[] = [
-  'PRODUCT_TYPE','FULL_DEVICE','FRONT_OPEN','KEYBOARD','BOTTOM_LABEL','SYSTEM_INFO',
+  'PRODUCT_TYPE','MODEL','STORAGE_VARIANT','CORE_SPEC','FULL_DEVICE','FRONT_OPEN','KEYBOARD','BOTTOM_LABEL','SYSTEM_INFO',
   'DEFECT_CLOSEUP','CHARGER','BACK','FRAME','ABOUT_SCREEN','BATTERY_HEALTH',
   'PC_INTERIOR','CPU_GPU_SCREEN','CAMERA_FRONT_BACK','LENS_FRONT_REAR',
   'SERIAL_LABEL','ACCESSORIES',
@@ -251,6 +254,7 @@ const SYSTEM_PROMPT = [
   'Ask only for information still missing and materially useful for exact identity, important spec, condition, or accessories.',
   'Do not request something already visible or explicitly answered in the conversation.',
   'requested_inputs must contain at most 3 items, most useful first.',
+  'When only one material text fact is missing, prefer MODEL, STORAGE_VARIANT, or CORE_SPEC instead of asking for unrelated photos. Use photo inputs only when visual evidence is actually necessary.',
   'READY_TO_PRICE means enough evidence exists for the separate Pricing Engine. It does not mean you know a price.',
   'AMPHON business rule: for NOTEBOOK and DESKTOP_PC, complete confirmed pricing specs are sufficient to price even when extra condition photos are still unavailable. Do not keep asking for photos solely to improve condition once core pricing specs are complete.',
   'Desktop core pricing specs are CPU, GPU, RAM and storage. Motherboard and PSU improve accuracy but are not hard prerequisites; if missing, the Pricing Engine must use conservative default values. Notebook core pricing specs are brand, series, CPU, GPU, RAM and storage.',
@@ -635,6 +639,9 @@ function sanitizeRequestedInputs(result: IntakeResult): IntakeResult {
     || result.pricing_tags.includes('NO_CHARGER')
 
   const requested = result.requested_inputs.filter((input) => {
+    if (input === 'MODEL') return !hasModel
+    if (input === 'STORAGE_VARIANT') return !hasAnyConfirmedFact(result, 'storage', 'capacity', 'ssd')
+    if (input === 'CORE_SPEC') return !specCompleteForPricing(result)
     if (input === 'BOTTOM_LABEL' || input === 'SERIAL_LABEL') return !hasModel
     if (input === 'SYSTEM_INFO') return !(hasCoreComputerSpec && hasGpu)
     if (input === 'CPU_GPU_SCREEN') return !(hasConfirmedFact(result, 'cpu') && hasGpu)
@@ -955,6 +962,9 @@ async function completeAnalysisRun(
 function inputLabel(code: RequestedInput) {
   const labels: Record<RequestedInput, string> = {
     PRODUCT_TYPE: 'สินค้าที่ต้องการขาย',
+    MODEL: 'รุ่นสินค้า',
+    STORAGE_VARIANT: 'ความจุเครื่อง',
+    CORE_SPEC: 'สเปกหลักของเครื่อง',
     FULL_DEVICE: 'รูปตัวเครื่องเต็มๆ',
     FRONT_OPEN: 'รูปหน้าเครื่องตอนเปิดจอ',
     KEYBOARD: 'รูปคีย์บอร์ดและตัวเครื่อง',
