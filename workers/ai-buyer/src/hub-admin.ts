@@ -817,7 +817,16 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       return hubAdminResponse(request, env, {
         ok: true,
         viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
-        summary: { total: 0, priced: 0, humanReview: 0, actionRequired: 0, accepted: 0 },
+        summary: {
+          total: 0,
+          priced: 0,
+          humanReview: 0,
+          actionRequired: 0,
+          accepted: 0,
+          purchased: 0,
+          sold: 0,
+          grossProfit: 0,
+        },
         openai,
         modes,
         cases: [],
@@ -828,7 +837,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
     const inCases = caseIds.join(',')
     const inCustomers = customerIds.join(',')
 
-    const [customers, pricing, offers, tasks, images, messages, modes, openai] = await Promise.all([
+    const [customers, pricing, offers, tasks, images, messages, outcomes, dealSummaries, modes, openai] = await Promise.all([
       customerIds.length
         ? serviceRows<any>(env,
           'ai_buyer_customers?id=in.(' + inCustomers + ')&select=id,display_name,picture_url,phone')
@@ -851,6 +860,11 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
         'ai_buyer_messages?case_id=in.(' + inCases + ')&direction=eq.INBOUND'
           + '&select=id,case_id,message_type,text_content,created_at'
           + '&order=created_at.desc&limit=400'),
+      serviceRows<any>(env,
+        'ai_buyer_case_outcomes?case_id=in.(' + inCases + ')'
+          + '&select=id,case_id,final_label,final_agreed_price,purchase_price,reason_code,note,outcome_at,verified,updated_at'),
+      serviceRows<any>(env,
+        'ai_buyer_deal_ledger_case_v?case_id=in.(' + inCases + ')&select=*'),
       modesPromise,
       openAIPromise,
     ])
@@ -860,6 +874,8 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
     const offerByCase = firstByCase(offers)
     const taskByCase = firstByCase(tasks)
     const lastMessageByCase = firstByCase(messages)
+    const outcomeByCase = firstByCase(outcomes)
+    const dealByCase = firstByCase(dealSummaries)
     const imageCountByCase = countByCase(images)
 
     const items = cases.map((row) => {
@@ -868,6 +884,8 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       const offer: any = offerByCase.get(row.id) || null
       const task: any = taskByCase.get(row.id) || null
       const message: any = lastMessageByCase.get(row.id) || null
+      const outcome: any = outcomeByCase.get(row.id) || null
+      const deal: any = dealByCase.get(row.id) || null
       return {
         id: row.id,
         title: row.title || 'ยังไม่ระบุสินค้า',
@@ -921,6 +939,27 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
           text: clean(message.text_content, 220) || null,
           createdAt: message.created_at,
         } : null,
+        finalOutcome: outcome ? {
+          id: outcome.id,
+          label: outcome.final_label,
+          finalAgreedPrice: numberValue(outcome.final_agreed_price),
+          purchasePrice: numberValue(outcome.purchase_price),
+          reasonCode: outcome.reason_code || null,
+          note: outcome.note || null,
+          outcomeAt: outcome.outcome_at,
+          verified: Boolean(outcome.verified),
+        } : null,
+        deal: deal ? {
+          ledgerLines: Number(deal.ledger_lines || 0),
+          purchaseTotal: numberValue(deal.purchase_total),
+          totalCost: numberValue(deal.total_cost),
+          saleTotal: numberValue(deal.sale_total),
+          grossProfit: numberValue(deal.gross_profit),
+          soldLines: Number(deal.sold_lines || 0),
+          inStockLines: Number(deal.in_stock_lines || 0),
+          firstAcquiredAt: deal.first_acquired_at || null,
+          lastSoldAt: deal.last_sold_at || null,
+        } : null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }
@@ -935,6 +974,9 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
         humanReview: items.filter((item) => item.state === 'HUMAN_REVIEW').length,
         actionRequired: items.filter((item) => item.state === 'ACTION_REQUIRED' || item.task?.status === 'ACTION_REQUIRED').length,
         accepted: items.filter((item) => item.acceptedPrice != null).length,
+        purchased: items.filter((item) => item.finalOutcome?.label === 'PURCHASED').length,
+        sold: items.reduce((sum, item) => sum + Number(item.deal?.soldLines || 0), 0),
+        grossProfit: items.reduce((sum, item) => sum + Number(item.deal?.grossProfit || 0), 0),
       },
       openai,
       modes,
