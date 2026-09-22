@@ -2,6 +2,7 @@
 import { indexCategories } from '../config/catalog'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { absoluteUrl } from '../lib/seo'
+import { MAIN_BUYBACK_URL } from '../config/ecosystem'
 import '../styles/global.css'
 import '../styles/auth.css'
 import '../styles/mobile-first.css'
@@ -115,6 +116,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
             <a href="/warranty/">การรับประกัน</a>
             <a href="/returns/">การคืนสินค้า</a>
             <a href="/new-arrivals/">สินค้าเข้าใหม่</a>
+            <a href={MAIN_BUYBACK_URL}>ขายสินค้าให้เรา</a>
           </nav>
           <div class="footer-small">
             ช่องทางทางการ:

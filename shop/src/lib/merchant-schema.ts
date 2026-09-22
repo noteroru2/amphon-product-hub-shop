@@ -1,4 +1,5 @@
 import type { StoreProduct, StoreSettings } from './store-api'
+import { MAIN_ORGANIZATION_ID } from '../config/ecosystem'
 import { absoluteUrl } from './seo'
 
 export function merchantItemConditionSchema(product: StoreProduct) {
@@ -92,6 +93,7 @@ export function buildMerchantOrganizationSchema(settings: StoreSettings | null) 
     name,
     url: settings?.siteUrl || absoluteUrl('/'),
     ...(settings?.legalName ? { legalName: settings.legalName } : {}),
+    parentOrganization: { '@id': MAIN_ORGANIZATION_ID },
     ...(returnPolicy ? { hasMerchantReturnPolicy: returnPolicy } : {}),
   }
 }

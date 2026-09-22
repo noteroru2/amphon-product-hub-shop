@@ -1,6 +1,7 @@
 ---
 import ProductCard from '../../components/ProductCard.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import BuybackCTA from '../../components/BuybackCTA.astro'
 import { catalogCategories, getCategoryBySlug } from '../../config/catalog'
 import { getCategorySeoContent } from '../../config/category-seo-content'
 import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
@@ -111,6 +112,8 @@ const schema = [
       )}
     </div>
   </section>
+
+  <BuybackCTA categorySlug={category.slug} />
 
   {seoContent && (
     <section class="section category-commercial-content">

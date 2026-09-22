@@ -1,0 +1,66 @@
+---
+import { getBuybackTarget, MAIN_BUYBACK_URL } from '../config/ecosystem';
+
+interface Props {
+  categorySlug?: string | null;
+}
+
+const { categorySlug = null } = Astro.props;
+const target = getBuybackTarget(categorySlug);
+const href = target?.href ?? MAIN_BUYBACK_URL;
+const itemName = target?.itemName ?? 'สินค้าไอที';
+const label = target?.label ?? 'ประเมินราคาขายสินค้าไอที';
+---
+
+<section class="section ecosystem-buyback-section" aria-label="ขายเครื่องเก่าให้อำพล เทรดดิ้ง">
+  <div class="container">
+    <div class="panel ecosystem-buyback">
+      <div>
+        <div class="eyebrow">มีเครื่องเก่าอยากขาย?</div>
+        <h2>มี{itemName}ที่ไม่ได้ใช้ เปลี่ยนเป็นเงินสดได้</h2>
+        <p>
+          AMPHON SHOP หน้านี้เน้นเลือกซื้อสินค้า หากต้องการขายเครื่องเก่า ให้ส่งรุ่น สเปก รูปและสภาพไปยังเว็บไซต์รับซื้อของ AMPHON TRADING เพื่อประเมินราคาเบื้องต้น
+        </p>
+      </div>
+      <a class="button button-secondary ecosystem-buyback-action" href={href}>{label} →</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ecosystem-buyback {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px 28px;
+    align-items: center;
+    padding: 24px;
+  }
+
+  .ecosystem-buyback h2 {
+    margin: 6px 0 8px;
+    font-size: clamp(1.3rem, 2.5vw, 1.85rem);
+  }
+
+  .ecosystem-buyback p {
+    max-width: 760px;
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .ecosystem-buyback-action {
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .ecosystem-buyback {
+      grid-template-columns: 1fr;
+      padding: 20px;
+    }
+
+    .ecosystem-buyback-action {
+      width: 100%;
+      white-space: normal;
+    }
+  }
+</style>

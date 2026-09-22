@@ -5,6 +5,8 @@ import { indexCategories } from '../config/catalog'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { listStoreProducts, type StoreProduct } from '../lib/store-api'
 import { absoluteUrl } from '../lib/seo'
+import BuybackCTA from '../components/BuybackCTA.astro'
+import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/ecosystem'
 
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
@@ -20,21 +22,35 @@ try {
 
 const title = 'สินค้าไอทีมือสองออนไลน์ | AMPHON TRADING'
 const description = 'เลือกซื้อโน้ตบุ๊ก iPhone คอมพิวเตอร์ กล้อง จอคอม และสินค้าไอทีมือสอง พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะพร้อมจำหน่ายก่อนสั่งซื้อ'
-const schema = [
+const schema: Record<string, unknown>[] = [
   {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'AMPHON SHOP',
     url: absoluteUrl('/'),
+    publisher: { '@id': MAIN_ORGANIZATION_ID },
   },
   {
     '@context': 'https://schema.org',
     '@type': 'OnlineStore',
+    '@id': `${absoluteUrl('/')}#store`,
     name: 'AMPHON TRADING',
+    legalName: MAIN_LEGAL_NAME,
     url: absoluteUrl('/'),
+    parentOrganization: { '@id': MAIN_ORGANIZATION_ID },
     sameAs: [mainWebsiteUrl, facebookPageUrl],
   },
 ]
+
+schema.push({
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': MAIN_ORGANIZATION_ID,
+  name: 'อำพล เทรดดิ้ง',
+  alternateName: 'AMPHON TRADING',
+  legalName: MAIN_LEGAL_NAME,
+  url: MAIN_SITE_URL,
+})
 
 const categoryLooks: Record<string, { icon: string; note: string }> = {
   notebooks: { icon: '💻', note: 'เรียน • ทำงาน • พกไปใช้ข้างนอก' },
@@ -137,5 +153,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
       </div>
     </div>
   </section>
+
+  <BuybackCTA />
 
 </BaseLayout>
