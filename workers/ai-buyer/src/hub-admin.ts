@@ -403,6 +403,96 @@ function countByCase<T extends { case_id: string }>(rows: T[]) {
   return map
 }
 
+export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEnv) {
+  try {
+    await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+    const caseId = clean(url.searchParams.get('caseId'), 100)
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+
+    const cases = await serviceRows<any>(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=id,conversation_id,customer_id,state,category,title,control_mode,identity_confidence,spec_completeness,condition_completeness,pricing_readiness,accepted_price,accepted_at,metadata,created_at,updated_at&limit=1',
+    )
+    const caseRow = cases[0]
+    if (!caseRow) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_NOT_FOUND' }, 404)
+    }
+
+    const [customers, messages, pricing, outcomes, ledger, images, observations] = await Promise.all([
+      serviceRows<any>(
+        env,
+        'ai_buyer_customers?id=eq.' + encodeURIComponent(caseRow.customer_id)
+          + '&select=id,display_name,picture_url,phone&limit=1',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_messages?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,direction,message_type,text_content,metadata,line_timestamp,created_at'
+          + '&order=created_at.asc&limit=500',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_pricing_decisions?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,price_source,estimated_resale,opening_offer,target_buy,hard_max,current_authorized_offer,pricing_confidence,adjustments,rationale,created_at'
+          + '&order=created_at.desc&limit=5',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_case_outcomes?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,final_label,final_agreed_price,purchase_price,reason_code,note,outcome_at,verified,updated_at&limit=1',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_deal_ledger?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=*&order=line_no.asc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_case_images?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,object_key,analysis_status,created_at&order=created_at.asc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_product_observations?case_id=eq.' + encodeURIComponent(caseId)
+          + '&select=id,source,confirmed,inferred,unknown_fields,model_name,model_code,category,identity_confidence,created_at'
+          + '&order=created_at.desc&limit=10',
+      ),
+    ])
+
+    const summary = await serviceRows<any>(
+      env,
+      'ai_buyer_deal_ledger_case_v?case_id=eq.' + encodeURIComponent(caseId)
+        + '&select=*',
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      case: caseRow,
+      customer: customers[0] || null,
+      messages,
+      pricing,
+      finalOutcome: outcomes[0] || null,
+      ledger,
+      dealSummary: summary[0] || null,
+      images,
+      observations,
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminManualReply(request: Request, env: HubAdminEnv) {
   try {
     const { user, profile } = await authenticateAdmin(request, env)
