@@ -81,7 +81,7 @@ async function request<T>(
 export type AiBuyerDashboardCase = {
   id: string;
   title: string;
-  category?: string | null;
+  category: string | null;
   state: string;
   controlMode: string;
   confidence: {
@@ -151,8 +151,8 @@ export type AiBuyerDashboardCase = {
     lastSoldAt?: string | null;
   } | null;
   needsFinalLabel?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AiBuyerDashboardData = {
@@ -170,7 +170,7 @@ export type AiBuyerDashboardData = {
     needsFinalLabel?: number;
   };
   openai?: AiBuyerOpenAISpend;
-  modes?: AiBuyerRolloutMode[];
+  modes: AiBuyerRolloutMode[];
   cases: AiBuyerDashboardCase[];
   generatedAt: string;
 };
