@@ -24,7 +24,9 @@
       "conflictingModelOrSpecRequiresReview": true,
       "priceBookFirst": true,
       "marketFallbackWhenNoReliablePriceBookMatch": true,
-      "priceGuardHardMaxAlwaysAuthoritative": true
+      "priceGuardHardMaxAlwaysAuthoritative": true,
+      "sellIntentRequiredForPricing": true,
+      "oneActiveCasePerConversation": true
     },
     "reasonCodes": [
       "READY_BY_COMPLETE_SPEC",
@@ -121,9 +123,12 @@
             "cpu",
             "gpu_or_integrated",
             "ram",
-            "storage",
+            "storage"
+          ],
+          "optionalConservativeDefaults": [
             "motherboard",
-            "psu"
+            "psu",
+            "system_class"
           ]
         },
         "fallbackPath": {
@@ -141,9 +146,7 @@
         "cpu",
         "gpu",
         "ram",
-        "storage",
-        "motherboard",
-        "psu"
+        "storage"
       ],
       "adjustmentsThb": {
         "ROUGH": -800
