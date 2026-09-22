@@ -3,6 +3,7 @@ import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pric
 import { runPricingForCase } from './pricing-router'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 import {
+  handleHubAdminCaseDetail,
   handleHubAdminDashboard,
   handleHubAdminDealLedger,
   handleHubAdminFinalOutcome,
@@ -1473,8 +1474,12 @@ export default {
       return handleHubAdminDashboard(request, env)
     }
 
+    if (url.pathname === '/v1/hub/admin/case' && request.method === 'GET') {
+      return handleHubAdminCaseDetail(request, env)
+    }
+
     if (
-      ['/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
