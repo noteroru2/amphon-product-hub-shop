@@ -124,5 +124,51 @@
   ],
   "alreadyPricedCount": 3,
   "expectedDeterministicPriceCoverage": 14,
-  "totalEvidenceReady": 17
+  "totalEvidenceReady": 17,
+  "specPricingPreviews": [
+    {
+      "caseId": "6ed54ba9-b84f-49c2-8cb9-15dd16141aef",
+      "category": "DESKTOP_PC",
+      "estimatedResale": 9900,
+      "expected": {
+        "opening": 3900,
+        "target": 4200,
+        "hardMax": 4700
+      }
+    },
+    {
+      "caseId": "fc75ebe4-4a91-4614-9dda-f28ab18914bd",
+      "category": "NOTEBOOK",
+      "estimatedResale": 12600,
+      "expected": {
+        "opening": 5600,
+        "target": 6000,
+        "hardMax": 6600
+      }
+    },
+    {
+      "caseId": "501518b1-80a7-47be-b64f-0a40d784c1f6f09",
+      "category": "NOTEBOOK",
+      "estimatedResale": 16400,
+      "expected": {
+        "opening": 7500,
+        "target": 8000,
+        "hardMax": 8800
+      }
+    }
+  ],
+  "staleDecisionSafety": [
+    {
+      "caseId": "6ed54ba9-b84f-49c2-8cb9-15dd16141aef",
+      "expectedState": "READY_TO_PRICE"
+    },
+    {
+      "caseId": "fc75ebe4-4a91-4614-9dda-f28ab18914bd",
+      "expectedState": "READY_TO_PRICE"
+    },
+    {
+      "caseId": "501518b1-80a7-47be-b64f-0a40d784c1f6f09",
+      "expectedState": "READY_TO_PRICE"
+    }
+  ]
 }
