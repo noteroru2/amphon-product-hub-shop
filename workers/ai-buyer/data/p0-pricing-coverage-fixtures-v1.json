@@ -1,68 +1,68 @@
 {
   "version": "P0_PRICING_COVERAGE_V1",
-  "expectedActivePriceBook": "AMPHON Master Price Book V2.4 P0 Coverage",
+  "expectedActivePriceBook": "AMPHON Master Price Book V2.5 Conservative",
   "directPriceBookCases": [
     {
       "caseId": "6b50df44-5b7e-4aff-8cfe-b45f5bad2910",
       "entryModel": "Digital IXUS 70",
       "expected": {
-        "opening": 2500,
-        "target": 2700,
-        "hardMax": 3100
+        "opening": 2100,
+        "target": 2300,
+        "hardMax": 2600
       }
     },
     {
       "caseId": "cb30cab5-d7bb-40f8-9a1c-d52a079196e5",
       "entryModel": "PowerShot A3200 IS",
       "expected": {
-        "opening": 2500,
-        "target": 2700,
-        "hardMax": 3100
+        "opening": 2100,
+        "target": 2300,
+        "hardMax": 2600
       }
     },
     {
       "caseId": "a6747df7-ffec-4bd2-8951-80c8e9b11401",
       "entryModel": "Osmo Action 4",
       "expected": {
-        "opening": 2300,
-        "target": 2500,
-        "hardMax": 2900
+        "opening": 2000,
+        "target": 2200,
+        "hardMax": 2500
       }
     },
     {
       "caseId": "7d4fa572-8069-486c-acca-ec30eaaf2653",
       "entryModel": "Instax Mini Evo",
       "expected": {
-        "opening": 2600,
-        "target": 2900,
-        "hardMax": 3300
+        "opening": 2200,
+        "target": 2500,
+        "hardMax": 2800
       }
     },
     {
       "caseId": "0d3ccb0f-9bde-4ce9-b8fe-414e4b51e8aa",
       "entryModel": "MacBook Pro 16-inch 2019 i7 32GB 512GB",
       "expected": {
-        "opening": 7600,
-        "target": 8100,
-        "hardMax": 9000
+        "opening": 6800,
+        "target": 7300,
+        "hardMax": 8000
       }
     },
     {
       "caseId": "254f5381-e4e4-4c9f-b7dd-831bb8285af1",
       "entryModel": "ExpertBook B3402FE i5",
       "expected": {
-        "opening": 5500,
-        "target": 5900,
-        "hardMax": 6400
+        "opening": 4900,
+        "target": 5300,
+        "hardMax": 5700
       }
     },
     {
       "caseId": "eb31cd76-f511-4ca3-824f-72a63d5a6431",
       "entryModel": "Aspire Go 15 AG15-72P Core 5 120U 16GB",
       "expected": {
-        "opening": 6600,
-        "target": 7100,
-        "hardMax": 7600
+        "opening": 5900,
+        "target": 6300,
+        "hardMax": 6800
       }
     },
     {
@@ -70,9 +70,9 @@
       "entryModel": "iPhone 11",
       "requiredTag": "BATTERY_BAD",
       "expected": {
-        "opening": 1300,
-        "target": 1500,
-        "hardMax": 1800
+        "opening": 1100,
+        "target": 1300,
+        "hardMax": 1600
       },
       "entryModelCode": "IPHONE11-64"
     },
@@ -81,27 +81,27 @@
       "entryModel": "iPhone 15 Pro Max",
       "derivedTag": "BACK_PANEL_REPLACED",
       "expected": {
-        "opening": 11200,
-        "target": 12100,
-        "hardMax": 13700
+        "opening": 9500,
+        "target": 10500,
+        "hardMax": 12000
       }
     },
     {
       "caseId": "1f441860-498e-47be-b64f-0a40d784c1ef",
       "entryModel": "MatePad T10s 3GB/64GB LTE",
       "expected": {
-        "opening": 1500,
-        "target": 1600,
-        "hardMax": 1800
+        "opening": 1200,
+        "target": 1400,
+        "hardMax": 1600
       }
     },
     {
       "caseId": "1fcae414-f315-4154-bc49-f7284e2363a0",
       "entryModel": "Pad 7 Pro 12GB/512GB",
       "expected": {
-        "opening": 6600,
-        "target": 7100,
-        "hardMax": 8000
+        "opening": 6000,
+        "target": 6500,
+        "hardMax": 7300
       }
     }
   ],
