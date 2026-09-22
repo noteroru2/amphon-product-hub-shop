@@ -25,6 +25,11 @@ const required = [
   'workers/ai-buyer/data/p0-regression-fixtures-v1.json',
   'scripts/run-ai-buyer-p0-offline-replay.mjs',
   'docs/ai-buyer/P0_REGRESSION_OFFLINE_REPLAY_REPORT.md',
+  'workers/ai-buyer/src/hub-admin.ts',
+  'supabase/migrations/20260922195000_ai_buyer_p0_deal_outcome_manual_reply.sql',
+  'supabase/migrations/20260922200500_ai_buyer_manual_reply_line_id.sql',
+  'supabase/migrations/20260922201500_ai_buyer_learning_dataset_views.sql',
+  'docs/ai-buyer/P0_DEAL_OUTCOME_LEDGER.md',
 ]
 
 for (const file of required) {
@@ -45,6 +50,9 @@ const specPricing = fs.readFileSync('workers/ai-buyer/src/spec-pricing-engine.ts
 const pricingRouter = fs.readFileSync('workers/ai-buyer/src/pricing-router.ts', 'utf8')
 const negotiation = fs.readFileSync('workers/ai-buyer/src/negotiation-engine.ts', 'utf8')
 const wrangler = fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8')
+const hubAdmin = fs.readFileSync('workers/ai-buyer/src/hub-admin.ts', 'utf8')
+const outcomeSql = fs.readFileSync('supabase/migrations/20260922195000_ai_buyer_p0_deal_outcome_manual_reply.sql', 'utf8')
+const datasetSql = fs.readFileSync('supabase/migrations/20260922201500_ai_buyer_learning_dataset_views.sql', 'utf8')
 
 for (const token of [
   "request.headers.get('x-line-signature')",
@@ -238,6 +246,58 @@ for (const token of [
   'approvePreparedOffer',
 ]) {
   if (!worker.includes(token)) throw new Error(`AI Buyer checkpoint 4 admin invariant missing: ${token}`)
+}
+
+for (const token of [
+  '/v1/hub/admin/manual-reply',
+  '/v1/hub/admin/final-outcome',
+  '/v1/hub/admin/deal-ledger',
+  'handleHubAdminManualReply',
+  'handleHubAdminFinalOutcome',
+  'handleHubAdminDealLedger',
+]) {
+  if (!worker.includes(token)) throw new Error(`AI Buyer P0 Hub route missing: ${token}`)
+}
+
+for (const token of [
+  'ai_buyer_prepare_manual_reply',
+  'ai_buyer_finalize_manual_reply',
+  'OWNER_MANUAL',
+  'ai_buyer_case_outcomes',
+  'ai_buyer_deal_ledger',
+  'needsFinalLabel',
+  'X-Line-Retry-Key',
+]) {
+  if (!hubAdmin.includes(token)) throw new Error(`AI Buyer P0 Hub learning invariant missing: ${token}`)
+}
+
+for (const token of [
+  'ai_buyer_case_outcomes',
+  'ai_buyer_deal_ledger',
+  'AGREED_PENDING_HANDOVER',
+  'PURCHASED',
+  'CUSTOMER_DECLINED_PRICE',
+  'OWNER_MANUAL',
+  'MANUAL_REPLY',
+  'ai_buyer_prepare_manual_reply',
+  'ai_buyer_finalize_manual_reply',
+  'ai_buyer_sync_deal_ledger',
+  'CUSTOMER_ACCEPTED',
+  'CUSTOMER_DECLINED',
+  'PRICE_QUOTE',
+]) {
+  if (!outcomeSql.includes(token)) throw new Error(`AI Buyer P0 outcome/ledger invariant missing: ${token}`)
+}
+
+for (const token of [
+  'ai_buyer_learning_deal_dataset_v',
+  'ai_buyer_final_label_queue_v',
+  'gross_profit',
+  'inventory_days',
+  'gross_margin_percent',
+  'roi_percent',
+]) {
+  if (!datasetSql.includes(token)) throw new Error(`AI Buyer P0 learning dataset invariant missing: ${token}`)
 }
 
 for (const token of [
