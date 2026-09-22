@@ -88,9 +88,9 @@
     },
     {
       "caseId": "145ce434-bc82-42a5-a1ac-dd87298bcb20",
-      "name": "Custom PC missing motherboard and PSU",
-      "expectedBucket": "B_NEEDS_INFO",
-      "expectedReason": "MISSING_CORE_SPEC"
+      "name": "Custom PC with CPU/GPU/RAM/storage; motherboard/PSU use conservative defaults",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_COMPLETE_SPEC"
     }
   ]
 }
