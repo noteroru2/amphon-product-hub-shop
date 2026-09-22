@@ -113,6 +113,7 @@ type PricingTag =
   | 'DEVICE_NOT_BOOTING'
   | 'LOCKED'
   | 'MISSING_ACCESSORY'
+  | 'BACK_PANEL_REPLACED'
   | 'MAJOR_DAMAGE'
   | 'KEYBOARD_DEFECT'
   | 'KEYBOARD_BACKLIGHT_DEFECT'
@@ -135,7 +136,7 @@ type PricingTag =
 
 const PRICING_TAGS: PricingTag[] = [
   'NO_CHARGER','BATTERY_BAD','SCREEN_DEFECT','BODY_HEAVY','HINGE_ISSUE',
-  'NO_BOX','DEVICE_NOT_BOOTING','LOCKED','MISSING_ACCESSORY','MAJOR_DAMAGE',
+  'NO_BOX','DEVICE_NOT_BOOTING','LOCKED','MISSING_ACCESSORY','BACK_PANEL_REPLACED','MAJOR_DAMAGE',
   'KEYBOARD_DEFECT','KEYBOARD_BACKLIGHT_DEFECT','TOUCHPAD_DEFECT','USB_PORT_DEFECT',
   'SPEAKER_DEFECT','WEBCAM_DEFECT','MIC_DEFECT','AUDIO_JACK_DEFECT','WIFI_BT_DEFECT',
   'FINGERPRINT_DEFECT','CHARGING_PORT_DEFECT','FAN_ABNORMAL','THERMAL_OVERHEAT',
@@ -582,14 +583,35 @@ function applyDeterministicConditionTags(result: IntakeResult) {
     || /significantly\s+degraded|service\s+recommended|battery\s+(?:bad|degraded|worn)|แบต(?:เตอรี่)?(?:เสื่อม|ไม่เก็บไฟ|หมดไว)/i.test(batteryText)
   )
 
-  if (!batteryBad || result.pricing_tags.includes('BATTERY_BAD')) return result
-  const pricingTags: PricingTag[] = result.pricing_tags
-    .concat('BATTERY_BAD' as PricingTag)
-    .slice(0, 10)
+  const conditionText = [
+    confirmedFactValue(result, 'condition', 'defects', 'body_condition'),
+    ...result.flags,
+  ].join(' ')
+
+  const derivedTags: PricingTag[] = []
+  if (batteryBad && !result.pricing_tags.includes('BATTERY_BAD')) {
+    derivedTags.push('BATTERY_BAD')
+  }
+  if (
+    /back\s*panel\s*(?:has\s*been\s*)?replaced|back_panel_replaced|ฝาหลัง(?:ถูก)?เปลี่ยน/i.test(conditionText)
+    && !result.pricing_tags.includes('BACK_PANEL_REPLACED')
+  ) {
+    derivedTags.push('BACK_PANEL_REPLACED')
+  }
+  if (!derivedTags.length) return result
+
+  const pricingTags = Array.from(new Set([
+    ...result.pricing_tags,
+    ...derivedTags,
+  ])).slice(0, 10) as PricingTag[]
   return {
     ...result,
     pricing_tags: pricingTags,
-    flags: Array.from(new Set([...result.flags, 'BATTERY_BAD_DETERMINISTIC'])).slice(0, 12),
+    flags: Array.from(new Set([
+      ...result.flags,
+      ...(derivedTags.includes('BATTERY_BAD') ? ['BATTERY_BAD_DETERMINISTIC'] : []),
+      ...(derivedTags.includes('BACK_PANEL_REPLACED') ? ['BACK_PANEL_REPLACED_DETERMINISTIC'] : []),
+    ])).slice(0, 12),
   }
 }
 
