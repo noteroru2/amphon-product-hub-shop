@@ -2,7 +2,13 @@ export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
 import { runPricingForCase } from './pricing-router'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
-import { handleHubAdminDashboard, handleHubAdminPreflight } from './hub-admin'
+import {
+  handleHubAdminDashboard,
+  handleHubAdminDealLedger,
+  handleHubAdminFinalOutcome,
+  handleHubAdminManualReply,
+  handleHubAdminPreflight,
+} from './hub-admin'
 
 interface Env {
   IMAGES: R2Bucket
@@ -1465,6 +1471,28 @@ export default {
 
     if (url.pathname === '/v1/hub/admin/dashboard' && request.method === 'GET') {
       return handleHubAdminDashboard(request, env)
+    }
+
+    if (
+      ['/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
+      && request.method === 'OPTIONS'
+    ) {
+      return handleHubAdminPreflight(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/manual-reply' && request.method === 'POST') {
+      return handleHubAdminManualReply(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/final-outcome' && request.method === 'POST') {
+      return handleHubAdminFinalOutcome(request, env)
+    }
+
+    if (
+      url.pathname === '/v1/hub/admin/deal-ledger'
+      && (request.method === 'GET' || request.method === 'POST')
+    ) {
+      return handleHubAdminDealLedger(request, env)
     }
 
     if (url.pathname === '/v1/admin/case/reprocess' && request.method === 'POST') {
