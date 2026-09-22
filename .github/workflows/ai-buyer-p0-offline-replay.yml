@@ -25,7 +25,8 @@ jobs:
           node-version: '22'
       - name: Verify AI remains paused
         shell: bash
-        run: grep -q '"AI_BUYER_PAUSED": "true"' workers/ai-buyer/wrangler.jsonc
+        run: |
+          grep -q '"AI_BUYER_PAUSED": "true"' workers/ai-buyer/wrangler.jsonc
       - name: Run P0 regression and offline replay
         env:
           SUPABASE_URL: https://mfpdtlxwdbxitgfzdape.supabase.co
