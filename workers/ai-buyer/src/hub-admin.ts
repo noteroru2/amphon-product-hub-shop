@@ -432,7 +432,7 @@ export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEn
       serviceRows<any>(
         env,
         'ai_buyer_messages?case_id=eq.' + encodeURIComponent(caseId)
-          + '&select=id,direction,message_type,text_content,metadata,line_timestamp,created_at'
+          + '&select=id,line_message_id,direction,message_type,text_content,metadata,line_timestamp,created_at'
           + '&order=created_at.asc&limit=500',
       ),
       serviceRows<any>(
