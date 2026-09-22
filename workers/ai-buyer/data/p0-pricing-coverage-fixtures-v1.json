@@ -147,7 +147,7 @@
       }
     },
     {
-      "caseId": "501518b1-80a7-47be-b64f-0a40d784c1f6f09",
+      "caseId": "501518b1-80a7-47cc-b9fe-08c9035f6f09",
       "category": "NOTEBOOK",
       "estimatedResale": 16400,
       "expected": {
@@ -167,7 +167,7 @@
       "expectedState": "READY_TO_PRICE"
     },
     {
-      "caseId": "501518b1-80a7-47be-b64f-0a40d784c1f6f09",
+      "caseId": "501518b1-80a7-47cc-b9fe-08c9035f6f09",
       "expectedState": "READY_TO_PRICE"
     }
   ]
