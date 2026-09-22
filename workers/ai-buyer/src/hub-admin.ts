@@ -887,7 +887,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
     const state = clean(url.searchParams.get('state'), 50)
     const category = clean(url.searchParams.get('category'), 50)
 
-    let casePath = 'ai_buyer_valuation_cases?select=id,conversation_id,customer_id,state,category,title,control_mode,identity_confidence,spec_completeness,condition_completeness,pricing_readiness,accepted_price,accepted_at,created_at,updated_at'
+    let casePath = 'ai_buyer_valuation_cases?select=id,conversation_id,customer_id,state,category,title,control_mode,identity_confidence,spec_completeness,condition_completeness,pricing_readiness,accepted_price,accepted_at,metadata,created_at,updated_at'
       + '&order=updated_at.desc&limit=' + limit
     if (state) casePath += '&state=eq.' + encodeURIComponent(state)
     if (category) casePath += '&category=eq.' + encodeURIComponent(category)
@@ -900,10 +900,14 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       env,
       'ai_buyer_category_automation_modes?select=category,mode,max_negotiation_rounds,active,updated_at&order=category.asc',
     )
+    const learningPromise = serviceRows<Record<string, unknown>>(
+      env,
+      'ai_buyer_learning_capture_status_v?select=*',
+    )
     const openAIPromise = loadOpenAISpend(env)
 
     if (!caseIds.length) {
-      const [modes, openai] = await Promise.all([modesPromise, openAIPromise])
+      const [modes, learningRows, openai] = await Promise.all([modesPromise, learningPromise, openAIPromise])
       return hubAdminResponse(request, env, {
         ok: true,
         viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
@@ -920,6 +924,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
         },
         openai,
         modes,
+        learning: learningRows[0] || null,
         cases: [],
         generatedAt: new Date().toISOString(),
       })
@@ -928,7 +933,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
     const inCases = caseIds.join(',')
     const inCustomers = customerIds.join(',')
 
-    const [customers, pricing, offers, tasks, images, messages, outcomes, dealSummaries, modes, openai] = await Promise.all([
+    const [customers, pricing, offers, tasks, images, messages, outcomes, dealSummaries, modes, learningRows, openai] = await Promise.all([
       customerIds.length
         ? serviceRows<any>(env,
           'ai_buyer_customers?id=in.(' + inCustomers + ')&select=id,display_name,picture_url,phone')
@@ -957,6 +962,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       serviceRows<any>(env,
         'ai_buyer_deal_ledger_case_v?case_id=in.(' + inCases + ')&select=*'),
       modesPromise,
+      learningPromise,
       openAIPromise,
     ])
 
@@ -1040,10 +1046,19 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
           outcomeAt: outcome.outcome_at,
           verified: Boolean(outcome.verified),
         } : null,
-        needsFinalLabel: !outcome && [
-          'ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED',
-          'COMPLETED','CUSTOMER_DECLINED','EXPIRED','CANCELLED',
-        ].includes(row.state),
+        needsFinalLabel: !outcome
+          && [
+            'ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED',
+            'COMPLETED','CUSTOMER_DECLINED','EXPIRED','CANCELLED',
+          ].includes(row.state)
+          && ![
+            'CONCURRENT_DUPLICATE_CASE',
+            'NON_SELLER_PAWN_OR_DEPOSIT_INQUIRY',
+            'NON_SELLER_PAWN_INQUIRY',
+            'NON_SELLER_BUYING_INQUIRY',
+            'LOGISTICS_ONLY_NO_ACTIVE_PRODUCT',
+            'STICKER_ONLY_NO_PRODUCT',
+          ].includes(clean((row as any).metadata?.cancelReason, 120)),
         deal: deal ? {
           ledgerLines: Number(deal.ledger_lines || 0),
           purchaseTotal: numberValue(deal.purchase_total),
@@ -1076,6 +1091,7 @@ export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv
       },
       openai,
       modes,
+      learning: learningRows[0] || null,
       cases: items,
       generatedAt: new Date().toISOString(),
     })
