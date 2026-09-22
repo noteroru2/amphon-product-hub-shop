@@ -138,8 +138,9 @@ const deterministic=fixture.alreadyPricedCount+previews.length
 if(deterministic!==fixture.expectedDeterministicPriceCoverage){
   failures.push({error:'DETERMINISTIC_COVERAGE_MISMATCH',expected:fixture.expectedDeterministicPriceCoverage,actual:deterministic})
 }
-if(fixture.directPriceBookCases.length+fixture.guardedFallbackCases.length!==14){
-  failures.push({error:'P0_CASE_COUNT_MISMATCH'})
+const coverageCaseCount=fixture.directPriceBookCases.length+fixture.guardedFallbackCases.length
+if(coverageCaseCount!==Number(fixture.coverageCaseCountExpected)){
+  failures.push({error:'P0_CASE_COUNT_MISMATCH',expected:fixture.coverageCaseCountExpected,actual:coverageCaseCount})
 }
 
 console.log(JSON.stringify({
