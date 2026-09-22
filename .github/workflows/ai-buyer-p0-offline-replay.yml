@@ -1,0 +1,33 @@
+name: AI Buyer P0 Regression Offline Replay
+
+on:
+  push:
+    branches:
+      - feat/ai-buyer-v1-foundation
+    paths:
+      - 'workers/ai-buyer/data/p0-regression-fixtures-v1.json'
+      - 'scripts/run-ai-buyer-p0-offline-replay.mjs'
+      - '.github/workflows/ai-buyer-p0-offline-replay.yml'
+      - 'supabase/migrations/20260922121500_ai_buyer_p0_offline_replay.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify AI remains paused
+        shell: bash
+        run: grep -q '"AI_BUYER_PAUSED": "true"' workers/ai-buyer/wrangler.jsonc
+      - name: Run P0 regression and offline replay
+        env:
+          SUPABASE_URL: https://mfpdtlxwdbxitgfzdape.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: node scripts/run-ai-buyer-p0-offline-replay.mjs
