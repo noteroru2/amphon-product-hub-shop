@@ -1038,10 +1038,11 @@ export async function runPricingForCase(env: PricingEnv, caseId: string) {
   if (!caseRow.category || caseRow.category === 'OTHER') {
     return escalatePricing(env, caseRow, 'CATEGORY_NOT_AUTOPRICED')
   }
-  if (numberValue(caseRow.identity_confidence) < 0.90 || numberValue(caseRow.condition_completeness) < 0.75) {
+  if (numberValue(caseRow.identity_confidence) < 0.88) {
     return escalatePricing(env, caseRow, 'PRICING_GATE_NOT_MET', {
       identityConfidence: caseRow.identity_confidence,
       conditionCompleteness: caseRow.condition_completeness,
+      policy: 'STRONG_IDENTITY_CAN_PRICE_WITH_PARTIAL_CONDITION',
     })
   }
 
@@ -1070,7 +1071,7 @@ export async function runPricingForCase(env: PricingEnv, caseId: string) {
       )
       const confidence = Math.min(
         0.99,
-        0.78 + row.score * 0.16 + clamp01(caseRow.condition_completeness) * 0.05,
+        0.80 + row.score * 0.16 + clamp01(caseRow.condition_completeness) * 0.03,
       )
       if (prices.hardMax <= 0) {
         return escalatePricing(env, caseRow, 'PRICE_BOOK_VALUE_NONPOSITIVE', {
@@ -1171,11 +1172,11 @@ export async function runPricingForCase(env: PricingEnv, caseId: string) {
   const dispersionFactor = Math.max(0, 1 - stats.dispersion / Math.max(0.01, Number(rule.max_market_dispersion)))
   const confidence = Math.min(
     0.94,
-    0.72
+    0.73
       + compFactor * 0.08
       + dispersionFactor * 0.07
-      + clamp01(caseRow.identity_confidence) * 0.04
-      + clamp01(caseRow.condition_completeness) * 0.03,
+      + clamp01(caseRow.identity_confidence) * 0.05
+      + clamp01(caseRow.condition_completeness) * 0.01,
   )
 
   if (confidence < 0.85 || prices.hardMax <= 0) {
