@@ -575,6 +575,57 @@ export function AiBuyerAdmin({
         />
       </div>
 
+      {dashboard?.learning && (
+        <section className="ai-learning-strip">
+          <div className="ai-learning-head">
+            <div>
+              <strong>Learning 5 วัน</strong>
+              <small>
+                {dashboard.learning.status === "CAPTURING"
+                  ? `กำลังเก็บข้อมูล · เหลือประมาณ ${Math.max(0, Math.round(Number(dashboard.learning.hours_remaining || 0)))} ชม.`
+                  : dashboard.learning.status}
+              </small>
+            </div>
+            <span className={dashboard.learning.owner_manual_events > 0 ? "good" : "warn"}>
+              OWNER_MANUAL {dashboard.learning.owner_manual_events}
+            </span>
+          </div>
+          <div className="ai-learning-metrics">
+            <div>
+              <MessageCircle size={16} />
+              <span>ลูกค้า</span>
+              <strong>{dashboard.learning.customer_events}</strong>
+            </div>
+            <div>
+              <Send size={16} />
+              <span>คำตอบคุณ</span>
+              <strong>{dashboard.learning.owner_manual_events}</strong>
+            </div>
+            <div>
+              <Banknote size={16} />
+              <span>ราคา Manual</span>
+              <strong>{dashboard.learning.price_quote_labels}</strong>
+            </div>
+            <div>
+              <BadgeCheck size={16} />
+              <span>Final Label</span>
+              <strong>{dashboard.learning.final_labeled_cases}</strong>
+            </div>
+            <div>
+              <PackageCheck size={16} />
+              <span>ซื้อจริง</span>
+              <strong>{dashboard.learning.purchased_cases}</strong>
+            </div>
+          </div>
+          {dashboard.learning.owner_manual_events === 0 && (
+            <p>
+              ตอนนี้มีข้อมูลลูกค้าแล้ว แต่ยังไม่มีคำตอบ OWNER_MANUAL จริง —
+              ให้ตอบลูกค้าจากกล่องแชตในหน้านี้ เพื่อให้ระบบเรียนรู้สไตล์คุณโดยตรง
+            </p>
+          )}
+        </section>
+      )}
+
       <div className="ai-admin-toolbar">
         <label>
           <MessageCircle size={17} />
