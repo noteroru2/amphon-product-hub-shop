@@ -46,6 +46,8 @@ function tagsFor(c,o){
 
 const failures=[]
 const previews=[]
+const specPreviews=[]
+const staleSafety=[]
 for(const f of fixture.directPriceBookCases){
   const c=caseById.get(f.caseId)
   const o=latest.get(f.caseId)
@@ -88,6 +90,50 @@ for(const f of fixture.directPriceBookCases){
   }
 }
 
+
+const specIds=(fixture.specPricingPreviews||[]).map(x=>x.caseId).join(',')
+if(specIds){
+  const specCases=await get('ai_buyer_valuation_cases?id=in.('+specIds+')&select=id,category,title,state,metadata')
+  const specDecisions=await get('ai_buyer_pricing_decisions?case_id=in.('+specIds+')&select=id,case_id,price_book_version_id,estimated_resale,created_at&order=created_at.desc')
+  const specSettings=await get('ai_buyer_spec_price_settings?version_id=eq.'+encodeURIComponent(active.id)
+    +'&select=category,target_buy_percent,hard_max_percent,opening_discount_percent,risk_reserve,rounding_step')
+  const settingByCategory=new Map(specSettings.map(x=>[x.category,x]))
+  const latestDecision=new Map()
+  for(const d of specDecisions) if(!latestDecision.has(d.case_id)) latestDecision.set(d.case_id,d)
+  const caseMap=new Map(specCases.map(x=>[x.id,x]))
+
+  const roundTo=(value,step)=>Math.max(0,Math.round(value/Math.max(1,Number(step||100)))*Math.max(1,Number(step||100)))
+
+  for(const f of fixture.specPricingPreviews||[]){
+    const cse=caseMap.get(f.caseId)
+    const setting=settingByCategory.get(f.category)
+    if(!cse||!setting){ failures.push({caseId:f.caseId,error:'SPEC_CASE_OR_SETTING_MISSING'}); continue }
+    const target=roundTo(Number(f.estimatedResale)*Number(setting.target_buy_percent)-Number(setting.risk_reserve),setting.rounding_step)
+    const hardMax=roundTo(Number(f.estimatedResale)*Number(setting.hard_max_percent)-Number(setting.risk_reserve),setting.rounding_step)
+    const opening=roundTo(target*(1-Number(setting.opening_discount_percent)),setting.rounding_step)
+    const preview={opening,target,hardMax}
+    specPreviews.push({caseId:f.caseId,title:cse.title,category:f.category,estimatedResale:f.estimatedResale,preview})
+    for(const k of ['opening','target','hardMax']){
+      if(preview[k]!==f.expected[k]) failures.push({caseId:f.caseId,error:'SPEC_PRICE_PREVIEW_MISMATCH',field:k,expected:f.expected[k],actual:preview[k]})
+    }
+  }
+
+  const offers=await get('ai_buyer_offers?case_id=in.('+specIds+')&select=id,case_id,pricing_decision_id,status,delivered_at,created_at&order=created_at.desc')
+  for(const s of fixture.staleDecisionSafety||[]){
+    const cse=caseMap.get(s.caseId)
+    const latest=latestDecision.get(s.caseId)
+    const related=offers.filter(o=>o.case_id===s.caseId && latest && o.pricing_decision_id===latest.id)
+    const delivered=related.filter(o=>o.delivered_at)
+    const superseded=related.filter(o=>o.status==='SUPERSEDED')
+    const row={caseId:s.caseId,state:cse?.state||null,latestDecisionVersion:latest?.price_book_version_id||null,activeVersion:active.id,delivered:delivered.length,superseded:superseded.length}
+    staleSafety.push(row)
+    if(!cse||cse.state!==s.expectedState) failures.push({caseId:s.caseId,error:'STALE_CASE_STATE_UNSAFE',expected:s.expectedState,actual:cse?.state||null})
+    if(!latest||latest.price_book_version_id===active.id) failures.push({caseId:s.caseId,error:'EXPECTED_STALE_DECISION_NOT_FOUND'})
+    if(delivered.length>0) failures.push({caseId:s.caseId,error:'STALE_OFFER_WAS_DELIVERED',count:delivered.length})
+    if(related.length>0 && superseded.length!==related.length) failures.push({caseId:s.caseId,error:'STALE_OFFER_NOT_SUPERSEDED',related:related.length,superseded:superseded.length})
+  }
+}
+
 const deterministic=fixture.alreadyPricedCount+previews.length
 if(deterministic!==fixture.expectedDeterministicPriceCoverage){
   failures.push({error:'DETERMINISTIC_COVERAGE_MISMATCH',expected:fixture.expectedDeterministicPriceCoverage,actual:deterministic})
@@ -104,6 +150,8 @@ console.log(JSON.stringify({
   totalEvidenceReady:fixture.totalEvidenceReady,
   guardedFallback:fixture.guardedFallbackCases,
   previews,
+  specPreviews,
+  staleSafety,
   failures
 },null,2))
 if(failures.length) process.exit(1)
