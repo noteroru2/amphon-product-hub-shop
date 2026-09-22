@@ -3,6 +3,7 @@ export interface HubAdminEnv {
   SUPABASE_SECRET_KEY: string
   AI_BUYER_HUB_ORIGINS?: string
   OPENAI_ADMIN_KEY?: string
+  LINE_CHANNEL_ACCESS_TOKEN: string
 }
 
 type HubUser = { id: string; email?: string | null }
@@ -286,7 +287,7 @@ export function hubAdminResponse(
   }
   if (origin) {
     headers['access-control-allow-origin'] = origin
-    headers['access-control-allow-methods'] = 'GET,OPTIONS'
+    headers['access-control-allow-methods'] = 'GET,POST,OPTIONS'
     headers['access-control-allow-headers'] = 'authorization,content-type'
     headers['access-control-max-age'] = '86400'
   }
@@ -300,7 +301,7 @@ export function handleHubAdminPreflight(request: Request, env: HubAdminEnv) {
     status: 204,
     headers: {
       'access-control-allow-origin': origin,
-      'access-control-allow-methods': 'GET,OPTIONS',
+      'access-control-allow-methods': 'GET,POST,OPTIONS',
       'access-control-allow-headers': 'authorization,content-type',
       'access-control-max-age': '86400',
       'vary': 'Origin',
@@ -326,6 +327,37 @@ async function serviceRows<T>(env: HubAdminEnv, path: string): Promise<T[]> {
   }
   const text = await response.text()
   return text ? JSON.parse(text) as T[] : []
+}
+
+async function serviceWrite<T>(
+  env: HubAdminEnv,
+  path: string,
+  init: RequestInit,
+): Promise<T[]> {
+  const response = await fetch(env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + path, {
+    ...init,
+    headers: {
+      ...serviceHeaders(env),
+      'content-type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error('AI_BUYER_HUB_DB_' + response.status + ':' + detail.slice(0, 800))
+  }
+  const text = await response.text()
+  return text ? JSON.parse(text) as T[] : []
+}
+
+function validUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function moneyValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null
 }
 
 async function authenticateAdmin(request: Request, env: HubAdminEnv) {
@@ -369,6 +401,392 @@ function countByCase<T extends { case_id: string }>(rows: T[]) {
   const map = new Map<string, number>()
   for (const row of rows) map.set(row.case_id, (map.get(row.case_id) || 0) + 1)
   return map
+}
+
+export async function handleHubAdminManualReply(request: Request, env: HubAdminEnv) {
+  try {
+    const { user, profile } = await authenticateAdmin(request, env)
+    let body: {
+      caseId?: string
+      text?: string
+      offerAmount?: number | null
+      idempotencyKey?: string
+    }
+    try {
+      body = await request.json() as typeof body
+    } catch {
+      return hubAdminResponse(request, env, { ok: false, error: 'JSON_INVALID' }, 400)
+    }
+
+    const caseId = clean(body.caseId, 100)
+    const text = clean(body.text, 4500)
+    const offerAmount = moneyValue(body.offerAmount)
+    const idempotencyKey = validUuid(clean(body.idempotencyKey, 100))
+      ? clean(body.idempotencyKey, 100)
+      : crypto.randomUUID()
+
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+    if (!text) {
+      return hubAdminResponse(request, env, { ok: false, error: 'MANUAL_REPLY_TEXT_REQUIRED' }, 400)
+    }
+    if (body.offerAmount != null && offerAmount == null) {
+      return hubAdminResponse(request, env, { ok: false, error: 'OFFER_AMOUNT_INVALID' }, 400)
+    }
+
+    const prepared = await serviceWrite<any>(
+      env,
+      'rpc/ai_buyer_prepare_manual_reply',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({
+          p_case_id: caseId,
+          p_actor_user_id: user.id,
+          p_actor_name: profile.display_name || 'Owner',
+          p_text: text,
+          p_offer_amount: offerAmount,
+          p_idempotency_key: idempotencyKey,
+        }),
+      },
+    )
+    const prep = prepared[0]
+    if (!prep?.action_id || !prep?.line_user_id) {
+      return hubAdminResponse(request, env, { ok: false, error: 'MANUAL_REPLY_PREPARE_EMPTY' }, 500)
+    }
+
+    if (prep.action_status === 'SENT') {
+      return hubAdminResponse(request, env, {
+        ok: true,
+        idempotent: true,
+        actionId: prep.action_id,
+        offerAmount,
+      })
+    }
+
+    const line = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
+        'content-type': 'application/json',
+        'X-Line-Retry-Key': idempotencyKey,
+      },
+      body: JSON.stringify({
+        to: prep.line_user_id,
+        messages: [{ type: 'text', text }],
+      }),
+    })
+
+    const raw = await line.text()
+    if (!line.ok) {
+      await serviceWrite(
+        env,
+        'rpc/ai_buyer_fail_manual_reply',
+        {
+          method: 'POST',
+          headers: { prefer: 'return=minimal' },
+          body: JSON.stringify({
+            p_action_id: prep.action_id,
+            p_error: 'LINE_PUSH_' + line.status + ':' + raw.slice(0, 1200),
+          }),
+        },
+      ).catch(() => [])
+      return hubAdminResponse(request, env, {
+        ok: false,
+        error: 'LINE_PUSH_' + line.status,
+        actionId: prep.action_id,
+      }, 502)
+    }
+
+    let lineMessageId = ''
+    try {
+      const parsed = raw ? JSON.parse(raw) as { sentMessages?: Array<{ id?: string }> } : {}
+      lineMessageId = clean(parsed.sentMessages?.[0]?.id, 200)
+    } catch {
+      lineMessageId = ''
+    }
+
+    const finalized = await serviceWrite<{ ai_buyer_finalize_manual_reply?: Record<string, unknown> }>(
+      env,
+      'rpc/ai_buyer_finalize_manual_reply',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({
+          p_action_id: prep.action_id,
+          p_line_message_id: lineMessageId || null,
+        }),
+      },
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      sent: true,
+      actionId: prep.action_id,
+      lineMessageId: lineMessageId || null,
+      offerAmount,
+      capture: finalized[0]?.ai_buyer_finalize_manual_reply || null,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+const FINAL_OUTCOME_LABELS = new Set([
+  'AGREED_PENDING_HANDOVER',
+  'PURCHASED',
+  'CUSTOMER_DECLINED_PRICE',
+  'CUSTOMER_NO_RESPONSE',
+  'SOLD_ELSEWHERE',
+  'CONDITION_REJECTED',
+  'IDENTITY_MISMATCH',
+  'OWNERSHIP_RISK',
+  'OUTSIDE_POLICY',
+  'CANCELLED_OTHER',
+])
+
+export async function handleHubAdminFinalOutcome(request: Request, env: HubAdminEnv) {
+  try {
+    const { user, profile } = await authenticateAdmin(request, env)
+    let body: {
+      caseId?: string
+      finalLabel?: string
+      finalAgreedPrice?: number | null
+      purchasePrice?: number | null
+      reasonCode?: string | null
+      note?: string | null
+      outcomeAt?: string | null
+    }
+    try {
+      body = await request.json() as typeof body
+    } catch {
+      return hubAdminResponse(request, env, { ok: false, error: 'JSON_INVALID' }, 400)
+    }
+
+    const caseId = clean(body.caseId, 100)
+    const finalLabel = clean(body.finalLabel, 100).toUpperCase()
+    const finalAgreedPrice = moneyValue(body.finalAgreedPrice)
+    const purchasePrice = moneyValue(body.purchasePrice)
+    const outcomeAt = body.outcomeAt && !Number.isNaN(new Date(body.outcomeAt).getTime())
+      ? new Date(body.outcomeAt).toISOString()
+      : new Date().toISOString()
+
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+    if (!FINAL_OUTCOME_LABELS.has(finalLabel)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'FINAL_LABEL_INVALID' }, 400)
+    }
+    if (finalLabel === 'AGREED_PENDING_HANDOVER' && finalAgreedPrice == null) {
+      return hubAdminResponse(request, env, { ok: false, error: 'FINAL_AGREED_PRICE_REQUIRED' }, 400)
+    }
+    if (finalLabel === 'PURCHASED' && purchasePrice == null && finalAgreedPrice == null) {
+      return hubAdminResponse(request, env, { ok: false, error: 'PURCHASE_PRICE_REQUIRED' }, 400)
+    }
+
+    const rows = await serviceWrite<any>(
+      env,
+      'ai_buyer_case_outcomes?on_conflict=case_id',
+      {
+        method: 'POST',
+        headers: { prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          case_id: caseId,
+          final_label: finalLabel,
+          final_agreed_price: finalAgreedPrice,
+          purchase_price: purchasePrice,
+          reason_code: clean(body.reasonCode, 120) || null,
+          note: clean(body.note, 1500) || null,
+          outcome_at: outcomeAt,
+          labeled_by: user.id,
+          source: profile.role === 'owner' ? 'MANUAL_OWNER' : 'MANUAL_ADMIN',
+          verified: true,
+        }),
+      },
+    )
+
+    const summary = await serviceRows<any>(
+      env,
+      'ai_buyer_deal_ledger_case_v?case_id=eq.' + encodeURIComponent(caseId)
+        + '&select=*',
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      outcome: rows[0] || null,
+      deal: summary[0] || null,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+export async function handleHubAdminDealLedger(request: Request, env: HubAdminEnv) {
+  try {
+    const { user } = await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+
+    if (request.method === 'GET') {
+      const caseId = clean(url.searchParams.get('caseId'), 100)
+      if (!validUuid(caseId)) {
+        return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+      }
+      const [lines, summary] = await Promise.all([
+        serviceRows<any>(
+          env,
+          'ai_buyer_deal_ledger?case_id=eq.' + encodeURIComponent(caseId)
+            + '&select=*&order=line_no.asc',
+        ),
+        serviceRows<any>(
+          env,
+          'ai_buyer_deal_ledger_case_v?case_id=eq.' + encodeURIComponent(caseId)
+            + '&select=*',
+        ),
+      ])
+      return hubAdminResponse(request, env, {
+        ok: true,
+        lines,
+        summary: summary[0] || null,
+      })
+    }
+
+    let body: {
+      id?: string
+      caseId?: string
+      lineNo?: number
+      productId?: string | null
+      itemTitle?: string | null
+      category?: string | null
+      model?: string | null
+      sku?: string | null
+      status?: string
+      purchasePrice?: number | null
+      acquiredAt?: string | null
+      repairCost?: number
+      partsCost?: number
+      transportCost?: number
+      warrantyCost?: number
+      channelFee?: number
+      otherCost?: number
+      salePrice?: number | null
+      saleChannel?: string | null
+      soldAt?: string | null
+      salePriceVerified?: boolean
+      note?: string | null
+    }
+    try {
+      body = await request.json() as typeof body
+    } catch {
+      return hubAdminResponse(request, env, { ok: false, error: 'JSON_INVALID' }, 400)
+    }
+
+    const caseId = clean(body.caseId, 100)
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+
+    const status = clean(body.status || 'PENDING', 40).toUpperCase()
+    if (!['PENDING','ACQUIRED','IN_STOCK','SOLD','RETURNED','WRITE_OFF','CANCELLED'].includes(status)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'LEDGER_STATUS_INVALID' }, 400)
+    }
+
+    const row = {
+      case_id: caseId,
+      line_no: Math.max(1, Math.min(100, Math.floor(Number(body.lineNo || 1) || 1))),
+      product_id: body.productId && validUuid(clean(body.productId, 100)) ? clean(body.productId, 100) : null,
+      item_title: clean(body.itemTitle, 500) || null,
+      category: clean(body.category, 80) || null,
+      model: clean(body.model, 240) || null,
+      sku: clean(body.sku, 120) || null,
+      status,
+      purchase_price: moneyValue(body.purchasePrice),
+      acquired_at: body.acquiredAt && !Number.isNaN(new Date(body.acquiredAt).getTime())
+        ? new Date(body.acquiredAt).toISOString()
+        : null,
+      repair_cost: moneyValue(body.repairCost) || 0,
+      parts_cost: moneyValue(body.partsCost) || 0,
+      transport_cost: moneyValue(body.transportCost) || 0,
+      warranty_cost: moneyValue(body.warrantyCost) || 0,
+      channel_fee: moneyValue(body.channelFee) || 0,
+      other_cost: moneyValue(body.otherCost) || 0,
+      sale_price: moneyValue(body.salePrice),
+      sale_channel: clean(body.saleChannel, 100) || null,
+      sold_at: body.soldAt && !Number.isNaN(new Date(body.soldAt).getTime())
+        ? new Date(body.soldAt).toISOString()
+        : null,
+      sale_price_source: body.salePriceVerified ? 'MANUAL_VERIFIED' : 'UNKNOWN',
+      sale_price_verified: Boolean(body.salePriceVerified),
+      note: clean(body.note, 1500) || null,
+      updated_by: user.id,
+    }
+
+    let saved: any[]
+    const id = clean(body.id, 100)
+    if (validUuid(id)) {
+      saved = await serviceWrite<any>(
+        env,
+        'ai_buyer_deal_ledger?id=eq.' + encodeURIComponent(id),
+        {
+          method: 'PATCH',
+          headers: { prefer: 'return=representation' },
+          body: JSON.stringify(row),
+        },
+      )
+    } else {
+      saved = await serviceWrite<any>(
+        env,
+        'ai_buyer_deal_ledger?on_conflict=case_id,line_no',
+        {
+          method: 'POST',
+          headers: { prefer: 'resolution=merge-duplicates,return=representation' },
+          body: JSON.stringify({ ...row, created_by: user.id }),
+        },
+      )
+    }
+
+    await serviceWrite(
+      env,
+      'rpc/ai_buyer_sync_deal_ledger',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=minimal' },
+        body: JSON.stringify({ p_case_id: caseId }),
+      },
+    ).catch(() => [])
+
+    const summary = await serviceRows<any>(
+      env,
+      'ai_buyer_deal_ledger_case_v?case_id=eq.' + encodeURIComponent(caseId)
+        + '&select=*',
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      line: saved[0] || null,
+      summary: summary[0] || null,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
 }
 
 export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv) {
