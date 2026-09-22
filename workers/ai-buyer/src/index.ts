@@ -281,6 +281,18 @@ async function upsertConversation(env: Env, customer: CustomerRow, at: string) {
   return rows[0]
 }
 
+async function existingActiveCase(env: Env, conversation: ConversationRow) {
+  const terminal = TERMINAL_STATES.join(',')
+  const rows = await readRows<CaseRow>(await supabaseRequest(
+    env,
+    'ai_buyer_valuation_cases?select=id,state'
+      + '&conversation_id=eq.' + encodeURIComponent(conversation.id)
+      + '&state=not.in.(' + terminal + ')'
+      + '&order=updated_at.desc&limit=1',
+  ))
+  return rows[0] || null
+}
+
 async function activeCase(env: Env, conversation: ConversationRow, customer: CustomerRow) {
   const rows = await readRows<CaseRow>(await supabaseRequest(
     env,
@@ -762,7 +774,7 @@ async function applyDeterministicTextEvidence(
 async function storeMessage(
   env: Env,
   conversation: ConversationRow,
-  caseRow: CaseRow,
+  caseRow: CaseRow | null,
   event: LineWebhookEvent,
 ) {
   const message = event.message
@@ -786,7 +798,7 @@ async function storeMessage(
     headers: { prefer: 'resolution=ignore-duplicates,return=representation' },
     body: JSON.stringify({
       conversation_id: conversation.id,
-      case_id: caseRow.id,
+      case_id: caseRow?.id || null,
       webhook_event_id: event.webhookEventId || null,
       line_message_id: message.id,
       direction: 'INBOUND',
@@ -916,10 +928,53 @@ async function processEvent(env: Env, event: LineWebhookEvent) {
     const at = lineTimestamp(event.timestamp)
     const customer = await upsertCustomer(env, lineUserId)
     const conversation = await upsertConversation(env, customer, at)
-    const caseRow = await activeCase(env, conversation, customer)
+
+    const passiveWithoutCase = ['sticker','location'].includes(event.message.type)
+    const existingCase = passiveWithoutCase ? await existingActiveCase(env, conversation) : null
+    if (passiveWithoutCase && !existingCase) {
+      await storeMessage(env, conversation, null, event)
+      await finishWebhook(env, eventId, 'PROCESSED')
+      return
+    }
+
+    const caseRow = existingCase || await activeCase(env, conversation, customer)
     const dbMessage = await storeMessage(env, conversation, caseRow, event)
 
     if (event.message.type === 'text') {
+      const text = clean(event.message.text, 2000)
+      const nonSellerPawn = /รับจำนำ|จำนำ|ฝากไว้|ยอดตังฝาก|ยอดฝาก/i.test(text)
+        && !/ขาย|รับซื้อ|ตีราคา|ประเมินราคา/i.test(text)
+      const logisticsOnly = /นัดรับวันไหน|นัดรับ.*(?:พรุ่งนี้|วันนี้|วันไหน)|มารับวันไหน/i.test(text)
+        && !/ขาย|รับซื้อ|ตีราคา|ประเมินราคา|รุ่น|สเปก/i.test(text)
+
+      if (nonSellerPawn || (logisticsOnly && caseRow.state === 'NEW')) {
+        const cancelReason = nonSellerPawn
+          ? 'NON_SELLER_PAWN_OR_DEPOSIT_INQUIRY'
+          : 'LOGISTICS_ONLY_NO_ACTIVE_PRODUCT'
+        const patch = await supabaseRequest(
+          env,
+          'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseRow.id),
+          {
+            method: 'PATCH',
+            headers: { prefer: 'return=minimal' },
+            body: JSON.stringify({
+              state: 'CANCELLED',
+              completed_at: new Date().toISOString(),
+              metadata: {
+                cancelReason,
+                cancelledAt: new Date().toISOString(),
+              },
+            }),
+          },
+        )
+        if (!patch.ok) {
+          const detail = await patch.text().catch(() => '')
+          throw new Error('NON_VALUATION_CANCEL_' + patch.status + ':' + detail.slice(0, 300))
+        }
+        await finishWebhook(env, eventId, 'PROCESSED')
+        return
+      }
+
       try {
         await applyDeterministicTextEvidence(env, conversation, caseRow, dbMessage.id)
       } catch (deterministicError) {
