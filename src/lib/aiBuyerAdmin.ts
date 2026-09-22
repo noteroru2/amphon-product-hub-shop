@@ -155,6 +155,30 @@ export type AiBuyerDashboardCase = {
   updatedAt: string;
 };
 
+export type AiBuyerLearningStatus = {
+  window_id: string;
+  name: string;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  hours_remaining: number | string;
+  total_events: number;
+  customer_events: number;
+  owner_manual_events: number;
+  owner_approved_events: number;
+  ai_system_events: number;
+  conversations: number;
+  price_quote_labels: number;
+  accepted_labels: number;
+  declined_labels: number;
+  eligible_cases: number;
+  final_labeled_cases: number;
+  purchased_cases: number;
+  sold_cases: number;
+  realized_gross_profit: number | string;
+  needs_final_label: number;
+};
+
 export type AiBuyerDashboardData = {
   ok: true;
   viewer: { displayName: string; role: "owner" | "admin" };
@@ -171,6 +195,7 @@ export type AiBuyerDashboardData = {
   };
   openai?: AiBuyerOpenAISpend;
   modes: AiBuyerRolloutMode[];
+  learning?: AiBuyerLearningStatus | null;
   cases: AiBuyerDashboardCase[];
   generatedAt: string;
 };
