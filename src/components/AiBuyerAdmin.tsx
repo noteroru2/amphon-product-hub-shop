@@ -65,6 +65,17 @@ function compactMoney(value: unknown) {
   return new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(n);
 }
 
+function usd(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: n > 0 && n < 0.01 ? 4 : 2,
+  }).format(n);
+}
+
 function when(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);
@@ -541,6 +552,26 @@ export function AiBuyerAdmin({
         <SummaryCard
           label="กำไรที่บันทึก"
           value={money(dashboard?.summary.grossProfit || 0)}
+        />
+        <SummaryCard
+          label="OpenAI เดือนนี้"
+          value={
+            dashboard?.openai?.status === "live"
+              ? usd(dashboard.openai.monthToDate)
+              : dashboard?.openai?.status === "not_configured"
+                ? "ยังไม่เชื่อม"
+                : "—"
+          }
+          note={dashboard?.openai?.status === "live" ? "Organization MTD" : "Cost API"}
+        />
+        <SummaryCard
+          label="โหมดอัตโนมัติ"
+          value={
+            (dashboard?.modes || []).every((mode) => mode.mode === "SHADOW")
+              ? "SHADOW"
+              : "ตรวจสอบ"
+          }
+          note={`${(dashboard?.modes || []).filter((mode) => mode.mode === "SHADOW").length}/${dashboard?.modes?.length || 0} หมวด`}
         />
       </div>
 
