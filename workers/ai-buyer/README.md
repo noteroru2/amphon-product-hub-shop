@@ -457,3 +457,5 @@ Full P0 contract:
 `docs/ai-buyer/P0_DEAL_OUTCOME_LEDGER.md`
 
 AI processing remains paused and category rollout remains SHADOW until explicit owner approval.
+
+P0 invariant checks cover the manual-reply, final-outcome, and deal-ledger contracts.
