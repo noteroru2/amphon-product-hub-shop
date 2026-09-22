@@ -699,7 +699,13 @@ function buildDesktop(
   const ram = matchEntry(entries, 'RAM', factValue(facts.confirmed, 'ram'), '', { searchFallback: false })
   const storage = matchEntry(entries, 'STORAGE', factValue(facts.confirmed, 'primary_storage') || factValue(facts.confirmed, 'storage'), '', { searchFallback: false })
   const motherboard = pcBroadMatch(entries, 'MOTHERBOARD', factValue(facts.confirmed, 'motherboard'))
+    || (findByKey(entries, 'MOTHERBOARD', 'Legacy workstation/proprietary')
+      ? { entry: findByKey(entries, 'MOTHERBOARD', 'Legacy workstation/proprietary') as SpecEntryRow, reason: 'DEFAULT_CONSERVATIVE' }
+      : null)
   const psu = pcBroadMatch(entries, 'PSU', factValue(facts.confirmed, 'psu'))
+    || (findByKey(entries, 'PSU', 'No-name / unknown')
+      ? { entry: findByKey(entries, 'PSU', 'No-name / unknown') as SpecEntryRow, reason: 'DEFAULT_UNKNOWN' }
+      : null)
   const pcCase = pcBroadMatch(entries, 'CASE', factValue(facts.confirmed, 'case'))
     || (findByKey(entries, 'CASE', 'Old/basic')
       ? { entry: findByKey(entries, 'CASE', 'Old/basic') as SpecEntryRow, reason: 'DEFAULT_BASIC' }
@@ -709,6 +715,9 @@ function buildDesktop(
       ? { entry: findByKey(entries, 'COOLER', 'Stock / basic') as SpecEntryRow, reason: 'DEFAULT_BASIC' }
       : null)
   const systemClass = choosePcSystemClass(entries, factValue(facts.confirmed, 'system_class'), facts.searchText)
+    || (findByKey(entries, 'SYSTEM_CLASS', 'UNKNOWN')
+      ? { entry: findByKey(entries, 'SYSTEM_CLASS', 'UNKNOWN') as SpecEntryRow, reason: 'DEFAULT_CONSERVATIVE' }
+      : null)
 
   const missing = [
     ['cpu', cpu], ['gpu', gpu], ['ram', ram], ['storage', storage],
@@ -781,6 +790,9 @@ function buildDesktop(
       ? traces.reduce((sum, item) => sum + confidenceScore(item.confidence), 0) / traces.length
       : 0,
     notes: [
+      ...(motherboard?.reason === 'DEFAULT_CONSERVATIVE' ? ['MOTHERBOARD_DEFAULT_CONSERVATIVE'] : []),
+      ...(psu?.reason === 'DEFAULT_UNKNOWN' ? ['PSU_DEFAULT_UNKNOWN_MINUS_300'] : []),
+      ...(systemClass?.reason === 'DEFAULT_CONSERVATIVE' ? ['SYSTEM_CLASS_DEFAULT_CONSERVATIVE'] : []),
       ...(pcCase?.reason === 'DEFAULT_BASIC' ? ['CASE_DEFAULT_BASIC'] : []),
       ...(cooler?.reason === 'DEFAULT_BASIC' ? ['COOLER_DEFAULT_BASIC'] : []),
     ],
