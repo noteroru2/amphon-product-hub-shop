@@ -593,6 +593,76 @@ function applyDeterministicConditionTags(result: IntakeResult) {
   }
 }
 
+function hasAnyConfirmedFact(result: IntakeResult, ...keys: string[]) {
+  return Boolean(confirmedFactValue(result, ...keys))
+}
+
+function sanitizeRequestedInputs(result: IntakeResult): IntakeResult {
+  const hasModel = Boolean(
+    result.model_code
+    || result.model_name
+    || hasAnyConfirmedFact(result, 'model', 'model_code', 'series'),
+  )
+  const hasCoreComputerSpec = ['cpu','ram'].every((key) => hasConfirmedFact(result, key))
+    && (hasConfirmedFact(result, 'storage') || hasConfirmedFact(result, 'ssd'))
+  const hasGpu = hasConfirmedFact(result, 'gpu')
+  const hasPhoneTabletVariant = hasModel && hasAnyConfirmedFact(result, 'storage', 'capacity')
+  const hasBattery = hasAnyConfirmedFact(result, 'battery_health', 'battery_condition')
+  const hasAccessories = hasAnyConfirmedFact(result, 'accessories', 'included_accessories')
+  const hasCharger = hasAnyConfirmedFact(result, 'charger', 'power_adapter', 'adapter')
+    || result.pricing_tags.includes('NO_CHARGER')
+
+  const requested = result.requested_inputs.filter((input) => {
+    if (input === 'BOTTOM_LABEL' || input === 'SERIAL_LABEL') return !hasModel
+    if (input === 'SYSTEM_INFO') return !(hasCoreComputerSpec && hasGpu)
+    if (input === 'CPU_GPU_SCREEN') return !(hasConfirmedFact(result, 'cpu') && hasGpu)
+    if (input === 'ABOUT_SCREEN') return !hasPhoneTabletVariant
+    if (input === 'BATTERY_HEALTH') return !hasBattery
+    if (input === 'ACCESSORIES') return !hasAccessories
+    if (input === 'CHARGER') return !hasCharger
+    if (input === 'PC_INTERIOR' && result.category === 'DESKTOP_PC') return !specCompleteForPricing(result)
+    return true
+  })
+
+  if (requested.length === result.requested_inputs.length) return result
+  return {
+    ...result,
+    requested_inputs: requested,
+    flags: Array.from(new Set([...result.flags, 'REDUNDANT_EVIDENCE_REQUEST_REMOVED'])).slice(0, 12),
+  }
+}
+
+function readinessReason(result: IntakeResult) {
+  if (result.pricing_tags.includes('LOCKED')) return 'LOCKED'
+  if (result.pricing_tags.includes('DEVICE_NOT_BOOTING')) return 'DEVICE_NOT_BOOTING'
+  if (result.pricing_tags.includes('MAJOR_DAMAGE')) return 'MAJOR_DAMAGE'
+  if (result.flags.some((flag) => /MULTIPLE_DEVICES|MAPPING_AMBIGUOUS/i.test(flag))) {
+    return 'MULTIPLE_DEVICES_AMBIGUOUS'
+  }
+
+  if (pricingReadyByPolicy(result)) {
+    if (specCompleteForPricing(result)) return 'READY_BY_COMPLETE_SPEC'
+    if (result.model_code) return 'READY_BY_MODEL_CODE'
+    return 'READY_BY_MODEL_IDENTITY'
+  }
+
+  if (result.category === 'UNKNOWN') return 'MISSING_PRODUCT_TYPE'
+  const hasModel = Boolean(result.model_code || result.model_name || confirmedFactValue(result, 'model', 'model_code'))
+  if (!hasModel) return 'MISSING_MODEL'
+
+  if (['SMARTPHONE','TABLET'].includes(result.category)
+    && !confirmedFactValue(result, 'storage', 'capacity')) {
+    return 'MISSING_STORAGE_VARIANT'
+  }
+
+  if (['NOTEBOOK','DESKTOP_PC'].includes(result.category) && !specCompleteForPricing(result)) {
+    return 'MISSING_CORE_SPEC'
+  }
+
+  if (result.action === 'HUMAN_REVIEW' || result.handoff_requested) return 'HUMAN_REVIEW_REQUIRED'
+  return result.requested_inputs.length ? 'MISSING_CORE_SPEC' : 'HUMAN_REVIEW_REQUIRED'
+}
+
 function specIdentityThreshold(result: IntakeResult) {
   if (result.category === 'DESKTOP_PC') return 0.65
   if (result.category === 'NOTEBOOK') return 0.80
@@ -760,7 +830,8 @@ async function callVision(
   const normalized = normalizeIntake(parsed)
   const merged = mergePriorObservations(normalized, observations)
   const conditioned = applyDeterministicConditionTags(merged)
-  const result = applyIntakeBusinessRules(conditioned)
+  const sanitized = sanitizeRequestedInputs(conditioned)
+  const result = applyIntakeBusinessRules(sanitized)
 
   return {
     model,
@@ -943,6 +1014,7 @@ async function updateCase(
       ...result.pricing_tags,
     ])).slice(0, 10),
     lastIntent: result.intent,
+    readinessReason: readinessReason(result),
     pendingReply: reply ? {
       text: reply,
       action: result.action,
