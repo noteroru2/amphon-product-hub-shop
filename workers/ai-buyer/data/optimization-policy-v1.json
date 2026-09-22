@@ -184,7 +184,8 @@
         "NO_BOX": -200,
         "BODY_HEAVY": -700,
         "SCREEN_DEFECT": -2000,
-        "MISSING_ACCESSORY": -200
+        "MISSING_ACCESSORY": -200,
+        "BACK_PANEL_REPLACED": -2000
       },
       "humanReview": [
         "LOCKED",
