@@ -105,6 +105,7 @@ type PricingTag =
   | 'DEVICE_NOT_BOOTING'
   | 'LOCKED'
   | 'MISSING_ACCESSORY'
+  | 'BACK_PANEL_REPLACED'
   | 'MAJOR_DAMAGE'
 
 type MarketCandidate = {
@@ -572,17 +573,28 @@ function aggregateIdentity(caseRow: CaseRow, observations: ObservationRow[]) {
     if (observation.model_code) modelCode = observation.model_code
   }
 
-  const tags = Array.isArray(caseRow.metadata?.lastPricingTags)
+  const rawTags = Array.isArray(caseRow.metadata?.lastPricingTags)
     ? caseRow.metadata?.lastPricingTags.map((tag) => clean(tag, 80)).filter(Boolean) as PricingTag[]
     : []
 
   const values = Object.values(confirmed).map((value) => clean(value, 500)).filter(Boolean)
-  const searchText = normalizeTokenText([
+  const evidenceText = [
     caseRow.title || '',
     modelName,
     modelCode,
     ...values,
-  ].join(' '))
+    ...(Array.isArray(caseRow.metadata?.lastFlags)
+      ? caseRow.metadata.lastFlags.map((flag) => clean(flag, 200))
+      : []),
+  ].join(' ')
+  const searchText = normalizeTokenText(evidenceText)
+
+  const tags = Array.from(new Set([
+    ...rawTags,
+    ...(/back\s*panel\s*(?:has\s*been\s*)?replaced|back_panel_replaced|ฝาหลัง(?:ถูก)?เปลี่ยน/i.test(evidenceText)
+      ? ['BACK_PANEL_REPLACED' as PricingTag]
+      : []),
+  ]))
 
   return {
     modelName,
