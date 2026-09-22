@@ -405,6 +405,24 @@ function deterministicTextHint(input: string): DeterministicTextHint | null {
     }))
   }
 
+  if (/ipad\s*air\s*4|ไอแพด\s*air\s*4/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'iPad Air 4' }
+    if (storage) confirmed.storage = storage
+    return withRisk(make('TABLET','Apple iPad Air 4',{
+      modelName:'iPad Air 4',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.99,
+      specCompleteness:storage ? 0.92 : 0.72,
+      conditionCompleteness:pricingTags.length ? 0.90 : 0.30,
+      pricingReadiness:storage ? 0.94 : 0.55,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
+  }
+
   if (/ipad\s*air\s*5|ไอแพด\s*air\s*5/i.test(lower)) {
     const storage = deterministicStorage(lower)
     const confirmed: Record<string,string> = { brand:'Apple', model:'iPad Air 5' }
@@ -541,6 +559,26 @@ function deterministicTextHint(input: string): DeterministicTextHint | null {
       controlMode:'HUMAN_REQUIRED',requestedInputs:[],readinessReason:'UNSUPPORTED_CATEGORY',
       flags:['DETERMINISTIC_TEXT_CLASSIFICATION','REGULATED_OR_UNSUPPORTED_PRODUCT'],
     })
+  }
+
+  if (/macbook\s*air[^\n]{0,40}\bm5\b|\bm5\b[^\n]{0,40}macbook\s*air/i.test(lower)) {
+    const storage = deterministicStorage(lower)
+    const confirmed: Record<string,string> = { brand:'Apple', model:'MacBook Air M5', chip:'Apple M5' }
+    if (/24\s*gb/i.test(lower)) confirmed.ram = '24 GB'
+    if (storage) confirmed.storage = storage
+    if (/2026/.test(lower)) confirmed.year = '2026'
+    return withRisk(make('MACBOOK','Apple MacBook Air M5',{
+      modelName:'MacBook Air M5',
+      confirmed,
+      unknownFields:storage ? [] : ['storage'],
+      identityConfidence:0.98,
+      specCompleteness:storage ? 0.95 : 0.78,
+      conditionCompleteness:pricingTags.length ? 0.85 : 0.55,
+      pricingReadiness:storage ? 0.93 : 0.55,
+      state:storage ? 'READY_TO_PRICE' : 'NEED_MORE_INFO',
+      requestedInputs:storage ? [] : ['STORAGE_VARIANT'],
+      readinessReason:storage ? 'READY_BY_MODEL_IDENTITY' : 'MISSING_STORAGE_VARIANT',
+    }))
   }
 
   if (/macbook/i.test(lower)) {
