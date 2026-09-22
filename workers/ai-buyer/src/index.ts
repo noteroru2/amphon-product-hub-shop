@@ -7,6 +7,7 @@ import {
   handleHubAdminDashboard,
   handleHubAdminDealLedger,
   handleHubAdminFinalOutcome,
+  handleHubAdminImage,
   handleHubAdminManualReply,
   handleHubAdminPreflight,
 } from './hub-admin'
@@ -1478,8 +1479,12 @@ export default {
       return handleHubAdminCaseDetail(request, env)
     }
 
+    if (url.pathname === '/v1/hub/admin/image' && request.method === 'GET') {
+      return handleHubAdminImage(request, env)
+    }
+
     if (
-      ['/v1/hub/admin/case','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
