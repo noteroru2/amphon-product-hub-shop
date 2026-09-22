@@ -407,3 +407,53 @@ creating a new price.
 
 The migration is applied to production, but all rollout modes remain SHADOW.
 The Cloudflare Worker is still not considered live until deployment is explicitly approved.
+
+
+## P0 — Deal Outcome Learning Loop
+
+The current optimization phase keeps OpenAI processing paused while capturing verified human operating data.
+
+### Hub owner/admin routes
+
+- `POST /v1/hub/admin/manual-reply` — sends an exact owner/admin LINE reply through the Messaging API and archives it as `OWNER_MANUAL`.
+- `POST /v1/hub/admin/final-outcome` — records the verified final deal label and final/purchase price.
+- `GET /v1/hub/admin/deal-ledger?caseId=<uuid>` — reads acquisition-to-sale economics.
+- `POST /v1/hub/admin/deal-ledger` — records/updates purchase, repair, logistics, fees and realized sale price.
+
+These Hub routes use the authenticated Supabase user and require owner/admin role.
+
+### Final outcome vs realized economics
+
+`ai_buyer_case_outcomes` stores one verified final label per valuation case.
+
+`ai_buyer_deal_ledger` stores one or more acquired items and follows them through inventory and sale.
+
+A `PURCHASED` outcome creates the first ledger row automatically. If that row is linked to `products.id`, Hub product/financial/order changes can synchronize cost and realized sale data.
+
+Learning/calibration view:
+
+`ai_buyer_learning_deal_dataset_v`
+
+Unlabeled terminal/accepted cases:
+
+`ai_buyer_final_label_queue_v`
+
+### Owner manual reply capture
+
+A manual Hub reply is prepared as an idempotent `MANUAL_REPLY` outbound action, pushed through LINE, and then finalized into `ai_buyer_messages`.
+
+The five-day learning trigger recognizes:
+
+`metadata.source = OWNER_MANUAL`
+
+and stores speaker `OWNER_MANUAL` in `ai_buyer_learning_events`.
+
+When an explicit `offerAmount` is supplied, the system records a verified `PRICE_QUOTE` learning label and an ADMIN offer/human override when a Pricing Decision exists.
+
+Replies typed directly in LINE OA Manager still require chat-history export/import because their text bodies are not delivered back to the Messaging API webhook.
+
+Full P0 contract:
+
+`docs/ai-buyer/P0_DEAL_OUTCOME_LEDGER.md`
+
+AI processing remains paused and category rollout remains SHADOW until explicit owner approval.
