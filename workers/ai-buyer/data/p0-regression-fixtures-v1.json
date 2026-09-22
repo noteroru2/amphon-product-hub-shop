@@ -1,0 +1,96 @@
+{
+  "version": "P0_REGRESSION_V1",
+  "policyVersion": "AMPHON_AI_BUYER_OPTIMIZATION_V1",
+  "cases": [
+    {
+      "caseId": "254f5381-e4e4-4c9f-b7dd-831bb8285af1",
+      "name": "ExpertBook exact model code",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "a4ecf322-cf4f-452e-aad1-a9125f289417",
+      "name": "iPhone 11 64GB degraded battery",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE",
+      "expectedBatteryBad": true
+    },
+    {
+      "caseId": "80741cac-5a1a-479f-b862-b5f449fe9872",
+      "name": "iPhone 15 Pro Max 256GB clear variant",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "0d3ccb0f-9bde-4ce9-b8fe-414e4b51e8aa",
+      "name": "MacBook Pro 16 2019 model and storage known",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "1fcae414-f315-4154-bc49-f7284e2363a0",
+      "name": "Xiaomi Pad 7 Pro 12/512",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_IDENTITY"
+    },
+    {
+      "caseId": "1f441860-498e-47be-b64f-0a40d784c1ef",
+      "name": "Huawei tablet exact model code 64GB",
+      "expectedBucket": "A_PRICE_NOW",
+      "expectedReason": "READY_BY_MODEL_CODE"
+    },
+    {
+      "caseId": "b8b678a1-317c-4ab4-b426-13af9972a621",
+      "name": "Complete PC specs but two-device mapping ambiguous",
+      "expectedBucket": "C_HUMAN_REVIEW",
+      "expectedReason": "MULTIPLE_DEVICES_AMBIGUOUS"
+    },
+    {
+      "caseId": "f224b8af-1e50-4446-afa2-d4c44c552886",
+      "name": "iPhone major multi-part damage",
+      "expectedBucket": "C_HUMAN_REVIEW",
+      "expectedReason": "MAJOR_DAMAGE"
+    },
+    {
+      "caseId": "05d757b3-de53-401b-8374-cdac14d6ff17",
+      "name": "Camera image/customer identity conflict",
+      "expectedBucket": "C_HUMAN_REVIEW",
+      "expectedReason": "MODEL_SPEC_CONFLICT"
+    },
+    {
+      "caseId": "0ad32432-c646-4e28-a1ae-ee81b796ae4f",
+      "name": "Phone possible active installment",
+      "expectedBucket": "C_HUMAN_REVIEW",
+      "expectedReason": "OWNERSHIP_OR_FINANCE_REVIEW"
+    },
+    {
+      "caseId": "dd18a3c6-c93c-4cae-a772-a464917ac3fe",
+      "name": "Multiple old phones without per-device mapping",
+      "expectedBucket": "C_HUMAN_REVIEW",
+      "expectedReason": "MULTIPLE_DEVICES_AMBIGUOUS"
+    },
+    {
+      "caseId": "674717f3-c2a3-4b21-904f-ba75c7790cb0",
+      "name": "iPad Air 4 model/storage known but identity confidence below gate",
+      "expectedBucket": "B_NEEDS_INFO"
+    },
+    {
+      "caseId": "ef468402-261b-4d37-b181-757a7de69fa6",
+      "name": "Galaxy S25 Ultra storage missing",
+      "expectedBucket": "B_NEEDS_INFO",
+      "expectedReason": "MISSING_STORAGE_VARIANT"
+    },
+    {
+      "caseId": "8a4804b5-cf30-4b70-88f6-875d2b96e440",
+      "name": "Nikon DSLR exact body model unknown",
+      "expectedBucket": "B_NEEDS_INFO",
+      "expectedReason": "MISSING_MODEL"
+    },
+    {
+      "caseId": "145ce434-bc82-42a5-a1ac-dd87298bcb20",
+      "name": "Custom PC missing motherboard and PSU",
+      "expectedBucket": "B_NEEDS_INFO",
+      "expectedReason": "MISSING_CORE_SPEC"
+    }
+  ]
+}
