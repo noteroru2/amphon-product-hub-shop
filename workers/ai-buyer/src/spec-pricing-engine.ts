@@ -906,11 +906,13 @@ export async function runSpecPricingForCase(
     return { handled: true, result: { ok: false, reason: 'CASE_NOT_READY' } }
   }
 
-  if (numberValue(caseRow.identity_confidence) < 0.90) {
+  const identityGate = category === 'DESKTOP_PC' ? 0.65 : 0.80
+  if (numberValue(caseRow.identity_confidence) < identityGate) {
     return {
       handled: true,
       result: await escalate(env, caseRow, 'PRICING_GATE_NOT_MET', {
         identityConfidence: caseRow.identity_confidence,
+        requiredIdentityConfidence: identityGate,
         conditionCompleteness: caseRow.condition_completeness,
         policy: 'SPEC_COMPLETE_CAN_PRICE_WITH_CONDITION_UNKNOWN',
       }),
@@ -989,10 +991,10 @@ export async function runSpecPricingForCase(
 
   const confidence = Math.min(
     0.98,
-    0.65
-      + clamp01(caseRow.identity_confidence) * 0.12
-      + clamp01(caseRow.condition_completeness) * 0.08
-      + clamp01(built.componentConfidence) * 0.15,
+    0.69
+      + clamp01(caseRow.identity_confidence) * 0.10
+      + clamp01(caseRow.condition_completeness) * 0.03
+      + clamp01(built.componentConfidence) * 0.18,
   )
 
   if (confidence < numberValue(setting.confidence_gate, 0.90) || prices.hardMax <= 0) {
