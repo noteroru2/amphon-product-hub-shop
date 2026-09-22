@@ -22,7 +22,7 @@ Price Book remains first choice. If no reliable row exists, use verified market 
 
 ### 2.1 Replace photo-driven readiness with evidence-driven readiness
 
-A case becomes READY_TO_PRICE when its category policy is satisfied even if condition photos are incomplete.
+A case becomes READY_TO_PRICE when its category policy is satisfied even if condition photos are incomplete. Pricing is allowed only for SELL_ITEM intent; purchase/general inquiries must not enter pricing.
 
 Do not keep a case in COLLECTING_PHOTOS solely because charger/accessories/cosmetic/battery photos are absent.
 
@@ -36,8 +36,10 @@ Before adding a requested input, check confirmed facts and prior observations. A
 
 ### 2.4 Core readiness
 
+Only one non-terminal valuation case may exist per conversation. Active-case creation must be atomic so parallel LINE image events cannot create duplicate shells.
+
 - NOTEBOOK: brand + series/model + CPU + GPU/integrated + RAM + storage. Identity >= 0.80.
-- DESKTOP_PC: CPU + GPU/integrated + RAM + storage + motherboard + PSU. Identity >= 0.65.
+- DESKTOP_PC: CPU + GPU/integrated + RAM + storage. Identity >= 0.65. Motherboard/PSU/system class improve accuracy but are not hard blockers; missing values use conservative defaults.
 - SMARTPHONE/TABLET: exact model + storage variant. Identity >= 0.90.
 - MACBOOK: model/model-code + chip/year + storage; RAM preferred but not always blocking. Identity >= 0.90.
 - CAMERA: exact model; body/lens bundle must be known when it materially changes value. Identity >= 0.90.
