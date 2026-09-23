@@ -271,7 +271,13 @@ function ChatBubble({
   );
 }
 
-export function LineOAChat({ profile }: { profile: Profile }) {
+export function LineOAChat({
+  profile,
+  onUnreadChange,
+}: {
+  profile: Profile;
+  onUnreadChange?: (count: number) => void;
+}) {
   const [chatList, setChatList] = useState<AiBuyerChatCaseSummary[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -348,7 +354,9 @@ export function LineOAChat({ profile }: { profile: Profile }) {
     try {
       const next = await loadAiBuyerChatList(120);
       setChatList(next.cases);
-      setUnreadTotal(Number(next.unreadTotal || 0));
+      const nextUnread = Number(next.unreadTotal || 0);
+      setUnreadTotal(nextUnread);
+      onUnreadChange?.(nextUnread);
     } catch (e) {
       if (!silent) setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -367,7 +375,11 @@ export function LineOAChat({ profile }: { profile: Profile }) {
           item.id === caseId ? { ...item, unreadCount: 0 } : item,
         ),
       );
-      setUnreadTotal((current) => Math.max(0, current - currentUnread));
+      setUnreadTotal((current) => {
+        const next = Math.max(0, current - currentUnread);
+        onUnreadChange?.(next);
+        return next;
+      });
     }
 
     try {
