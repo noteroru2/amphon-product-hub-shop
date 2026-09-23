@@ -352,6 +352,35 @@ button:active:not(:disabled) {
   color: #06c755;
 }
 
+.bottom-nav .lineoa-nav-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.bottom-nav .lineoa-nav-icon > svg {
+  display: block;
+}
+
+.bottom-nav .lineoa-nav-badge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #ff334b;
+  color: #fff;
+  border: 2px solid #fff;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 900;
+  box-shadow: 0 2px 7px rgba(255, 51, 75, .25);
+}
+
 @media (max-width: 390px) {
   .bottom-nav.with-lineoa button {
     font-size: 8px;
