@@ -544,6 +544,38 @@ export async function handleHubAdminChatCase(request: Request, env: HubAdminEnv)
   }
 }
 
+export async function handleHubAdminChatUnread(request: Request, env: HubAdminEnv) {
+  try {
+    const auth = await authenticateAdmin(request, env)
+    const rows = await serviceWrite<any>(
+      env,
+      'rpc/ai_buyer_chat_unread_total',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({ p_user_id: auth.user.id }),
+      },
+    )
+    const total = Number(
+      Array.isArray(rows)
+        ? (rows[0]?.ai_buyer_chat_unread_total ?? rows[0] ?? 0)
+        : 0,
+    )
+    return hubAdminResponse(request, env, {
+      ok: true,
+      unreadTotal: Number.isFinite(total) ? total : 0,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminChatMarkRead(request: Request, env: HubAdminEnv) {
   try {
     const auth = await authenticateAdmin(request, env)
