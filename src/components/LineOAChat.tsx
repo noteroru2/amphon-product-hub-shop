@@ -16,6 +16,7 @@ import {
   loadAiBuyerChatCase,
   loadAiBuyerChatList,
   loadAiBuyerImageBlob,
+  markAiBuyerChatRead,
   sendAiBuyerManualReply,
   type AiBuyerChatCaseDetail,
   type AiBuyerChatCaseSummary,
@@ -80,20 +81,33 @@ function ConversationItem({
   const preview =
     item.lastMessage?.text ||
     (item.lastMessage?.type === "IMAGE" ? "📷 ส่งรูปภาพ" : "ยังไม่มีข้อความ");
+  const unread = Number(item.unreadCount || 0);
 
   return (
     <button
       type="button"
-      className={"lineoa-thread" + (active ? " active" : "")}
+      className={
+        "lineoa-thread" +
+        (active ? " active" : "") +
+        (unread > 0 ? " unread" : "")
+      }
       onClick={onClick}
     >
-      <div className="lineoa-avatar">
-        {item.customer?.pictureUrl ? (
-          <img src={item.customer.pictureUrl} alt="" loading="lazy" />
-        ) : (
-          <span>{initials(customer)}</span>
+      <div className="lineoa-avatar-wrap">
+        <div className="lineoa-avatar">
+          {item.customer?.pictureUrl ? (
+            <img src={item.customer.pictureUrl} alt="" loading="lazy" />
+          ) : (
+            <span>{initials(customer)}</span>
+          )}
+        </div>
+        {unread > 0 && (
+          <span className="lineoa-unread-badge">
+            {unread > 99 ? "99+" : unread}
+          </span>
         )}
       </div>
+
       <div className="lineoa-thread-copy">
         <div className="lineoa-thread-head">
           <strong>{customer}</strong>
@@ -106,6 +120,7 @@ function ConversationItem({
             <span className="price">เสนอ {money(item.offer.amount)}</span>
           )}
           {item.imageCount > 0 && <span>📷 {item.imageCount}</span>}
+          {unread > 0 && <span className="unread-tag">ยังไม่ได้อ่าน</span>}
         </div>
       </div>
     </button>
@@ -258,6 +273,8 @@ function ChatBubble({
 
 export function LineOAChat({ profile }: { profile: Profile }) {
   const [chatList, setChatList] = useState<AiBuyerChatCaseSummary[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [onlyUnread, setOnlyUnread] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<AiBuyerChatCaseDetail | null>(null);
   const [query, setQuery] = useState("");
@@ -279,23 +296,38 @@ export function LineOAChat({ profile }: { profile: Profile }) {
     node.scrollTo({ top: node.scrollHeight, behavior });
   };
 
+  const isNearBottom = () => {
+    const node = messageListRef.current;
+    if (!node) return true;
+    return node.scrollHeight - node.scrollTop - node.clientHeight < 180;
+  };
+
   useEffect(() => {
     document.body.classList.add("lineoa-active");
     const viewport = window.visualViewport;
+
     const syncViewport = () => {
       const height = viewport?.height || window.innerHeight;
+      const top = viewport?.offsetTop || 0;
       document.documentElement.style.setProperty(
         "--lineoa-viewport-height",
         `${Math.round(height)}px`,
       );
+      document.documentElement.style.setProperty(
+        "--lineoa-viewport-top",
+        `${Math.round(top)}px`,
+      );
     };
+
     syncViewport();
     viewport?.addEventListener("resize", syncViewport);
     viewport?.addEventListener("scroll", syncViewport);
     window.addEventListener("resize", syncViewport);
+
     return () => {
       document.body.classList.remove("lineoa-active", "lineoa-chat-open");
       document.documentElement.style.removeProperty("--lineoa-viewport-height");
+      document.documentElement.style.removeProperty("--lineoa-viewport-top");
       viewport?.removeEventListener("resize", syncViewport);
       viewport?.removeEventListener("scroll", syncViewport);
       window.removeEventListener("resize", syncViewport);
@@ -311,15 +343,37 @@ export function LineOAChat({ profile }: { profile: Profile }) {
     if (!canAccess) return;
     if (silent) setRefreshing(true);
     else setLoading(true);
-    setError(null);
+    if (!silent) setError(null);
+
     try {
       const next = await loadAiBuyerChatList(120);
       setChatList(next.cases);
+      setUnreadTotal(Number(next.unreadTotal || 0));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (!silent) setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }
+
+  async function markRead(caseId: string) {
+    const currentUnread =
+      chatList.find((item) => item.id === caseId)?.unreadCount || 0;
+
+    if (currentUnread > 0) {
+      setChatList((current) =>
+        current.map((item) =>
+          item.id === caseId ? { ...item, unreadCount: 0 } : item,
+        ),
+      );
+      setUnreadTotal((current) => Math.max(0, current - currentUnread));
+    }
+
+    try {
+      await markAiBuyerChatRead(caseId);
+    } catch {
+      void refreshList(true);
     }
   }
 
@@ -328,17 +382,26 @@ export function LineOAChat({ profile }: { profile: Profile }) {
       setDetail(null);
       return;
     }
+
+    const keepAtBottom = isNearBottom();
     if (!silent) {
       setDetail(null);
       setDetailLoading(true);
+      setError(null);
     }
-    setError(null);
+
     try {
       const next = await loadAiBuyerChatCase(caseId);
       setDetail(next);
-      window.requestAnimationFrame(() => scrollToBottom("auto"));
+      void markRead(caseId);
+
+      if (!silent || keepAtBottom) {
+        window.requestAnimationFrame(() =>
+          scrollToBottom(silent ? "auto" : "auto"),
+        );
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (!silent) setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDetailLoading(false);
     }
@@ -356,8 +419,21 @@ export function LineOAChat({ profile }: { profile: Profile }) {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!canAccess) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void refreshList(true);
+      if (selectedId) void refreshDetail(selectedId, true);
+    }, 10000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAccess, selectedId]);
+
+  useEffect(() => {
     if (!detail) return;
-    const timer = window.setTimeout(() => scrollToBottom("auto"), 40);
+    const timer = window.setTimeout(() => {
+      if (isNearBottom()) scrollToBottom("auto");
+    }, 40);
     return () => window.clearTimeout(timer);
   }, [detail?.case.id, detail?.messages.length]);
 
@@ -369,18 +445,19 @@ export function LineOAChat({ profile }: { profile: Profile }) {
 
   const cases = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return chatList;
-    return chatList.filter((item) =>
-      [
+    return chatList.filter((item) => {
+      if (onlyUnread && Number(item.unreadCount || 0) <= 0) return false;
+      if (!q) return true;
+      return [
         item.customer?.displayName,
         item.title,
         item.category,
         item.lastMessage?.text,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q)),
-    );
-  }, [chatList, query]);
+        .some((value) => String(value).toLowerCase().includes(q));
+    });
+  }, [chatList, onlyUnread, query]);
 
   const selected = chatList.find((item) => item.id === selectedId) || null;
   const offerAmount = numeric(offer);
@@ -390,6 +467,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
     if (!selectedId || !canSend) return;
     setSending(true);
     setError(null);
+
     try {
       const currentOffer = offerAmount;
       await sendAiBuyerManualReply({
@@ -397,6 +475,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
         text: text.trim(),
         offerAmount: currentOffer,
       });
+
       setText("");
       setOffer("");
       setNotice(
@@ -404,6 +483,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
           ? `ส่งราคา ${money(currentOffer)} และบันทึก Manual Price แล้ว`
           : "ส่งข้อความ LINE แล้ว",
       );
+
       await refreshDetail(selectedId, true);
       void refreshList(true);
       window.requestAnimationFrame(() => scrollToBottom("smooth"));
@@ -430,9 +510,16 @@ export function LineOAChat({ profile }: { profile: Profile }) {
       <aside className="lineoa-sidebar">
         <header className="lineoa-list-header">
           <div className="lineoa-brand-dot">L</div>
-          <div>
+          <div className="lineoa-list-title">
             <small>AMPHON · LINE OA</small>
-            <h1>แชท</h1>
+            <div>
+              <h1>แชท</h1>
+              {unreadTotal > 0 && (
+                <span className="lineoa-unread-total">
+                  {unreadTotal > 99 ? "99+" : unreadTotal}
+                </span>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -443,14 +530,25 @@ export function LineOAChat({ profile }: { profile: Profile }) {
           </button>
         </header>
 
-        <label className="lineoa-search">
-          <Search />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="ค้นหาชื่อลูกค้า รุ่น หรือข้อความ"
-          />
-        </label>
+        <div className="lineoa-list-tools">
+          <label className="lineoa-search">
+            <Search />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="ค้นหาชื่อลูกค้า รุ่น หรือข้อความ"
+            />
+          </label>
+          <button
+            type="button"
+            className={"lineoa-unread-filter" + (onlyUnread ? " active" : "")}
+            onClick={() => setOnlyUnread((current) => !current)}
+          >
+            <span className="lineoa-unread-dot" />
+            ยังไม่อ่าน
+            {unreadTotal > 0 && <b>{unreadTotal}</b>}
+          </button>
+        </div>
 
         <div className="lineoa-thread-list">
           {loading && !chatList.length ? (
@@ -467,7 +565,9 @@ export function LineOAChat({ profile }: { profile: Profile }) {
               />
             ))
           ) : (
-            <div className="lineoa-empty">ไม่พบแชท</div>
+            <div className="lineoa-empty">
+              {onlyUnread ? "ไม่มีข้อความที่ยังไม่ได้อ่าน" : "ไม่พบแชท"}
+            </div>
           )}
         </div>
       </aside>
@@ -477,7 +577,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
           <div className="lineoa-chat-empty">
             <MessageCircle />
             <strong>เลือกแชทเพื่อเริ่มตอบลูกค้า</strong>
-            <span>โหลดเฉพาะข้อมูลแชท จึงเปิดได้เร็วกว่าเดิม</span>
+            <span>จุดแดงคือข้อความใหม่ที่ยังไม่ได้อ่าน</span>
           </div>
         ) : detailLoading && !detail ? (
           <div className="lineoa-loading">
@@ -493,6 +593,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
               >
                 <ChevronLeft />
               </button>
+
               <div className="lineoa-avatar small">
                 {detail.customer?.picture_url ? (
                   <img src={detail.customer.picture_url} alt="" />
@@ -500,10 +601,12 @@ export function LineOAChat({ profile }: { profile: Profile }) {
                   <span>{initials(detail.customer?.display_name)}</span>
                 )}
               </div>
+
               <div className="lineoa-chat-title">
                 <strong>{detail.customer?.display_name || "ลูกค้า LINE"}</strong>
                 <span>{detail.case.title || selected?.title || "ยังไม่ระบุสินค้า"}</span>
               </div>
+
               <div className="lineoa-chat-price">
                 <small>ราคาล่าสุด</small>
                 <strong>
@@ -532,9 +635,11 @@ export function LineOAChat({ profile }: { profile: Profile }) {
                   แสดง 120 ข้อความล่าสุด เพื่อให้เปิดแชทเร็วและลื่น
                 </div>
               )}
+
               <div className="lineoa-day-divider">
                 <span>บทสนทนาล่าสุด</span>
               </div>
+
               {detail.messages.map((message) => (
                 <ChatBubble
                   key={message.id}
@@ -545,7 +650,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
               ))}
             </div>
 
-            <div className="lineoa-composer">
+            <footer className="lineoa-composer">
               <div className="lineoa-offer-box">
                 <Banknote />
                 <label>
@@ -555,7 +660,7 @@ export function LineOAChat({ profile }: { profile: Profile }) {
                     value={offer}
                     onChange={(event) => setOffer(event.target.value)}
                     onFocus={() =>
-                      window.setTimeout(() => scrollToBottom("smooth"), 120)
+                      window.setTimeout(() => scrollToBottom("auto"), 120)
                     }
                     placeholder="เช่น 5,200"
                   />
@@ -568,14 +673,14 @@ export function LineOAChat({ profile }: { profile: Profile }) {
                   value={text}
                   onChange={(event) => setText(event.target.value)}
                   onFocus={() =>
-                    window.setTimeout(() => scrollToBottom("smooth"), 120)
+                    window.setTimeout(() => scrollToBottom("auto"), 120)
                   }
                   placeholder={
                     offerAmount != null
                       ? "พิมพ์ข้อความเพิ่ม หรือส่งราคาอย่างเดียว"
                       : "พิมพ์ข้อความถึงลูกค้า…"
                   }
-                  rows={2}
+                  rows={1}
                   onKeyDown={(event) => {
                     if (
                       event.key === "Enter" &&
@@ -599,11 +704,11 @@ export function LineOAChat({ profile }: { profile: Profile }) {
 
               {offerAmount != null && (
                 <p className="lineoa-offer-preview">
-                  บันทึก {money(offerAmount)} เป็น Manual Price และส่งราคาเข้าแชท
-                  LINE พร้อมกัน
+                  บันทึก {money(offerAmount)} เป็น Manual Price และส่งราคาเข้า LINE
+                  พร้อมกัน
                 </p>
               )}
-            </div>
+            </footer>
           </>
         ) : (
           <div className="lineoa-chat-empty">
