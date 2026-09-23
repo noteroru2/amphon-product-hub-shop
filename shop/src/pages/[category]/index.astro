@@ -4,6 +4,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
 import { catalogCategories, getCategoryBySlug } from '../../config/catalog'
 import { getCategorySeoContent } from '../../config/category-seo-content'
+import { getCategorySearchIntent } from '../../config/search-intent-content'
 import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
 import { absoluteUrl, productPath } from '../../lib/seo'
 
@@ -37,6 +38,7 @@ const robots = category.indexPolicy === 'INDEX'
   : 'noindex,follow'
 const canonicalPath = `/${category.slug}/`
 const seoContent = getCategorySeoContent(category.key)
+const searchIntent = getCategorySearchIntent(category.key)
 const relatedCategories = (seoContent?.relatedSlugs || [])
   .map((slug) => catalogCategories.find((item) => item.slug === slug))
   .filter((item): item is NonNullable<typeof item> => Boolean(item && item.indexPolicy === 'INDEX'))
@@ -47,7 +49,7 @@ const itemList = products.slice(0, 24).map((product, index) => ({
   url: absoluteUrl(productPath(product)),
   name: product.title,
 }))
-const schema = [
+const schema: Record<string, unknown>[] = [
   {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -65,6 +67,21 @@ const schema = [
     ],
   },
 ]
+
+if (searchIntent?.faqs.length) {
+  schema.push({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: searchIntent.faqs.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  })
+}
 ---
 <BaseLayout title={category.title} description={category.description} canonicalPath={canonicalPath} robots={robots} jsonLd={schema}>
   <div class="container breadcrumbs">
@@ -131,6 +148,26 @@ const schema = [
             ))}
           </div>
           <p class="human-guide-closing">{seoContent.closing}</p>
+        </article>
+      </div>
+    </section>
+  )}
+
+  {searchIntent && (
+    <section class="section category-answer-content" aria-labelledby="category-search-answer">
+      <div class="container">
+        <article class="panel seo-answer-panel">
+          <div class="eyebrow">คำตอบก่อนซื้อ</div>
+          <h2 id="category-search-answer">ข้อมูลสำหรับคนที่กำลังหา {category.name}</h2>
+          <p class="seo-answer-lead">{searchIntent.summary}</p>
+          <div class="faq-list">
+            {searchIntent.faqs.map((item) => (
+              <details>
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
         </article>
       </div>
     </section>
