@@ -5,6 +5,7 @@ import BuybackCTA from '../../components/BuybackCTA.astro'
 import { catalogCategories, getCategoryBySlug } from '../../config/catalog'
 import { getCategorySeoContent } from '../../config/category-seo-content'
 import { getCategorySearchIntent } from '../../config/search-intent-content'
+import { effectiveCategoryIndexPolicy } from '../../config/category-governance'
 import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
 import { absoluteUrl, productPath } from '../../lib/seo'
 
@@ -17,23 +18,26 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 
 let products: StoreProduct[] = []
 let brands: EvergreenPage[] = []
+let currentStockCount = 0
+let historicalStockCount = 0
 let apiError = false
 try {
-  const [productResult, brandResult] = await Promise.all([
-    listStoreProducts({
-      categorySlug: category.slug,
-      limit: 48,
-    }),
+  const [productResult, historyResult, brandResult] = await Promise.all([
+    listStoreProducts({ categorySlug: category.slug, limit: 48 }),
+    listStoreProducts({ categorySlug: category.slug, availability: 'all', limit: 1 }),
     listEvergreenPages({ pageType: 'BRAND', category: category.slug, effectiveIndexPolicy: 'INDEX', limit: 100 }),
   ])
   products = productResult.products
+  currentStockCount = productResult.pagination.total
+  historicalStockCount = historyResult.pagination.total
   brands = brandResult.pages
 } catch (error) {
   apiError = true
   console.error('SHOP_CATEGORY_STORE_API', category.key, error)
 }
 
-const robots = category.indexPolicy === 'INDEX'
+const effectiveIndexPolicy = effectiveCategoryIndexPolicy(category, { currentStockCount, historicalStockCount })
+const robots = !apiError && effectiveIndexPolicy === 'INDEX'
   ? 'index,follow,max-image-preview:large'
   : 'noindex,follow'
 const canonicalPath = `/${category.slug}/`
@@ -94,7 +98,7 @@ if (searchIntent?.faqs.length) {
       <h1>{category.h1}</h1>
       <p class="lead">{seoContent?.hero || 'ดูของที่มีอยู่จริงในร้าน พร้อมราคา รูป และรายละเอียดของแต่ละชิ้น เลือกตัวที่ตรงกับงานและงบได้เลย'}</p>
       <div class="category-hero-status" aria-label="สถานะสินค้าหมวดนี้">
-        <span class="category-status-pill">{products.length > 0 ? `ตอนนี้มี ${products.length} รายการ` : 'ของหมวดนี้เข้าเป็นรอบ ๆ'}</span>
+        <span class="category-status-pill">{currentStockCount > 0 ? `ตอนนี้มี ${currentStockCount} รายการ` : 'ของหมวดนี้เข้าเป็นรอบ ๆ'}</span>
         <span>ของมือสองเปลี่ยนเร็ว ถ้าเจอตัวที่ชอบแนะนำเปิดดูรายละเอียดไว้ก่อน</span>
       </div>
     </div>
@@ -118,8 +122,8 @@ if (searchIntent?.faqs.length) {
       <div class="section-head human-section-head">
         <div>
           <div class="eyebrow">ของที่มีตอนนี้</div>
-          <h2>{products.length ? 'เลือกจากสินค้าที่พร้อมขาย' : 'ตอนนี้ยังไม่มีของในหมวดนี้'}</h2>
-          <p class="muted">{products.length ? `มี ${products.length} รายการ ลองกดดูรูปและรายละเอียดของแต่ละเครื่องได้เลย` : 'ของมือสองเข้าร้านไม่พร้อมกันทุกหมวด แวะกลับมาดูได้เรื่อย ๆ ครับ'}</p>
+          <h2>{currentStockCount ? 'เลือกจากสินค้าที่พร้อมขาย' : 'ตอนนี้ยังไม่มีของในหมวดนี้'}</h2>
+          <p class="muted">{currentStockCount ? `มี ${currentStockCount} รายการ ลองกดดูรูปและรายละเอียดของแต่ละเครื่องได้เลย` : 'ของมือสองเข้าร้านไม่พร้อมกันทุกหมวด แวะกลับมาดูได้เรื่อย ๆ ครับ'}</p>
         </div>
       </div>
       {products.length ? (
