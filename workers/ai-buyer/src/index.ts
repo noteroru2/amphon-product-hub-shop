@@ -7,6 +7,7 @@ import {
   handleHubAdminChatCase,
   handleHubAdminChatList,
   handleHubAdminChatMarkRead,
+  handleHubAdminChatUnread,
   handleHubAdminDashboard,
   handleHubAdminDealLedger,
   handleHubAdminFinalOutcome,
@@ -1498,8 +1499,12 @@ export default {
       return handleHubAdminChatMarkRead(request, env)
     }
 
+    if (url.pathname === '/v1/hub/admin/chat-unread' && request.method === 'GET') {
+      return handleHubAdminChatUnread(request, env)
+    }
+
     if (
-      ['/v1/hub/admin/case','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/chat-unread','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
