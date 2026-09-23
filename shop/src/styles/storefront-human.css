@@ -522,3 +522,124 @@
     align-self: flex-start;
   }
 }
+
+
+/* Product-first SEO / AEO / GEO content.
+   Keep commercial content visually secondary to live products. */
+.seo-answer-section,
+.category-answer-content,
+.product-answer-section {
+  background: #f7f7f7;
+}
+
+.seo-answer-panel {
+  padding: clamp(22px, 4vw, 34px);
+  box-shadow: none;
+}
+
+.seo-answer-panel > h2 {
+  max-width: 860px;
+  margin: 7px 0 12px;
+}
+
+.seo-answer-lead {
+  max-width: 920px;
+  margin-bottom: 24px;
+  color: #555;
+  line-height: 1.85;
+}
+
+.seo-pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 30px;
+}
+
+.seo-pillar-card {
+  display: flex;
+  min-width: 0;
+  min-height: 170px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.seo-pillar-card:hover {
+  transform: translateY(-2px);
+  border-color: #f0c8ad;
+  box-shadow: 0 10px 26px rgba(69,39,20,.06);
+}
+
+.seo-pillar-card strong {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.seo-pillar-card span {
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.65;
+}
+
+.seo-pillar-card b {
+  margin-top: auto;
+  color: var(--brand-dark);
+  font-size: .82rem;
+}
+
+.seo-faq-block {
+  max-width: 920px;
+  padding-top: 2px;
+}
+
+.seo-faq-block > h2 {
+  margin-bottom: 8px;
+  font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+}
+
+.seo-answer-panel .faq-list details {
+  background: #fff;
+}
+
+.seo-answer-panel .faq-list summary {
+  line-height: 1.55;
+}
+
+.seo-answer-panel .faq-list details p {
+  max-width: 860px;
+  line-height: 1.8;
+}
+
+@media (max-width: 920px) {
+  .seo-pillar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .seo-answer-section,
+  .category-answer-content,
+  .product-answer-section {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+
+  .seo-answer-panel {
+    padding: 18px;
+  }
+
+  .seo-pillar-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .seo-pillar-card {
+    min-height: 0;
+    padding: 15px;
+  }
+}

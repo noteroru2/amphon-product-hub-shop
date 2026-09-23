@@ -4,7 +4,8 @@ import BaseLayout from '../layouts/BaseLayout.astro'
 import { indexCategories } from '../config/catalog'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { listStoreProducts, type StoreProduct } from '../lib/store-api'
-import { absoluteUrl } from '../lib/seo'
+import { absoluteUrl, productPath } from '../lib/seo'
+import { shopFaqs, shopKeywordPillars } from '../config/search-intent-content'
 import BuybackCTA from '../components/BuybackCTA.astro'
 import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/ecosystem'
 
@@ -20,8 +21,8 @@ try {
   console.error('SHOP_HOME_STORE_API', error)
 }
 
-const title = 'สินค้าไอทีมือสองออนไลน์ | AMPHON TRADING'
-const description = 'เลือกซื้อโน้ตบุ๊ก iPhone คอมพิวเตอร์ กล้อง จอคอม และสินค้าไอทีมือสอง พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะพร้อมจำหน่ายก่อนสั่งซื้อ'
+const title = 'สินค้าไอทีมือสองออนไลน์ โน้ตบุ๊ก คอม iPhone กล้อง | AMPHON TRADING'
+const description = 'ร้านขายสินค้าไอทีมือสองออนไลน์ เลือกซื้อโน้ตบุ๊ก คอมพิวเตอร์ iPhone มือถือ iPad จอคอม กล้อง และเครื่องเกม พร้อมดูราคา สเปก สภาพ รูปสินค้าจริง และสถานะก่อนสั่งซื้อ'
 const schema: Record<string, unknown>[] = [
   {
     '@context': 'https://schema.org',
@@ -50,6 +51,33 @@ schema.push({
   alternateName: 'AMPHON TRADING',
   legalName: MAIN_LEGAL_NAME,
   url: MAIN_SITE_URL,
+})
+
+if (products.length > 0) {
+  schema.push({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'สินค้าไอทีมือสองพร้อมขายจาก AMPHON SHOP',
+    itemListElement: products.slice(0, 16).map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: product.title,
+      url: absoluteUrl(productPath(product)),
+    })),
+  })
+}
+
+schema.push({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: shopFaqs.map((item) => ({
+    '@type': 'Question',
+    name: item.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.answer,
+    },
+  })),
 })
 
 const categoryLooks: Record<string, { icon: string; note: string }> = {
@@ -151,6 +179,41 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         <article class="storefront-step"><span>2</span><strong>ซูมดูรูปกับตำหนิ</strong><p>ของมือสองสภาพต่างกันทุกชิ้น รูปจริงช่วยตัดสินใจได้มากกว่าชื่อรุ่น</p></article>
         <article class="storefront-step"><span>3</span><strong>ส่งรหัสสินค้าให้ร้าน</strong><p>ทัก LINE @webuy เพื่อเช็กว่ายังว่าง ถามรายละเอียด หรือให้ร้านช่วยยืนยันของที่ได้และประกันก่อนชำระ</p></article>
       </div>
+    </div>
+  </section>
+
+  <section class="section seo-answer-section" aria-labelledby="shop-search-guide">
+    <div class="container">
+      <article class="panel seo-answer-panel">
+        <div class="eyebrow">ข้อมูลช่วยเลือกซื้อ</div>
+        <h2 id="shop-search-guide">ร้านขายสินค้าไอทีมือสองที่ดูของจริงก่อนซื้อได้</h2>
+        <p class="seo-answer-lead">
+          AMPHON SHOP เป็นหน้าร้านออนไลน์ของ AMPHON TRADING สำหรับเลือกซื้อสินค้าไอทีมือสองจากรายการที่มีข้อมูลจริงในระบบ
+          ทั้งราคา สเปก สภาพ รูป ตำหนิ อุปกรณ์ และสถานะของสินค้าแต่ละชิ้น เพื่อให้ค้นหาและเปรียบเทียบของที่ตรงกับงานและงบได้ง่ายขึ้น
+        </p>
+
+        <div class="seo-pillar-grid" aria-label="หมวดสินค้าไอทีมือสองหลัก">
+          {shopKeywordPillars.map((item) => (
+            <a class="seo-pillar-card" href={item.href}>
+              <strong>{item.name}</strong>
+              <span>{item.summary}</span>
+              <b>ดูสินค้าที่มีจริง →</b>
+            </a>
+          ))}
+        </div>
+
+        <div class="seo-faq-block">
+          <h2>คำถามก่อนซื้อสินค้าไอทีมือสอง</h2>
+          <div class="faq-list">
+            {shopFaqs.map((item) => (
+              <details>
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </article>
     </div>
   </section>
 
