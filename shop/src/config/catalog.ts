@@ -12,6 +12,9 @@ export interface CatalogCategory {
   sourceSubtype?: string
   query?: string
   indexPolicy: IndexPolicy
+  autoIndexWhenStocked?: boolean
+  minCurrentStockForIndex?: number
+  minHistoricalStockForIndex?: number
   order: number
 }
 
@@ -42,7 +45,7 @@ const categories: CatalogCategory[] = [
     h1: 'คอมพิวเตอร์มือสอง พร้อมใช้งาน',
     title: 'คอมพิวเตอร์มือสอง พร้อมใช้งาน | AMPHON TRADING',
     description: 'คอมพิวเตอร์ตั้งโต๊ะมือสองและชุด PC พร้อมดูสเปก ราคา รูปจริงและสถานะสินค้าก่อนสั่งซื้อ',
-    sourceCategory: 'pc', indexPolicy: 'INDEX', order: 30,
+    sourceCategory: 'pc', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 1, minHistoricalStockForIndex: 1, order: 30,
   },
   {
     key: 'gaming-pcs', slug: 'gaming-pcs', name: 'คอมเกมมิ่งมือสอง', navName: 'PC Gaming',
@@ -63,7 +66,7 @@ const categories: CatalogCategory[] = [
     h1: 'มือถือ Android มือสอง พร้อมราคา',
     title: 'มือถือมือสอง Android พร้อมราคา | AMPHON TRADING',
     description: 'เลือกซื้อมือถือ Android มือสองจากสินค้าจริง พร้อมสเปก ราคา สภาพและรูปประกอบ',
-    sourceCategory: 'smartphone', indexPolicy: 'INDEX', order: 60,
+    sourceCategory: 'smartphone', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 1, minHistoricalStockForIndex: 1, order: 60,
   },
   {
     key: 'tablets', slug: 'tablets', name: 'iPad และ Tablet มือสอง', navName: 'iPad / Tablet',
@@ -77,7 +80,7 @@ const categories: CatalogCategory[] = [
     h1: 'จอคอมมือสอง พร้อมราคา',
     title: 'จอคอมมือสอง พร้อมราคา | AMPHON TRADING',
     description: 'เลือกซื้อจอคอมมือสอง ดูขนาด ความละเอียด รีเฟรชเรต ราคาและรูปสินค้าจริง',
-    sourceCategory: 'monitor', indexPolicy: 'INDEX', order: 80,
+    sourceCategory: 'monitor', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 1, minHistoricalStockForIndex: 1, order: 80,
   },
   {
     key: 'cameras', slug: 'cameras', name: 'กล้องมือสอง', navName: 'กล้อง',
@@ -91,7 +94,7 @@ const categories: CatalogCategory[] = [
     h1: 'เครื่องเกมมือสอง PS5 Nintendo Switch',
     title: 'เครื่องเกมมือสอง PS5 Nintendo Switch | AMPHON TRADING',
     description: 'เลือกซื้อเครื่องเกมมือสอง ดูรุ่น อุปกรณ์ สภาพ ราคาและรูปสินค้าจริง',
-    sourceCategory: 'gaming', indexPolicy: 'INDEX', order: 100,
+    sourceCategory: 'gaming', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 1, minHistoricalStockForIndex: 1, order: 100,
   },
   {
     key: 'camera-lenses', slug: 'camera-lenses', name: 'เลนส์กล้องมือสอง', navName: 'เลนส์กล้อง',
