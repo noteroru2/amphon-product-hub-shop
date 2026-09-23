@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "amphon-shop",
-  "main": "@astrojs/cloudflare/entrypoints/server",
+  "main": "./dist/_worker.js/index.js",
   "compatibility_date": "2026-09-11",
   "compatibility_flags": [
     "nodejs_compat",
