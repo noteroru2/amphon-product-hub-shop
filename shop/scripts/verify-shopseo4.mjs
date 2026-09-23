@@ -29,13 +29,15 @@ const strategicIndexSlugs = [
   'notebooks',
   'macbooks',
   'gaming-laptops',
-  'desktop-pcs',
   'gaming-pcs',
   'iphones',
-  'smartphones',
   'tablets',
-  'monitors',
   'cameras',
+]
+const stockGatedSlugs = [
+  'desktop-pcs',
+  'smartphones',
+  'monitors',
   'gaming-consoles',
 ]
 const gatedSlugs = [
@@ -47,15 +49,15 @@ const gatedSlugs = [
 ]
 
 const checks = [
-  ['homepage links only governed index categories', home.includes('indexCategories.map')],
+  ['homepage derives governed categories from real stock', home.includes('homeCategories') && home.includes('categoryIsEffectivelyIndexable') && home.includes('getAllStoreProducts')],
   ['category listing uses canonical taxonomy ownership', categoryPage.includes('categorySlug: category.slug')],
   ['category listing no longer queries source category directly', !categoryPage.includes('category: category.sourceCategory')],
   ['category commercial content is rendered', categoryPage.includes('category-commercial-content') && categoryPage.includes('seoContent.buyingPoints')],
   ['category has CollectionPage schema', categoryPage.includes("'@type': 'CollectionPage'")],
   ['category has ItemList schema for current products', categoryPage.includes("'@type': 'ItemList'") && categoryPage.includes('productPath(product)')],
   ['category keeps BreadcrumbList schema', categoryPage.includes("'@type': 'BreadcrumbList'")],
-  ['category HOLD remains noindex', categoryPage.includes("category.indexPolicy === 'INDEX'") && categoryPage.includes("'noindex,follow'")],
-  ['category sitemap contains only index categories', sitemapCategories.includes('indexCategories.map')],
+  ['category page uses effective stock-aware index policy', categoryPage.includes('effectiveCategoryIndexPolicy') && categoryPage.includes('historicalStockCount') && categoryPage.includes("'noindex,follow'")],
+  ['category sitemap uses stock-aware governance', sitemapCategories.includes('categoryIsEffectivelyIndexable') && sitemapCategories.includes('getAllStoreProducts')],
   ['product sitemap excludes non-index policies', sitemapProducts.includes("['NOINDEX', 'HOLD', 'RETIRED']")],
   [
     'evergreen sitemap contains only effective INDEX',
@@ -78,6 +80,17 @@ for (const slug of strategicIndexSlugs) {
   ])
 }
 
+for (const slug of stockGatedSlugs) {
+  checks.push([
+    `empty strategic category ${slug} is HOLD with auto-index governance`,
+    new RegExp(`key: '${slug}'[\\s\\S]{0,700}?indexPolicy: 'HOLD'[\\s\\S]{0,220}?autoIndexWhenStocked: true`).test(catalog),
+  ])
+  checks.push([
+    `stock-gated category ${slug} keeps commercial content`,
+    new RegExp(`(?:^|\\n)  ['"]?${slug}['"]?: \\{[\\s\\S]{0,1800}?primaryKeyword:`).test(categoryContent),
+  ])
+}
+
 for (const slug of gatedSlugs) {
   checks.push([
     `secondary category ${slug} remains gated`,
@@ -86,7 +99,7 @@ for (const slug of gatedSlugs) {
 }
 
 const keywordMatches = [...categoryContent.matchAll(/primaryKeyword:\s*'([^']+)'/g)].map((match) => match[1].trim().toLowerCase())
-checks.push(['11 strategic category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length])
+checks.push(['11 strategic category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length + stockGatedSlugs.length])
 checks.push(['strategic category keyword owners are unique', new Set(keywordMatches).size === keywordMatches.length])
 
 const failures = checks.filter(([, ok]) => !ok)

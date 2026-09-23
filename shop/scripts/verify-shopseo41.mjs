@@ -36,7 +36,22 @@ const newStockBackedTier2 = [
 ]
 
 const approvedTier2Index = [...promotedFromBaselineHold, ...newStockBackedTier2]
-const expectedCurrentIndex = [...baselineIndexCategories, ...approvedTier2Index]
+const expectedCurrentIndex = [
+  'notebooks',
+  'macbooks',
+  'gaming-laptops',
+  'gaming-pcs',
+  'iphones',
+  'tablets',
+  'cameras',
+]
+
+const expectedStockGated = [
+  'desktop-pcs',
+  'smartphones',
+  'monitors',
+  'gaming-consoles',
+]
 
 const expectedHold = [
   'camera-lenses',
@@ -54,7 +69,7 @@ const checks = [
   ['baseline evergreen index is zero', baseline.index_surface?.evergreen === 0],
   ['baseline records Shop GSC rows as not available yet', baseline.shop_performance?.status === 'NO_SEARCH_ANALYTICS_ROWS_YET'],
   ['baseline records Shop sitemap submission action', baseline.gsc_sitemaps?.action === 'SUBMIT_SHOP_SITEMAP_IN_GSC'],
-  ['category sitemap is controlled by indexCategories', sitemapCategories.includes('indexCategories.map')],
+  ['category sitemap is controlled by stock-aware governance', sitemapCategories.includes('categoryIsEffectivelyIndexable') && sitemapCategories.includes('getAllStoreProducts')],
   ['product sitemap excludes non-index policies', sitemapProducts.includes("['NOINDEX', 'HOLD', 'RETIRED']")],
   [
     'evergreen sitemap requires effective INDEX policy',
@@ -66,6 +81,9 @@ const checks = [
 
 for (const slug of expectedCurrentIndex) {
   checks.push([`${slug} is INDEX after approved Tier-2 expansion`, categoryPolicies.get(slug) === 'INDEX'])
+}
+for (const slug of expectedStockGated) {
+  checks.push([`${slug} is HOLD until stock/history qualifies it`, categoryPolicies.get(slug) === 'HOLD'])
 }
 for (const slug of expectedHold) {
   checks.push([`${slug} remains HOLD during observation`, categoryPolicies.get(slug) === 'HOLD'])
@@ -88,7 +106,7 @@ checks.push([
 
 checks.push([
   'no unapproved HOLD category was promoted',
-  expectedHold.every((slug) => categoryPolicies.get(slug) === 'HOLD'),
+  [...expectedStockGated, ...expectedHold].every((slug) => categoryPolicies.get(slug) === 'HOLD'),
 ])
 
 const failures = checks.filter(([, ok]) => !ok)

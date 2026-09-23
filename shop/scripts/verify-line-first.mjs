@@ -26,7 +26,7 @@ const checks = [
   ['Existing product web-cart flow remains present', product.includes('id="add-to-cart"') && product.includes('href="/cart/"')],
   ['Web purchase CTA is explicitly demoted, not removed', product.includes('web-purchase-secondary') && product.includes('ใส่ตะกร้า (ชำระผ่านเว็บ)') && product.includes('ไปตะกร้า / ชำระผ่านเว็บ')],
   ['Homepage promotes LINE as the primary buying path', home.includes('สั่งซื้อผ่าน LINE {primaryLineId}') && home.includes('LINE เป็นช่องทางหลัก')],
-  ['Homepage shows available products before category browsing', home.includes("availability: 'available'") && home.includes('limit: 16') && home.indexOf('id="latest-products"') < home.indexOf('id="shop-categories"')],
+  ['Homepage shows current products before category browsing', home.includes('currentProducts') && home.includes('slice(0, 16)') && home.indexOf('id="latest-products"') < home.indexOf('id="shop-categories"')],
   ['Homepage connects official brand profiles in schema', home.includes('sameAs: [mainWebsiteUrl, facebookPageUrl]')],
   ['Cart renders LINE before optional web checkout', cartActionBlock.includes('ซื้อ / สอบถามผ่าน LINE ${escapeHtml(lineId)}') && cartActionBlock.indexOf('button-line button-wide') < cartActionBlock.indexOf('${webCheckout}')],
   ['PromptPay/card web checkout remains implemented', checkout.includes('promptPayEnabled') && checkout.includes('ชำระออนไลน์')],

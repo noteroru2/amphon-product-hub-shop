@@ -1,9 +1,10 @@
 ---
 import ProductCard from '../components/ProductCard.astro'
 import BaseLayout from '../layouts/BaseLayout.astro'
-import { indexCategories } from '../config/catalog'
+import { catalogCategories } from '../config/catalog'
+import { categoryIsEffectivelyIndexable, categoryStockStateFromProducts } from '../config/category-governance'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
-import { listStoreProducts, type StoreProduct } from '../lib/store-api'
+import { getAllStoreProducts, type StoreProduct } from '../lib/store-api'
 import { absoluteUrl, productPath } from '../lib/seo'
 import { shopFaqs, shopKeywordPillars } from '../config/search-intent-content'
 import BuybackCTA from '../components/BuybackCTA.astro'
@@ -12,10 +13,15 @@ import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
 let products: StoreProduct[] = []
+let homeCategories = catalogCategories.filter((category) => category.indexPolicy === 'INDEX')
 let apiError = false
 try {
-  const result = await listStoreProducts({ availability: 'available', limit: 16 })
-  products = result.products
+  const allProducts = await getAllStoreProducts()
+  const currentProducts = allProducts.filter((product) => product.status === 'published' || product.status === 'reserved')
+  products = currentProducts.slice(0, 16)
+  homeCategories = catalogCategories.filter((category) =>
+    categoryIsEffectivelyIndexable(category, categoryStockStateFromProducts(category.slug, allProducts)),
+  )
 } catch (error) {
   apiError = true
   console.error('SHOP_HOME_STORE_API', error)
@@ -145,7 +151,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         <div><div class="eyebrow">กำลังหาอะไรอยู่?</div><h2>เลือกตามของที่อยากได้</h2><p class="muted">กดเข้าหมวดแล้วค่อยไล่ดูของที่มีจริงตอนนี้ได้เลย</p></div>
       </div>
       <div class="category-grid storefront-category-grid">
-        {indexCategories.map((category) => {
+        {homeCategories.map((category) => {
           const look = categoryLooks[category.slug] || { icon: '•', note: 'ดูสินค้าที่มีในหมวดนี้' }
           return (
             <a class="category-card storefront-category-card" href={`/${category.slug}/`}>
@@ -196,7 +202,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         </p>
 
         <div class="seo-pillar-grid" aria-label="หมวดสินค้าไอทีมือสองหลัก">
-          {shopKeywordPillars.map((item) => (
+          {shopKeywordPillars.filter((item) => homeCategories.some((category) => item.href === `/${category.slug}/`)).map((item) => (
             <a class="seo-pillar-card" href={item.href}>
               <strong>{item.name}</strong>
               <span>{item.summary}</span>
