@@ -556,10 +556,11 @@ export async function handleHubAdminChatUnread(request: Request, env: HubAdminEn
         body: JSON.stringify({ p_user_id: auth.user.id }),
       },
     )
+    const payload = rows as unknown as any
     const total = Number(
-      Array.isArray(rows)
-        ? (rows[0]?.ai_buyer_chat_unread_total ?? rows[0] ?? 0)
-        : 0,
+      Array.isArray(payload)
+        ? (payload[0]?.ai_buyer_chat_unread_total ?? payload[0]?.unread_total ?? payload[0] ?? 0)
+        : payload,
     )
     return hubAdminResponse(request, env, {
       ok: true,
