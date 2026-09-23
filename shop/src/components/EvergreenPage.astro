@@ -28,7 +28,7 @@ const itemList = products.slice(0, 24).map((product, index) => ({
   url: absoluteUrl(productPath(product)),
   name: product.title,
 }))
-const schema = [
+const schema: Record<string, unknown>[] = [
   {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -45,6 +45,21 @@ const schema = [
     })),
   },
 ]
+
+if (page.faq.length > 0) {
+  schema.push({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: page.faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  })
+}
 ---
 <BaseLayout title={title} description={description} canonicalPath={page.canonicalPath} robots={robots} jsonLd={schema}>
   <div class="container breadcrumbs">
