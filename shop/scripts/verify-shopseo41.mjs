@@ -15,7 +15,7 @@ const baseline = JSON.parse(baselineRaw)
 const categoryMatches = [...catalog.matchAll(/key:\s*'([^']+)'[\s\S]*?indexPolicy:\s*'(INDEX|HOLD|NOINDEX|RETIRED)'/g)]
 const categoryPolicies = new Map(categoryMatches.map((match) => [match[1], match[2]]))
 
-const expectedIndex = [
+const baselineIndexCategories = [
   'notebooks',
   'desktop-pcs',
   'iphones',
@@ -26,9 +26,15 @@ const expectedIndex = [
   'gaming-consoles',
 ]
 
-const expectedHold = [
+const approvedTier2Index = [
   'macbooks',
+  'gaming-laptops',
   'gaming-pcs',
+]
+
+const expectedCurrentIndex = [...baselineIndexCategories, ...approvedTier2Index]
+
+const expectedHold = [
   'camera-lenses',
   'graphics-cards',
   'pc-components',
@@ -54,20 +60,27 @@ const checks = [
   ],
 ]
 
-for (const slug of expectedIndex) {
-  checks.push([`${slug} remains INDEX during observation`, categoryPolicies.get(slug) === 'INDEX'])
+for (const slug of expectedCurrentIndex) {
+  checks.push([`${slug} is INDEX after approved Tier-2 expansion`, categoryPolicies.get(slug) === 'INDEX'])
 }
 for (const slug of expectedHold) {
   checks.push([`${slug} remains HOLD during observation`, categoryPolicies.get(slug) === 'HOLD'])
 }
 
 const baselineIndex = [...(baseline.index_categories || [])].sort().join('|')
-const sourceIndex = [...expectedIndex].sort().join('|')
-checks.push(['machine baseline INDEX categories match freeze contract', baselineIndex === sourceIndex])
+const frozenBaselineIndex = [...baselineIndexCategories].sort().join('|')
+checks.push(['machine baseline INDEX categories remain immutable', baselineIndex === frozenBaselineIndex])
 
-const baselineHold = [...(baseline.hold_categories || [])].sort().join('|')
-const sourceHold = [...expectedHold].sort().join('|')
-checks.push(['machine baseline HOLD categories match freeze contract', baselineHold === sourceHold])
+const baselineHold = [...(baseline.hold_categories || [])].sort()
+checks.push([
+  'approved Tier-2 categories came from the original HOLD surface',
+  approvedTier2Index.every((slug) => baselineHold.includes(slug)),
+])
+
+checks.push([
+  'no unapproved HOLD category was promoted',
+  expectedHold.every((slug) => categoryPolicies.get(slug) === 'HOLD'),
+])
 
 const failures = checks.filter(([, ok]) => !ok)
 for (const [label, ok] of checks) console.log(`${ok ? 'PASS' : 'FAIL'} - ${label}`)
