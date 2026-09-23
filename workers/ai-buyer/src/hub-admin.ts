@@ -406,16 +406,22 @@ function countByCase<T extends { case_id: string }>(rows: T[]) {
 
 export async function handleHubAdminChatList(request: Request, env: HubAdminEnv) {
   try {
-    await authenticateAdmin(request, env)
+    const auth = await authenticateAdmin(request, env)
     const url = new URL(request.url)
     const rawLimit = Number(url.searchParams.get('limit') || 120)
     const limit = Math.max(20, Math.min(200, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 120))
 
-    const rows = await serviceRows<any>(
+    const rows = await serviceWrite<any>(
       env,
-      'ai_buyer_chat_list_v?select=*'
-        + '&order=last_activity_at.desc'
-        + '&limit=' + limit,
+      'rpc/ai_buyer_chat_list_for_user',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({
+          p_user_id: auth.user.id,
+          p_limit: limit,
+        }),
+      },
     )
 
     return hubAdminResponse(request, env, {
@@ -444,7 +450,9 @@ export async function handleHubAdminChatList(request: Request, env: HubAdminEnv)
         } : null,
         updatedAt: row.updated_at,
         lastActivityAt: row.last_activity_at || row.updated_at,
+        unreadCount: Number(row.unread_count || 0),
       })),
+      unreadTotal: rows.reduce((sum, row) => sum + Number(row.unread_count || 0), 0),
       generatedAt: new Date().toISOString(),
     })
   } catch (error) {
@@ -524,6 +532,45 @@ export async function handleHubAdminChatCase(request: Request, env: HubAdminEnv)
       hasMore,
       oldestMessageAt: messages[0]?.created_at || null,
       generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+export async function handleHubAdminChatMarkRead(request: Request, env: HubAdminEnv) {
+  try {
+    const auth = await authenticateAdmin(request, env)
+    const body = await request.json().catch(() => ({})) as { caseId?: string }
+    const caseId = clean(body.caseId, 100)
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+
+    const rows = await serviceWrite<any>(
+      env,
+      'rpc/ai_buyer_chat_mark_read',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({
+          p_user_id: auth.user.id,
+          p_case_id: caseId,
+        }),
+      },
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      caseId,
+      unreadCount: Number(rows[0]?.unread_count || 0),
+      lastReadAt: rows[0]?.last_read_at || new Date().toISOString(),
     })
   } catch (error) {
     const code = clean((error as Error)?.message || error, 1000)
