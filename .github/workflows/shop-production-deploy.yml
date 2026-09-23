@@ -1,0 +1,79 @@
+name: Shop Production Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'shop/**'
+      - '.github/workflows/shop-production-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shop-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PUBLIC_SITE_URL: https://shop.amphon.co.th
+      PUBLIC_AMPHON_STORE_API: https://amphon-product-images.noteroru2.workers.dev/store
+      PUBLIC_LINE_URL: https://line.me/R/ti/p/@webuy
+      PUBLIC_SUPABASE_URL: https://mfpdtlxwdbxitgfzdape.supabase.co
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_TWyHir8t7-LO7PZLHAzR6Q_yXjDRK5-
+      PUBLIC_PHONE: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: shop/package-lock.json
+
+      - name: Install Shop dependencies
+        working-directory: shop
+        run: npm ci
+
+      - name: Verify and build Shop
+        working-directory: shop
+        run: npm run build
+
+      - name: Require Cloudflare deployment credential
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
+
+      - name: Deploy AMPHON Shop
+        working-directory: shop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config wrangler.jsonc
+
+      - name: Verify live Shop
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            home="$(curl -fsS --max-time 20 https://shop.amphon.co.th/ || true)"
+            notebooks="$(curl -fsS --max-time 20 https://shop.amphon.co.th/notebooks/ || true)"
+
+            if echo "$home" | grep -q "ร้านขายสินค้าไอทีมือสองที่ดูของจริงก่อนซื้อได้" \
+              && echo "$notebooks" | grep -q "ข้อมูลสำหรับคนที่กำลังหา"; then
+              echo "Shop production deploy PASS: $GITHUB_SHA"
+              exit 0
+            fi
+
+            echo "Attempt $i: waiting for shop.amphon.co.th to expose the new storefront"
+            sleep 5
+          done
+
+          echo "::error::shop.amphon.co.th did not expose the expected SEO/AEO/GEO storefront"
+          exit 1
