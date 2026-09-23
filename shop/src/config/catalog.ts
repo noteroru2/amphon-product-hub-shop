@@ -28,7 +28,14 @@ const categories: CatalogCategory[] = [
     h1: 'MacBook มือสอง พร้อมดูสภาพและราคา',
     title: 'MacBook มือสอง สภาพจริง พร้อมราคา | AMPHON TRADING',
     description: 'เลือกซื้อ MacBook มือสอง ดูรูปจริง สเปก ราคา สภาพและประกันจาก AMPHON TRADING',
-    sourceCategory: 'notebook', query: 'MacBook', indexPolicy: 'HOLD', order: 20,
+    sourceCategory: 'notebook', sourceSubtype: 'macbook', query: 'MacBook', indexPolicy: 'INDEX', order: 20,
+  },
+  {
+    key: 'gaming-laptops', slug: 'gaming-laptops', name: 'โน้ตบุ๊กเกมมิ่งมือสอง', navName: 'Gaming Laptop',
+    h1: 'โน้ตบุ๊กเกมมิ่งมือสอง พร้อมดูสเปกและราคา',
+    title: 'โน้ตบุ๊กเกมมิ่งมือสอง Gaming Laptop พร้อมราคา | AMPHON TRADING',
+    description: 'เลือกซื้อโน้ตบุ๊กเกมมิ่งมือสอง ดู CPU การ์ดจอ RAM SSD จอ ราคา สภาพและรูปเครื่องจริงก่อนสั่งซื้อ',
+    sourceCategory: 'notebook', sourceSubtype: 'gaming', indexPolicy: 'INDEX', order: 25,
   },
   {
     key: 'desktop-pcs', slug: 'desktop-pcs', name: 'คอมพิวเตอร์มือสอง', navName: 'คอมมือสอง',
@@ -42,7 +49,7 @@ const categories: CatalogCategory[] = [
     h1: 'คอมเกมมิ่งมือสอง สเปกคุ้ม',
     title: 'คอมเกมมิ่งมือสอง สเปกคุ้ม | AMPHON TRADING',
     description: 'เลือกซื้อ PC Gaming มือสอง ดู CPU การ์ดจอ RAM SSD ราคาและรูปสินค้าจริง',
-    sourceCategory: 'pc', sourceSubtype: 'gaming', indexPolicy: 'HOLD', order: 40,
+    sourceCategory: 'pc', sourceSubtype: 'gaming', indexPolicy: 'INDEX', order: 40,
   },
   {
     key: 'iphones', slug: 'iphones', name: 'iPhone มือสอง', navName: 'iPhone',
