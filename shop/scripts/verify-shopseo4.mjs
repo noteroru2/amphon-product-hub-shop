@@ -27,7 +27,10 @@ const [
 
 const strategicIndexSlugs = [
   'notebooks',
+  'macbooks',
+  'gaming-laptops',
   'desktop-pcs',
+  'gaming-pcs',
   'iphones',
   'smartphones',
   'tablets',
@@ -36,8 +39,6 @@ const strategicIndexSlugs = [
   'gaming-consoles',
 ]
 const gatedSlugs = [
-  'macbooks',
-  'gaming-pcs',
   'camera-lenses',
   'graphics-cards',
   'pc-components',
@@ -85,7 +86,7 @@ for (const slug of gatedSlugs) {
 }
 
 const keywordMatches = [...categoryContent.matchAll(/primaryKeyword:\s*'([^']+)'/g)].map((match) => match[1].trim().toLowerCase())
-checks.push(['8 strategic category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length])
+checks.push(['11 strategic category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length])
 checks.push(['strategic category keyword owners are unique', new Set(keywordMatches).size === keywordMatches.length])
 
 const failures = checks.filter(([, ok]) => !ok)
