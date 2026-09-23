@@ -54,13 +54,16 @@ jobs:
 
       - name: Inspect Astro production output
         working-directory: shop
-        run: find dist -maxdepth 5 -type f -print | sort
+        run: |
+          test -f dist/server/entry.mjs
+          test -f dist/server/wrangler.json
+          cat dist/server/wrangler.json
 
       - name: Deploy AMPHON Shop
         working-directory: shop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx wrangler deploy --config wrangler.jsonc
+        run: npx wrangler deploy --config dist/server/wrangler.json
 
       - name: Verify live Shop
         shell: bash
