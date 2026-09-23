@@ -166,13 +166,54 @@ const lineUrl = primaryLineUrl
 const lineId = primaryLineId
 const phone = import.meta.env.PUBLIC_PHONE?.trim() || ''
 const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
+
+const productFaqs = product ? [
+  {
+    question: `${product.title} ราคาเท่าไร?`,
+    answer: `ราคาที่แสดงล่าสุดของสินค้ารหัส ${product.sku} คือ ${formatPrice(product.price)} โดยควรเช็กสถานะกับร้านอีกครั้งก่อนชำระ เพราะสินค้าไอทีมือสองเป็นสินค้ารายชิ้น`,
+  },
+  {
+    question: `${product.title} สภาพเป็นอย่างไร?`,
+    answer: product.conditionPercent !== null && product.conditionPercent !== undefined
+      ? `ร้านระบุสภาพโดยรวมประมาณ ${product.conditionPercent}%${product.defects ? ` และมีรายละเอียดตำหนิว่า ${product.defects}` : ''} ควรดูรูปจริงและรายละเอียดในหน้านี้ประกอบก่อนซื้อ`
+      : `${product.defects ? `ร้านระบุรายละเอียดตำหนิว่า ${product.defects}` : 'รายการนี้ยังไม่ได้ระบุเปอร์เซ็นต์สภาพ'} ควรดูรูปจริงและข้อมูลของสินค้าชิ้นนี้ประกอบก่อนซื้อ`,
+  },
+  {
+    question: `${product.title} ยังมีสินค้าไหม?`,
+    answer: product.availability === 'available'
+      ? 'สถานะล่าสุดบนเว็บคือพร้อมขาย สามารถส่งรหัสสินค้าให้ร้านทาง LINE เพื่อยืนยันสถานะก่อนชำระได้'
+      : product.availability === 'reserved'
+        ? 'สถานะล่าสุดคือมีลูกค้าจองแล้ว หากหลุดจองสถานะจะอัปเดตบนหน้าเว็บ'
+        : 'สินค้าชิ้นนี้ขายแล้ว สามารถดูสินค้ารุ่นหรือหมวดใกล้เคียงที่ยังพร้อมขายได้จากลิงก์ในหน้านี้',
+  },
+  {
+    question: `${product.title} มีประกันหรือไม่?`,
+    answer: warrantyDate
+      ? `หน้าสินค้ามีข้อมูลประกันถึง ${warrantyDate} โดยควรอ่านเงื่อนไขประกันของร้านและยืนยันรายละเอียดของสินค้าชิ้นนี้ก่อนสั่งซื้อ`
+      : 'รายการนี้ยังไม่ได้ระบุวันหมดประกันบนหน้าเว็บ หากเรื่องประกันมีผลต่อการตัดสินใจ แนะนำให้สอบถามร้านก่อนสั่งซื้อ',
+  },
+] : []
 ---
 <BaseLayout
   title={title}
   description={description}
   canonicalPath={canonicalPath}
   robots={robots}
-  jsonLd={schema}
+  jsonLd={product ? [
+    ...(schema || []),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: productFaqs.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    },
+  ] : schema}
   ogImage={primaryImage}
   ogImageAlt={socialImageAlt}
   ogImageWidth={primaryImageWidth}
@@ -409,6 +450,26 @@ const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, '')}` : ''
           </div>
         </div>
       </section>}
+
+      <section class="section product-answer-section" aria-labelledby="product-search-answer">
+        <div class="container">
+          <article class="panel seo-answer-panel">
+            <div class="eyebrow">คำตอบจากข้อมูลสินค้าชิ้นจริง</div>
+            <h2 id="product-search-answer">ข้อมูลก่อนซื้อ {product.title} มือสอง</h2>
+            <p class="seo-answer-lead">
+              สรุปข้อมูลที่คนมักต้องการรู้ก่อนซื้อจากรายการสินค้ารหัส {product.sku} โดยยึดราคา สภาพ ประกัน และสถานะที่แสดงอยู่บนหน้าสินค้านี้
+            </p>
+            <div class="faq-list">
+              {productFaqs.map((item) => (
+                <details>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
     </>
   ) : (
     <section class="section"><div class="container"><div class="empty"><h1 class="not-found-title">{Astro.response.status === 503 ? 'กำลังโหลดข้อมูลสินค้า' : 'ไม่พบสินค้านี้'}</h1><p>{Astro.response.status === 503 ? 'ตอนนี้โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งได้ครับ' : 'สินค้านี้อาจขายแล้ว ถูกยกเลิก หรือไม่มีรายการอยู่บนร้านแล้ว'}</p><a class="button button-primary" href="/">กลับหน้าร้าน</a></div></div></section>
