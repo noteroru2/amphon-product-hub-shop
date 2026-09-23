@@ -446,6 +446,10 @@ export async function loadAiBuyerChatList(limit = 120) {
   );
 }
 
+export async function loadAiBuyerChatUnreadTotal() {
+  return request<{ ok: true; unreadTotal: number }>("/v1/hub/admin/chat-unread");
+}
+
 export async function loadAiBuyerChatCase(caseId: string) {
   return request<AiBuyerChatCaseDetail>(
     `/v1/hub/admin/chat-case?caseId=${encodeURIComponent(caseId)}`,
