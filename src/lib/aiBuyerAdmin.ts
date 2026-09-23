@@ -122,6 +122,7 @@ export type AiBuyerChatCaseSummary = {
   } | null;
   updatedAt: string;
   lastActivityAt: string;
+  unreadCount: number;
 };
 
 export type AiBuyerChatMessage = {
@@ -183,6 +184,7 @@ export type AiBuyerChatCaseDetail = {
 export type AiBuyerChatListData = {
   ok: true;
   cases: AiBuyerChatCaseSummary[];
+  unreadTotal: number;
   generatedAt: string;
 };
 
@@ -448,6 +450,18 @@ export async function loadAiBuyerChatCase(caseId: string) {
   return request<AiBuyerChatCaseDetail>(
     `/v1/hub/admin/chat-case?caseId=${encodeURIComponent(caseId)}`,
   );
+}
+
+export async function markAiBuyerChatRead(caseId: string) {
+  return request<{
+    ok: true;
+    caseId: string;
+    unreadCount: number;
+    lastReadAt: string;
+  }>("/v1/hub/admin/chat-read", {
+    method: "POST",
+    body: JSON.stringify({ caseId }),
+  });
 }
 
 export async function loadAiBuyerCase(caseId: string) {
