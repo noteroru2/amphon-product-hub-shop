@@ -58,6 +58,7 @@ import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import { LineOAChat } from "./components/LineOAChat";
+import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -194,6 +195,7 @@ function App() {
   const [duplicateChecking, setDuplicateChecking] = useState(false);
   const [activity, setActivity] = useState<ProductActivity[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [lineUnread, setLineUnread] = useState(0);
   const saveLock = useRef(false);
   const deepLinkHandled = useRef(false);
 
@@ -333,6 +335,37 @@ function App() {
     const t = setTimeout(() => setNotice(null), 3500);
     return () => clearTimeout(t);
   }, [notice]);
+
+  useEffect(() => {
+    if (!profile || !["owner", "admin"].includes(profile.role)) {
+      setLineUnread(0);
+      return;
+    }
+
+    let cancelled = false;
+    const loadUnread = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const result = await loadAiBuyerChatUnreadTotal();
+        if (!cancelled) setLineUnread(Math.max(0, Number(result.unreadTotal || 0)));
+      } catch {
+        // Do not interrupt Hub usage if the badge endpoint is temporarily unavailable.
+      }
+    };
+
+    void loadUnread();
+    const timer = window.setInterval(() => void loadUnread(), 15000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [profile?.id, profile?.role]);
 
   useEffect(() => {
     if (tab !== "add" || !profile || !online) {
@@ -816,7 +849,7 @@ function App() {
         {tab === "line-chat" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
-            <LineOAChat profile={profile} />
+            <LineOAChat profile={profile} onUnreadChange={setLineUnread} />
           )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
@@ -867,6 +900,7 @@ function App() {
           setTab={setTab}
           onAdd={openAdd}
           showLineOA={Boolean(profile && ["owner", "admin"].includes(profile.role))}
+          lineUnread={lineUnread}
         />
       )}
     </div>
@@ -3819,11 +3853,13 @@ function BottomNav({
   setTab,
   onAdd,
   showLineOA,
+  lineUnread,
 }: {
   tab: Tab;
   setTab: (tab: Tab) => void;
   onAdd: () => void;
   showLineOA: boolean;
+  lineUnread: number;
 }) {
   return (
     <nav className={"bottom-nav" + (showLineOA ? " with-lineoa" : "")}>
@@ -3854,7 +3890,14 @@ function BottomNav({
           className={tab === "line-chat" ? "active lineoa-nav-item" : "lineoa-nav-item"}
           onClick={() => setTab("line-chat")}
         >
-          <MessageCircle />
+          <span className="lineoa-nav-icon">
+            <MessageCircle />
+            {lineUnread > 0 && (
+              <b className="lineoa-nav-badge">
+                {lineUnread > 99 ? "99+" : lineUnread}
+              </b>
+            )}
+          </span>
           <span>LINE OA</span>
         </button>
       )}
