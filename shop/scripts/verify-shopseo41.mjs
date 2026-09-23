@@ -26,12 +26,16 @@ const baselineIndexCategories = [
   'gaming-consoles',
 ]
 
-const approvedTier2Index = [
+const promotedFromBaselineHold = [
   'macbooks',
-  'gaming-laptops',
   'gaming-pcs',
 ]
 
+const newStockBackedTier2 = [
+  'gaming-laptops',
+]
+
+const approvedTier2Index = [...promotedFromBaselineHold, ...newStockBackedTier2]
 const expectedCurrentIndex = [...baselineIndexCategories, ...approvedTier2Index]
 
 const expectedHold = [
@@ -73,8 +77,13 @@ checks.push(['machine baseline INDEX categories remain immutable', baselineIndex
 
 const baselineHold = [...(baseline.hold_categories || [])].sort()
 checks.push([
-  'approved Tier-2 categories came from the original HOLD surface',
-  approvedTier2Index.every((slug) => baselineHold.includes(slug)),
+  'promoted Tier-2 categories came from the original HOLD surface',
+  promotedFromBaselineHold.every((slug) => baselineHold.includes(slug)),
+])
+
+checks.push([
+  'new stock-backed Tier-2 category did not overwrite a frozen baseline category',
+  newStockBackedTier2.every((slug) => !baselineHold.includes(slug) && !baselineIndexCategories.includes(slug)),
 ])
 
 checks.push([
