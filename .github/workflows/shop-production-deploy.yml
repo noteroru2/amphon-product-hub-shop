@@ -52,17 +52,15 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare production Wrangler config
+      - name: Inspect Astro production output
         working-directory: shop
-        run: |
-          sed 's#"main": "@astrojs/cloudflare/entrypoints/server"#"main": "./dist/_worker.js/index.js"#' wrangler.jsonc > wrangler.deploy.jsonc
-          test -f dist/_worker.js/index.js
+        run: find dist -maxdepth 5 -type f -print | sort
 
       - name: Deploy AMPHON Shop
         working-directory: shop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx wrangler deploy --config wrangler.deploy.jsonc
+        run: npx wrangler deploy --config wrangler.jsonc
 
       - name: Verify live Shop
         shell: bash
