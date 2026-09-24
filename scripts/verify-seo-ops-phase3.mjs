@@ -3,15 +3,15 @@ import { readFile } from 'node:fs/promises'
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
 const [migration, worker, shopApi, reviewPage, productPage, seoCenter, merchantCenter, trustCenter, app] = await Promise.all([
-  read('../supabase/migrations/20260925003800_seo_ops_phase3_execute_measure_merchant_recovery_reviews.sql'),
-  read('../workers/r2-upload/src/index.ts'),
-  read('../shop/src/lib/store-api.ts'),
-  read('../shop/src/pages/review/[token]/index.astro'),
-  read('../shop/src/pages/p/[product].astro'),
-  read('../src/components/SeoOpportunityCenter.tsx'),
-  read('../src/components/MerchantDiagnosticsCenter.tsx'),
-  read('../src/components/TrustReviewCenter.tsx'),
-  read('../src/App.tsx'),
+  read('supabase/migrations/20260925003800_seo_ops_phase3_execute_measure_merchant_recovery_reviews.sql'),
+  read('workers/r2-upload/src/index.ts'),
+  read('shop/src/lib/store-api.ts'),
+  read('shop/src/pages/review/[token]/index.astro'),
+  read('shop/src/pages/p/[product].astro'),
+  read('src/components/SeoOpportunityCenter.tsx'),
+  read('src/components/MerchantDiagnosticsCenter.tsx'),
+  read('src/components/TrustReviewCenter.tsx'),
+  read('src/App.tsx'),
 ])
 
 const checks = [
