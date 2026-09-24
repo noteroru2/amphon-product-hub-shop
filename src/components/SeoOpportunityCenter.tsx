@@ -1,0 +1,227 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ExternalLink,
+  Link2,
+  LoaderCircle,
+  RefreshCw,
+  SearchCheck,
+  ShieldCheck,
+  TrendingUp,
+  WandSparkles,
+  XCircle,
+} from 'lucide-react'
+import {
+  listSeoActions,
+  setSeoActionStatus,
+  type SeoAction,
+  type SeoActionStatus,
+  type SeoActionType,
+} from '../lib/seoOpportunities'
+
+const TYPE_META: Record<SeoActionType, { label: string; tone: string; icon: typeof TrendingUp }> = {
+  META_REVIEW: { label: 'CTR / Meta', tone: 'violet', icon: WandSparkles },
+  INTERNAL_LINK_BOOST: { label: 'Internal Link', tone: 'blue', icon: Link2 },
+  RECOVERY_PLAN: { label: 'Recovery', tone: 'amber', icon: SearchCheck },
+  PROTECT_PAGE: { label: 'Protect', tone: 'green', icon: ShieldCheck },
+  BRAND_WATCH: { label: 'Brand Watch', tone: 'slate', icon: ShieldCheck },
+  WATCH: { label: 'Watch', tone: 'slate', icon: TrendingUp },
+}
+
+type Filter = 'ALL' | SeoActionType
+
+function percent(value: number) {
+  return new Intl.NumberFormat('th-TH', { style: 'percent', maximumFractionDigits: 2 }).format(value)
+}
+
+function number(value: number, digits = 0) {
+  return new Intl.NumberFormat('th-TH', { maximumFractionDigits: digits }).format(value)
+}
+
+function pageLabel(url: string) {
+  try {
+    const parsed = new URL(url)
+    return `${parsed.hostname}${decodeURIComponent(parsed.pathname)}`
+  } catch {
+    return url
+  }
+}
+
+export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState<SeoAction[]>([])
+  const [filter, setFilter] = useState<Filter>('ALL')
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      setItems(await listSeoActions())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  const visible = useMemo(
+    () => filter === 'ALL' ? items : items.filter((item) => item.actionType === filter),
+    [items, filter],
+  )
+
+  const summary = useMemo(() => ({
+    open: items.filter((item) => item.status === 'OPEN').length,
+    protect: items.filter((item) => item.status === 'PROTECTED').length,
+    meta: items.filter((item) => item.actionType === 'META_REVIEW').length,
+    links: items.filter((item) => item.actionType === 'INTERNAL_LINK_BOOST').length,
+    recovery: items.filter((item) => item.actionType === 'RECOVERY_PLAN').length,
+  }), [items])
+
+  async function setStatus(item: SeoAction, status: Exclude<SeoActionStatus, 'STALE'>) {
+    setBusyId(item.id)
+    setError(null)
+    try {
+      const updated = await setSeoActionStatus(item.id, status)
+      setItems((current) => current.map((row) => row.id === updated.id ? updated : row))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <section className="screen page-pad seo-opportunity-screen">
+      <header className="topbar seo-opportunity-topbar">
+        <button className="icon-btn" onClick={onBack} aria-label="กลับ">
+          <ArrowLeft />
+        </button>
+        <div>
+          <p className="eyebrow">SEARCH CONSOLE</p>
+          <h1>SEO Action Center</h1>
+        </div>
+        <button className="refresh-button" onClick={() => void load()} aria-label="รีเฟรช">
+          <RefreshCw className={loading ? 'spin' : ''} />
+        </button>
+      </header>
+
+      <div className="seo-action-guard">
+        <ShieldCheck size={20} />
+        <div>
+          <strong>Guard เปิดอยู่</strong>
+          <span>ระบบอ่าน Query จริงและสร้างงาน แต่ไม่ rewrite Title / H1 / URL / Canonical เอง</span>
+        </div>
+      </div>
+
+      <div className="seo-action-summary">
+        <div><span>รอดำเนินการ</span><strong>{summary.open}</strong></div>
+        <div><span>Protect</span><strong>{summary.protect}</strong></div>
+        <div><span>CTR</span><strong>{summary.meta}</strong></div>
+        <div><span>Link Boost</span><strong>{summary.links}</strong></div>
+        <div><span>Recovery</span><strong>{summary.recovery}</strong></div>
+      </div>
+
+      <div className="seo-action-filters" role="tablist" aria-label="ตัวกรอง SEO">
+        {([
+          ['ALL', 'ทั้งหมด'],
+          ['META_REVIEW', 'CTR'],
+          ['INTERNAL_LINK_BOOST', 'Link'],
+          ['RECOVERY_PLAN', 'Recovery'],
+          ['PROTECT_PAGE', 'Protect'],
+        ] as Array<[Filter,string]>).map(([value,label]) => (
+          <button
+            key={value}
+            className={filter === value ? 'active' : ''}
+            onClick={() => setFilter(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="inline-error"><span>{error}</span><button onClick={() => void load()}>ลองใหม่</button></div>}
+
+      {loading && !items.length ? (
+        <div className="seo-action-loading"><LoaderCircle className="spin" /> กำลังอ่าน GSC Action Queue...</div>
+      ) : (
+        <div className="seo-action-list">
+          {visible.map((item) => {
+            const meta = TYPE_META[item.actionType]
+            const Icon = meta.icon
+            const busy = busyId === item.id
+            return (
+              <article className="seo-action-card" key={item.id}>
+                <div className="seo-action-card-head">
+                  <span className={`seo-action-type tone-${meta.tone}`}><Icon size={15} /> {meta.label}</span>
+                  <span className={`seo-action-status status-${item.status.toLowerCase()}`}>{item.status}</span>
+                </div>
+
+                <h2>{item.primaryQuery}</h2>
+                <a className="seo-action-page" href={item.page} target="_blank" rel="noreferrer">
+                  {pageLabel(item.page)} <ExternalLink size={13} />
+                </a>
+
+                <div className="seo-action-metrics">
+                  <div><span>Impressions</span><strong>{number(item.impressions)}</strong></div>
+                  <div><span>Clicks</span><strong>{number(item.clicks)}</strong></div>
+                  <div><span>CTR</span><strong>{percent(item.ctr)}</strong></div>
+                  <div><span>Position</span><strong>{number(item.position, 2)}</strong></div>
+                </div>
+
+                <div className="seo-action-plan">
+                  <strong>ระบบแนะนำ</strong>
+                  <p>{item.recommendedAction}</p>
+                  {item.queryCount > 1 && <small>รวม {item.queryCount} query variants ที่ชี้ URL เดียวกัน</small>}
+                </div>
+
+                {(item.candidateTitle || item.candidateDescription || item.candidateNotes) && (
+                  <div className="seo-action-candidate">
+                    <span>Candidate พร้อมตรวจ</span>
+                    {item.candidateTitle && <strong>{item.candidateTitle}</strong>}
+                    {item.candidateDescription && <p>{item.candidateDescription}</p>}
+                    {item.candidateNotes && <small>{item.candidateNotes}</small>}
+                  </div>
+                )}
+
+                <div className="seo-action-footer">
+                  <span>Priority {number(item.priorityScore, 1)}</span>
+                  <div>
+                    {item.executionMode === 'REVIEW' && item.status === 'OPEN' && (
+                      <>
+                        <button
+                          className="seo-action-dismiss"
+                          disabled={busy}
+                          onClick={() => void setStatus(item, 'DISMISSED')}
+                        >
+                          <XCircle size={15} /> ข้าม
+                        </button>
+                        <button
+                          className="seo-action-approve"
+                          disabled={busy}
+                          onClick={() => void setStatus(item, 'APPROVED')}
+                        >
+                          {busy ? <LoaderCircle className="spin" size={15} /> : <CheckCircle2 size={15} />}
+                          อนุมัติแผน
+                        </button>
+                      </>
+                    )}
+                    {item.status === 'APPROVED' && <span className="seo-approved-note"><CheckCircle2 size={15} /> อนุมัติแล้ว</span>}
+                    {item.status === 'PROTECTED' && <span className="seo-protect-note"><ShieldCheck size={15} /> ล็อก Protect</span>}
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+          {!visible.length && !loading && <div className="empty-state"><SearchCheck /><strong>ไม่มี Action ในกลุ่มนี้</strong></div>}
+        </div>
+      )}
+    </section>
+  )
+}
