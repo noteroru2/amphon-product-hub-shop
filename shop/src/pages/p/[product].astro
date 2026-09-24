@@ -121,7 +121,11 @@ const inspectionDate = evidence?.inspectionDate ? formatThaiDate(evidence.inspec
 const evidenceRows = evidence?.evidenceRows || []
 const evidenceImages = evidence?.evidenceImages || []
 const structuredSpecEntries = (() => {
-  const rows = [...evidenceRows, ...allSpecEntries]
+  const evidenceMetaRows: Array<[string, string]> = [
+    ...(evidence?.inspectionDate ? [['วันที่ตรวจเครื่อง', evidence.inspectionDate] as [string, string]] : []),
+    ...(evidence?.inspectionResult ? [['ผลตรวจโดยรวม', evidence.inspectionResult] as [string, string]] : []),
+  ]
+  const rows = [...evidenceMetaRows, ...evidenceRows, ...allSpecEntries]
   const seen = new Set<string>()
   return rows.filter(([name, value]) => {
     const key = `${name}::${value}`
@@ -328,7 +332,7 @@ if (product && evidence?.hasProductEvidence) {
             <div><span>สภาพ</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูด้านล่าง'}</strong></div>
             <div><span>รูปจริง</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
             <div><span>ประกัน</span><strong>{warrantyDate || 'ยังไม่ระบุ'}</strong></div>
-            <div><span>ผลตรวจจริง</span><strong>{evidence?.hasProductEvidence ? `${evidenceRows.length} จุด` : updatedDate || 'ยังไม่บันทึก'}</strong></div>
+            <div><span>ผลตรวจจริง</span><strong>{evidence?.hasProductEvidence ? `${evidence.evidenceFieldCount} จุด` : updatedDate || 'ยังไม่บันทึก'}</strong></div>
           </div>
 
           <div class="chips product-quick-links" aria-label="ไปยังข้อมูลสำคัญของสินค้า">
@@ -389,7 +393,7 @@ if (product && evidence?.hasProductEvidence) {
                 <>
                   {inspectionDate && <p><strong>วันที่ตรวจ:</strong> {inspectionDate}</p>}
                   {evidence.inspectionResult && <p><strong>ผลตรวจโดยรวม:</strong> {evidence.inspectionResult}</p>}
-                  <p>มีข้อมูลผลตรวจที่บันทึกไว้ <strong>{evidenceRows.length} จุด</strong>{evidence.evidenceImageCount ? ` และรูปหลักฐาน ${evidence.evidenceImageCount} รูป` : ''}</p>
+                  <p>มีข้อมูลผลตรวจที่บันทึกไว้ <strong>{evidence.evidenceFieldCount} จุด</strong>{evidence.evidenceImageCount ? ` และรูปหลักฐาน ${evidence.evidenceImageCount} รูป` : ''}</p>
                   <a class="inline-link" href="#product-evidence">ดู Product Evidence ของเครื่องนี้</a>
                 </>
               ) : groups.condition.length ? <dl class="compact-specs">
@@ -450,7 +454,7 @@ if (product && evidence?.hasProductEvidence) {
               <div class="evidence-meta-grid">
                 <div><span>วันที่ตรวจ</span><strong>{inspectionDate || 'ยังไม่ระบุ'}</strong></div>
                 <div><span>ผลตรวจโดยรวม</span><strong>{evidence.inspectionResult || 'ดูรายละเอียดด้านล่าง'}</strong></div>
-                <div><span>ผลตรวจที่บันทึก</span><strong>{evidenceRows.length} จุด</strong></div>
+                <div><span>ผลตรวจที่บันทึก</span><strong>{evidence.evidenceFieldCount} จุด</strong></div>
                 <div><span>รูปหลักฐาน</span><strong>{evidence.evidenceImageCount} รูป</strong></div>
               </div>
 
