@@ -68,16 +68,19 @@ jobs:
       - name: Verify live Shop
         shell: bash
         run: |
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            home="$(curl -fsS --max-time 20 https://shop.amphon.co.th/ || true)"
-            notebooks="$(curl -fsS --max-time 20 https://shop.amphon.co.th/notebooks/ || true)"
-            merchant="$(curl -fsS --max-time 20 https://shop.amphon.co.th/google-merchant.xml || true)"
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
 
-            if echo "$home" | grep -q "ร้านขายสินค้าไอทีมือสองที่ดูของจริงก่อนซื้อได้" \
-              && echo "$notebooks" | grep -q "ข้อมูลสำหรับคนที่กำลังหา" \
-              && echo "$merchant" | grep -q "<g:product_type>" \
-              && echo "$merchant" | grep -q "<g:shipping>" \
-              && echo "$merchant" | grep -q "<g:product_detail>"; then
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            curl -fsS --max-time 20 https://shop.amphon.co.th/ -o "$tmpdir/home.html" || true
+            curl -fsS --max-time 20 https://shop.amphon.co.th/notebooks/ -o "$tmpdir/notebooks.html" || true
+            curl -fsS --max-time 20 https://shop.amphon.co.th/google-merchant.xml -o "$tmpdir/merchant.xml" || true
+
+            if grep -Fq "ร้านขายสินค้าไอทีมือสองที่ดูของจริงก่อนซื้อได้" "$tmpdir/home.html" \
+              && grep -Fq "ข้อมูลสำหรับคนที่กำลังหา" "$tmpdir/notebooks.html" \
+              && grep -Fq "<g:product_type>" "$tmpdir/merchant.xml" \
+              && grep -Fq "<g:shipping>" "$tmpdir/merchant.xml" \
+              && grep -Fq "<g:product_detail>" "$tmpdir/merchant.xml"; then
               echo "Shop production deploy PASS: $GITHUB_SHA"
               exit 0
             fi
