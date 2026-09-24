@@ -377,7 +377,8 @@ export function getSubtypeLabel(category?: ProductCategory, subtype?: string) {
 
 export function getSpecRows(draft: ProductDraft) {
   const knownFields = getSmartFields(draft)
-  const labels = new Map(knownFields.map((field) => [field.key, field.label]))
+  const evidenceFields = getEvidenceFields(draft)
+  const labels = new Map([...knownFields, ...evidenceFields].map((field) => [field.key, field.label]))
   const seen = new Set<string>()
   const rows: Array<[string, string]> = []
   for (const field of knownFields) {
