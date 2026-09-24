@@ -35,6 +35,7 @@ import {
   ImageDown,
   Bot,
   MessageCircle,
+  TrendingUp,
 } from "lucide-react";
 import { db } from "./lib/db";
 import { compressImage } from "./lib/image";
@@ -58,6 +59,7 @@ import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import { LineOAChat } from "./components/LineOAChat";
+import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
 import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import {
   getCategoryDefinition,
@@ -121,7 +123,8 @@ type Tab =
   | "profile"
   | "employees"
   | "ai-buyer"
-  | "line-chat";
+  | "line-chat"
+  | "seo-opportunities";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
@@ -808,6 +811,7 @@ function App() {
             onPublish={() => setTab("publish")}
             onOrders={() => setTab("orders")}
             onAiBuyer={() => setTab("ai-buyer")}
+            onSeo={() => setTab("seo-opportunities")}
             onEdit={openEdit}
           />
         )}
@@ -852,6 +856,11 @@ function App() {
           profile &&
           ["owner", "admin"].includes(profile.role) && (
             <LineOAChat profile={profile} onUnreadChange={setLineUnread} />
+          )}
+        {tab === "seo-opportunities" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <SeoOpportunityCenter onBack={() => setTab("home")} />
           )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
@@ -1158,6 +1167,7 @@ function HomeScreen({
   onPublish,
   onOrders,
   onAiBuyer,
+  onSeo,
   onEdit,
 }: {
   profile: Profile;
@@ -1170,6 +1180,7 @@ function HomeScreen({
   onPublish: () => void;
   onOrders: () => void;
   onAiBuyer: () => void;
+  onSeo: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
   const publishedCount = products.filter(
@@ -1240,6 +1251,23 @@ function HomeScreen({
               <strong>AI Buyer</strong>
               <small>
                 ตอบ LINE · ปิดผลดีล · ราคาซื้อจริง · Profit Ledger
+              </small>
+            </span>
+          </div>
+          <ChevronRight />
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <button
+          className="publish-center-launch seo-action-home-launch"
+          onClick={onSeo}
+        >
+          <div>
+            <TrendingUp size={21} />
+            <span>
+              <strong>SEO Action Center</strong>
+              <small>
+                GSC Query จริง · CTR · Internal Link · Recovery · Protect
               </small>
             </span>
           </div>
