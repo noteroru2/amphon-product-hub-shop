@@ -240,3 +240,25 @@ h2 { font-size: clamp(1.45rem, 3vw, 2.15rem); letter-spacing: -.025em; }
   .nav { order:3; max-width:100%; width:100%; margin-left:0; }
   .cart-link { margin-left:auto; }
 }
+
+
+/* Query-driven spec landing pages */
+.spec-page-facts { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.spec-page-facts span { display:inline-flex; gap:5px; align-items:baseline; padding:8px 11px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:.82rem; color:#555; }
+.spec-page-facts strong { color:#111; font-size:1rem; }
+.spec-hub-groups { display:grid; gap:18px; }
+.spec-hub-group { padding:24px; }
+.spec-hub-card { display:flex; flex-direction:column; gap:6px; }
+.spec-hub-card span { color:#444; font-size:.88rem; }
+.spec-hub-card small { color:var(--muted); line-height:1.45; }
+.spec-finder-bridge { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px 28px; align-items:center; padding:24px; background:#fbfdff; border-color:#dbeafe; }
+.spec-finder-bridge h2 { margin:6px 0 8px; font-size:clamp(1.3rem,2.5vw,1.85rem); }
+.spec-finder-bridge p { margin:0; max-width:760px; color:var(--muted); line-height:1.7; }
+.spec-stock-section .product-grid { margin-top:8px; }
+.spec-editorial-section .editorial-panel { background:#fff; }
+.spec-taxonomy-links { margin-top:8px; }
+@media (max-width:720px) {
+  .spec-finder-bridge { grid-template-columns:1fr; padding:20px; }
+  .spec-finder-bridge .button { width:100%; }
+  .spec-hub-group { padding:18px; }
+}
