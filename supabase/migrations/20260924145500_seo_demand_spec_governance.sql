@@ -253,6 +253,43 @@ from public.commerce_spec_pages;
 
 grant select on public.commerce_public_spec_page_v to service_role;
 
+create or replace view public.commerce_gsc_opportunity_v
+with (security_invoker=true)
+as
+select
+  property,
+  query,
+  page,
+  clicks,
+  impressions,
+  ctr,
+  position,
+  fetched_at,
+  case
+    when impressions >= 50 and position <= 5 and ctr < 0.05 then 'CTR_OPPORTUNITY'
+    when impressions >= 20 and position > 5 and position <= 15 then 'TOP10_PUSH'
+    when impressions >= 15 and position > 15 and position <= 30 then 'PAGE1_RECOVERY'
+    when impressions >= 10 and position <= 10 then 'PROTECT'
+    else 'WATCH'
+  end as opportunity_type,
+  round(
+    impressions
+    * case
+        when position <= 5 then 1.00
+        when position <= 10 then 0.85
+        when position <= 15 then 0.65
+        when position <= 30 then 0.35
+        else 0.10
+      end
+    * case when ctr < 0.05 then 1.35 else 1.00 end
+  , 2) as opportunity_score
+from public.commerce_gsc_query_demand
+where window_days = 28
+  and fetched_at >= now() - interval '3 days'
+  and impressions >= 10;
+
+grant select on public.commerce_gsc_opportunity_v to service_role;
+
 select private.refresh_commerce_spec_pages();
 
 do $$
