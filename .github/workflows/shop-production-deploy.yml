@@ -71,9 +71,13 @@ jobs:
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
             home="$(curl -fsS --max-time 20 https://shop.amphon.co.th/ || true)"
             notebooks="$(curl -fsS --max-time 20 https://shop.amphon.co.th/notebooks/ || true)"
+            merchant="$(curl -fsS --max-time 20 https://shop.amphon.co.th/google-merchant.xml || true)"
 
             if echo "$home" | grep -q "ร้านขายสินค้าไอทีมือสองที่ดูของจริงก่อนซื้อได้" \
-              && echo "$notebooks" | grep -q "ข้อมูลสำหรับคนที่กำลังหา"; then
+              && echo "$notebooks" | grep -q "ข้อมูลสำหรับคนที่กำลังหา" \
+              && echo "$merchant" | grep -q "<g:product_type>" \
+              && echo "$merchant" | grep -q "<g:shipping>" \
+              && echo "$merchant" | grep -q "<g:product_detail>"; then
               echo "Shop production deploy PASS: $GITHUB_SHA"
               exit 0
             fi
@@ -82,5 +86,5 @@ jobs:
             sleep 5
           done
 
-          echo "::error::shop.amphon.co.th did not expose the expected SEO/AEO/GEO storefront"
+          echo "::error::shop.amphon.co.th did not expose the expected storefront + Google Merchant feed"
           exit 1
