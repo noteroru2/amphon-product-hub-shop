@@ -62,6 +62,8 @@ import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import {
   getCategoryDefinition,
   getCompleteness,
+  getEvidenceCompleteness,
+  getEvidenceFields,
   getImageRoles,
   getSmartFields,
   productSchemas,
@@ -1932,6 +1934,8 @@ function DetailStep({
   duplicateChecking: boolean;
 }) {
   const fields = getSmartFields(draft);
+  const evidenceFields = getEvidenceFields(draft);
+  const evidenceCompleteness = getEvidenceCompleteness(draft);
   const setSpec = (key: string, value: string) =>
     update({ specs: { ...draft.specs, [key]: value } });
   const groups = [
@@ -2035,6 +2039,31 @@ function DetailStep({
           ))}
         </div>
       ))}
+      {evidenceFields.length > 0 && (
+        <div className="smart-section product-evidence-entry">
+          <div className="smart-section-title">
+            <strong>Product Evidence — ผลตรวจเครื่องจริง</strong>
+            <small>
+              กรอกเฉพาะจุดที่ตรวจจริง ข้อมูลนี้จะแสดงบนหน้า Shop และช่วยให้ลูกค้า/Google เห็นหลักฐานของสินค้าชิ้นนี้
+            </small>
+          </div>
+          <div className="evidence-progress">
+            <span>บันทึกผลตรวจแล้ว {evidenceCompleteness.filled}/{evidenceCompleteness.total} จุด</span>
+            <strong>{evidenceCompleteness.score}%</strong>
+          </div>
+          {evidenceFields.map((field) => (
+            <SmartSpecField
+              key={`evidence-${field.key}`}
+              field={field}
+              value={draft.specs[field.key] ?? ""}
+              onChange={(value) => setSpec(field.key, value)}
+            />
+          ))}
+          <p className="form-hint">
+            แนะนำแนบรูปประเภท “หลักฐานผลทดสอบ”, “Battery Health”, “Pixel Test” หรือ “Benchmark” ในขั้นตอนรูปภาพเมื่อมีหลักฐานจริง
+          </p>
+        </div>
+      )}
       <div className="smart-section">
         <div className="smart-section-title">
           <strong>ตำหนิและหมายเหตุ</strong>
@@ -2101,6 +2130,14 @@ function SmartSpecField({
             </option>
           ))}
         </select>
+      ) : field.type === "date" ? (
+        <input
+          type="date"
+          value={value}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            onChange(event.target.value)
+          }
+        />
       ) : (
         <input
           value={value}

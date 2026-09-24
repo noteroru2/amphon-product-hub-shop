@@ -117,6 +117,23 @@ const publishedDate = product ? formatThaiDate(product.publishedAt) : null
 const updatedDate = product ? formatThaiDate(product.updatedAt) : null
 const warrantyDate = product ? formatThaiDate(product.warrantyUntil) : null
 const evidence = product ? productEvidence(product) : null
+const inspectionDate = evidence?.inspectionDate ? formatThaiDate(evidence.inspectionDate) : null
+const evidenceRows = evidence?.evidenceRows || []
+const evidenceImages = evidence?.evidenceImages || []
+const structuredSpecEntries = (() => {
+  const evidenceMetaRows: Array<[string, string]> = [
+    ...(evidence?.inspectionDate ? [['วันที่ตรวจเครื่อง', evidence.inspectionDate] as [string, string]] : []),
+    ...(evidence?.inspectionResult ? [['ผลตรวจโดยรวม', evidence.inspectionResult] as [string, string]] : []),
+  ]
+  const rows = [...evidenceMetaRows, ...evidenceRows, ...allSpecEntries]
+  const seen = new Set<string>()
+  return rows.filter(([name, value]) => {
+    const key = `${name}::${value}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})()
 const galleryImages = product
   ? [...product.images].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
   : []
@@ -139,7 +156,7 @@ const breadcrumbItems = product ? [
 
 const schema = product ? [
   buildMerchantOrganizationSchema(settings),
-  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: allSpecEntries }),
+  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: structuredSpecEntries }),
   {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -193,6 +210,19 @@ const productFaqs = product ? [
       : 'รายการนี้ยังไม่ได้ระบุวันหมดประกันบนหน้าเว็บ หากเรื่องประกันมีผลต่อการตัดสินใจ แนะนำให้สอบถามร้านก่อนสั่งซื้อ',
   },
 ] : []
+
+if (product && evidence?.hasProductEvidence) {
+  const checkedItems = evidenceRows.slice(0, 6).map(([name, value]) => `${name}: ${value}`).join(' • ')
+  productFaqs.push({
+    question: `ร้านตรวจ ${product.title} เครื่องนี้อะไรแล้วบ้าง?`,
+    answer: [
+      inspectionDate ? `มีข้อมูลการตรวจวันที่ ${inspectionDate}` : '',
+      evidence.inspectionResult ? `ผลตรวจโดยรวม: ${evidence.inspectionResult}` : '',
+      checkedItems ? `ข้อมูลที่บันทึก: ${checkedItems}` : '',
+      evidence.evidenceImageCount ? `มีรูปหลักฐานผลตรวจ ${evidence.evidenceImageCount} รูปในหน้าสินค้า` : '',
+    ].filter(Boolean).join(' • '),
+  })
+}
 ---
 <BaseLayout
   title={title}
@@ -302,11 +332,12 @@ const productFaqs = product ? [
             <div><span>สภาพ</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูด้านล่าง'}</strong></div>
             <div><span>รูปจริง</span><strong>{evidence?.imageCount || 0} รูป</strong></div>
             <div><span>ประกัน</span><strong>{warrantyDate || 'ยังไม่ระบุ'}</strong></div>
-            <div><span>อัปเดตล่าสุด</span><strong>{updatedDate || 'ล่าสุด'}</strong></div>
+            <div><span>ผลตรวจจริง</span><strong>{evidence?.hasProductEvidence ? `${evidence.evidenceFieldCount} จุด` : updatedDate || 'ยังไม่บันทึก'}</strong></div>
           </div>
 
           <div class="chips product-quick-links" aria-label="ไปยังข้อมูลสำคัญของสินค้า">
             <a class="button button-secondary" href="#condition">ดูสภาพ</a>
+            {evidence?.hasProductEvidence && <a class="button button-secondary" href="#product-evidence">ผลตรวจเครื่องจริง</a>}
             <a class="button button-secondary" href="#specs">ดูสเปก</a>
             <a class="button button-secondary" href="#shipping">ส่ง / คืนสินค้า</a>
           </div>
@@ -358,8 +389,15 @@ const productFaqs = product ? [
 
             <article class="panel trust-card">
               <h3>ร้านเช็กอะไรไว้บ้าง</h3>
-              {groups.condition.length ? <dl class="compact-specs">
-                {groups.condition.map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
+              {evidence?.hasProductEvidence ? (
+                <>
+                  {inspectionDate && <p><strong>วันที่ตรวจ:</strong> {inspectionDate}</p>}
+                  {evidence.inspectionResult && <p><strong>ผลตรวจโดยรวม:</strong> {evidence.inspectionResult}</p>}
+                  <p>มีข้อมูลผลตรวจที่บันทึกไว้ <strong>{evidence.evidenceFieldCount} จุด</strong>{evidence.evidenceImageCount ? ` และรูปหลักฐาน ${evidence.evidenceImageCount} รูป` : ''}</p>
+                  <a class="inline-link" href="#product-evidence">ดู Product Evidence ของเครื่องนี้</a>
+                </>
+              ) : groups.condition.length ? <dl class="compact-specs">
+                {groups.condition.slice(0, 5).map(([key, value]) => <div><dt>{key}</dt><dd>{value}</dd></div>)}
               </dl> : <p class="muted">ยังไม่มีผลเช็กเพิ่มเติมบนหน้าเว็บ ถ้าอยากให้เช็กจุดไหนก่อนซื้อ ทักร้านได้ครับ</p>}
             </article>
 
@@ -400,6 +438,48 @@ const productFaqs = product ? [
           </div>
         </div>
       </section>
+
+      {evidence?.hasProductEvidence && (
+        <section id="product-evidence" class="section product-evidence-section" aria-labelledby="product-evidence-title">
+          <div class="container">
+            <div class="panel product-evidence-panel">
+              <div class="section-head">
+                <div>
+                  <div class="eyebrow">PRODUCT EVIDENCE</div>
+                  <h2 id="product-evidence-title">ผลตรวจเครื่องจริงของ {product.title}</h2>
+                </div>
+                <p class="muted trust-intro">ข้อมูลด้านล่างมาจากผลตรวจและข้อมูลที่บันทึกไว้กับสินค้ารหัส {product.sku} โดยตรง ช่องที่ไม่ได้ตรวจจะไม่ถูกสรุปว่า “ปกติ” แทน</p>
+              </div>
+
+              <div class="evidence-meta-grid">
+                <div><span>วันที่ตรวจ</span><strong>{inspectionDate || 'ยังไม่ระบุ'}</strong></div>
+                <div><span>ผลตรวจโดยรวม</span><strong>{evidence.inspectionResult || 'ดูรายละเอียดด้านล่าง'}</strong></div>
+                <div><span>ผลตรวจที่บันทึก</span><strong>{evidence.evidenceFieldCount} จุด</strong></div>
+                <div><span>รูปหลักฐาน</span><strong>{evidence.evidenceImageCount} รูป</strong></div>
+              </div>
+
+              {evidenceRows.length > 0 && (
+                <dl class="evidence-spec-list">
+                  {evidenceRows.map(([key, value]) => <div class="evidence-spec-row"><dt>{key}</dt><dd>{value}</dd></div>)}
+                </dl>
+              )}
+
+              {evidenceImages.length > 0 && (
+                <div class="evidence-photo-strip" aria-label="รูปหลักฐานการตรวจเครื่อง">
+                  {evidenceImages.slice(0, 8).map((image) => (
+                    <figure>
+                      <img src={image.url} alt={`${product.title} ${imageRoleLabel(image.role)} หลักฐานการตรวจเครื่อง`} loading="lazy" decoding="async" />
+                      <figcaption>{imageRoleLabel(image.role)}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+
+              <p class="evidence-disclaimer">Product Evidence แสดงเฉพาะข้อมูลที่ถูกบันทึกกับเครื่องชิ้นนี้ เพื่อช่วยให้เทียบสภาพของสินค้ามือสองจากข้อมูลจริง ไม่ใช่การรับรองว่าเครื่องทุกส่วนที่ไม่ได้ระบุถูกตรวจครบแล้ว</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section id="specs" class="section">
         <div class="container">
