@@ -12,6 +12,7 @@ const [migration, app, center, client] = await Promise.all([
 const checks = [
   ['queue is page-clustered instead of query-spam', migration.includes('unique (property, page)') && migration.includes('query_count integer')],
   ['fresh opportunities only', migration.includes("fetched_at >= now() - interval '3 days'")],
+  ['action execution is scoped to main site and Shop only', migration.includes("page like 'https://amphon.co.th/%'") && migration.includes("page like 'https://shop.amphon.co.th/%'")],
   ['brand queries are guarded from SEO rewrites', migration.includes("'BRAND_WATCH'") && migration.includes("lower(p.primary_query) ~ '(amphon|amphontd|อำพล|อําพล)'")],
   ['protect actions are auto-guarded', migration.includes("'PROTECT_PAGE'") && migration.includes("'AUTO_GUARD'") && migration.includes("'PROTECTED'")],
   ['CTR actions explicitly forbid automatic rewrite', migration.includes('ห้าม auto-rewrite')],
