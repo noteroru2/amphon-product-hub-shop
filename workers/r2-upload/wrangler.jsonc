@@ -26,6 +26,10 @@
       "*/5 * * * *"
     ]
   },
+  // Optional Worker-only secrets for Shopee Direct API:
+  // SHOPEE_PARTNER_ID
+  // SHOPEE_PARTNER_KEY
+  // They are intentionally NOT required while Shopee Direct API is disabled.
   "secrets": {
     "required": [
       "SHOP_INTEGRATION_SECRET"
