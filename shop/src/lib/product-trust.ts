@@ -106,6 +106,23 @@ export function evidenceImages(images: StoreImage[], role: string) {
   return images.filter((image) => image.role === role)
 }
 
+
+export function productImageSeoText(product: StoreProduct, image: StoreImage, index = 0) {
+  const role = imageRoleLabel(image.role)
+  const condition = product.conditionPercent !== null && product.conditionPercent !== undefined
+    ? ` สภาพประมาณ ${product.conditionPercent}%`
+    : ''
+  const defect = image.role === 'defect' && product.defects ? ` ตำหนิ: ${product.defects}` : ''
+  const position = index > 0 ? ` รูปที่ ${index + 1}` : ''
+  const title = `${product.title} มือสอง ${role}${position}`
+  const caption = `${product.title} มือสอง ${role}${condition}${defect} รหัสสินค้า ${product.sku}`
+  return {
+    alt: title.slice(0, 180),
+    title: title.slice(0, 180),
+    caption: caption.replace(/\s+/g, ' ').trim().slice(0, 800),
+  }
+}
+
 export function productEvidence(product: StoreProduct) {
   const roles = new Set(product.images.map((image) => image.role))
   const evidenceRows = PRODUCT_EVIDENCE_KEYS
