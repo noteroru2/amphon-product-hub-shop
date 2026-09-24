@@ -51,7 +51,7 @@ create or replace function private.refresh_commerce_gsc_action_queue()
 returns void
 language plpgsql
 security definer
-set search_path = public, private, pg_temp
+set search_path = ''
 as $$
 begin
   with fresh as (
@@ -205,7 +205,7 @@ create or replace function public.set_gsc_action_status(
 returns public.commerce_gsc_action_queue
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   result_row public.commerce_gsc_action_queue;
