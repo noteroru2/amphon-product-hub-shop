@@ -48,7 +48,8 @@ create or replace function private.normalize_commerce_spec_token(p_dimension tex
 returns text
 language plpgsql
 immutable
-as $$
+set search_path = pg_catalog, private
+as $
 declare
   v text := lower(coalesce(p_raw,''));
   m text[];
@@ -84,7 +85,12 @@ begin
   end if;
   return null;
 end;
-$$;
+$;
+
+revoke all on function private.normalize_commerce_spec_token(text,text) from public;
+revoke all on function private.normalize_commerce_spec_token(text,text) from anon;
+revoke all on function private.normalize_commerce_spec_token(text,text) from authenticated;
+grant execute on function private.normalize_commerce_spec_token(text,text) to service_role;
 
 create or replace function private.refresh_commerce_spec_pages()
 returns void
