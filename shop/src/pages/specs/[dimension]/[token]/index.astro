@@ -3,7 +3,7 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../../../components/BuybackCTA.astro'
 import ProductCard from '../../../../components/ProductCard.astro'
 import { getAllStoreProducts, resolveSpecPage, type SpecDimension, type StoreProduct } from '../../../../lib/store-api'
-import { absoluteUrl } from '../../../../lib/seo'
+import { absoluteUrl, productPath } from '../../../../lib/seo'
 import { matchesSpecPage, specDimensionLabel } from '../../../../lib/spec-seo'
 
 const dimension = String(Astro.params.dimension || '').toUpperCase() as SpecDimension
@@ -62,7 +62,7 @@ const schema = page ? [
     itemListElement: products.map((product, index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      url: absoluteUrl(`/p/${product.listingSlug || product.sku.toLowerCase()}/`),
+      url: absoluteUrl(productPath(product)),
       name: product.title,
     })),
   },
