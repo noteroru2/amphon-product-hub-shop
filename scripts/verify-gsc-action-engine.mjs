@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises'
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
 const [migration, app, center, client] = await Promise.all([
-  read('../supabase/migrations/20260924153000_gsc_action_engine.sql'),
-  read('../src/App.tsx'),
-  read('../src/components/SeoOpportunityCenter.tsx'),
-  read('../src/lib/seoOpportunities.ts'),
+  read('supabase/migrations/20260924153000_gsc_action_engine.sql'),
+  read('src/App.tsx'),
+  read('src/components/SeoOpportunityCenter.tsx'),
+  read('src/lib/seoOpportunities.ts'),
 ])
 
 const checks = [
