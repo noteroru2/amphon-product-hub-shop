@@ -20,13 +20,14 @@ for (const path of required) {
   try { await access(resolve(root, path)) } catch { failures.push(`missing: ${path}`) }
 }
 
-const [layout, product, home, card, sitemap, merchant, arrivals] = await Promise.all([
+const [layout, product, home, card, sitemap, merchantRoute, merchantFeed, arrivals] = await Promise.all([
   read('src/layouts/BaseLayout.astro'),
   read('src/pages/p/[product].astro'),
   read('src/pages/index.astro'),
   read('src/components/ProductCard.astro'),
   read('src/pages/sitemap.xml.ts'),
   read('src/pages/google-merchant.xml.ts'),
+  read('src/lib/google-merchant-feed.ts'),
   read('src/pages/new-arrivals/index.astro'),
 ])
 
@@ -40,7 +41,7 @@ const checks = [
   ['Global navigation links new arrivals and policies', layout.includes('href="/new-arrivals/"') && layout.includes('href="/how-to-buy/"') && layout.includes('href="/returns/"')],
   ['Product cards show real-image count and SKU', card.includes('รูปจริง {product.images.length} รูป') && card.includes('รหัสสินค้า {product.sku}')],
   ['Static trust sitemap is part of sitemap index', sitemap.includes("absoluteUrl('/sitemap-static.xml')")],
-  ['Merchant feed exports only available INDEX merchant products', merchant.includes("product.availability === 'available'") && merchant.includes("product.indexPolicy === 'INDEX'") && merchant.includes('product.merchantEnabled') && merchant.includes('<g:image_link>')],
+  ['Merchant feed exports only available INDEX merchant products', merchantFeed.includes("product.availability === 'available'") && merchantFeed.includes("product.indexPolicy === 'INDEX'") && merchantFeed.includes('product.merchantEnabled === true') && merchantFeed.includes('<g:image_link>') && merchantRoute.includes('buildGoogleMerchantFeed')],
   ['New arrivals is indexable collection with ItemList', arrivals.includes("'@type': 'CollectionPage'") && arrivals.includes("'@type': 'ItemList'") && arrivals.includes("availability: 'available'")],
 ]
 
