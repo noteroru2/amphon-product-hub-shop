@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, app, center, client] = await Promise.all([
+const [migration, ownershipGuard, app, center, client] = await Promise.all([
   read('supabase/migrations/20260924153000_gsc_action_engine.sql'),
+  read('supabase/migrations/20260924154500_gsc_action_ownership_override.sql'),
   read('src/App.tsx'),
   read('src/components/SeoOpportunityCenter.tsx'),
   read('src/lib/seoOpportunities.ts'),
@@ -13,6 +14,7 @@ const checks = [
   ['queue is page-clustered instead of query-spam', migration.includes('unique (property, page)') && migration.includes('query_count integer')],
   ['fresh opportunities only', migration.includes("fetched_at >= now() - interval '3 days'")],
   ['action execution is scoped to main site and Shop only', migration.includes("page like 'https://amphon.co.th/%'") && migration.includes("page like 'https://shop.amphon.co.th/%'")],
+  ['reviewed ownership overrides survive automated refresh', ownershipGuard.includes('manual_action_type') && ownershipGuard.includes('coalesce(public.commerce_gsc_action_queue.manual_action_type, excluded.action_type)')],
   ['brand queries are guarded from SEO rewrites', migration.includes("'BRAND_WATCH'") && migration.includes("lower(p.primary_query) ~ '(amphon|amphontd|อำพล|อําพล)'")],
   ['protect actions are auto-guarded', migration.includes("'PROTECT_PAGE'") && migration.includes("'AUTO_GUARD'") && migration.includes("'PROTECTED'")],
   ['CTR actions explicitly forbid automatic rewrite', migration.includes('ห้าม auto-rewrite')],
