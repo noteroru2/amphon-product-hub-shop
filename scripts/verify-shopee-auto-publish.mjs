@@ -69,8 +69,8 @@ const checks = [
     worker.includes('runShopeePublishSweep(env)')
       && worker.includes("cron === '* * * * *'")],
   ['Partner credentials are Worker-only secrets',
-    wrangler.includes('"SHOPEE_PARTNER_ID"')
-      && wrangler.includes('"SHOPEE_PARTNER_KEY"')
+    deploy.includes('wrangler secret put SHOPEE_PARTNER_ID')
+      && deploy.includes('wrangler secret put SHOPEE_PARTNER_KEY')
       && !hubClient.includes('SHOPEE_PARTNER_KEY')
       && !hubAdmin.includes('SHOPEE_PARTNER_KEY')],
   ['Hub has Shopee authorize, queue, discovery and mapping controls',
