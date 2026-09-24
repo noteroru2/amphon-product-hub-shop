@@ -1,6 +1,7 @@
 ---
 import type { StoreProduct } from '../lib/store-api'
 import { formatPrice, productPath } from '../lib/seo'
+import { productImageSeoText } from '../lib/product-trust'
 
 interface Props { product: StoreProduct }
 const { product } = Astro.props
@@ -9,7 +10,7 @@ const cover = [...product.images].sort((a, b) => Number(b.isCover) - Number(a.is
 <a class="product-card" href={productPath(product)}>
   <div class="product-image">
     {cover?.url ? (
-      <img src={cover.url} alt={`${product.title} มือสอง`} loading="lazy" decoding="async" />
+      <img src={cover.url} alt={productImageSeoText(product, cover, 0).alt} loading="lazy" decoding="async" />
     ) : (
       <span class="product-placeholder">ยังไม่มีรูป</span>
     )}
