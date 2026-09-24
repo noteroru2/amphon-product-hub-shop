@@ -256,22 +256,36 @@ grant select on public.commerce_public_spec_page_v to service_role;
 create or replace view public.commerce_gsc_opportunity_v
 with (security_invoker=true)
 as
+with fresh as (
+  select
+    property,
+    query,
+    split_part(page, '#', 1) as page,
+    sum(clicks) as clicks,
+    sum(impressions) as impressions,
+    case when sum(impressions) > 0 then sum(clicks) / sum(impressions) else 0 end as ctr,
+    case when sum(impressions) > 0 then sum(position * impressions) / sum(impressions) else 0 end as position,
+    max(fetched_at) as fetched_at
+  from public.commerce_gsc_query_demand
+  where window_days = 28
+    and fetched_at >= now() - interval '3 days'
+    and impressions >= 5
+  group by property, query, split_part(page, '#', 1)
+),
+scored as (
+  select *,
+    case
+      when impressions >= 50 and position <= 5 and ctr < 0.05 then 'CTR_OPPORTUNITY'
+      when impressions >= 20 and position > 5 and position <= 15 then 'TOP10_PUSH'
+      when impressions >= 15 and position > 15 and position <= 30 then 'PAGE1_RECOVERY'
+      when impressions >= 10 and position <= 10 then 'PROTECT'
+      else 'WATCH'
+    end as opportunity_type
+  from fresh
+  where impressions >= 10
+)
 select
-  property,
-  query,
-  page,
-  clicks,
-  impressions,
-  ctr,
-  position,
-  fetched_at,
-  case
-    when impressions >= 50 and position <= 5 and ctr < 0.05 then 'CTR_OPPORTUNITY'
-    when impressions >= 20 and position > 5 and position <= 15 then 'TOP10_PUSH'
-    when impressions >= 15 and position > 15 and position <= 30 then 'PAGE1_RECOVERY'
-    when impressions >= 10 and position <= 10 then 'PROTECT'
-    else 'WATCH'
-  end as opportunity_type,
+  property,query,page,clicks,impressions,ctr,position,fetched_at,opportunity_type,
   round(
     impressions
     * case
@@ -282,11 +296,8 @@ select
         else 0.10
       end
     * case when ctr < 0.05 then 1.35 else 1.00 end
-  , 2) as opportunity_score
-from public.commerce_gsc_query_demand
-where window_days = 28
-  and fetched_at >= now() - interval '3 days'
-  and impressions >= 10;
+  ,2) as opportunity_score
+from scored;
 
 grant select on public.commerce_gsc_opportunity_v to service_role;
 
