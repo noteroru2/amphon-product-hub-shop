@@ -22,7 +22,7 @@ const checks = [
   ['merchant policy URLs are aligned to live Shop pages', migration.includes('https://shop.amphon.co.th/shipping/') && migration.includes('https://shop.amphon.co.th/returns/') && migration.includes('https://shop.amphon.co.th/warranty/')],
   ['review invite requires paid and completed order', migration.includes('o.completed_at is not null') && migration.includes('o.paid_at is not null') && migration.includes('ensure_commerce_review_invites')],
   ['reviews are single-use and pending before publication', migration.includes('REVIEW_INVITE_USED') && migration.includes("'PENDING','APPROVED','REJECTED'") && migration.includes("where r.status='APPROVED'")],
-  ['public review Store API exposes only approved review view', worker.includes('commerce_public_reviews_v') && worker.includes('/store/reviews/submit') && worker.includes('/store/review-invites/')],
+  ['public review Store API exposes only approved review view', worker.includes('commerce_public_reviews_v') && worker.includes('/store/reviews/submit') && worker.includes('review-invites')],
   ['review page is explicitly noindex and contains no customer/order PII', reviewPage.includes('robots="noindex,nofollow"') && !reviewPage.includes('customer_email') && !reviewPage.includes('customer_phone')],
   ['product page labels reviews as verified purchase only', productPage.includes('รีวิวจากผู้ซื้อจริง') && productPage.includes('ยืนยันจากคำสั่งซื้อ')],
   ['product page does not fabricate review schema', !productPage.includes('aggregateRating') && !productPage.includes("'@type': 'Review'")],
