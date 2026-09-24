@@ -672,6 +672,12 @@ create index if not exists commerce_customer_reviews_status_idx
   on public.commerce_customer_reviews(status,submitted_at desc);
 create index if not exists commerce_customer_reviews_product_idx
   on public.commerce_customer_reviews(product_id,status,submitted_at desc);
+create index if not exists commerce_review_invites_product_idx
+  on public.commerce_review_invites(product_id);
+create index if not exists commerce_customer_reviews_order_idx
+  on public.commerce_customer_reviews(order_id);
+create index if not exists commerce_customer_reviews_moderated_by_idx
+  on public.commerce_customer_reviews(moderated_by);
 
 alter table public.commerce_customer_reviews enable row level security;
 drop policy if exists commerce_customer_reviews_read_admin on public.commerce_customer_reviews;
@@ -738,7 +744,9 @@ limit 1;
 $$;
 
 revoke all on function public.resolve_review_invite(uuid) from public;
-grant execute on function public.resolve_review_invite(uuid) to anon,authenticated,service_role;
+revoke all on function public.resolve_review_invite(uuid) from anon;
+revoke all on function public.resolve_review_invite(uuid) from authenticated;
+grant execute on function public.resolve_review_invite(uuid) to service_role;
 
 create or replace function public.submit_verified_review(
   p_token uuid,
@@ -814,7 +822,9 @@ end;
 $$;
 
 revoke all on function public.submit_verified_review(uuid,integer,text,text,text) from public;
-grant execute on function public.submit_verified_review(uuid,integer,text,text,text) to anon,authenticated,service_role;
+revoke all on function public.submit_verified_review(uuid,integer,text,text,text) from anon;
+revoke all on function public.submit_verified_review(uuid,integer,text,text,text) from authenticated;
+grant execute on function public.submit_verified_review(uuid,integer,text,text,text) to service_role;
 
 create or replace function public.moderate_verified_review(
   p_review_id uuid,
