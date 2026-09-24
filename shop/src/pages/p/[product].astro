@@ -120,6 +120,16 @@ const evidence = product ? productEvidence(product) : null
 const inspectionDate = evidence?.inspectionDate ? formatThaiDate(evidence.inspectionDate) : null
 const evidenceRows = evidence?.evidenceRows || []
 const evidenceImages = evidence?.evidenceImages || []
+const structuredSpecEntries = (() => {
+  const rows = [...evidenceRows, ...allSpecEntries]
+  const seen = new Set<string>()
+  return rows.filter(([name, value]) => {
+    const key = `${name}::${value}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})()
 const galleryImages = product
   ? [...product.images].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
   : []
@@ -142,7 +152,7 @@ const breadcrumbItems = product ? [
 
 const schema = product ? [
   buildMerchantOrganizationSchema(settings),
-  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: allSpecEntries }),
+  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: structuredSpecEntries }),
   {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
