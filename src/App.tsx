@@ -60,6 +60,8 @@ import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import { LineOAChat } from "./components/LineOAChat";
 import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
+import { MerchantDiagnosticsCenter } from "./components/MerchantDiagnosticsCenter";
+import { TrustReviewCenter } from "./components/TrustReviewCenter";
 import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import {
   getCategoryDefinition,
@@ -124,7 +126,9 @@ type Tab =
   | "employees"
   | "ai-buyer"
   | "line-chat"
-  | "seo-opportunities";
+  | "seo-opportunities"
+  | "merchant-diagnostics"
+  | "trust-reviews";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
@@ -812,6 +816,8 @@ function App() {
             onOrders={() => setTab("orders")}
             onAiBuyer={() => setTab("ai-buyer")}
             onSeo={() => setTab("seo-opportunities")}
+            onMerchant={() => setTab("merchant-diagnostics")}
+            onTrustReviews={() => setTab("trust-reviews")}
             onEdit={openEdit}
           />
         )}
@@ -861,6 +867,16 @@ function App() {
           profile &&
           ["owner", "admin"].includes(profile.role) && (
             <SeoOpportunityCenter onBack={() => setTab("home")} />
+          )}
+        {tab === "merchant-diagnostics" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <MerchantDiagnosticsCenter onBack={() => setTab("home")} />
+          )}
+        {tab === "trust-reviews" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <TrustReviewCenter onBack={() => setTab("home")} />
           )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
@@ -1168,6 +1184,8 @@ function HomeScreen({
   onOrders,
   onAiBuyer,
   onSeo,
+  onMerchant,
+  onTrustReviews,
   onEdit,
 }: {
   profile: Profile;
@@ -1181,6 +1199,8 @@ function HomeScreen({
   onOrders: () => void;
   onAiBuyer: () => void;
   onSeo: () => void;
+  onMerchant: () => void;
+  onTrustReviews: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
   const publishedCount = products.filter(
@@ -1273,6 +1293,36 @@ function HomeScreen({
           </div>
           <ChevronRight />
         </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <div className="seo-ops-home-grid">
+          <button
+            className="publish-center-launch merchant-home-launch"
+            onClick={onMerchant}
+          >
+            <div>
+              <ShoppingCart size={21} />
+              <span>
+                <strong>Merchant Diagnostics</strong>
+                <small>Feed preflight · Google issues · Shipping / Return policy</small>
+              </span>
+            </div>
+            <ChevronRight />
+          </button>
+          <button
+            className="publish-center-launch trust-review-home-launch"
+            onClick={onTrustReviews}
+          >
+            <div>
+              <ShieldCheck size={21} />
+              <span>
+                <strong>Verified Reviews</strong>
+                <small>Paid + Completed เท่านั้น · ตรวจรีวิวก่อนเผยแพร่</small>
+              </span>
+            </div>
+            <ChevronRight />
+          </button>
+        </div>
       )}
       <div className="stats-grid">
         <Stat

@@ -128,3 +128,133 @@ export async function setSeoActionStatus(
   if (error) throw error
   return mapAction(data as SeoActionRow)
 }
+
+
+export interface SeoRecoveryDiagnostic {
+  actionId: string
+  diagnosisType: string
+  competingPageCount: number
+  leaderPage: string | null
+  currentShare: number
+  leaderShare: number
+  autoSafeInternalLink: boolean
+  requiresHumanReview: boolean
+  recommendedChecks: string
+  checkedAt: string
+}
+
+export interface SeoExecutionMeasurement {
+  checkpointDays: number
+  verdict: 'IMPROVED' | 'NEUTRAL' | 'REGRESSED' | 'INSUFFICIENT_DATA'
+  rollbackRecommended: boolean
+  ctrDelta: number
+  positionDelta: number
+  clicksDelta: number
+  impressionsDelta: number
+  measuredAt: string
+}
+
+export interface SeoActionExecution {
+  id: string
+  actionId: string
+  executionKind: string
+  repository: string | null
+  pullRequestNumber: number | null
+  commitSha: string | null
+  liveUrl: string | null
+  appliedAt: string
+  monitorStatus: 'MONITORING' | 'ROLLBACK_REVIEW' | 'COMPLETE' | 'STOPPED'
+  rollbackReviewReason: string | null
+  measurements: SeoExecutionMeasurement[]
+}
+
+export interface SeoOpsDetailBundle {
+  recoveryByAction: Record<string, SeoRecoveryDiagnostic>
+  executionsByAction: Record<string, SeoActionExecution[]>
+}
+
+export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDetailBundle> {
+  if (!supabase) throw new Error('Supabase is not configured')
+  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {} }
+
+  const [{ data: recoveryData, error: recoveryError }, { data: executionData, error: executionError }] = await Promise.all([
+    supabase
+      .from('commerce_gsc_recovery_diagnostics')
+      .select('*')
+      .in('action_id', actionIds),
+    supabase
+      .from('commerce_gsc_action_executions')
+      .select('*')
+      .in('action_id', actionIds)
+      .order('applied_at', { ascending: false }),
+  ])
+  if (recoveryError) throw recoveryError
+  if (executionError) throw executionError
+
+  const executions = (executionData || []) as Array<Record<string, any>>
+  const executionIds = executions.map((row) => String(row.id))
+  let measurementData: Array<Record<string, any>> = []
+  if (executionIds.length) {
+    const result = await supabase
+      .from('commerce_gsc_action_measurements')
+      .select('*')
+      .in('execution_id', executionIds)
+      .order('checkpoint_days', { ascending: true })
+    if (result.error) throw result.error
+    measurementData = (result.data || []) as Array<Record<string, any>>
+  }
+
+  const recoveryByAction: Record<string, SeoRecoveryDiagnostic> = {}
+  for (const row of (recoveryData || []) as Array<Record<string, any>>) {
+    recoveryByAction[String(row.action_id)] = {
+      actionId: String(row.action_id),
+      diagnosisType: String(row.diagnosis_type),
+      competingPageCount: Number(row.competing_page_count || 0),
+      leaderPage: row.leader_page ? String(row.leader_page) : null,
+      currentShare: Number(row.current_share || 0),
+      leaderShare: Number(row.leader_share || 0),
+      autoSafeInternalLink: Boolean(row.auto_safe_internal_link),
+      requiresHumanReview: Boolean(row.requires_human_review),
+      recommendedChecks: String(row.recommended_checks || ''),
+      checkedAt: String(row.checked_at || ''),
+    }
+  }
+
+  const measurementsByExecution = new Map<string, SeoExecutionMeasurement[]>()
+  for (const row of measurementData) {
+    const executionId = String(row.execution_id)
+    const items = measurementsByExecution.get(executionId) || []
+    items.push({
+      checkpointDays: Number(row.checkpoint_days || 0),
+      verdict: row.verdict,
+      rollbackRecommended: Boolean(row.rollback_recommended),
+      ctrDelta: Number(row.ctr_delta || 0),
+      positionDelta: Number(row.position_delta || 0),
+      clicksDelta: Number(row.clicks_delta || 0),
+      impressionsDelta: Number(row.impressions_delta || 0),
+      measuredAt: String(row.measured_at || ''),
+    })
+    measurementsByExecution.set(executionId, items)
+  }
+
+  const executionsByAction: Record<string, SeoActionExecution[]> = {}
+  for (const row of executions) {
+    const actionId = String(row.action_id)
+    const item: SeoActionExecution = {
+      id: String(row.id),
+      actionId,
+      executionKind: String(row.execution_kind || ''),
+      repository: row.repository ? String(row.repository) : null,
+      pullRequestNumber: row.pull_request_number === null ? null : Number(row.pull_request_number),
+      commitSha: row.commit_sha ? String(row.commit_sha) : null,
+      liveUrl: row.live_url ? String(row.live_url) : null,
+      appliedAt: String(row.applied_at || ''),
+      monitorStatus: row.monitor_status,
+      rollbackReviewReason: row.rollback_review_reason ? String(row.rollback_review_reason) : null,
+      measurements: measurementsByExecution.get(String(row.id)) || [],
+    }
+    ;(executionsByAction[actionId] ||= []).push(item)
+  }
+
+  return { recoveryByAction, executionsByAction }
+}

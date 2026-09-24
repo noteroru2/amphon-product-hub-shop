@@ -1,0 +1,140 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { resolveStoreReviewInvite } from '../../../lib/store-api'
+
+const token = String(Astro.params.token || '')
+let invite = null
+let apiAvailable = true
+if (/^[0-9a-fA-F-]{36}$/.test(token)) {
+  try {
+    invite = await resolveStoreReviewInvite(token)
+  } catch (error) {
+    console.error('SHOP_REVIEW_INVITE', error)
+    apiAvailable = false
+    Astro.response.status = 503
+  }
+}
+if (!invite && apiAvailable) Astro.response.status = 404
+
+const storeApi = import.meta.env.PUBLIC_AMPHON_STORE_API?.trim().replace(/\/$/, '') || ''
+const canReview = Boolean(invite?.valid && !invite?.already_used && storeApi)
+---
+
+<BaseLayout
+  title="รีวิวการซื้อสินค้า | AMPHON SHOP"
+  description="ส่งรีวิวจากคำสั่งซื้อที่ยืนยันแล้วของ AMPHON SHOP"
+  canonicalPath={`/review/${token}/`}
+  robots="noindex,nofollow"
+>
+  <section class="hero compact-store-hero review-submit-hero">
+    <div class="container">
+      <div class="eyebrow">VERIFIED PURCHASE REVIEW</div>
+      <h1>รีวิวจากผู้ซื้อจริง</h1>
+      <p class="lead">ลิงก์นี้ผูกกับคำสั่งซื้อที่ชำระและดำเนินการเสร็จแล้ว รีวิวจะถูกตรวจเพื่อป้องกันข้อมูลส่วนตัว สแปม หรือเนื้อหาที่ไม่เกี่ยวข้องก่อนแสดงบนเว็บไซต์</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container review-submit-wrap">
+      {canReview && invite ? (
+        <div class="panel review-submit-panel">
+          <div class="review-product-summary">
+            <span>สินค้าที่รีวิว</span>
+            <strong>{invite.product_title}</strong>
+            <small>รหัสสินค้า {invite.product_sku}</small>
+          </div>
+
+          <form
+            id="verified-review-form"
+            class="verified-review-form"
+            data-api={storeApi}
+            data-token={token}
+          >
+            <fieldset class="review-rating-field">
+              <legend>คะแนนของคุณ</legend>
+              <div class="review-rating-options">
+                {[5,4,3,2,1].map((rating) => (
+                  <label>
+                    <input type="radio" name="rating" value={rating} required />
+                    <span>{rating} ★</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label class="review-form-field">
+              <span>ชื่อที่ต้องการให้แสดง</span>
+              <input name="displayName" maxlength="80" required placeholder="เช่น Note / ลูกค้าอุบล" autocomplete="name" />
+              <small>ไม่จำเป็นต้องใช้ชื่อจริงเต็ม หากไม่ต้องการเปิดเผยบนเว็บไซต์</small>
+            </label>
+
+            <label class="review-form-field">
+              <span>หัวข้อรีวิว <small>(ไม่บังคับ)</small></span>
+              <input name="title" maxlength="120" placeholder="เช่น เครื่องตรงปก แพ็กดี" />
+            </label>
+
+            <label class="review-form-field">
+              <span>รายละเอียดรีวิว</span>
+              <textarea name="body" minlength="10" maxlength="2000" rows="6" required placeholder="เล่าประสบการณ์เกี่ยวกับสินค้า สภาพ การจัดส่ง หรือการบริการ"></textarea>
+              <small>กรุณาอย่าใส่เบอร์โทร ที่อยู่ เลขบัญชี Serial/IMEI หรือข้อมูลส่วนตัวอื่นในรีวิว</small>
+            </label>
+
+            <div id="review-submit-message" class="review-submit-message" aria-live="polite"></div>
+            <button id="review-submit-button" class="button button-primary button-wide" type="submit">ส่งรีวิว</button>
+          </form>
+        </div>
+      ) : (
+        <div class="panel review-unavailable">
+          <h2>{apiAvailable ? 'ลิงก์รีวิวนี้ไม่พร้อมใช้งาน' : 'ระบบรีวิวกำลังไม่พร้อมใช้งาน'}</h2>
+          <p>{invite?.already_used ? 'ลิงก์นี้ถูกใช้ส่งรีวิวแล้ว เพื่อป้องกันรีวิวซ้ำจึงไม่สามารถส่งซ้ำได้' : 'ลิงก์อาจหมดอายุ ไม่ตรงกับคำสั่งซื้อที่เสร็จสมบูรณ์ หรือระบบกำลังตรวจสอบข้อมูลคำสั่งซื้อ'}</p>
+          <a class="button button-secondary" href="/">กลับหน้าร้าน</a>
+        </div>
+      )}
+    </div>
+  </section>
+
+  {canReview && (
+    <script is:inline>
+      (() => {
+        const form = document.getElementById('verified-review-form')
+        const button = document.getElementById('review-submit-button')
+        const message = document.getElementById('review-submit-message')
+        if (!(form instanceof HTMLFormElement) || !(button instanceof HTMLButtonElement) || !message) return
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault()
+          const api = form.dataset.api
+          const token = form.dataset.token
+          if (!api || !token) return
+
+          const data = new FormData(form)
+          const rating = Number(data.get('rating'))
+          const displayName = String(data.get('displayName') || '').trim()
+          const title = String(data.get('title') || '').trim()
+          const body = String(data.get('body') || '').trim()
+
+          button.disabled = true
+          button.textContent = 'กำลังส่งรีวิว...'
+          message.textContent = ''
+
+          try {
+            const response = await fetch(api + '/reviews/submit', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ token, rating, displayName, title, body }),
+            })
+            const payload = await response.json().catch(() => ({}))
+            if (!response.ok) throw new Error(payload.error || 'ส่งรีวิวไม่สำเร็จ')
+
+            form.innerHTML =
+              '<div class="review-submit-success"><strong>ขอบคุณสำหรับรีวิวครับ</strong><p>รีวิวถูกบันทึกแล้วและกำลังรอตรวจเพื่อเผยแพร่บนเว็บไซต์ ไม่มีการสร้างคะแนนบนหน้าสินค้าจนกว่าจะอนุมัติจริง</p><a class="button button-secondary" href="/">กลับหน้าร้าน</a></div>'
+          } catch (error) {
+            message.textContent = error instanceof Error ? error.message : 'ส่งรีวิวไม่สำเร็จ'
+            button.disabled = false
+            button.textContent = 'ส่งรีวิว'
+          }
+        })
+      })()
+    </script>
+  )}
+</BaseLayout>

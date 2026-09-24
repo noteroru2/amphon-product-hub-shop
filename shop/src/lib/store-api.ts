@@ -112,6 +112,29 @@ export interface ProductListResult {
   }
 }
 
+
+export interface StoreVerifiedReview {
+  id: string
+  product_id?: string
+  sku: string
+  product_title?: string
+  rating: number
+  title: string | null
+  body: string
+  display_name: string
+  verified_purchase: boolean
+  submitted_at: string
+  moderated_at?: string | null
+}
+
+export interface StoreReviewInvite {
+  valid: boolean
+  product_title: string
+  product_sku: string
+  expires_at: string
+  already_used: boolean
+}
+
 export interface ListStoreProductsParams {
   q?: string
   category?: string
@@ -260,6 +283,39 @@ export async function getStoreProduct(sku: string): Promise<StoreProduct | null>
   }
   const data = await response.json() as { product: StoreProduct }
   return data.product
+}
+
+
+export async function listVerifiedProductReviews(sku: string, limit = 10): Promise<StoreVerifiedReview[]> {
+  const data = await fetchJson<{ reviews: StoreVerifiedReview[] }>(
+    `${storeApiBase()}/reviews?sku=${encodeURIComponent(sku)}&limit=${Math.min(Math.max(limit, 1), 50)}`,
+  )
+  return data.reviews || []
+}
+
+export async function resolveStoreReviewInvite(token: string): Promise<StoreReviewInvite | null> {
+  const response = await fetch(`${storeApiBase()}/review-invites/${encodeURIComponent(token)}`, {
+    headers: { accept: 'application/json' },
+    cache: 'no-store',
+  })
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`Store API ${response.status}`)
+  const data = await response.json() as { invite: StoreReviewInvite }
+  return data.invite
+}
+
+export async function submitStoreVerifiedReview(input: {
+  token: string
+  rating: number
+  title?: string
+  body: string
+  displayName: string
+}) {
+  return fetchJson<{ ok: boolean; reviewId: string; status: string }>(`${storeApiBase()}/reviews/submit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
 }
 
 export async function listEvergreenPages(params: ListEvergreenPagesParams = {}): Promise<EvergreenPageListResult> {

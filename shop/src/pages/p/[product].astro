@@ -2,7 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
 import { primaryLineId, primaryLineUrl } from '../../lib/contact'
-import { getAllIndexSpecPages, getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type SpecPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
+import { getAllIndexSpecPages, getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, listVerifiedProductReviews, type EvergreenPage, type SpecPage, type StoreProduct, type StoreSettings, type StoreVerifiedReview } from '../../lib/store-api'
 import {
   absoluteUrl,
   extractSkuFromProductSegment,
@@ -99,6 +99,15 @@ if (product) {
     relatedProducts = related.products.filter((item) => item.sku !== product?.sku).slice(0, 6)
   } catch (error) {
     console.error('SHOP3_RELATED_PRODUCTS', product.sku, error)
+  }
+}
+
+let verifiedReviews: StoreVerifiedReview[] = []
+if (product) {
+  try {
+    verifiedReviews = await listVerifiedProductReviews(product.sku, 8)
+  } catch (error) {
+    console.error('SHOP_VERIFIED_REVIEWS', product.sku, error)
   }
 }
 
@@ -493,6 +502,39 @@ if (product && evidence?.hasProductEvidence) {
 
               <p class="evidence-disclaimer">Product Evidence แสดงเฉพาะข้อมูลที่ถูกบันทึกกับเครื่องชิ้นนี้ เพื่อช่วยให้เทียบสภาพของสินค้ามือสองจากข้อมูลจริง ไม่ใช่การรับรองว่าเครื่องทุกส่วนที่ไม่ได้ระบุถูกตรวจครบแล้ว</p>
             </div>
+          </div>
+        </section>
+      )}
+
+      {verifiedReviews.length > 0 && (
+        <section id="verified-reviews" class="section verified-reviews-section" aria-labelledby="verified-reviews-title">
+          <div class="container">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">VERIFIED PURCHASE</div>
+                <h2 id="verified-reviews-title">รีวิวจากผู้ซื้อจริง</h2>
+              </div>
+              <p class="muted trust-intro">แสดงเฉพาะรีวิวที่ผูกกับคำสั่งซื้อที่ชำระเงินและดำเนินการเสร็จแล้ว และผ่านการตรวจเผยแพร่ของร้าน</p>
+            </div>
+            <div class="verified-review-grid">
+              {verifiedReviews.map((review) => (
+                <article class="panel verified-review-card">
+                  <div class="verified-review-head">
+                    <div class="verified-review-stars" aria-label={`${review.rating} จาก 5 ดาว`}>
+                      {'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}
+                    </div>
+                    <span class="verified-purchase-badge">ยืนยันจากคำสั่งซื้อ</span>
+                  </div>
+                  {review.title && <h3>{review.title}</h3>}
+                  <p>{review.body}</p>
+                  <div class="verified-review-meta">
+                    <strong>{review.display_name}</strong>
+                    <time datetime={review.submitted_at}>{formatThaiDate(review.submitted_at) || 'รีวิวล่าสุด'}</time>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p class="review-trust-note">AMPHON SHOP ไม่สร้างคะแนนหรือรีวิวตัวอย่าง และไม่รวมรีวิวที่ยังไม่ได้รับอนุมัติไว้ในหน้านี้</p>
           </div>
         </section>
       )}
