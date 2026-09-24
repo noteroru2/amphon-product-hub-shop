@@ -1,7 +1,7 @@
 import type { ProductCategory, ProductDraft } from '../types/product'
 
 export type FieldImportance = 'required' | 'recommended' | 'optional'
-export type SmartFieldType = 'text' | 'number' | 'select' | 'textarea'
+export type SmartFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date'
 
 export interface SmartFieldDefinition {
   key: string
@@ -52,6 +52,85 @@ const commonImageRoles: ImageRoleDefinition[] = [
 const storageField: SmartFieldDefinition = { key: 'storage', label: 'ความจุ', importance: 'required', placeholder: 'เช่น 256GB' }
 const colorField: SmartFieldDefinition = { key: 'color', label: 'สี', importance: 'recommended', placeholder: 'เช่น Natural Titanium' }
 const modelCodeField: SmartFieldDefinition = { key: 'model_code', label: 'Model Code', importance: 'recommended', placeholder: 'เช่น FA707NV / A3102' }
+
+const commonEvidenceFields: SmartFieldDefinition[] = [
+  { key: 'inspection_date', label: 'วันที่ตรวจเครื่อง', importance: 'optional', type: 'date', section: 'condition' },
+  { key: 'inspection_result', label: 'ผลตรวจโดยรวม', importance: 'optional', type: 'select', options: ['ผ่านการตรวจใช้งาน', 'พบข้อสังเกตตามที่ระบุ', 'รอตรวจเพิ่มเติม'], section: 'condition' },
+  { key: 'basic_function_test', label: 'เปิดเครื่อง / ใช้งานพื้นฐาน', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+]
+
+const evidenceFieldsByCategory: Partial<Record<ProductCategory, SmartFieldDefinition[]>> = {
+  notebook: [
+    { key: 'keyboard_test', label: 'ทดสอบคีย์บอร์ด / Trackpad', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'ports_test', label: 'ทดสอบพอร์ต USB / HDMI / Audio', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'wifi_bluetooth_test', label: 'ทดสอบ Wi-Fi / Bluetooth', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'webcam_mic_test', label: 'ทดสอบ Webcam / Microphone', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'speaker_test', label: 'ทดสอบลำโพง', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'storage_health', label: 'SSD / Storage Health', importance: 'optional', placeholder: 'เช่น 98% / Good / SMART ปกติ', section: 'condition' },
+    { key: 'stress_test', label: 'Stress Test CPU / GPU', importance: 'optional', placeholder: 'เช่น AIDA64 15 นาที ผ่าน / ยังไม่ได้ทดสอบ', section: 'condition', whenSubtypes: ['gaming'] },
+    { key: 'temperature_test', label: 'อุณหภูมิขณะทดสอบ', importance: 'optional', placeholder: 'เช่น CPU 86°C / GPU 74°C', section: 'condition', whenSubtypes: ['gaming'] },
+  ],
+  pc: [
+    { key: 'ports_test', label: 'ทดสอบพอร์ตหน้า / หลัง', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'storage_health', label: 'SSD / Storage Health', importance: 'optional', placeholder: 'เช่น 99% / SMART ปกติ', section: 'condition' },
+    { key: 'stress_test', label: 'Stress Test CPU / RAM', importance: 'optional', placeholder: 'เช่น OCCT 20 นาที ผ่าน', section: 'condition' },
+    { key: 'gpu_stress_test', label: 'Stress Test GPU', importance: 'optional', placeholder: 'เช่น FurMark 15 นาที ผ่าน', section: 'condition', whenSubtypes: ['gaming', 'workstation'] },
+    { key: 'temperature_test', label: 'อุณหภูมิขณะทดสอบ', importance: 'optional', placeholder: 'เช่น CPU 78°C / GPU 72°C', section: 'condition' },
+  ],
+  iphone: [
+    { key: 'charging_test', label: 'ทดสอบชาร์จ / พอร์ตชาร์จ', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'speaker_mic_test', label: 'ทดสอบลำโพง / ไมค์', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'camera_test', label: 'ทดสอบกล้องหน้า / หลัง', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'wifi_bluetooth_test', label: 'ทดสอบ Wi-Fi / Bluetooth', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'button_test', label: 'ทดสอบปุ่ม / สวิตช์', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  smartphone: [
+    { key: 'charging_test', label: 'ทดสอบชาร์จ / พอร์ตชาร์จ', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'speaker_mic_test', label: 'ทดสอบลำโพง / ไมค์', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'camera_test', label: 'ทดสอบกล้องหน้า / หลัง', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'wifi_bluetooth_test', label: 'ทดสอบ Wi-Fi / Bluetooth', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'button_test', label: 'ทดสอบปุ่ม / สวิตช์', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  tablet: [
+    { key: 'charging_test', label: 'ทดสอบชาร์จ / พอร์ตชาร์จ', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'speaker_mic_test', label: 'ทดสอบลำโพง / ไมค์', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'camera_test', label: 'ทดสอบกล้อง', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'wifi_bluetooth_test', label: 'ทดสอบ Wi-Fi / Bluetooth', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  camera: [
+    { key: 'autofocus_test', label: 'ทดสอบ Auto Focus', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'video_test', label: 'ทดสอบบันทึกวิดีโอ', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'card_slot_test', label: 'ทดสอบช่อง Memory Card', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  lens: [
+    { key: 'autofocus_test', label: 'ทดสอบ Auto Focus', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'zoom_focus_ring_test', label: 'ทดสอบวงแหวน Zoom / Focus', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  monitor: [
+    { key: 'input_port_test', label: 'ทดสอบ HDMI / DisplayPort / USB-C', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'burn_in_test', label: 'ทดสอบ Burn-in / Image Retention', importance: 'optional', type: 'select', options: ['ไม่พบ', 'พบ', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  gaming: [
+    { key: 'charging_test', label: 'ทดสอบชาร์จ / Power', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'network_test', label: 'ทดสอบ Wi-Fi / Network', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+    { key: 'controller_test', label: 'ทดสอบ Controller / ปุ่ม', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+  component: [
+    { key: 'benchmark_test', label: 'Benchmark / Burn-in Test', importance: 'optional', placeholder: 'เช่น 3DMark / MemTest / CrystalDiskMark ผ่าน', section: 'condition' },
+  ],
+  accessory: [
+    { key: 'connection_test', label: 'ทดสอบการเชื่อมต่อ', importance: 'optional', type: 'select', options: ['ปกติ', 'มีข้อสังเกต', 'ไม่ได้ตรวจ'], section: 'condition' },
+  ],
+}
+
+const evidenceImageRoles: ImageRoleDefinition[] = [
+  { value: 'test', label: 'หลักฐานผลทดสอบ' },
+  { value: 'battery', label: 'หลักฐาน Battery Health' },
+  { value: 'pixel_test', label: 'หลักฐาน Pixel Test' },
+  { value: 'ports', label: 'หลักฐานพอร์ต / Connector' },
+  { value: 'benchmark', label: 'Benchmark / Stress Test' },
+]
+
 
 export const productSchemas: ProductCategoryDefinition[] = [
   {
@@ -265,8 +344,30 @@ export function getSmartFields(draft: Pick<ProductDraft, 'category' | 'subtype'>
   return definition.fields.filter((field) => !field.whenSubtypes?.length || (draft.subtype ? field.whenSubtypes.includes(draft.subtype) : false))
 }
 
+export function getEvidenceFields(draft: Pick<ProductDraft, 'category' | 'subtype'>) {
+  const categoryFields = draft.category ? evidenceFieldsByCategory[draft.category] ?? [] : []
+  return [...commonEvidenceFields, ...categoryFields]
+    .filter((field) => !field.whenSubtypes?.length || (draft.subtype ? field.whenSubtypes.includes(draft.subtype) : false))
+}
+
+export function getEvidenceCompleteness(draft: Pick<ProductDraft, 'category' | 'subtype' | 'specs'>) {
+  const fields = getEvidenceFields(draft)
+  const filled = fields.filter((field) => hasValue(draft.specs?.[field.key]))
+  return {
+    total: fields.length,
+    filled: filled.length,
+    score: fields.length ? Math.round((filled.length / fields.length) * 100) : 0,
+    labels: filled.map((field) => field.label),
+  }
+}
+
 export function getImageRoles(category?: ProductCategory) {
-  return getCategoryDefinition(category)?.imageRoles ?? commonImageRoles
+  const categoryRoles = getCategoryDefinition(category)?.imageRoles ?? commonImageRoles
+  const byValue = new Map<string, ImageRoleDefinition>()
+  for (const role of [...categoryRoles, ...evidenceImageRoles]) {
+    if (!byValue.has(role.value)) byValue.set(role.value, role)
+  }
+  return [...byValue.values()]
 }
 
 export function getSubtypeLabel(category?: ProductCategory, subtype?: string) {
