@@ -2,7 +2,7 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../../../components/BuybackCTA.astro'
 import ProductCard from '../../../../components/ProductCard.astro'
-import { getAllStoreProducts, resolveSpecPage, type SpecDimension, type StoreProduct } from '../../../../lib/store-api'
+import { getAllStoreProducts, resolveSpecPage, type SpecDimension, type SpecPage, type StoreProduct } from '../../../../lib/store-api'
 import { absoluteUrl, productPath } from '../../../../lib/seo'
 import { matchesSpecPage, specDimensionLabel } from '../../../../lib/spec-seo'
 
@@ -10,7 +10,7 @@ const dimension = String(Astro.params.dimension || '').toUpperCase() as SpecDime
 const token = String(Astro.params.token || '').toLowerCase()
 if (!['GPU','CPU','RAM','STORAGE'].includes(dimension) || !token) return Astro.redirect('/404/', 302)
 
-let page = null
+let page: SpecPage | null = null
 let products: StoreProduct[] = []
 try {
   page = await resolveSpecPage({ dimension, token })
