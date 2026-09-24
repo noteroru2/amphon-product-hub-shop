@@ -1,0 +1,150 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import BuybackCTA from '../../../../components/BuybackCTA.astro'
+import ProductCard from '../../../../components/ProductCard.astro'
+import { getAllStoreProducts, resolveSpecPage, type SpecDimension, type StoreProduct } from '../../../../lib/store-api'
+import { absoluteUrl } from '../../../../lib/seo'
+import { matchesSpecPage, specDimensionLabel } from '../../../../lib/spec-seo'
+
+const dimension = String(Astro.params.dimension || '').toUpperCase() as SpecDimension
+const token = String(Astro.params.token || '').toLowerCase()
+if (!['GPU','CPU','RAM','STORAGE'].includes(dimension) || !token) return Astro.redirect('/404/', 302)
+
+let page = null
+let products: StoreProduct[] = []
+try {
+  page = await resolveSpecPage({ dimension, token })
+  if (page) {
+    const all = await getAllStoreProducts()
+    products = all
+      .filter((product) => product.availability !== 'out_of_stock')
+      .filter((product) => !['NOINDEX','HOLD','RETIRED'].includes(product.indexPolicy || 'INDEX'))
+      .filter((product) => matchesSpecPage(product, page))
+      .sort((a, b) => Number(b.updatedAt ? new Date(b.updatedAt) : 0) - Number(a.updatedAt ? new Date(a.updatedAt) : 0))
+  }
+} catch (error) {
+  console.error('SHOP_SPEC_PAGE', dimension, token, error)
+  Astro.response.status = 503
+}
+
+if (!page && Astro.response.status !== 503) Astro.response.status = 404
+if (page && page.canonicalPath !== Astro.url.pathname) return Astro.redirect(page.canonicalPath, 301)
+
+const isIndex = Boolean(page && page.effectiveIndexPolicy === 'INDEX' && page.seoReady && products.length >= 3)
+const robots = isIndex ? 'index,follow,max-image-preview:large' : 'noindex,follow'
+const canonicalPath = page?.canonicalPath || Astro.url.pathname
+const dimensionLabel = page ? specDimensionLabel(page.dimension) : ''
+const buybackCategory = page?.dimension === 'GPU' ? 'gaming-pcs' : page?.dimension === 'CPU' ? 'desktop-pcs' : null
+
+const breadcrumbItems = page ? [
+  { name: 'หน้าแรก', path: '/' },
+  { name: 'เลือกตามสเปก', path: '/specs/' },
+  { name: dimensionLabel, path: `/specs/${page.dimension.toLowerCase()}/` },
+  { name: page.label, path: page.canonicalPath },
+] : []
+
+const schema = page ? [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbItems.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: page.primaryKeyword,
+    numberOfItems: products.length,
+    itemListElement: products.map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: absoluteUrl(`/p/${product.listingSlug || product.sku.toLowerCase()}/`),
+      name: product.title,
+    })),
+  },
+] : undefined
+---
+<BaseLayout
+  title={page?.seoTitle || 'เลือกสินค้าตามสเปก | AMPHON SHOP'}
+  description={page?.seoDescription || 'เลือกสินค้าไอทีมือสองจากสเปกจริง'}
+  canonicalPath={canonicalPath}
+  robots={robots}
+  jsonLd={schema}
+>
+  {page ? (
+    <>
+      <div class="container breadcrumbs">
+        <ol>
+          {breadcrumbItems.map((item, index) => (
+            <li>{index < breadcrumbItems.length - 1 ? <a href={item.path}>{item.name}</a> : item.name}</li>
+          ))}
+        </ol>
+      </div>
+
+      <section class="hero compact-store-hero spec-landing-hero">
+        <div class="container">
+          <div class="eyebrow">เลือกจากสเปกจริงในสต๊อก</div>
+          <h1>{page.primaryKeyword}</h1>
+          <p class="lead">{page.introContent}</p>
+          <div class="spec-page-facts" aria-label="ข้อมูลความพร้อมของหน้า">
+            <span><strong>{products.length}</strong> เครื่องพร้อมดู</span>
+            <span><strong>{page.distinctBrandCount}</strong> แบรนด์ในสต๊อก</span>
+            <span><strong>{page.historicalListingCount}</strong> รายการในประวัติระบบ</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section spec-stock-section" aria-labelledby="spec-stock-title">
+        <div class="container">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">สินค้าก่อน เนื้อหาทีหลัง</div>
+              <h2 id="spec-stock-title">สินค้า {page.label} ที่มีอยู่จริงตอนนี้</h2>
+            </div>
+            <p class="muted trust-intro">ราคา รูป สภาพ และ Product Evidence เป็นข้อมูลของสินค้ารายเครื่อง ไม่ใช่รายการตัวอย่าง</p>
+          </div>
+          {products.length ? (
+            <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+          ) : (
+            <div class="empty">ตอนนี้ยังไม่มีสินค้าที่ตรงสเปกนี้พร้อมขาย</div>
+          )}
+        </div>
+      </section>
+
+      <section class="section spec-editorial-section">
+        <div class="container">
+          <article class="panel editorial-panel">
+            <div class="eyebrow">ข้อมูลประกอบการเลือกซื้อ</div>
+            <h2>เลือก {page.label} มือสองอย่างไรให้ตรงการใช้งาน</h2>
+            <p>{page.seoDescription}</p>
+            <p>
+              หน้านี้รวมจากสเปกที่บันทึกไว้กับสินค้าใน AMPHON SHOP โดยตรง และถูกเปิดให้ Google index เฉพาะเมื่อมีสต๊อก ประวัติสินค้า
+              และความหลากหลายเพียงพอตาม SEO governance จึงไม่สร้างหน้าสเปกบางจาก combination จำนวนมาก
+            </p>
+            <p>
+              ก่อนซื้อควรเปิดหน้าสินค้าแต่ละเครื่องเพื่อดู CPU, GPU, RAM, Storage, สภาพจริง ตำหนิ รูปหลักฐาน และ Product Evidence
+              เพราะสินค้ามือสองที่ใช้ {page.label} เดียวกันอาจต่างกันมากในเรื่องซีพียู แรม ระบบระบายความร้อน แบตเตอรี่ และสภาพเครื่อง
+            </p>
+            <div class="chips">
+              <a class="button button-secondary" href="/gaming-laptops/">ดู Gaming Laptop</a>
+              <a class="button button-secondary" href="/gaming-pcs/">ดู Gaming PC</a>
+              <a class="button button-secondary" href="/notebooks/">ดู Notebook</a>
+              <a class="button button-secondary" href="/specs/">เลือกจากสเปกอื่น</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <BuybackCTA categorySlug={buybackCategory} />
+    </>
+  ) : (
+    <section class="section"><div class="container"><div class="empty">
+      <h1>{Astro.response.status === 503 ? 'กำลังโหลดข้อมูลสเปก' : 'ไม่พบหน้าสเปกนี้'}</h1>
+      <a class="button button-primary" href="/specs/">เลือกจากสเปกอื่น</a>
+    </div></div></section>
+  )}
+</BaseLayout>
