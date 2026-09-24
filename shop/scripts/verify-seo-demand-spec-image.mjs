@@ -19,6 +19,8 @@ const [migration, worker, storeApi, specLib, specRoute, specHub, specMap, imageM
 
 const checks = [
   ['GSC demand storage is RLS-protected', migration.includes('commerce_gsc_query_demand') && migration.includes('enable row level security')],
+  ['stale GSC demand expires from governance', migration.includes("g.fetched_at >= now() - interval '3 days'")],
+  ['GSC opportunity queue scores CTR/ranking gaps', migration.includes('commerce_gsc_opportunity_v') && migration.includes('CTR_OPPORTUNITY') && migration.includes('TOP10_PUSH') && migration.includes('PAGE1_RECOVERY')],
   ['spec candidates default HOLD', migration.includes("index_policy text not null default 'HOLD'") && migration.includes("effective_index_policy text not null default 'HOLD'")],
   ['GPU threshold requires stock history and brand diversity', migration.includes("dimension='GPU' and current_stock_count>=3 and historical_listing_count>=3 and distinct_brand_count>=2")],
   ['RAM and storage require real GSC demand', migration.includes("dimension='RAM'") && migration.includes('gsc_impressions_28d>=20') && migration.includes("dimension='STORAGE'")],
