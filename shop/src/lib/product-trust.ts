@@ -78,6 +78,7 @@ export function groupPublicSpecs(product: StoreProduct) {
   for (const [key, raw] of Object.entries(product.specs || {})) {
     const value = specValue(raw)
     if (!value) continue
+    if ((PRODUCT_EVIDENCE_KEYS as readonly string[]).includes(key)) continue
     const row: [string, string] = [humanizeSpecKey(key), value]
     if (ACCESSORY_RE.test(key)) accessories.push(row)
     else if (CONDITION_RE.test(key)) condition.push(row)
@@ -120,6 +121,9 @@ export function productEvidence(product: StoreProduct) {
     inspectionDate: specValue(product.specs?.inspection_date) || null,
     inspectionResult: specValue(product.specs?.inspection_result) || null,
     evidenceRows,
+    evidenceFieldCount: evidenceRows.length
+      + (specValue(product.specs?.inspection_date) ? 1 : 0)
+      + (specValue(product.specs?.inspection_result) ? 1 : 0),
     evidenceImageCount: evidenceImages.length,
     evidenceImages,
     hasProductEvidence: evidenceRows.length > 0
