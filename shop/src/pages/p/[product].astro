@@ -2,7 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
 import { primaryLineId, primaryLineUrl } from '../../lib/contact'
-import { getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
+import { getAllIndexSpecPages, getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type SpecPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
 import {
   absoluteUrl,
   extractSkuFromProductSegment,
@@ -12,7 +12,8 @@ import {
   productPath,
   productSegment,
 } from '../../lib/seo'
-import { groupPublicSpecs, imageRoleLabel, productEvidence } from '../../lib/product-trust'
+import { groupPublicSpecs, imageRoleLabel, productEvidence, productImageSeoText } from '../../lib/product-trust'
+import { matchesSpecPage } from '../../lib/spec-seo'
 import {
   buildMerchantOrganizationSchema,
   buildProductMerchantSchema,
@@ -70,6 +71,17 @@ const seriesPage = product?.catalogSeries?.slug
 const modelPage = product?.catalogModel?.slug
   ? evergreenPages.find((item) => item.pageType === 'MODEL' && item.model?.slug === product?.catalogModel?.slug)
   : undefined
+
+
+let matchingSpecPages: SpecPage[] = []
+if (product) {
+  try {
+    const active = await getAllIndexSpecPages()
+    matchingSpecPages = active.filter((page) => matchesSpecPage(product!, page)).slice(0, 4)
+  } catch (error) {
+    console.error('SHOP_PRODUCT_SPEC_LINKS', product.sku, error)
+  }
+}
 
 let relatedProducts: StoreProduct[] = []
 if (product) {
@@ -276,7 +288,7 @@ if (product && evidence?.hasProductEvidence) {
                 <figure class="product-photo gallery-main-photo">
                   <img
                     src={galleryImages[0].url}
-                    alt={`${product.title} ${imageRoleLabel(galleryImages[0].role)}`}
+                    alt={productImageSeoText(product, galleryImages[0], 0).alt}
                     loading="eager"
                     decoding="async"
                     data-gallery-main
@@ -298,7 +310,7 @@ if (product && evidence?.hasProductEvidence) {
                       class:list={['gallery-thumb', index === 0 && 'active']}
                       data-gallery-index={index}
                       data-src={image.url}
-                      data-alt={`${product.title} ${imageRoleLabel(image.role)} รูปที่ ${index + 1}`}
+                      data-alt={productImageSeoText(product, image, index).alt}
                       data-caption={imageRoleLabel(image.role)}
                       aria-label={`ดูรูปที่ ${index + 1}: ${imageRoleLabel(image.role)}`}
                       aria-current={index === 0 ? 'true' : 'false'}
@@ -324,6 +336,10 @@ if (product && evidence?.hasProductEvidence) {
             {modelPage && <a class="button button-secondary" href={modelPage.canonicalPath}>ดูสินค้ารุ่น {modelPage.model?.name}</a>}
             {!modelPage && seriesPage && <a class="button button-secondary" href={seriesPage.canonicalPath}>ดูซีรีส์ {seriesPage.series?.name}</a>}
             {!modelPage && !seriesPage && brandPage && <a class="button button-secondary" href={brandPage.canonicalPath}>ดู {brandPage.brand.name} มือสอง</a>}
+          </div>}
+
+          {matchingSpecPages.length > 0 && <div class="chips taxonomy-links spec-taxonomy-links" aria-label="ดูสินค้าสเปกเดียวกัน">
+            {matchingSpecPages.map((page) => <a class="button button-secondary" href={page.canonicalPath}>ดู {page.label} มือสอง</a>)}
           </div>}
 
           <div class="price-large">{formatPrice(product.price)}</div>
@@ -468,7 +484,7 @@ if (product && evidence?.hasProductEvidence) {
                 <div class="evidence-photo-strip" aria-label="รูปหลักฐานการตรวจเครื่อง">
                   {evidenceImages.slice(0, 8).map((image) => (
                     <figure>
-                      <img src={image.url} alt={`${product.title} ${imageRoleLabel(image.role)} หลักฐานการตรวจเครื่อง`} loading="lazy" decoding="async" />
+                      <img src={image.url} alt={productImageSeoText(product, image).alt} loading="lazy" decoding="async" />
                       <figcaption>{imageRoleLabel(image.role)}</figcaption>
                     </figure>
                   ))}
@@ -517,7 +533,7 @@ if (product && evidence?.hasProductEvidence) {
             {relatedProducts.map((item) => (
               <a class="product-card" href={productPath(item)}>
                 <div class="product-image">
-                  {item.images[0]?.url ? <img src={item.images[0].url} alt={`${item.title} มือสอง`} loading="lazy" decoding="async" /> : <span class="product-placeholder">ยังไม่มีรูป</span>}
+                  {item.images[0]?.url ? <img src={item.images[0].url} alt={item.images[0] ? productImageSeoText(item, item.images[0], 0).alt : `${item.title} มือสอง`} loading="lazy" decoding="async" /> : <span class="product-placeholder">ยังไม่มีรูป</span>}
                 </div>
                 <div class="product-body">
                   <span class="badge">พร้อมขาย</span>

@@ -1,0 +1,58 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getAllIndexSpecPages, type SpecPage } from '../../lib/store-api'
+import { specDimensionLabel } from '../../lib/spec-seo'
+
+let pages: SpecPage[] = []
+try {
+  pages = await getAllIndexSpecPages()
+} catch (error) {
+  console.error('SHOP_SPEC_HUB', error)
+  Astro.response.status = 503
+}
+const robots = pages.length >= 3 ? 'index,follow,max-image-preview:large' : 'noindex,follow'
+const groups = ['GPU','CPU','RAM','STORAGE'].map((dimension) => ({
+  dimension,
+  label: specDimensionLabel(dimension),
+  pages: pages.filter((page) => page.dimension === dimension),
+})).filter((group) => group.pages.length)
+---
+<BaseLayout
+  title="เลือกสินค้าไอทีมือสองตามสเปก GPU CPU RAM SSD | AMPHON TRADING"
+  description="เลือกโน้ตบุ๊กและคอมมือสองจาก GPU CPU RAM หรือ SSD ที่มีสินค้าจริงใน AMPHON SHOP เปิดเฉพาะกลุ่มสเปกที่ผ่านเกณฑ์สต๊อกและคุณภาพ SEO"
+  canonicalPath="/specs/"
+  robots={robots}
+>
+  <section class="hero compact-store-hero">
+    <div class="container">
+      <div class="eyebrow">SPEC FINDER</div>
+      <h1>เลือกสินค้าไอทีมือสองตามสเปกจริง</h1>
+      <p class="lead">ไม่สร้างหน้าฟิลเตอร์เป็นพัน URL — หน้านี้แสดงเฉพาะกลุ่ม GPU, CPU, RAM หรือ Storage ที่มีสต๊อก/ประวัติและผ่าน SEO governance แล้ว</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      {groups.length ? (
+        <div class="spec-hub-groups">
+          {groups.map((group) => (
+            <section class="panel spec-hub-group">
+              <div class="section-head">
+                <div><div class="eyebrow">{group.dimension}</div><h2>{group.label}</h2></div>
+              </div>
+              <div class="category-grid">
+                {group.pages.map((page) => (
+                  <a class="category-card spec-hub-card" href={page.canonicalPath}>
+                    <strong>{page.label}</strong>
+                    <span>{page.currentStockCount} เครื่องในสต๊อก</span>
+                    <small>{page.distinctBrandCount} แบรนด์ • ประวัติ {page.historicalListingCount} รายการ</small>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : <div class="empty">ยังไม่มีกลุ่มสเปกที่ผ่านเกณฑ์ INDEX</div>}
+    </div>
+  </section>
+</BaseLayout>

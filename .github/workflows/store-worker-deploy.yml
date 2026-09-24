@@ -71,12 +71,15 @@ jobs:
         run: |
           for i in 1 2 3 4 5 6; do
             body="$(curl -fsS https://amphon-product-images.noteroru2.workers.dev/store/settings || true)"
+            specs="$(curl -fsS 'https://amphon-product-images.noteroru2.workers.dev/store/spec-pages?effectiveIndexPolicy=INDEX&limit=10' || true)"
             status="$(curl -fsS https://amphon-product-images.noteroru2.workers.dev/shopee/status -H 'Authorization: Bearer invalid-smoke-token' || true)"
-            if echo "$body" | grep -q '"autoPublish"' && echo "$status" | grep -Eq 'SHOPEE_ADMIN_AUTH_INVALID|SHOPEE_ADMIN_AUTH_REQUIRED|error'; then
+            if echo "$body" | grep -q '"autoPublish"' \
+              && echo "$specs" | grep -q '"canonicalPath"' \
+              && echo "$status" | grep -Eq 'SHOPEE_ADMIN_AUTH_INVALID|SHOPEE_ADMIN_AUTH_REQUIRED|error'; then
               echo "Store Worker production smoke PASS"
               exit 0
             fi
             sleep 5
           done
-          echo "::error::Store Worker live settings do not expose autoPublish after deploy"
+          echo "::error::Store Worker live settings/spec pages are not ready after deploy"
           exit 1

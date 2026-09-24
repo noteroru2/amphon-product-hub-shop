@@ -1,0 +1,47 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro'
+import { listSpecPages, type SpecDimension, type SpecPage } from '../../../lib/store-api'
+import { specDimensionLabel } from '../../../lib/spec-seo'
+
+const dimension = String(Astro.params.dimension || '').toUpperCase() as SpecDimension
+if (!['GPU','CPU','RAM','STORAGE'].includes(dimension)) return Astro.redirect('/404/', 302)
+
+let pages: SpecPage[] = []
+try {
+  const result = await listSpecPages({ dimension, effectiveIndexPolicy: 'INDEX', limit: 200 })
+  pages = result.pages
+} catch (error) {
+  console.error('SHOP_SPEC_DIMENSION', dimension, error)
+  Astro.response.status = 503
+}
+const dimensionLabel = specDimensionLabel(dimension)
+const robots = pages.length >= 2 ? 'index,follow,max-image-preview:large' : 'noindex,follow'
+---
+<BaseLayout
+  title={`${dimensionLabel} มือสอง เลือกจากสเปกจริง | AMPHON TRADING`}
+  description={`รวมกลุ่ม ${dimensionLabel} ที่มีสินค้าไอทีมือสองจริงใน AMPHON SHOP และผ่านเกณฑ์ stock/history/SEO governance`}
+  canonicalPath={`/specs/${dimension.toLowerCase()}/`}
+  robots={robots}
+>
+  <div class="container breadcrumbs"><ol><li><a href="/">หน้าแรก</a></li><li><a href="/specs/">เลือกตามสเปก</a></li><li>{dimensionLabel}</li></ol></div>
+  <section class="hero compact-store-hero">
+    <div class="container">
+      <div class="eyebrow">{dimension}</div>
+      <h1>{dimensionLabel} มือสองจากสต๊อกจริง</h1>
+      <p class="lead">แสดงเฉพาะกลุ่มสเปกที่ผ่าน threshold เข้ม ไม่เปิด index จาก filter combination บาง ๆ</p>
+    </div>
+  </section>
+  <section class="section"><div class="container">
+    {pages.length ? (
+      <div class="category-grid">
+        {pages.map((page) => (
+          <a class="category-card spec-hub-card" href={page.canonicalPath}>
+            <strong>{page.label}</strong>
+            <span>{page.currentStockCount} เครื่องในสต๊อก</span>
+            <small>{page.distinctBrandCount} แบรนด์ • ประวัติ {page.historicalListingCount} รายการ</small>
+          </a>
+        ))}
+      </div>
+    ) : <div class="empty">ยังไม่มีกลุ่ม {dimensionLabel} ที่ผ่านเกณฑ์ INDEX</div>}
+  </div></section>
+</BaseLayout>
