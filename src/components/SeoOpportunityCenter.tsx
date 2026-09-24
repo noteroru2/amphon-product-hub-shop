@@ -14,10 +14,13 @@ import {
 } from 'lucide-react'
 import {
   listSeoActions,
+  loadSeoOpsDetails,
   setSeoActionStatus,
   type SeoAction,
   type SeoActionStatus,
   type SeoActionType,
+  type SeoActionExecution,
+  type SeoRecoveryDiagnostic,
 } from '../lib/seoOpportunities'
 
 const TYPE_META: Record<SeoActionType, { label: string; tone: string; icon: typeof TrendingUp }> = {
@@ -54,12 +57,18 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [recoveryByAction, setRecoveryByAction] = useState<Record<string, SeoRecoveryDiagnostic>>({})
+  const [executionsByAction, setExecutionsByAction] = useState<Record<string, SeoActionExecution[]>>({})
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      setItems(await listSeoActions())
+      const nextItems = await listSeoActions()
+      setItems(nextItems)
+      const details = await loadSeoOpsDetails(nextItems.map((item) => item.id))
+      setRecoveryByAction(details.recoveryByAction)
+      setExecutionsByAction(details.executionsByAction)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -180,6 +189,49 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                   <p>{item.recommendedAction}</p>
                   {item.queryCount > 1 && <small>รวม {item.queryCount} query variants ที่ชี้ URL เดียวกัน</small>}
                 </div>
+
+                {recoveryByAction[item.id] && (
+                  <div className={`seo-recovery-diagnostic ${recoveryByAction[item.id].requiresHumanReview ? 'review-required' : 'auto-safe'}`}>
+                    <div className="seo-recovery-head">
+                      <strong>Recovery Diagnosis</strong>
+                      <span>{recoveryByAction[item.id].diagnosisType.replaceAll('_', ' ')}</span>
+                    </div>
+                    <p>{recoveryByAction[item.id].recommendedChecks}</p>
+                    <small>
+                      Query owner pages: {recoveryByAction[item.id].competingPageCount}
+                      {' • '}Current share {percent(recoveryByAction[item.id].currentShare)}
+                      {recoveryByAction[item.id].autoSafeInternalLink ? ' • ผ่าน Auto-link guard' : ' • ต้องตรวจ ownership ก่อน'}
+                    </small>
+                  </div>
+                )}
+
+                {(executionsByAction[item.id] || []).slice(0, 1).map((execution) => (
+                  <div className={`seo-measurement-panel monitor-${execution.monitorStatus.toLowerCase()}`} key={execution.id}>
+                    <div className="seo-recovery-head">
+                      <strong>Execute → Measure</strong>
+                      <span>{execution.monitorStatus}</span>
+                    </div>
+                    <p>
+                      Deploy แล้ว {new Date(execution.appliedAt).toLocaleDateString('th-TH')}
+                      {execution.repository ? ` • ${execution.repository}` : ''}
+                      {execution.pullRequestNumber ? ` • PR #${execution.pullRequestNumber}` : ''}
+                    </p>
+                    {execution.measurements.length > 0 ? (
+                      <div className="seo-measurement-chips">
+                        {execution.measurements.map((measurement) => (
+                          <span className={`verdict-${measurement.verdict.toLowerCase()}`} key={measurement.checkpointDays}>
+                            {measurement.checkpointDays}D {measurement.verdict}
+                            {' • '}Pos {measurement.positionDelta > 0 ? '+' : ''}{number(measurement.positionDelta, 2)}
+                            {' • '}CTR {measurement.ctrDelta > 0 ? '+' : ''}{percent(measurement.ctrDelta)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <small>รอ checkpoint 7 / 14 / 28 วันจาก GSC</small>
+                    )}
+                    {execution.rollbackReviewReason && <div className="seo-rollback-note">{execution.rollbackReviewReason}</div>}
+                  </div>
+                ))}
 
                 {(item.candidateTitle || item.candidateDescription || item.candidateNotes) && (
                   <div className="seo-action-candidate">
