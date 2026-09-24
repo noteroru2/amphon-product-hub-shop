@@ -1291,12 +1291,90 @@ async function notifyPublicOrderPayment(request: Request, env: Env, publicToken:
   return storeJson({ order }, 200, 'no-store')
 }
 
+
+type PublicReviewRow = {
+  id: string
+  product_id: string
+  sku: string
+  product_title: string
+  rating: number
+  title?: string | null
+  body: string
+  display_name: string
+  verified_purchase: boolean
+  submitted_at: string
+  moderated_at?: string | null
+}
+
+async function loadPublicReviews(env: Env, sku: string, limit = 10) {
+  const safeSku = safeStoreText(sku, 80).toUpperCase()
+  if (!safeSku) return []
+  return serviceRest<PublicReviewRow[]>(
+    env,
+    `commerce_public_reviews_v?sku=eq.${encodeURIComponent(safeSku)}&select=id,product_id,sku,product_title,rating,title,body,display_name,verified_purchase,submitted_at,moderated_at&order=submitted_at.desc&limit=${Math.min(Math.max(limit,1),50)}`,
+  )
+}
+
+async function resolvePublicReviewInvite(env: Env, token: string) {
+  const rows = await serviceRest<Array<{
+    valid: boolean
+    product_title: string
+    product_sku: string
+    expires_at: string
+    already_used: boolean
+  }>>(env, 'rpc/resolve_review_invite', {
+    method: 'POST',
+    body: JSON.stringify({ p_token: token }),
+  })
+  return rows[0] || null
+}
+
+async function submitPublicVerifiedReview(request: Request, env: Env) {
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return storeJson({ error: 'ข้อมูลรีวิวไม่ถูกต้อง' }, 400, 'no-store')
+  }
+  const token = safeStoreText(body?.token, 64)
+  const rating = Number(body?.rating)
+  const title = safeStoreText(body?.title, 120)
+  const reviewBody = safeStoreText(body?.body, 2000)
+  const displayName = safeStoreText(body?.displayName, 80)
+  if (!/^[0-9a-fA-F-]{36}$/.test(token) || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewBody.length < 10 || !displayName) {
+    return storeJson({ error: 'กรุณาตรวจคะแนน ชื่อ และข้อความรีวิว' }, 400, 'no-store')
+  }
+  try {
+    const id = await serviceRest<string | null>(env, 'rpc/submit_verified_review', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_token: token,
+        p_rating: rating,
+        p_title: title || null,
+        p_body: reviewBody,
+        p_display_name: displayName,
+      }),
+    })
+    return storeJson({ ok: true, reviewId: id, status: 'PENDING' }, 201, 'no-store')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/REVIEW_INVITE_(INVALID|USED|EXPIRED)|REVIEW_ORDER_NOT_ELIGIBLE/.test(message)) {
+      return storeJson({ error: 'ลิงก์รีวิวนี้ไม่พร้อมใช้งานหรือถูกใช้แล้ว' }, 409, 'no-store')
+    }
+    throw error
+  }
+}
+
 async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
   if (!url.pathname.startsWith('/store')) return null
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: storeCorsHeaders() })
 
   if (request.method === 'POST' && url.pathname === '/store/checkout') {
     return createPublicCheckout(request, env)
+  }
+
+  if (request.method === 'POST' && url.pathname === '/store/reviews/submit') {
+    return submitPublicVerifiedReview(request, env)
   }
 
   const orderMatch = url.pathname.match(/^\/store\/orders\/([0-9a-fA-F-]{36})(?:\/(payment-notify))?$/)
@@ -1325,6 +1403,14 @@ async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<
     return warranty ? storeJson({ warranty }, 200, 'no-store') : storeJson({ error: 'ไม่พบข้อมูลประกัน' }, 404, 'no-store')
   }
 
+  const reviewInviteMatch = url.pathname.match(/^\/store\/review-invites\/([0-9a-fA-F-]{36})$/)
+  if (reviewInviteMatch && request.method === 'GET') {
+    const invite = await resolvePublicReviewInvite(env, reviewInviteMatch[1])
+    return invite
+      ? storeJson({ invite }, 200, 'no-store')
+      : storeJson({ error: 'ไม่พบลิงก์รีวิว' }, 404, 'no-store')
+  }
+
   if (!['GET', 'HEAD'].includes(request.method)) return storeJson({ error: 'Method not allowed' }, 405, 'no-store')
 
   if (url.pathname === '/store/health') {
@@ -1336,6 +1422,14 @@ async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<
     const settings = await loadStoreSettings(env)
     if (!settings) return storeJson({ error: 'Store settings not found' }, 404, 'public, max-age=60, stale-while-revalidate=300')
     return storeJson({ settings: mapStoreSettings(settings) }, 200, 'public, max-age=300, stale-while-revalidate=1800')
+  }
+
+  if (url.pathname === '/store/reviews') {
+    const sku = safeStoreText(url.searchParams.get('sku'), 80)
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 10) || 10, 1), 50)
+    if (!sku) return storeJson({ reviews: [] }, 200, 'public, max-age=60, stale-while-revalidate=300')
+    const reviews = await loadPublicReviews(env, sku, limit)
+    return storeJson({ reviews }, 200, 'public, max-age=60, stale-while-revalidate=300')
   }
 
   if (url.pathname === '/store/seo-pages/resolve') {
