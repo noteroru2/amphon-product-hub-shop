@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "check": "astro check",
-    "build": "node scripts/verify-content-hygiene.mjs && node scripts/verify-shop-p0p1.mjs && node scripts/verify-shop87b.mjs && node scripts/verify-shop87c.mjs && node scripts/verify-shopseo4.mjs && node scripts/verify-shopseo41.mjs && node scripts/verify-model-longtail.mjs && node scripts/verify-google-merchant-feed.mjs && node scripts/verify-product-evidence.mjs && node scripts/verify-shop9.mjs && node scripts/verify-line-first.mjs && astro check && astro build",
+    "build": "node scripts/verify-content-hygiene.mjs && node scripts/verify-shop-p0p1.mjs && node scripts/verify-shop87b.mjs && node scripts/verify-shop87c.mjs && node scripts/verify-shopseo4.mjs && node scripts/verify-shopseo41.mjs && node scripts/verify-model-longtail.mjs && node scripts/verify-google-merchant-feed.mjs && node scripts/verify-product-evidence.mjs && node scripts/verify-seo-demand-spec-image.mjs && node scripts/verify-shop9.mjs && node scripts/verify-line-first.mjs && astro check && astro build",
     "preview": "astro preview",
     "deploy": "npm run build && wrangler deploy",
     "verify:foundation": "node scripts/verify-foundation.mjs",
@@ -33,6 +33,7 @@
     "verify:model-longtail": "node scripts/verify-model-longtail.mjs",
     "verify:google-merchant-feed": "node scripts/verify-google-merchant-feed.mjs",
     "verify:product-evidence": "node scripts/verify-product-evidence.mjs",
+    "verify:seo-demand-spec-image": "node scripts/verify-seo-demand-spec-image.mjs",
     "verify:shop9": "node scripts/verify-shop9.mjs",
     "verify:line-first": "node scripts/verify-line-first.mjs",
     "verify:p0p1": "node scripts/verify-shop-p0p1.mjs"
