@@ -15,11 +15,12 @@ let products: StoreProduct[] = []
 try {
   page = await resolveSpecPage({ dimension, token })
   if (page) {
+    const resolvedPage = page
     const all = await getAllStoreProducts()
     products = all
       .filter((product) => product.availability !== 'out_of_stock')
       .filter((product) => !['NOINDEX','HOLD','RETIRED'].includes(product.indexPolicy || 'INDEX'))
-      .filter((product) => matchesSpecPage(product, page))
+      .filter((product) => matchesSpecPage(product, resolvedPage))
       .sort((a, b) => Number(b.updatedAt ? new Date(b.updatedAt) : 0) - Number(a.updatedAt ? new Date(a.updatedAt) : 0))
   }
 } catch (error) {
