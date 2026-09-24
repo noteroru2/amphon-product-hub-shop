@@ -2,14 +2,66 @@
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { primaryLineId, primaryLineUrl } from '../lib/contact'
 import { getStoreSettings, type StoreSettings } from '../lib/store-api'
+
 let settings: StoreSettings | null = null
 try { settings = await getStoreSettings() } catch {}
-const returns = settings?.returns
+
+const configuredDays = settings?.returns?.category === 'FINITE' && settings.returns.days !== null
+  ? settings.returns.days
+  : 7
 ---
-<BaseLayout title="การคืนสินค้า | AMPHON SHOP" description="ข้อมูลการคืนสินค้า AMPHON SHOP และช่องทางติดต่อร้านเพื่อยืนยันเงื่อนไขก่อนสั่งซื้อสินค้าไอทีมือสอง" canonicalPath="/returns/">
-  <section class="hero compact-store-hero"><div class="container"><div class="eyebrow">การคืนสินค้า</div><h1>ตรวจเงื่อนไขก่อนสั่งซื้อ</h1><p class="lead">เงื่อนไขการคืนสินค้าควรยืนยันตามการตั้งค่าปัจจุบันและลักษณะของสินค้าชิ้นนั้นก่อนชำระ</p></div></section>
-  <section class="section"><div class="container policy-grid">
-    <article class="panel trust-card"><h2>นโยบายปัจจุบัน</h2><p>{returns?.enabled ? 'ร้านเปิดใช้นโยบายคืนสินค้าตามเงื่อนไขที่กำหนด' : 'กรุณาสอบถามร้านเพื่อยืนยันเงื่อนไขการคืนสินค้าของรายการที่สนใจ'}</p>{returns?.enabled && returns.category === 'FINITE' && returns.days !== null && <p><strong>ระยะเวลาที่ตั้งไว้:</strong> {returns.days} วัน</p>}</article>
-    <article class="panel trust-card"><h2>ให้ร้านยืนยันก่อน</h2><p>ส่งรหัสสินค้าและคำถามไปที่ LINE {primaryLineId} เพื่อเช็กเงื่อนไขที่เกี่ยวข้องกับสินค้าชิ้นนั้น</p><a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">สอบถามเรื่องการคืนสินค้า</a></article>
-  </div></section>
+<BaseLayout
+  title="นโยบายการคืนสินค้า 7 วัน | AMPHON SHOP"
+  description="นโยบายคืนสินค้า AMPHON SHOP: รับคืนภายใน 7 วันเฉพาะสินค้ามีข้อบกพร่อง มีปัญหาการใช้งาน หรือไม่ตรงรายละเอียด ไม่รับคืนเพราะเปลี่ยนใจและไม่รับเปลี่ยนสินค้า"
+  canonicalPath="/returns/"
+>
+  <section class="hero compact-store-hero">
+    <div class="container">
+      <div class="eyebrow">นโยบายการคืนสินค้า</div>
+      <h1>รับคืนภายใน {configuredDays} วัน เฉพาะกรณีสินค้ามีปัญหา</h1>
+      <p class="lead">AMPHON SHOP กำหนดเงื่อนไขการคืนสินค้าให้ชัดเจนสำหรับสินค้าไอทีมือสอง เพื่อให้ข้อมูลบนเว็บไซต์ตรงกับเงื่อนไขที่ใช้กับคำสั่งซื้อจริง</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container policy-grid">
+      <article class="panel trust-card">
+        <h2>เงื่อนไขที่รับคืนสินค้า</h2>
+        <p>ร้านรับคืนสินค้าภายใน <strong>{configuredDays} วัน</strong> เฉพาะกรณีต่อไปนี้</p>
+        <ul>
+          <li>สินค้ามีข้อบกพร่องหรือมีปัญหาการใช้งาน</li>
+          <li>สินค้าที่ได้รับไม่ตรงกับรายละเอียด สเปก สภาพ หรือตำหนิที่แจ้งไว้ในหน้าสินค้า</li>
+        </ul>
+      </article>
+
+      <article class="panel trust-card">
+        <h2>กรณีที่ไม่รับคืน</h2>
+        <ul>
+          <li><strong>ไม่รับคืนเนื่องจากเปลี่ยนใจ</strong> หรือไม่ต้องการสินค้าแล้ว</li>
+          <li><strong>ไม่รับเปลี่ยนสินค้าเป็นเครื่องอื่น</strong></li>
+        </ul>
+      </article>
+
+      <article class="panel trust-card">
+        <h2>วิธีคืนสินค้า</h2>
+        <p>ลูกค้าสามารถคืนสินค้าได้ทั้งสองวิธี</p>
+        <ul>
+          <li>จัดส่งสินค้ากลับมายังร้าน</li>
+          <li>นำสินค้ามาคืนที่หน้าร้าน</li>
+        </ul>
+        <p>ก่อนส่งสินค้ากลับ กรุณาแจ้งรหัสสินค้า/คำสั่งซื้อ พร้อมอธิบายอาการหรือปัญหาผ่าน LINE {primaryLineId} เพื่อให้ร้านตรวจสอบเคสก่อนดำเนินการคืนสินค้า</p>
+      </article>
+
+      <article class="panel trust-card">
+        <h2>ค่าจัดส่งคืนสินค้า</h2>
+        <p><strong>ค่าจัดส่งคืนเป็นความรับผิดชอบของลูกค้า</strong> เว้นแต่ร้านเป็นผู้จัดส่งสินค้าผิด หรือร้านได้ตกลงรับผิดชอบค่าจัดส่งเป็นกรณีไป</p>
+      </article>
+
+      <article class="panel trust-card">
+        <h2>ติดต่อเรื่องการคืนสินค้า</h2>
+        <p>ส่งรหัสสินค้า/คำสั่งซื้อ พร้อมรายละเอียดปัญหา รูปภาพหรือวิดีโอที่เกี่ยวข้องมาที่ LINE {primaryLineId}</p>
+        <a class="button button-line" href={primaryLineUrl} target="_blank" rel="nofollow noopener">ติดต่อ LINE เรื่องการคืนสินค้า</a>
+      </article>
+    </div>
+  </section>
 </BaseLayout>
