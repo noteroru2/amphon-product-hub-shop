@@ -159,6 +159,42 @@ export interface EvergreenPageListResult {
   pagination: { total: number; limit: number; offset: number; hasMore: boolean }
 }
 
+
+export type SpecDimension = 'GPU' | 'CPU' | 'RAM' | 'STORAGE'
+
+export interface SpecPage {
+  id: string
+  dimension: SpecDimension
+  token: string
+  label: string
+  canonicalPath: string
+  primaryKeyword: string
+  seoTitle: string
+  seoDescription: string
+  introContent: string
+  indexPolicy: IndexPolicy
+  seoReady: boolean
+  effectiveIndexPolicy: IndexPolicy
+  currentStockCount: number
+  historicalListingCount: number
+  distinctBrandCount: number
+  gscImpressions28d: number
+  gscClicks28d: number
+  updatedAt: string | null
+}
+
+export interface SpecPageListResult {
+  pages: SpecPage[]
+  pagination: { total: number; limit: number; offset: number; hasMore: boolean }
+}
+
+export interface ListSpecPagesParams {
+  dimension?: SpecDimension
+  effectiveIndexPolicy?: IndexPolicy
+  limit?: number
+  offset?: number
+}
+
 export interface ListEvergreenPagesParams {
   pageType?: EvergreenPageType
   category?: string
@@ -267,6 +303,37 @@ export async function getAllIndexEvergreenPages(maxPages = 100): Promise<Evergre
   let offset = 0
   for (let page = 0; page < maxPages; page += 1) {
     const result = await listEvergreenPages({ effectiveIndexPolicy: 'INDEX', limit, offset })
+    pages.push(...result.pages)
+    if (!result.pagination.hasMore) break
+    offset += limit
+  }
+  return pages
+}
+
+
+export async function listSpecPages(params: ListSpecPagesParams = {}): Promise<SpecPageListResult> {
+  return fetchJson<SpecPageListResult>(`${storeApiBase()}/spec-pages${queryString(params)}`)
+}
+
+export async function resolveSpecPage(params: { dimension: SpecDimension | string; token: string }): Promise<SpecPage | null> {
+  const response = await fetch(`${storeApiBase()}/spec-pages/resolve${queryString(params)}`, {
+    headers: { accept: 'application/json' },
+  })
+  if (response.status === 404) return null
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Store API ${response.status}${body ? `: ${body.slice(0, 180)}` : ''}`)
+  }
+  const data = await response.json() as { page: SpecPage }
+  return data.page
+}
+
+export async function getAllIndexSpecPages(maxPages = 20): Promise<SpecPage[]> {
+  const pages: SpecPage[] = []
+  const limit = 200
+  let offset = 0
+  for (let page = 0; page < maxPages; page += 1) {
+    const result = await listSpecPages({ effectiveIndexPolicy: 'INDEX', limit, offset })
     pages.push(...result.pages)
     if (!result.pagination.hasMore) break
     offset += limit
