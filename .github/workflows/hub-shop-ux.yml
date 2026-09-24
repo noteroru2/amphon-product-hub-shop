@@ -18,6 +18,7 @@ on:
       - '.github/workflows/store-worker-deploy.yml'
       - 'scripts/verify-hub-publish-center-ux.mjs'
       - 'scripts/verify-hub-ease.mjs'
+      - 'scripts/verify-gsc-action-engine.mjs'
       - '.github/workflows/hub-shop-ux.yml'
   push:
     branches: [main]
@@ -61,6 +62,7 @@ jobs:
           node scripts/verify-shopee-assisted-listing.mjs
           node scripts/verify-hub-publish-center-ux.mjs
           node scripts/verify-hub-ease.mjs
+          node scripts/verify-gsc-action-engine.mjs
 
       - name: Hub Vite build
         run: npx vite build
