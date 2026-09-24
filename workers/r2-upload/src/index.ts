@@ -537,6 +537,88 @@ async function resolveEvergreenPage(env: Env, url: URL): Promise<EvergreenPageRo
   return rows[0] || null
 }
 
+type StoreSpecPageRow = {
+  id: string
+  dimension: 'GPU' | 'CPU' | 'RAM' | 'STORAGE'
+  token: string
+  label: string
+  canonical_path: string
+  primary_keyword: string
+  seo_title: string
+  seo_description: string
+  intro_content: string
+  index_policy: string
+  seo_ready: boolean
+  effective_index_policy: string
+  current_stock_count: number
+  historical_listing_count: number
+  distinct_brand_count: number
+  gsc_impressions_28d: number | string
+  gsc_clicks_28d: number | string
+  updated_at?: string | null
+}
+
+const SPEC_PAGE_SELECT = [
+  'id','dimension','token','label','canonical_path','primary_keyword','seo_title','seo_description',
+  'intro_content','index_policy','seo_ready','effective_index_policy','current_stock_count',
+  'historical_listing_count','distinct_brand_count','gsc_impressions_28d','gsc_clicks_28d','updated_at',
+].join(',')
+
+function mapSpecPage(row: StoreSpecPageRow) {
+  return {
+    id: row.id,
+    dimension: row.dimension,
+    token: row.token,
+    label: row.label,
+    canonicalPath: row.canonical_path,
+    primaryKeyword: row.primary_keyword,
+    seoTitle: row.seo_title,
+    seoDescription: row.seo_description,
+    introContent: row.intro_content,
+    indexPolicy: row.index_policy,
+    seoReady: Boolean(row.seo_ready),
+    effectiveIndexPolicy: row.effective_index_policy,
+    currentStockCount: Number(row.current_stock_count || 0),
+    historicalListingCount: Number(row.historical_listing_count || 0),
+    distinctBrandCount: Number(row.distinct_brand_count || 0),
+    gscImpressions28d: Number(row.gsc_impressions_28d || 0),
+    gscClicks28d: Number(row.gsc_clicks_28d || 0),
+    updatedAt: row.updated_at || null,
+  }
+}
+
+async function loadSpecPages(
+  env: Env,
+  params: {
+    dimension?: string
+    effectiveIndexPolicy?: string
+    limit: number
+    offset: number
+  },
+): Promise<{ rows: StoreSpecPageRow[]; total: number }> {
+  const filters = [
+    `select=${SPEC_PAGE_SELECT}`,
+    'order=dimension.asc,current_stock_count.desc,token.asc',
+    `limit=${params.limit}`,
+    `offset=${params.offset}`,
+  ]
+  if (params.dimension) filters.push(`dimension=eq.${encodeURIComponent(params.dimension.toUpperCase())}`)
+  if (params.effectiveIndexPolicy) filters.push(`effective_index_policy=eq.${encodeURIComponent(params.effectiveIndexPolicy.toUpperCase())}`)
+  return serviceRestWithCount<StoreSpecPageRow[]>(env, `commerce_public_spec_page_v?${filters.join('&')}`)
+}
+
+async function resolveSpecPage(env: Env, url: URL): Promise<StoreSpecPageRow | null> {
+  const dimension = safeStoreText(url.searchParams.get('dimension'), 16).toUpperCase()
+  const token = safeStoreText(url.searchParams.get('token'), 100).toLowerCase()
+  if (!['GPU','CPU','RAM','STORAGE'].includes(dimension) || !token) return null
+  const rows = await serviceRest<StoreSpecPageRow[]>(
+    env,
+    `commerce_public_spec_page_v?select=${SPEC_PAGE_SELECT}&dimension=eq.${encodeURIComponent(dimension)}&token=eq.${encodeURIComponent(token)}&limit=1`,
+  )
+  return rows[0] || null
+}
+
+
 
 type PublicOrderRow = {
   id: string
@@ -1275,6 +1357,23 @@ async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<
     const pages = page.rows.map(mapEvergreenPage)
     return storeJson({ pages, pagination: { total: page.total, limit, offset, hasMore: offset + pages.length < page.total } }, 200, 'public, max-age=60, stale-while-revalidate=300')
   }
+
+  if (url.pathname === '/store/spec-pages/resolve') {
+    const found = await resolveSpecPage(env, url)
+    if (!found) return storeJson({ error: 'Spec page not found' }, 404, 'public, max-age=60, stale-while-revalidate=300')
+    return storeJson({ page: mapSpecPage(found) }, 200, 'public, max-age=60, stale-while-revalidate=300')
+  }
+
+  if (url.pathname === '/store/spec-pages') {
+    const dimension = safeStoreText(url.searchParams.get('dimension'), 16)
+    const effectiveIndexPolicy = safeStoreText(url.searchParams.get('effectiveIndexPolicy'), 16)
+    const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 50) || 50, 1), 200)
+    const offset = Math.max(Number(url.searchParams.get('offset') || 0) || 0, 0)
+    const page = await loadSpecPages(env, { dimension, effectiveIndexPolicy, limit, offset })
+    const pages = page.rows.map(mapSpecPage)
+    return storeJson({ pages, pagination: { total: page.total, limit, offset, hasMore: offset + pages.length < page.total } }, 200, 'public, max-age=60, stale-while-revalidate=300')
+  }
+
 
   const detailMatch = url.pathname.match(/^\/store\/products\/([^/]+)$/)
   if (detailMatch) {
