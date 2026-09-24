@@ -28,9 +28,7 @@
   },
   "secrets": {
     "required": [
-      "SHOP_INTEGRATION_SECRET",
-      "SHOPEE_PARTNER_ID",
-      "SHOPEE_PARTNER_KEY"
+      "SHOP_INTEGRATION_SECRET"
     ]
   }
 }
