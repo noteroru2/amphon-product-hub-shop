@@ -60,6 +60,10 @@ begin
     where fetched_at >= now() - interval '3 days'
       and opportunity_type in ('CTR_OPPORTUNITY','TOP10_PUSH','PAGE1_RECOVERY','PROTECT')
       and impressions >= 10
+      and (
+        page like 'https://amphon.co.th/%'
+        or page like 'https://shop.amphon.co.th/%'
+      )
   ),
   grouped as (
     select
@@ -181,7 +185,10 @@ begin
   update public.commerce_gsc_action_queue
   set status='STALE', updated_at=now()
   where status in ('OPEN','PROTECTED')
-    and last_seen_at < now() - interval '3 days';
+    and (
+      last_seen_at < now() - interval '3 days'
+      or not (page like 'https://amphon.co.th/%' or page like 'https://shop.amphon.co.th/%')
+    );
 end;
 $$;
 
