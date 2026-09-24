@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro'
 import { getAllStoreProducts } from '../lib/store-api'
 import { absoluteUrl, productPath } from '../lib/seo'
-import { productImageSeoText } from '../lib/product-trust'
 import { xmlEscape, xmlResponse } from '../lib/xml'
 
 export const GET: APIRoute = async () => {
@@ -15,10 +14,9 @@ export const GET: APIRoute = async () => {
         .sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
         .slice(0, 10)
 
-      const imageXml = images.map((image, index) => {
-        const seo = productImageSeoText(product, image, index)
-        return `<image:image><image:loc>${xmlEscape(image.url)}</image:loc><image:title>${xmlEscape(seo.title)}</image:title><image:caption>${xmlEscape(seo.caption)}</image:caption></image:image>`
-      }).join('')
+      const imageXml = images
+        .map((image) => `<image:image><image:loc>${xmlEscape(image.url)}</image:loc></image:image>`)
+        .join('')
 
       return `  <url><loc>${xmlEscape(absoluteUrl(productPath(product)))}</loc>${imageXml}</url>`
     })
