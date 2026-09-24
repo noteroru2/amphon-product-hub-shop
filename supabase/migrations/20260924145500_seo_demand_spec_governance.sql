@@ -134,6 +134,7 @@ begin
     from agg a
     left join public.commerce_gsc_query_demand g
       on g.window_days=28
+     and g.fetched_at >= now() - interval '3 days'
      and (
        lower(g.query) like '%'||replace(a.token,'-',' ')||'%'
        or lower(g.query) like '%'||replace(a.token,'-','')||'%'
