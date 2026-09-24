@@ -2,7 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
 import { primaryLineId, primaryLineUrl } from '../../lib/contact'
-import { getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
+import { getAllIndexSpecPages, getStoreProduct, getStoreSettings, listEvergreenPages, listStoreProducts, type EvergreenPage, type SpecPage, type StoreProduct, type StoreSettings } from '../../lib/store-api'
 import {
   absoluteUrl,
   extractSkuFromProductSegment,
@@ -13,6 +13,7 @@ import {
   productSegment,
 } from '../../lib/seo'
 import { groupPublicSpecs, imageRoleLabel, productEvidence, productImageSeoText } from '../../lib/product-trust'
+import { matchesSpecPage } from '../../lib/spec-seo'
 import {
   buildMerchantOrganizationSchema,
   buildProductMerchantSchema,
@@ -70,6 +71,17 @@ const seriesPage = product?.catalogSeries?.slug
 const modelPage = product?.catalogModel?.slug
   ? evergreenPages.find((item) => item.pageType === 'MODEL' && item.model?.slug === product?.catalogModel?.slug)
   : undefined
+
+
+let matchingSpecPages: SpecPage[] = []
+if (product) {
+  try {
+    const active = await getAllIndexSpecPages()
+    matchingSpecPages = active.filter((page) => matchesSpecPage(product!, page)).slice(0, 4)
+  } catch (error) {
+    console.error('SHOP_PRODUCT_SPEC_LINKS', product.sku, error)
+  }
+}
 
 let relatedProducts: StoreProduct[] = []
 if (product) {
@@ -324,6 +336,10 @@ if (product && evidence?.hasProductEvidence) {
             {modelPage && <a class="button button-secondary" href={modelPage.canonicalPath}>ดูสินค้ารุ่น {modelPage.model?.name}</a>}
             {!modelPage && seriesPage && <a class="button button-secondary" href={seriesPage.canonicalPath}>ดูซีรีส์ {seriesPage.series?.name}</a>}
             {!modelPage && !seriesPage && brandPage && <a class="button button-secondary" href={brandPage.canonicalPath}>ดู {brandPage.brand.name} มือสอง</a>}
+          </div>}
+
+          {matchingSpecPages.length > 0 && <div class="chips taxonomy-links spec-taxonomy-links" aria-label="ดูสินค้าสเปกเดียวกัน">
+            {matchingSpecPages.map((page) => <a class="button button-secondary" href={page.canonicalPath}>ดู {page.label} มือสอง</a>)}
           </div>}
 
           <div class="price-large">{formatPrice(product.price)}</div>
