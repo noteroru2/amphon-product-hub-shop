@@ -92,7 +92,9 @@ export const IMAGE_ROLE_LABELS: Record<string, string> = {
   screen: 'หน้าจอ', screen_on: 'เปิดจอ', keyboard: 'คีย์บอร์ด', ports: 'พอร์ต',
   serial: 'ฉลากรุ่น / Serial', label: 'ฉลากรุ่น', defect: 'รูปตำหนิ',
   accessories: 'รูปอุปกรณ์', warranty: 'หลักฐานประกัน', test: 'ผลทดสอบ',
-  pixel_test: 'Pixel Test', controller: 'Controller', dock: 'Dock', stand: 'ขาตั้ง',
+  pixel_test: 'Pixel Test', battery: 'Battery Health', benchmark: 'Benchmark / Stress Test',
+  spec: 'หน้าสเปก / ผลระบบ', about: 'ข้อมูลเครื่อง', shutter: 'Shutter Count',
+  controller: 'Controller', dock: 'Dock', stand: 'ขาตั้ง',
   sensor: 'Sensor', mount: 'Mount', lens: 'เลนส์', body: 'ตัวเครื่อง', other: 'รูปเพิ่มเติม',
 }
 
