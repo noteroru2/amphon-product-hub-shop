@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro'
 import { catalogCategories } from '../config/catalog'
 import { categoryIsEffectivelyIndexable, categoryStockStateFromProducts } from '../config/category-governance'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
-import { getAllStoreProducts, type StoreProduct } from '../lib/store-api'
+import { getAllIndexSpecPages, getAllStoreProducts, type SpecPage, type StoreProduct } from '../lib/store-api'
 import { absoluteUrl, productPath } from '../lib/seo'
 import { shopFaqs, shopKeywordPillars } from '../config/search-intent-content'
 import BuybackCTA from '../components/BuybackCTA.astro'
@@ -13,6 +13,7 @@ import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
 let products: StoreProduct[] = []
+let indexSpecPages: SpecPage[] = []
 let homeCategories = catalogCategories.filter((category) => category.indexPolicy === 'INDEX')
 let apiError = false
 try {
@@ -22,6 +23,7 @@ try {
   homeCategories = catalogCategories.filter((category) =>
     categoryIsEffectivelyIndexable(category, categoryStockStateFromProducts(category.slug, allProducts)),
   )
+  indexSpecPages = await getAllIndexSpecPages()
 } catch (error) {
   apiError = true
   console.error('SHOP_HOME_STORE_API', error)
@@ -165,6 +167,21 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
       </div>
     </div>
   </section>
+
+  {indexSpecPages.length >= 3 && (
+    <section class="section home-spec-finder">
+      <div class="container">
+        <div class="panel spec-finder-bridge">
+          <div>
+            <div class="eyebrow">เลือกตามสเปก</div>
+            <h2>รู้ GPU หรือสเปกที่อยากได้อยู่แล้ว?</h2>
+            <p>เปิด Spec Finder เพื่อดูเฉพาะกลุ่มสเปกที่มีสินค้าจริงและผ่านเกณฑ์ SEO governance แล้ว เช่น {indexSpecPages.slice(0, 3).map((page) => page.label).join(' • ')}</p>
+          </div>
+          <a class="button button-secondary" href="/specs/">เลือกสินค้าตามสเปก →</a>
+        </div>
+      </div>
+    </section>
+  )}
 
   <section class="section storefront-trust">
     <div class="container">
