@@ -156,6 +156,16 @@ export interface SeoExecutionMeasurement {
   positionDelta: number
   clicksDelta: number
   impressionsDelta: number
+  integrityStatus: 'PASS' | 'BLOCKED'
+  integrityCodes: string[]
+  integrityReason: string | null
+  dataAgeHours: number | null
+  baselineAgeHours: number | null
+  exposureDays: number | null
+  baselineQueryShare: number | null
+  currentQueryShare: number | null
+  queryShareShift: number | null
+  trafficRatio: number | null
   measuredAt: string
 }
 
@@ -202,6 +212,13 @@ export interface SeoExecutorJob {
   pullRequestUrl: string | null
   liveVerifiedAt: string | null
   lastError: string | null
+  guardCode: 'READY' | 'PAGE_EXPERIMENT_LOCK' | 'ACTION_BUDGET' | 'RISK_GATE' | 'PROTECTED'
+  guardReason: string | null
+  nextEligibleAt: string | null
+  budgetUsed24h: number
+  budgetLimit24h: number
+  activePageExperiments: number
+  pageLockExecutionId: string | null
   updatedAt: string
 }
 
@@ -279,6 +296,16 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       positionDelta: Number(row.position_delta || 0),
       clicksDelta: Number(row.clicks_delta || 0),
       impressionsDelta: Number(row.impressions_delta || 0),
+      integrityStatus: row.integrity_status || 'BLOCKED',
+      integrityCodes: Array.isArray(row.integrity_codes) ? row.integrity_codes.map(String) : [],
+      integrityReason: row.integrity_reason ? String(row.integrity_reason) : null,
+      dataAgeHours: row.data_age_hours === null ? null : Number(row.data_age_hours),
+      baselineAgeHours: row.baseline_age_hours === null ? null : Number(row.baseline_age_hours),
+      exposureDays: row.exposure_days === null ? null : Number(row.exposure_days),
+      baselineQueryShare: row.baseline_query_share === null ? null : Number(row.baseline_query_share),
+      currentQueryShare: row.current_query_share === null ? null : Number(row.current_query_share),
+      queryShareShift: row.query_share_shift === null ? null : Number(row.query_share_shift),
+      trafficRatio: row.traffic_ratio === null ? null : Number(row.traffic_ratio),
       measuredAt: String(row.measured_at || ''),
     })
     measurementsByExecution.set(executionId, items)
@@ -334,6 +361,13 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       pullRequestUrl: row.pull_request_url ? String(row.pull_request_url) : null,
       liveVerifiedAt: row.live_verified_at ? String(row.live_verified_at) : null,
       lastError: row.last_error ? String(row.last_error) : null,
+      guardCode: row.guard_code || 'READY',
+      guardReason: row.guard_reason ? String(row.guard_reason) : null,
+      nextEligibleAt: row.next_eligible_at ? String(row.next_eligible_at) : null,
+      budgetUsed24h: Number(row.budget_used_24h || 0),
+      budgetLimit24h: Number(row.budget_limit_24h || 4),
+      activePageExperiments: Number(row.active_page_experiments || 0),
+      pageLockExecutionId: row.page_lock_execution_id ? String(row.page_lock_execution_id) : null,
       updatedAt: String(row.updated_at || ''),
     }
   }
