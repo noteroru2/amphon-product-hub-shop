@@ -237,6 +237,22 @@ export interface SeoActionExecution {
   recoveryMeasurements: SeoRollbackRecoveryMeasurement[]
 }
 
+export interface SeoActionPrior {
+  actionId: string
+  repository: string
+  actionType: SeoActionType
+  opportunityType: string
+  priorScope: 'NONE' | 'EXACT' | 'ACTION_TYPE' | 'EXACT_COLD_START' | 'ACTION_TYPE_COLD_START'
+  priorState: 'COLD_START' | 'FAVOR' | 'NEUTRAL' | 'CAUTION'
+  experiments: number
+  highConfidenceExperiments: number
+  benefitConfirmed: number
+  harmDirectional: number
+  priorScore: number
+  priorAdjustedPriority: number
+  priorReason: string
+}
+
 export interface SeoExecutorJob {
   id: string
   actionId: string
@@ -262,6 +278,16 @@ export interface SeoExecutorJob {
   budgetLimit24h: number
   activePageExperiments: number
   pageLockExecutionId: string | null
+  priorState: 'COLD_START' | 'FAVOR' | 'NEUTRAL' | 'CAUTION'
+  priorScope: 'NONE' | 'EXACT' | 'ACTION_TYPE' | 'EXACT_COLD_START' | 'ACTION_TYPE_COLD_START'
+  priorScore: number
+  priorExperiments: number
+  priorHighConfidenceExperiments: number
+  priorBenefitConfirmed: number
+  priorHarmDirectional: number
+  priorAdjustedPriority: number
+  priorReason: string | null
+  priorCheckedAt: string | null
   updatedAt: string
 }
 
@@ -270,17 +296,19 @@ export interface SeoOpsDetailBundle {
   executionsByAction: Record<string, SeoActionExecution[]>
   executorByAction: Record<string, SeoExecutorJob>
   learningByAction: Record<string, SeoLearningLedger>
+  priorByAction: Record<string, SeoActionPrior>
 }
 
 export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDetailBundle> {
   if (!supabase) throw new Error('Supabase is not configured')
-  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {}, executorByAction: {}, learningByAction: {} }
+  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {}, executorByAction: {}, learningByAction: {}, priorByAction: {} }
 
   const [
     { data: recoveryData, error: recoveryError },
     { data: executionData, error: executionError },
     { data: executorData, error: executorError },
     { data: learningData, error: learningError },
+    { data: priorData, error: priorError },
   ] = await Promise.all([
     supabase
       .from('commerce_gsc_recovery_diagnostics')
@@ -300,11 +328,16 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       .select('*')
       .in('action_id', actionIds)
       .order('applied_at', { ascending: false }),
+    supabase
+      .from('commerce_gsc_action_prior_v')
+      .select('*')
+      .in('action_id', actionIds),
   ])
   if (recoveryError) throw recoveryError
   if (executionError) throw executionError
   if (executorError) throw executorError
   if (learningError) throw learningError
+  if (priorError) throw priorError
 
   const executions = (executionData || []) as Array<Record<string, any>>
   const executionIds = executions.map((row) => String(row.id))
@@ -457,6 +490,16 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       budgetLimit24h: Number(row.budget_limit_24h || 4),
       activePageExperiments: Number(row.active_page_experiments || 0),
       pageLockExecutionId: row.page_lock_execution_id ? String(row.page_lock_execution_id) : null,
+      priorState: row.prior_state || 'COLD_START',
+      priorScope: row.prior_scope || 'NONE',
+      priorScore: Number(row.prior_score || 0),
+      priorExperiments: Number(row.prior_experiments || 0),
+      priorHighConfidenceExperiments: Number(row.prior_high_confidence_experiments || 0),
+      priorBenefitConfirmed: Number(row.prior_benefit_confirmed || 0),
+      priorHarmDirectional: Number(row.prior_harm_directional || 0),
+      priorAdjustedPriority: Number(row.prior_adjusted_priority || 0),
+      priorReason: row.prior_reason ? String(row.prior_reason) : null,
+      priorCheckedAt: row.prior_checked_at ? String(row.prior_checked_at) : null,
       updatedAt: String(row.updated_at || ''),
     }
   }
@@ -487,5 +530,24 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
     }
   }
 
-  return { recoveryByAction, executionsByAction, executorByAction, learningByAction }
+  const priorByAction: Record<string, SeoActionPrior> = {}
+  for (const row of (priorData || []) as Array<Record<string, any>>) {
+    priorByAction[String(row.action_id)] = {
+      actionId: String(row.action_id),
+      repository: String(row.repository || ''),
+      actionType: row.action_type,
+      opportunityType: String(row.opportunity_type || ''),
+      priorScope: row.prior_scope,
+      priorState: row.prior_state,
+      experiments: Number(row.experiments || 0),
+      highConfidenceExperiments: Number(row.high_confidence_experiments || 0),
+      benefitConfirmed: Number(row.benefit_confirmed || 0),
+      harmDirectional: Number(row.harm_directional || 0),
+      priorScore: Number(row.prior_score || 0),
+      priorAdjustedPriority: Number(row.prior_adjusted_priority || 0),
+      priorReason: String(row.prior_reason || ''),
+    }
+  }
+
+  return { recoveryByAction, executionsByAction, executorByAction, learningByAction, priorByAction }
 }
