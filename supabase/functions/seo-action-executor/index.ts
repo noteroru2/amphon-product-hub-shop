@@ -94,6 +94,14 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, identity, jobs: result || [] })
     }
 
+    if (operation === 'rollback_claim') {
+      const result = await adminRpc('claim_gsc_rollback_jobs', {
+        p_repository: identity.repository,
+        p_limit: Math.max(1, Math.min(Number(body.limit || 2), 5)),
+      })
+      return json({ ok: true, identity, jobs: result || [] })
+    }
+
     if (operation === 'pr_ready') {
       const result = await adminRpc('list_gsc_executor_pr_ready', {
         p_repository: identity.repository,
@@ -107,6 +115,19 @@ Deno.serve(async (req: Request) => {
       if (!jobId || !outcome) return json({ error: 'MISSING_JOB_OR_OUTCOME' }, 400)
 
       const result = await adminRpc('finish_gsc_executor_job', {
+        p_job_id: jobId,
+        p_outcome: outcome,
+        p_payload: typeof body.payload === 'object' && body.payload !== null ? body.payload : {},
+      })
+      return json({ ok: true, identity, job: result })
+    }
+
+    if (operation === 'rollback_finish') {
+      const jobId = String(body.jobId || '')
+      const outcome = String(body.outcome || '')
+      if (!jobId || !outcome) return json({ error: 'MISSING_JOB_OR_OUTCOME' }, 400)
+
+      const result = await adminRpc('finish_gsc_rollback_job', {
         p_job_id: jobId,
         p_outcome: outcome,
         p_payload: typeof body.payload === 'object' && body.payload !== null ? body.payload : {},
