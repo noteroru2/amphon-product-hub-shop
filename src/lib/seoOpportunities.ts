@@ -107,7 +107,7 @@ export async function listSeoActions(limit = 100): Promise<SeoAction[]> {
   const { data, error } = await supabase
     .from('commerce_gsc_action_queue')
     .select('*')
-    .in('status', ['OPEN', 'APPROVED', 'PROTECTED'])
+    .in('status', ['OPEN', 'APPROVED', 'PROTECTED', 'APPLIED'])
     .order('priority_score', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -129,6 +129,11 @@ export async function setSeoActionStatus(
   return mapAction(data as SeoActionRow)
 }
 
+export async function retrySeoExecutorJob(id: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase.rpc('retry_gsc_executor_job', { p_job_id: id })
+  if (error) throw error
+}
 
 export interface SeoRecoveryDiagnostic {
   actionId: string
@@ -161,6 +166,11 @@ export interface SeoActionExecution {
   repository: string | null
   pullRequestNumber: number | null
   commitSha: string | null
+  baseCommitSha: string | null
+  rollbackCommitSha: string | null
+  diffSha256: string | null
+  changedFiles: string[]
+  riskMode: string | null
   liveUrl: string | null
   appliedAt: string
   monitorStatus: 'MONITORING' | 'ROLLBACK_REVIEW' | 'COMPLETE' | 'STOPPED'
@@ -168,16 +178,42 @@ export interface SeoActionExecution {
   measurements: SeoExecutionMeasurement[]
 }
 
+export interface SeoExecutorJob {
+  id: string
+  actionId: string
+  riskMode: 'AUTO_DEPLOY' | 'PR_ONLY' | 'HUMAN_REVIEW' | 'PROTECT' | 'OBSERVE'
+  status: 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'PR_READY' | 'APPLIED' | 'BLOCKED' | 'PROTECTED' | 'FAILED' | 'CANCELLED'
+  targetRepository: string
+  executionKind: string
+  reason: string
+  attempts: number
+  baseCommitSha: string | null
+  patchCommitSha: string | null
+  rollbackCommitSha: string | null
+  diffSha256: string | null
+  changedFiles: string[]
+  pullRequestNumber: number | null
+  pullRequestUrl: string | null
+  liveVerifiedAt: string | null
+  lastError: string | null
+  updatedAt: string
+}
+
 export interface SeoOpsDetailBundle {
   recoveryByAction: Record<string, SeoRecoveryDiagnostic>
   executionsByAction: Record<string, SeoActionExecution[]>
+  executorByAction: Record<string, SeoExecutorJob>
 }
 
 export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDetailBundle> {
   if (!supabase) throw new Error('Supabase is not configured')
-  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {} }
+  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {}, executorByAction: {} }
 
-  const [{ data: recoveryData, error: recoveryError }, { data: executionData, error: executionError }] = await Promise.all([
+  const [
+    { data: recoveryData, error: recoveryError },
+    { data: executionData, error: executionError },
+    { data: executorData, error: executorError },
+  ] = await Promise.all([
     supabase
       .from('commerce_gsc_recovery_diagnostics')
       .select('*')
@@ -187,9 +223,14 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       .select('*')
       .in('action_id', actionIds)
       .order('applied_at', { ascending: false }),
+    supabase
+      .from('commerce_gsc_executor_jobs')
+      .select('*')
+      .in('action_id', actionIds),
   ])
   if (recoveryError) throw recoveryError
   if (executionError) throw executionError
+  if (executorError) throw executorError
 
   const executions = (executionData || []) as Array<Record<string, any>>
   const executionIds = executions.map((row) => String(row.id))
@@ -247,6 +288,11 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       repository: row.repository ? String(row.repository) : null,
       pullRequestNumber: row.pull_request_number === null ? null : Number(row.pull_request_number),
       commitSha: row.commit_sha ? String(row.commit_sha) : null,
+      baseCommitSha: row.base_commit_sha ? String(row.base_commit_sha) : null,
+      rollbackCommitSha: row.rollback_commit_sha ? String(row.rollback_commit_sha) : null,
+      diffSha256: row.diff_sha256 ? String(row.diff_sha256) : null,
+      changedFiles: Array.isArray(row.changed_files) ? row.changed_files.map(String) : [],
+      riskMode: row.risk_mode ? String(row.risk_mode) : null,
       liveUrl: row.live_url ? String(row.live_url) : null,
       appliedAt: String(row.applied_at || ''),
       monitorStatus: row.monitor_status,
@@ -256,5 +302,29 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
     ;(executionsByAction[actionId] ||= []).push(item)
   }
 
-  return { recoveryByAction, executionsByAction }
+  const executorByAction: Record<string, SeoExecutorJob> = {}
+  for (const row of (executorData || []) as Array<Record<string, any>>) {
+    executorByAction[String(row.action_id)] = {
+      id: String(row.id),
+      actionId: String(row.action_id),
+      riskMode: row.risk_mode,
+      status: row.status,
+      targetRepository: String(row.target_repository || ''),
+      executionKind: String(row.execution_kind || ''),
+      reason: String(row.reason || ''),
+      attempts: Number(row.attempts || 0),
+      baseCommitSha: row.base_commit_sha ? String(row.base_commit_sha) : null,
+      patchCommitSha: row.patch_commit_sha ? String(row.patch_commit_sha) : null,
+      rollbackCommitSha: row.rollback_commit_sha ? String(row.rollback_commit_sha) : null,
+      diffSha256: row.diff_sha256 ? String(row.diff_sha256) : null,
+      changedFiles: Array.isArray(row.changed_files) ? row.changed_files.map(String) : [],
+      pullRequestNumber: row.pull_request_number === null ? null : Number(row.pull_request_number),
+      pullRequestUrl: row.pull_request_url ? String(row.pull_request_url) : null,
+      liveVerifiedAt: row.live_verified_at ? String(row.live_verified_at) : null,
+      lastError: row.last_error ? String(row.last_error) : null,
+      updatedAt: String(row.updated_at || ''),
+    }
+  }
+
+  return { recoveryByAction, executionsByAction, executorByAction }
 }
