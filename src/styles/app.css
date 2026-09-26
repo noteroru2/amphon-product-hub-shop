@@ -388,3 +388,11 @@
 .seo-prior-selector.state-caution,.seo-executor-prior.state-caution{border-color:#fecaca;background:#fff7ed}
 .seo-prior-selector.state-neutral,.seo-executor-prior.state-neutral{border-color:#bfdbfe;background:#eff6ff}
 .seo-prior-selector.state-cold_start,.seo-executor-prior.state-cold_start{border-color:#e2e8f0;background:#f8fafc}
+
+
+/* Causal Attribution + Sitewide Volatility */
+.seo-context-guards{display:flex;flex-wrap:wrap;gap:5px}
+.seo-context-guards small{padding:3px 6px;border:1px solid #cbd5e1;border-radius:999px;background:#f8fafc;font-size:8px;font-weight:800;line-height:1.3}
+.context-causal.status-pass,.context-volatility.status-pass{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.context-causal.status-contaminated,.context-volatility.status-external_shift{border-color:#fecaca;background:#fff7ed;color:#b91c1c}
+.context-causal.status-unknown,.context-volatility.status-unknown{border-color:#fde68a;background:#fffbeb;color:#92400e}

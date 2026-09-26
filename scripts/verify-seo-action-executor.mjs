@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, priorMigration, gateway, client, center] = await Promise.all([
+const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, priorMigration, contextMigration, gateway, client, center] = await Promise.all([
   read('supabase/migrations/20260926060000_seo_action_executor.sql'),
   read('supabase/migrations/20260926161000_seo_auto_rollback_executor.sql'),
   read('supabase/migrations/20260926162500_seo_auto_rollback_claim_hotfix.sql'),
@@ -10,6 +10,7 @@ const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learn
   read('supabase/migrations/20260926171000_seo_learning_recovery_measurement.sql'),
   read('supabase/migrations/20260926172500_seo_recovery_measurement_alias_hotfix_v2.sql'),
   read('supabase/migrations/20260926173500_seo_prior_aware_action_selector.sql'),
+  read('supabase/migrations/20260926175500_seo_causal_volatility_guards.sql'),
   read('supabase/functions/seo-action-executor/index.ts'),
   read('src/lib/seoOpportunities.ts'),
   read('src/components/SeoOpportunityCenter.tsx'),
@@ -58,6 +59,15 @@ const checks = [
   ['claim ordering prefers favorable mature priors without relaxing guards', priorMigration.includes("when 'FAVOR' then 0") && priorMigration.includes("j.guard_code='READY'") && priorMigration.includes('a.priority_score desc')],
   ['executor stores an auditable prior snapshot', priorMigration.includes('prior_state') && priorMigration.includes('selector_prior_state') && priorMigration.includes('refresh_gsc_learning_prior_snapshots')],
   ['Hub exposes prior-aware decisions before approval and in executor snapshot', client.includes('SeoActionPrior') && client.includes('priorByAction') && center.includes('Prior-aware Action Selector') && center.includes('Prior snapshot')],
+  ['site change audit is service-role only and commit bounded', contextMigration.includes('report_gsc_site_changes') && contextMigration.includes('TOO_MANY_COMMITS') && contextMigration.includes('to service_role')],
+  ['causal attribution blocks unrecognized production changes', contextMigration.includes('CAUSAL_CONTAMINATION') && contextMigration.includes('ATTRIBUTION_AUDIT_GAP') && contextMigration.includes('production_files')],
+  ['sitewide volatility compares peer query-page distributions', contextMigration.includes('gsc_sitewide_volatility_context') && contextMigration.includes('percentile_cont(0.5)') && contextMigration.includes('SITEWIDE_VOLATILITY')],
+  ['context guard prevents rollback before rollback trigger sees verdict', contextMigration.includes('before insert or update') && contextMigration.includes("new.rollback_recommended := false") && contextMigration.includes("'CONTAMINATED','EXTERNAL_SHIFT'")],
+  ['recovery learning is blocked by causal or sitewide contamination', contextMigration.includes('gsc_recovery_measurement_context_guard') && contextMigration.includes("new.verdict := 'INSUFFICIENT_DATA'")],
+  ['execution gate neutralizes stale local rollback/recovery state', contextMigration.includes('gsc_execution_context_gate') && contextMigration.includes("new.monitor_status := case") && contextMigration.includes("new.recovery_status := 'MONITORING'")],
+  ['sitewide snapshots are captured before measurements on governance cron', contextMigration.includes('capture_gsc_sitewide_query_snapshots') && contextMigration.includes('refresh_gsc_action_measurements')],
+  ['gateway accepts change audit only after GitHub OIDC authorization', gateway.includes("operation === 'site_change_report'") && gateway.includes("report_gsc_site_changes")],
+  ['Hub exposes causal and sitewide evidence', client.includes('causalStatus') && client.includes('volatilityStatus') && center.includes('Causal {measurement.causalStatus}') && center.includes('Sitewide {measurement.volatilityStatus}')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
@@ -66,4 +76,4 @@ if (failed.length) {
   console.error(`SEO ACTION EXECUTOR verification failed: ${failed.map(([label]) => label).join(', ')}`)
   process.exit(1)
 }
-console.log('SEO ACTION EXECUTOR PASS — safety guards, learning ledger and prior-aware action selector protected')
+console.log('SEO ACTION EXECUTOR PASS — causal attribution, sitewide volatility, learning and prior-aware safety protected')

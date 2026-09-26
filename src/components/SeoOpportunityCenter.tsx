@@ -165,7 +165,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>Measurement Integrity • Prior-aware Selector (ขั้นต่ำ 3 HIGH) • Page Lock • Action Budget 4/24h • Auto Rollback → Recovery → Learning Ledger</span>
+          <span>Measurement Integrity • Causal Attribution • Sitewide Volatility • Prior-aware Selector • Page Lock • Action Budget 4/24h • Auto Rollback → Recovery → Learning</span>
         </div>
       </div>
 
@@ -363,6 +363,23 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                               {measurement.integrityCodes.length > 0 ? ` • ${measurement.integrityCodes.join(', ')}` : ''}
                               {measurement.exposureDays !== null ? ` • exposure ${number(measurement.exposureDays, 1)}d` : ''}
                             </small>
+                            <div className="seo-context-guards">
+                              <small className={`context-causal status-${measurement.causalStatus.toLowerCase()}`}>
+                                Causal {measurement.causalStatus}
+                                {measurement.contaminatingCommitCount > 0 ? ` • commits ${measurement.contaminatingCommitCount}` : ''}
+                              </small>
+                              <small className={`context-volatility status-${measurement.volatilityStatus.toLowerCase()}`}>
+                                Sitewide {measurement.volatilityStatus}
+                                {' • '}peers {measurement.volatilityPeerCount}
+                                {measurement.volatilityMedianPositionDelta !== null ? ` • median Δpos ${number(measurement.volatilityMedianPositionDelta, 2)}` : ''}
+                              </small>
+                            </div>
+                            {measurement.causalReason && measurement.causalStatus !== 'PASS' && (
+                              <small className="seo-integrity-reason">{measurement.causalReason}</small>
+                            )}
+                            {measurement.volatilityReason && measurement.volatilityStatus !== 'PASS' && (
+                              <small className="seo-integrity-reason">{measurement.volatilityReason}</small>
+                            )}
                             {measurement.integrityReason && measurement.integrityStatus === 'BLOCKED' && (
                               <small className="seo-integrity-reason">{measurement.integrityReason}</small>
                             )}
@@ -412,6 +429,22 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                                   {' • '}28D window purity {percent(measurement.windowPurity)}
                                   {measurement.postRollbackExposureDays !== null ? ` • exposure ${number(measurement.postRollbackExposureDays, 1)}d` : ''}
                                 </small>
+                                <div className="seo-context-guards">
+                                  <small className={`context-causal status-${measurement.causalStatus.toLowerCase()}`}>
+                                    Causal {measurement.causalStatus}
+                                    {measurement.contaminatingCommitCount > 0 ? ` • commits ${measurement.contaminatingCommitCount}` : ''}
+                                  </small>
+                                  <small className={`context-volatility status-${measurement.volatilityStatus.toLowerCase()}`}>
+                                    Sitewide {measurement.volatilityStatus}
+                                    {' • '}peers {measurement.volatilityPeerCount}
+                                  </small>
+                                </div>
+                                {measurement.causalReason && measurement.causalStatus !== 'PASS' && (
+                                  <small className="seo-integrity-reason">{measurement.causalReason}</small>
+                                )}
+                                {measurement.volatilityReason && measurement.volatilityStatus !== 'PASS' && (
+                                  <small className="seo-integrity-reason">{measurement.volatilityReason}</small>
+                                )}
                                 {measurement.integrityCodes.length > 0 && (
                                   <small className="seo-integrity-reason">{measurement.integrityCodes.join(', ')}</small>
                                 )}
