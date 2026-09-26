@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, rollbackMigration, gateway, client, center] = await Promise.all([
+const [migration, rollbackMigration, rollbackClaimHotfix, gateway, client, center] = await Promise.all([
   read('supabase/migrations/20260926060000_seo_action_executor.sql'),
   read('supabase/migrations/20260926161000_seo_auto_rollback_executor.sql'),
+  read('supabase/migrations/20260926162500_seo_auto_rollback_claim_hotfix.sql'),
   read('supabase/functions/seo-action-executor/index.ts'),
   read('src/lib/seoOpportunities.ts'),
   read('src/components/SeoOpportunityCenter.tsx'),
@@ -27,6 +28,7 @@ const checks = [
   ['rollback completion requires live verification', rollbackMigration.includes('ROLLBACK_LIVE_VERIFICATION_REQUIRED')],
   ['rollback never resumes monitoring after success', rollbackMigration.includes("monitor_status=case when p_outcome='ROLLED_BACK' then 'STOPPED'")],
   ['rollback RPCs are service-role only', rollbackMigration.includes('claim_gsc_rollback_jobs') && rollbackMigration.includes('finish_gsc_rollback_job') && rollbackMigration.includes('to service_role')],
+  ['rollback claim uses a cross-statement lease token', rollbackClaimHotfix.includes('v_claim_token') && rollbackClaimHotfix.includes('r.lease_token=v_claim_token')],
   ['gateway exposes rollback claim/finish to GitHub OIDC only', gateway.includes("operation === 'rollback_claim'") && gateway.includes("operation === 'rollback_finish'")],
   ['Hub exposes automatic rollback lifecycle', client.includes('rollbackActualCommitSha') && center.includes('Auto Rollback') && center.includes('ROLLED_BACK')],
 ]
