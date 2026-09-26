@@ -320,3 +320,21 @@
   .merchant-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .trust-review-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* SEO Action Executor */
+.seo-action-status.status-applied{background:#ecfdf5;color:#047857}
+.seo-executor-panel{display:grid;gap:7px;padding:10px 11px;border:1px solid #dbeafe;border-radius:12px;background:#f8fbff}
+.seo-executor-panel.mode-auto_deploy{border-color:#bbf7d0;background:#f0fdf4}
+.seo-executor-panel.mode-pr_only{border-color:#ddd6fe;background:#faf5ff}
+.seo-executor-panel.mode-human_review{border-color:#fde68a;background:#fffbeb}
+.seo-executor-panel.mode-protect{border-color:#bbf7d0;background:#f0fdf4}
+.seo-executor-panel.status-failed{border-color:#fecaca;background:#fff1f2}
+.seo-executor-panel.status-blocked{border-color:#fde68a;background:#fffbeb}
+.seo-executor-panel p{margin:0;font-size:9px;line-height:1.55;color:#475569}
+.seo-executor-artifacts{display:flex;flex-wrap:wrap;gap:5px}
+.seo-executor-artifacts>span{font-size:8px;line-height:1.45;color:#475569;background:rgba(255,255,255,.75);border:1px solid rgba(148,163,184,.22);border-radius:8px;padding:5px 7px;overflow-wrap:anywhere}
+.seo-executor-artifacts code{font-size:8px;color:#0f172a}
+.seo-executor-pr{display:inline-flex;width:max-content;max-width:100%;align-items:center;gap:5px;font-size:9px;font-weight:800;color:#5b21b6;text-decoration:none}
+.seo-executor-error{padding:7px 8px;border:1px solid #fecaca;border-radius:9px;background:#fff;color:#b91c1c;font-size:8px;line-height:1.5;overflow-wrap:anywhere}
+.seo-executor-retry{display:inline-flex;width:max-content;align-items:center;gap:5px;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:9px;padding:7px 9px;font-size:8px;font-weight:800}
