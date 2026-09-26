@@ -22,6 +22,7 @@ import {
   type SeoActionType,
   type SeoActionExecution,
   type SeoExecutorJob,
+  type SeoLearningLedger,
   type SeoRecoveryDiagnostic,
 } from '../lib/seoOpportunities'
 
@@ -74,6 +75,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
   const [recoveryByAction, setRecoveryByAction] = useState<Record<string, SeoRecoveryDiagnostic>>({})
   const [executionsByAction, setExecutionsByAction] = useState<Record<string, SeoActionExecution[]>>({})
   const [executorByAction, setExecutorByAction] = useState<Record<string, SeoExecutorJob>>({})
+  const [learningByAction, setLearningByAction] = useState<Record<string, SeoLearningLedger>>({})
 
   async function load() {
     setLoading(true)
@@ -85,6 +87,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
       setRecoveryByAction(details.recoveryByAction)
       setExecutionsByAction(details.executionsByAction)
       setExecutorByAction(details.executorByAction)
+      setLearningByAction(details.learningByAction)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -101,13 +104,17 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
     [items, filter],
   )
 
-  const summary = useMemo(() => ({
-    open: items.filter((item) => item.status === 'OPEN').length,
-    protect: items.filter((item) => item.status === 'PROTECTED').length,
-    meta: items.filter((item) => item.actionType === 'META_REVIEW').length,
-    links: items.filter((item) => item.actionType === 'INTERNAL_LINK_BOOST').length,
-    recovery: items.filter((item) => item.actionType === 'RECOVERY_PLAN').length,
-  }), [items])
+  const summary = useMemo(() => {
+    const learning = Object.values(learningByAction)
+    return {
+      open: items.filter((item) => item.status === 'OPEN').length,
+      protect: items.filter((item) => item.status === 'PROTECTED').length,
+      meta: items.filter((item) => item.actionType === 'META_REVIEW').length,
+      links: items.filter((item) => item.actionType === 'INTERNAL_LINK_BOOST').length,
+      learned: learning.filter((item) => item.confidence === 'HIGH').length,
+      harm: learning.filter((item) => item.learningSignal === 'HARM_CONFIRMED' || item.learningSignal === 'HARM_LIKELY').length,
+    }
+  }, [items, learningByAction])
 
   async function setStatus(item: SeoAction, status: Exclude<SeoActionStatus, 'STALE'>) {
     setBusyId(item.id)
@@ -154,7 +161,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>Measurement Integrity • 1 URL = 1 active experiment • Action Budget 4/24h • REGRESSED → Auto Rollback • H1 / URL / Canonical ถูกล็อก</span>
+          <span>Measurement Integrity • 1 URL = 1 active experiment • Action Budget 4/24h • REGRESSED → Auto Rollback → Recovery 7/14/28D → Learning Ledger</span>
         </div>
       </div>
 
@@ -163,7 +170,8 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <div><span>Protect</span><strong>{summary.protect}</strong></div>
         <div><span>CTR</span><strong>{summary.meta}</strong></div>
         <div><span>Link Boost</span><strong>{summary.links}</strong></div>
-        <div><span>Recovery</span><strong>{summary.recovery}</strong></div>
+        <div><span>Learned High</span><strong>{summary.learned}</strong></div>
+        <div><span>Harm signal</span><strong>{summary.harm}</strong></div>
       </div>
 
       <div className="seo-action-filters" role="tablist" aria-label="ตัวกรอง SEO">
@@ -337,9 +345,72 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                         {execution.rollbackError && <div className="seo-executor-error">{execution.rollbackError}</div>}
                       </div>
                     )}
+                    {execution.recoveryStatus !== 'NONE' && (
+                      <div className={`seo-recovery-measurement status-${execution.recoveryStatus.toLowerCase()}`}>
+                        <div className="seo-auto-rollback-head">
+                          <strong>Rollback Recovery Measurement</strong>
+                          <span>{execution.recoveryStatus}</span>
+                        </div>
+                        {execution.recoveryLockUntil && (
+                          <small>Page Lock ถึงไม่เกิน {new Date(execution.recoveryLockUntil).toLocaleString('th-TH')} หรือปลดก่อนเมื่อ 28D ผ่าน</small>
+                        )}
+                        {execution.recoveryMeasurements.length > 0 ? (
+                          <div className="seo-measurement-chips">
+                            {execution.recoveryMeasurements.map((measurement) => (
+                              <div className="seo-measurement-entry" key={measurement.checkpointDays}>
+                                <span className={`recovery-verdict-${measurement.verdict.toLowerCase()}`}>
+                                  {measurement.checkpointDays}D {measurement.maturity} • {measurement.verdict}
+                                  {' • '}Pos vs trigger {measurement.positionDeltaVsTrigger > 0 ? '+' : ''}{number(measurement.positionDeltaVsTrigger, 2)}
+                                </span>
+                                <small className={`seo-integrity-status integrity-${measurement.integrityStatus.toLowerCase()}`}>
+                                  Integrity {measurement.integrityStatus}
+                                  {' • '}28D window purity {percent(measurement.windowPurity)}
+                                  {measurement.postRollbackExposureDays !== null ? ` • exposure ${number(measurement.postRollbackExposureDays, 1)}d` : ''}
+                                </small>
+                                {measurement.integrityCodes.length > 0 && (
+                                  <small className="seo-integrity-reason">{measurement.integrityCodes.join(', ')}</small>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <small>รอ Recovery checkpoint 7 / 14 / 28 วันหลัง rollback</small>
+                        )}
+                        {execution.recoveryFinalVerdict && (
+                          <small>Final recovery: <strong>{execution.recoveryFinalVerdict}</strong></small>
+                        )}
+                      </div>
+                    )}
                     {execution.rollbackReviewReason && <div className="seo-rollback-note">{execution.rollbackReviewReason}</div>}
                   </div>
                 ))}
+
+                {learningByAction[item.id] && (() => {
+                  const learning = learningByAction[item.id]
+                  return (
+                    <div className={`seo-learning-ledger signal-${learning.learningSignal.toLowerCase()}`}>
+                      <div className="seo-recovery-head">
+                        <strong>SEO Learning Ledger</strong>
+                        <span>{learning.learningSignal.replaceAll('_', ' ')}</span>
+                      </div>
+                      <small>
+                        Confidence {learning.confidence}
+                        {' • '}Evidence {learning.evidenceCount}
+                        {learning.latestActionCheckpointDays ? ` • Action ${learning.latestActionCheckpointDays}D ${learning.latestActionVerdict || ''}` : ''}
+                      </small>
+                      {learning.rollbackTriggered && (
+                        <small>
+                          Rollback trigger {learning.rollbackTriggerCheckpointDays || '—'}D
+                          {learning.latestRecoveryCheckpointDays ? ` • Recovery ${learning.latestRecoveryCheckpointDays}D ${learning.latestRecoveryVerdict || ''}` : ' • รอ Recovery evidence'}
+                        </small>
+                      )}
+                      <small>
+                        Learning weight {number(learning.signalWeight, 2)}
+                        {' • '}Confidence weight {number(learning.confidenceWeight, 2)}
+                      </small>
+                    </div>
+                  )
+                })()}
 
                 {(item.candidateTitle || item.candidateDescription || item.candidateNotes) && (
                   <div className="seo-action-candidate">
