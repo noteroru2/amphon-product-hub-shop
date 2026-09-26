@@ -213,10 +213,16 @@ begin
     );
   end if;
 
-  select coalesce(max(p.causal_audit_required),true)
-  into v_required
-  from public.commerce_gsc_executor_policy p
-  where p.repository=coalesce(e.repository,'noteroru2/amphon.co.th');
+  select coalesce(
+    (
+      select p.causal_audit_required
+      from public.commerce_gsc_executor_policy p
+      where p.repository=coalesce(e.repository,'noteroru2/amphon.co.th')
+      limit 1
+    ),
+    true
+  )
+  into v_required;
 
   if not v_required then
     return jsonb_build_object(
