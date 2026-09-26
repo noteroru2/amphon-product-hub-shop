@@ -21,6 +21,7 @@ import {
   type SeoActionStatus,
   type SeoActionType,
   type SeoActionExecution,
+  type SeoActionPrior,
   type SeoExecutorJob,
   type SeoLearningLedger,
   type SeoRecoveryDiagnostic,
@@ -76,6 +77,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
   const [executionsByAction, setExecutionsByAction] = useState<Record<string, SeoActionExecution[]>>({})
   const [executorByAction, setExecutorByAction] = useState<Record<string, SeoExecutorJob>>({})
   const [learningByAction, setLearningByAction] = useState<Record<string, SeoLearningLedger>>({})
+  const [priorByAction, setPriorByAction] = useState<Record<string, SeoActionPrior>>({})
 
   async function load() {
     setLoading(true)
@@ -88,6 +90,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
       setExecutionsByAction(details.executionsByAction)
       setExecutorByAction(details.executorByAction)
       setLearningByAction(details.learningByAction)
+      setPriorByAction(details.priorByAction)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -106,15 +109,16 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
 
   const summary = useMemo(() => {
     const learning = Object.values(learningByAction)
+    const priors = Object.values(priorByAction)
     return {
       open: items.filter((item) => item.status === 'OPEN').length,
       protect: items.filter((item) => item.status === 'PROTECTED').length,
       meta: items.filter((item) => item.actionType === 'META_REVIEW').length,
-      links: items.filter((item) => item.actionType === 'INTERNAL_LINK_BOOST').length,
+      favor: priors.filter((item) => item.priorState === 'FAVOR').length,
+      caution: priors.filter((item) => item.priorState === 'CAUTION').length,
       learned: learning.filter((item) => item.confidence === 'HIGH').length,
-      harm: learning.filter((item) => item.learningSignal === 'HARM_CONFIRMED' || item.learningSignal === 'HARM_LIKELY').length,
     }
-  }, [items, learningByAction])
+  }, [items, learningByAction, priorByAction])
 
   async function setStatus(item: SeoAction, status: Exclude<SeoActionStatus, 'STALE'>) {
     setBusyId(item.id)
@@ -161,7 +165,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>Measurement Integrity • 1 URL = 1 active experiment • Action Budget 4/24h • REGRESSED → Auto Rollback → Recovery 7/14/28D → Learning Ledger</span>
+          <span>Measurement Integrity • Prior-aware Selector (ขั้นต่ำ 3 HIGH) • Page Lock • Action Budget 4/24h • Auto Rollback → Recovery → Learning Ledger</span>
         </div>
       </div>
 
@@ -169,9 +173,9 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <div><span>รอดำเนินการ</span><strong>{summary.open}</strong></div>
         <div><span>Protect</span><strong>{summary.protect}</strong></div>
         <div><span>CTR</span><strong>{summary.meta}</strong></div>
-        <div><span>Link Boost</span><strong>{summary.links}</strong></div>
+        <div><span>Prior FAVOR</span><strong>{summary.favor}</strong></div>
+        <div><span>Prior CAUTION</span><strong>{summary.caution}</strong></div>
         <div><span>Learned High</span><strong>{summary.learned}</strong></div>
-        <div><span>Harm signal</span><strong>{summary.harm}</strong></div>
       </div>
 
       <div className="seo-action-filters" role="tablist" aria-label="ตัวกรอง SEO">
@@ -227,6 +231,35 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                   {item.queryCount > 1 && <small>รวม {item.queryCount} query variants ที่ชี้ URL เดียวกัน</small>}
                 </div>
 
+                {priorByAction[item.id] && (() => {
+                  const prior = priorByAction[item.id]
+                  return (
+                    <div className={`seo-prior-selector state-${prior.priorState.toLowerCase()}`}>
+                      <div className="seo-recovery-head">
+                        <strong>Prior-aware Action Selector</strong>
+                        <span>{prior.priorState.replaceAll('_', ' ')}</span>
+                      </div>
+                      <p>{prior.priorReason}</p>
+                      <small>
+                        Scope {prior.priorScope.replaceAll('_', ' ')}
+                        {' • '}Score {number(prior.priorScore, 3)}
+                        {' • '}HIGH {prior.highConfidenceExperiments}/{prior.experiments}
+                      </small>
+                      <small>
+                        Benefit {prior.benefitConfirmed}
+                        {' • '}Harm directional {prior.harmDirectional}
+                        {' • '}Priority {number(item.priorityScore, 1)} → {number(prior.priorAdjustedPriority, 1)}
+                      </small>
+                      {prior.priorState === 'FAVOR' && (
+                        <small>ใช้ prior เพื่อจัดคิวงานที่ผ่าน hard guards แล้วให้มาก่อนเท่านั้น — ไม่ปลด safety guard</small>
+                      )}
+                      {prior.priorState === 'CAUTION' && (
+                        <small>ระบบลดระดับ mutation อัตโนมัติเป็น Human Review จนกว่าจะมีหลักฐานใหม่เปลี่ยน prior</small>
+                      )}
+                    </div>
+                  )
+                })()}
+
                 {recoveryByAction[item.id] && (
                   <div className={`seo-recovery-diagnostic ${recoveryByAction[item.id].requiresHumanReview ? 'review-required' : 'auto-safe'}`}>
                     <div className="seo-recovery-head">
@@ -252,6 +285,18 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                         <span>{EXECUTOR_MODE_LABEL[job.riskMode]} • {job.status}</span>
                       </div>
                       <p>{job.reason}</p>
+                      <div className={`seo-executor-prior state-${job.priorState.toLowerCase()}`}>
+                        <div className="seo-auto-rollback-head">
+                          <strong>Prior snapshot</strong>
+                          <span>{job.priorState}</span>
+                        </div>
+                        {job.priorReason && <small>{job.priorReason}</small>}
+                        <small>
+                          {job.priorScope.replaceAll('_', ' ')}
+                          {' • '}score {number(job.priorScore, 3)}
+                          {' • '}HIGH {job.priorHighConfidenceExperiments}/{job.priorExperiments}
+                        </small>
+                      </div>
                       <div className={`seo-executor-guard guard-${job.guardCode.toLowerCase()}`}>
                         <div className="seo-auto-rollback-head">
                           <strong>Execution Safety Guard</strong>

@@ -378,3 +378,13 @@
 .recovery-verdict-partial_recovery{color:#a16207;font-weight:800}
 .recovery-verdict-not_recovered,.recovery-verdict-further_regressed{color:#b91c1c;font-weight:800}
 .recovery-verdict-insufficient_data{color:#9a3412;font-weight:800}
+
+
+/* Prior-aware Action Selector */
+.seo-prior-selector,.seo-executor-prior{display:grid;gap:6px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc}
+.seo-prior-selector p{margin:0;font-size:9px;line-height:1.5;color:#334155}
+.seo-prior-selector small,.seo-executor-prior small{font-size:8px;line-height:1.5;color:#475569}
+.seo-prior-selector.state-favor,.seo-executor-prior.state-favor{border-color:#bbf7d0;background:#f0fdf4}
+.seo-prior-selector.state-caution,.seo-executor-prior.state-caution{border-color:#fecaca;background:#fff7ed}
+.seo-prior-selector.state-neutral,.seo-executor-prior.state-neutral{border-color:#bfdbfe;background:#eff6ff}
+.seo-prior-selector.state-cold_start,.seo-executor-prior.state-cold_start{border-color:#e2e8f0;background:#f8fafc}

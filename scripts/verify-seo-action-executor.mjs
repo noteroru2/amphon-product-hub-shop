@@ -2,13 +2,14 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, gateway, client, center] = await Promise.all([
+const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, priorMigration, gateway, client, center] = await Promise.all([
   read('supabase/migrations/20260926060000_seo_action_executor.sql'),
   read('supabase/migrations/20260926161000_seo_auto_rollback_executor.sql'),
   read('supabase/migrations/20260926162500_seo_auto_rollback_claim_hotfix.sql'),
   read('supabase/migrations/20260926163000_seo_measurement_page_lock_budget.sql'),
   read('supabase/migrations/20260926171000_seo_learning_recovery_measurement.sql'),
   read('supabase/migrations/20260926172500_seo_recovery_measurement_alias_hotfix_v2.sql'),
+  read('supabase/migrations/20260926173500_seo_prior_aware_action_selector.sql'),
   read('supabase/functions/seo-action-executor/index.ts'),
   read('src/lib/seoOpportunities.ts'),
   read('src/components/SeoOpportunityCenter.tsx'),
@@ -50,6 +51,13 @@ const checks = [
   ['Learning Ledger confidence is maturity weighted', learningMigration.includes("when 'HIGH' then 1.0") && learningMigration.includes("when 'MEDIUM' then 0.6") && learningMigration.includes("when 'LOW' then 0.3")],
   ['Learning summary aggregates action priors without auto-applying them', learningMigration.includes('commerce_gsc_learning_summary_v') && learningMigration.includes('learning_score')],
   ['Hub exposes Recovery Measurement and Learning Ledger', client.includes('SeoRollbackRecoveryMeasurement') && client.includes('SeoLearningLedger') && center.includes('Rollback Recovery Measurement') && center.includes('SEO Learning Ledger')],
+  ['prior selector requires at least 3 HIGH-confidence experiments', priorMigration.includes('prior_min_high_confidence_experiments=3') && priorMigration.includes("l.confidence='HIGH'") && priorMigration.includes("'COLD_START'")],
+  ['positive priors only reorder already-safe automatic jobs', priorMigration.includes("'FAVOR'") && priorMigration.includes('prior_adjusted_priority') && priorMigration.includes("j.risk_mode in ('AUTO_DEPLOY','PR_ONLY')")],
+  ['negative mature priors only make execution stricter', priorMigration.includes("'CAUTION'") && priorMigration.includes("then 'HUMAN_REVIEW'") && priorMigration.includes("then 'BLOCKED'")],
+  ['prior selector never promotes Recovery/Protect or bypasses base guards', priorMigration.includes("when e.action_type='PROTECT_PAGE' then 'PROTECT'") && priorMigration.includes("when e.action_type='RECOVERY_PLAN' then 'HUMAN_REVIEW'")],
+  ['claim ordering prefers favorable mature priors without relaxing guards', priorMigration.includes("when 'FAVOR' then 0") && priorMigration.includes("j.guard_code='READY'") && priorMigration.includes('a.priority_score desc')],
+  ['executor stores an auditable prior snapshot', priorMigration.includes('prior_state') && priorMigration.includes('selector_prior_state') && priorMigration.includes('refresh_gsc_learning_prior_snapshots')],
+  ['Hub exposes prior-aware decisions before approval and in executor snapshot', client.includes('SeoActionPrior') && client.includes('priorByAction') && center.includes('Prior-aware Action Selector') && center.includes('Prior snapshot')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
@@ -58,4 +66,4 @@ if (failed.length) {
   console.error(`SEO ACTION EXECUTOR verification failed: ${failed.map(([label]) => label).join(', ')}`)
   process.exit(1)
 }
-console.log('SEO ACTION EXECUTOR PASS — safety guards, rollback recovery measurement and learning ledger protected')
+console.log('SEO ACTION EXECUTOR PASS — safety guards, learning ledger and prior-aware action selector protected')
