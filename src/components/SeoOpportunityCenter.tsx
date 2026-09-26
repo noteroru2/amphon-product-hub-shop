@@ -15,11 +15,13 @@ import {
 import {
   listSeoActions,
   loadSeoOpsDetails,
+  retrySeoExecutorJob,
   setSeoActionStatus,
   type SeoAction,
   type SeoActionStatus,
   type SeoActionType,
   type SeoActionExecution,
+  type SeoExecutorJob,
   type SeoRecoveryDiagnostic,
 } from '../lib/seoOpportunities'
 
@@ -42,6 +44,18 @@ function number(value: number, digits = 0) {
   return new Intl.NumberFormat('th-TH', { maximumFractionDigits: digits }).format(value)
 }
 
+function shortSha(value: string | null) {
+  return value ? value.slice(0, 10) : '—'
+}
+
+const EXECUTOR_MODE_LABEL: Record<SeoExecutorJob['riskMode'], string> = {
+  AUTO_DEPLOY: 'AUTO DEPLOY',
+  PR_ONLY: 'PR ONLY',
+  HUMAN_REVIEW: 'HUMAN REVIEW',
+  PROTECT: 'NO MUTATION',
+  OBSERVE: 'OBSERVE',
+}
+
 function pageLabel(url: string) {
   try {
     const parsed = new URL(url)
@@ -59,6 +73,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [recoveryByAction, setRecoveryByAction] = useState<Record<string, SeoRecoveryDiagnostic>>({})
   const [executionsByAction, setExecutionsByAction] = useState<Record<string, SeoActionExecution[]>>({})
+  const [executorByAction, setExecutorByAction] = useState<Record<string, SeoExecutorJob>>({})
 
   async function load() {
     setLoading(true)
@@ -69,6 +84,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
       const details = await loadSeoOpsDetails(nextItems.map((item) => item.id))
       setRecoveryByAction(details.recoveryByAction)
       setExecutionsByAction(details.executionsByAction)
+      setExecutorByAction(details.executorByAction)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -97,8 +113,21 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
     setBusyId(item.id)
     setError(null)
     try {
-      const updated = await setSeoActionStatus(item.id, status)
-      setItems((current) => current.map((row) => row.id === updated.id ? updated : row))
+      await setSeoActionStatus(item.id, status)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function retryExecutor(job: SeoExecutorJob) {
+    setBusyId(job.actionId)
+    setError(null)
+    try {
+      await retrySeoExecutorJob(job.id)
+      await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -125,7 +154,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>ระบบอ่าน Query จริงและสร้างงาน แต่ไม่ rewrite Title / H1 / URL / Canonical เอง</span>
+          <span>Link Boost ที่ผ่าน Guard ทำอัตโนมัติ • Meta สร้าง PR ให้ตรวจ • Recovery เสี่ยงต้อง Human Review • H1 / URL / Canonical ถูกล็อก</span>
         </div>
       </div>
 
@@ -204,6 +233,43 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                     </small>
                   </div>
                 )}
+
+                {executorByAction[item.id] && (() => {
+                  const job = executorByAction[item.id]
+                  const retryable = job.status === 'FAILED' && (job.riskMode === 'AUTO_DEPLOY' || job.riskMode === 'PR_ONLY')
+                  return (
+                    <div className={`seo-executor-panel mode-${job.riskMode.toLowerCase()} status-${job.status.toLowerCase()}`}>
+                      <div className="seo-recovery-head">
+                        <strong>SEO Action Executor</strong>
+                        <span>{EXECUTOR_MODE_LABEL[job.riskMode]} • {job.status}</span>
+                      </div>
+                      <p>{job.reason}</p>
+                      <div className="seo-executor-artifacts">
+                        <span>Repo <strong>{job.targetRepository}</strong></span>
+                        {job.patchCommitSha && <span>Commit <code>{shortSha(job.patchCommitSha)}</code></span>}
+                        {job.rollbackCommitSha && <span>Rollback <code>{shortSha(job.rollbackCommitSha)}</code></span>}
+                        {job.diffSha256 && <span>Diff SHA <code>{shortSha(job.diffSha256)}</code></span>}
+                        {job.changedFiles.length > 0 && <span>Files <strong>{job.changedFiles.join(', ')}</strong></span>}
+                        {job.liveVerifiedAt && <span>Live verified <strong>{new Date(job.liveVerifiedAt).toLocaleString('th-TH')}</strong></span>}
+                      </div>
+                      {job.pullRequestUrl && (
+                        <a className="seo-executor-pr" href={job.pullRequestUrl} target="_blank" rel="noreferrer">
+                          ตรวจ PR #{job.pullRequestNumber} <ExternalLink size={12} />
+                        </a>
+                      )}
+                      {job.lastError && <div className="seo-executor-error">{job.lastError}</div>}
+                      {retryable && (
+                        <button
+                          className="seo-executor-retry"
+                          disabled={busy}
+                          onClick={() => void retryExecutor(job)}
+                        >
+                          {busy ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />} ลอง Executor อีกครั้ง
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {(executionsByAction[item.id] || []).slice(0, 1).map((execution) => (
                   <div className={`seo-measurement-panel monitor-${execution.monitorStatus.toLowerCase()}`} key={execution.id}>
