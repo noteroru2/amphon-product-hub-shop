@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, priorMigration, contextMigration, gateway, client, center] = await Promise.all([
+const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learningMigration, recoveryHotfixV2, priorMigration, contextMigration, towerMigration, gateway, client, center, towerClient, towerCenter, app] = await Promise.all([
   read('supabase/migrations/20260926060000_seo_action_executor.sql'),
   read('supabase/migrations/20260926161000_seo_auto_rollback_executor.sql'),
   read('supabase/migrations/20260926162500_seo_auto_rollback_claim_hotfix.sql'),
@@ -11,9 +11,13 @@ const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, learn
   read('supabase/migrations/20260926172500_seo_recovery_measurement_alias_hotfix_v2.sql'),
   read('supabase/migrations/20260926173500_seo_prior_aware_action_selector.sql'),
   read('supabase/migrations/20260926175500_seo_causal_volatility_guards.sql'),
+  read('supabase/migrations/20260926182500_seo_control_tower_alerting.sql'),
   read('supabase/functions/seo-action-executor/index.ts'),
   read('src/lib/seoOpportunities.ts'),
   read('src/components/SeoOpportunityCenter.tsx'),
+  read('src/lib/seoControlTower.ts'),
+  read('src/components/SeoControlTower.tsx'),
+  read('src/App.tsx'),
 ])
 
 const checks = [
@@ -68,6 +72,13 @@ const checks = [
   ['sitewide snapshots are captured before measurements on governance cron', contextMigration.includes('capture_gsc_sitewide_query_snapshots') && contextMigration.includes('refresh_gsc_action_measurements')],
   ['gateway accepts change audit only after GitHub OIDC authorization', gateway.includes("operation === 'site_change_report'") && gateway.includes("report_gsc_site_changes")],
   ['Hub exposes causal and sitewide evidence', client.includes('causalStatus') && client.includes('volatilityStatus') && center.includes('Causal {measurement.causalStatus}') && center.includes('Sitewide {measurement.volatilityStatus}')],
+  ['Control Tower unifies experiment/rollback/recovery/learning state', towerMigration.includes('commerce_seo_control_tower_experiments_v') && towerMigration.includes('commerce_seo_control_tower_summary_v') && towerMigration.includes('learning_signal')],
+  ['alert engine covers failures, regression, causal, volatility and overdue checkpoints', towerMigration.includes('EXECUTOR_FAILED') && towerMigration.includes('ROLLBACK_PROBLEM') && towerMigration.includes('CAUSAL_CONTAMINATION') && towerMigration.includes('SITEWIDE_VOLATILITY') && towerMigration.includes('EXPERIMENT_OVERDUE')],
+  ['alerts are per-occurrence acknowledgements and can reopen unread', towerMigration.includes('generation integer') && towerMigration.includes('commerce_seo_alert_receipts') && towerMigration.includes('then public.commerce_seo_alerts.generation+1')],
+  ['alert mutations are RPC-gated for owner/admin', towerMigration.includes('acknowledge_commerce_seo_alert') && towerMigration.includes("current_user_role() not in ('owner','admin')")],
+  ['governance refreshes alerts every 15 minutes after measurements and guards', towerMigration.includes('refresh_commerce_seo_alerts') && towerMigration.includes('*/15 * * * *')],
+  ['Hub exposes Control Tower, alert inbox and acknowledgement actions', towerClient.includes('loadSeoControlTower') && towerClient.includes('acknowledgeSeoAlert') && towerCenter.includes('Control Tower') && towerCenter.includes('Active Experiments')],
+  ['Hub home polls and badges unread SEO alerts', app.includes('loadSeoAlertUnreadCount') && app.includes('seoAlertUnread') && app.includes('SEO Control Tower')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
@@ -76,4 +87,4 @@ if (failed.length) {
   console.error(`SEO ACTION EXECUTOR verification failed: ${failed.map(([label]) => label).join(', ')}`)
   process.exit(1)
 }
-console.log('SEO ACTION EXECUTOR PASS — causal attribution, sitewide volatility, learning and prior-aware safety protected')
+console.log('SEO ACTION EXECUTOR PASS — causal, volatility, control tower, alerting, learning and prior-aware safety protected')
