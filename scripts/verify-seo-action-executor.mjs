@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-const [migration, rollbackMigration, rollbackClaimHotfix, gateway, client, center] = await Promise.all([
+const [migration, rollbackMigration, rollbackClaimHotfix, safetyMigration, gateway, client, center] = await Promise.all([
   read('supabase/migrations/20260926060000_seo_action_executor.sql'),
   read('supabase/migrations/20260926161000_seo_auto_rollback_executor.sql'),
   read('supabase/migrations/20260926162500_seo_auto_rollback_claim_hotfix.sql'),
+  read('supabase/migrations/20260926163000_seo_measurement_page_lock_budget.sql'),
   read('supabase/functions/seo-action-executor/index.ts'),
   read('src/lib/seoOpportunities.ts'),
   read('src/components/SeoOpportunityCenter.tsx'),
@@ -31,6 +32,13 @@ const checks = [
   ['rollback claim uses a cross-statement lease token', rollbackClaimHotfix.includes('v_claim_token') && rollbackClaimHotfix.includes('r.lease_token=v_claim_token')],
   ['gateway exposes rollback claim/finish to GitHub OIDC only', gateway.includes("operation === 'rollback_claim'") && gateway.includes("operation === 'rollback_finish'")],
   ['Hub exposes automatic rollback lifecycle', client.includes('rollbackActualCommitSha') && center.includes('Auto Rollback') && center.includes("execution.rollbackStatus !== 'NONE'")],
+  ['measurement integrity uses aligned primary query snapshots', safetyMigration.includes('baseline_query_impressions') && safetyMigration.includes("lower(d.query)=lower(e.primary_query)") && !safetyMigration.includes('commerce_gsc_opportunity_v o')],
+  ['measurement integrity blocks rollback on bad evidence', safetyMigration.includes("'INSUFFICIENT_DATA'") && safetyMigration.includes("'STALE_SOURCE'") && safetyMigration.includes("'LOW_CURRENT_SAMPLE'") && safetyMigration.includes('v_integrity=\'BLOCKED\'')],
+  ['query mix and traffic anomaly guards are enforced', safetyMigration.includes("'QUERY_MIX_SHIFT'") && safetyMigration.includes("'TRAFFIC_ANOMALY'")],
+  ['page experiment lock is enforced with hard unique backstop', safetyMigration.includes("'PAGE_EXPERIMENT_LOCK'") && safetyMigration.includes('commerce_gsc_active_page_experiment_uidx')],
+  ['action budget is rolling 24h and configurable', safetyMigration.includes('max_actions_24h') && safetyMigration.includes("now()-interval '24 hours'") && safetyMigration.includes("'ACTION_BUDGET'")],
+  ['executor claims are serialized and budget capped', safetyMigration.includes('pg_advisory_xact_lock') && safetyMigration.includes('v_remaining') && safetyMigration.includes('page_rank=1')],
+  ['Hub exposes safety guards and integrity status', client.includes('guardCode') && client.includes('integrityStatus') && center.includes('Execution Safety Guard') && center.includes('Integrity {measurement.integrityStatus}')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
