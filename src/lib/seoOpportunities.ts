@@ -175,6 +175,12 @@ export interface SeoActionExecution {
   appliedAt: string
   monitorStatus: 'MONITORING' | 'ROLLBACK_REVIEW' | 'COMPLETE' | 'STOPPED'
   rollbackReviewReason: string | null
+  rollbackStatus: 'NONE' | 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'ROLLED_BACK' | 'BLOCKED' | 'FAILED'
+  rollbackTriggerMeasurementId: string | null
+  rollbackActualCommitSha: string | null
+  rollbackActualDiffSha256: string | null
+  rolledBackAt: string | null
+  rollbackError: string | null
   measurements: SeoExecutionMeasurement[]
 }
 
@@ -297,6 +303,12 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       appliedAt: String(row.applied_at || ''),
       monitorStatus: row.monitor_status,
       rollbackReviewReason: row.rollback_review_reason ? String(row.rollback_review_reason) : null,
+      rollbackStatus: row.rollback_status || 'NONE',
+      rollbackTriggerMeasurementId: row.rollback_trigger_measurement_id ? String(row.rollback_trigger_measurement_id) : null,
+      rollbackActualCommitSha: row.rollback_actual_commit_sha ? String(row.rollback_actual_commit_sha) : null,
+      rollbackActualDiffSha256: row.rollback_actual_diff_sha256 ? String(row.rollback_actual_diff_sha256) : null,
+      rolledBackAt: row.rolled_back_at ? String(row.rolled_back_at) : null,
+      rollbackError: row.rollback_error ? String(row.rollback_error) : null,
       measurements: measurementsByExecution.get(String(row.id)) || [],
     }
     ;(executionsByAction[actionId] ||= []).push(item)
