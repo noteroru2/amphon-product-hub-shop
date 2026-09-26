@@ -154,7 +154,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>Link Boost ที่ผ่าน Guard ทำอัตโนมัติ • Meta สร้าง PR ให้ตรวจ • Recovery เสี่ยงต้อง Human Review • REGRESSED → Auto Rollback • H1 / URL / Canonical ถูกล็อก</span>
+          <span>Measurement Integrity • 1 URL = 1 active experiment • Action Budget 4/24h • REGRESSED → Auto Rollback • H1 / URL / Canonical ถูกล็อก</span>
         </div>
       </div>
 
@@ -244,6 +244,20 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                         <span>{EXECUTOR_MODE_LABEL[job.riskMode]} • {job.status}</span>
                       </div>
                       <p>{job.reason}</p>
+                      <div className={`seo-executor-guard guard-${job.guardCode.toLowerCase()}`}>
+                        <div className="seo-auto-rollback-head">
+                          <strong>Execution Safety Guard</strong>
+                          <span>{job.guardCode.replaceAll('_', ' ')}</span>
+                        </div>
+                        {job.guardReason && <small>{job.guardReason}</small>}
+                        <small>
+                          Action Budget {job.budgetUsed24h}/{job.budgetLimit24h} ใน 24 ชม.
+                          {' • '}Active experiment URL นี้ {job.activePageExperiments}
+                        </small>
+                        {job.nextEligibleAt && (
+                          <small>คาดว่าตรวจใหม่ได้หลัง {new Date(job.nextEligibleAt).toLocaleString('th-TH')}</small>
+                        )}
+                      </div>
                       <div className="seo-executor-artifacts">
                         <span>Repo <strong>{job.targetRepository}</strong></span>
                         {job.patchCommitSha && <span>Commit <code>{shortSha(job.patchCommitSha)}</code></span>}
@@ -285,11 +299,21 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                     {execution.measurements.length > 0 ? (
                       <div className="seo-measurement-chips">
                         {execution.measurements.map((measurement) => (
-                          <span className={`verdict-${measurement.verdict.toLowerCase()}`} key={measurement.checkpointDays}>
-                            {measurement.checkpointDays}D {measurement.verdict}
-                            {' • '}Pos {measurement.positionDelta > 0 ? '+' : ''}{number(measurement.positionDelta, 2)}
-                            {' • '}CTR {measurement.ctrDelta > 0 ? '+' : ''}{percent(measurement.ctrDelta)}
-                          </span>
+                          <div className="seo-measurement-entry" key={measurement.checkpointDays}>
+                            <span className={`verdict-${measurement.verdict.toLowerCase()}`}>
+                              {measurement.checkpointDays}D {measurement.verdict}
+                              {' • '}Pos {measurement.positionDelta > 0 ? '+' : ''}{number(measurement.positionDelta, 2)}
+                              {' • '}CTR {measurement.ctrDelta > 0 ? '+' : ''}{percent(measurement.ctrDelta)}
+                            </span>
+                            <small className={`seo-integrity-status integrity-${measurement.integrityStatus.toLowerCase()}`}>
+                              Integrity {measurement.integrityStatus}
+                              {measurement.integrityCodes.length > 0 ? ` • ${measurement.integrityCodes.join(', ')}` : ''}
+                              {measurement.exposureDays !== null ? ` • exposure ${number(measurement.exposureDays, 1)}d` : ''}
+                            </small>
+                            {measurement.integrityReason && measurement.integrityStatus === 'BLOCKED' && (
+                              <small className="seo-integrity-reason">{measurement.integrityReason}</small>
+                            )}
+                          </div>
                         ))}
                       </div>
                     ) : (
