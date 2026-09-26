@@ -362,3 +362,19 @@
 .seo-integrity-status.integrity-pass{color:#166534}
 .seo-integrity-status.integrity-blocked{color:#9a3412}
 .seo-integrity-reason{font-size:8px;line-height:1.45;color:#7c2d12}
+
+
+/* SEO Learning Ledger + Rollback Recovery Measurement */
+.seo-recovery-measurement,.seo-learning-ledger{display:grid;gap:6px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}
+.seo-recovery-measurement.status-monitoring{border-color:#fde68a;background:#fffbeb}
+.seo-recovery-measurement.status-complete{border-color:#bbf7d0;background:#f0fdf4}
+.seo-recovery-measurement.status-blocked{border-color:#fecaca;background:#fff7ed}
+.seo-recovery-measurement small,.seo-learning-ledger small{font-size:8px;line-height:1.5;color:#475569}
+.seo-learning-ledger.signal-benefit_confirmed{border-color:#bbf7d0;background:#f0fdf4}
+.seo-learning-ledger.signal-harm_confirmed,.seo-learning-ledger.signal-harm_likely{border-color:#fecaca;background:#fff7ed}
+.seo-learning-ledger.signal-harm_unconfirmed,.seo-learning-ledger.signal-insufficient{border-color:#e2e8f0;background:#f8fafc}
+.seo-learning-ledger.signal-no_clear_effect{border-color:#cbd5e1;background:#f8fafc}
+.recovery-verdict-recovered{color:#166534;font-weight:800}
+.recovery-verdict-partial_recovery{color:#a16207;font-weight:800}
+.recovery-verdict-not_recovered,.recovery-verdict-further_regressed{color:#b91c1c;font-weight:800}
+.recovery-verdict-insufficient_data{color:#9a3412;font-weight:800}
