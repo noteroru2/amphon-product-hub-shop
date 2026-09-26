@@ -112,6 +112,19 @@ if (!ownerIdentityBackfill.ok) {
 }
 const ownerIdentityBackfillResult = await ownerIdentityBackfill.json()
 
+const ownerPricebookSync = await fetch(
+  base + '/rest/v1/rpc/ai_buyer_sync_owner_pricebook_reviews',
+  {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({}),
+  },
+)
+if (!ownerPricebookSync.ok) {
+  throw new Error('Owner Model Price Book review sync failed: ' + (await ownerPricebookSync.text()).slice(0, 1000))
+}
+const ownerPricebookSyncResult = await ownerPricebookSync.json()
+
 const ownerStatusResp = await fetch(
   base + '/rest/v1/ai_buyer_owner_model_status_v?select=*',
   { headers },
@@ -131,5 +144,6 @@ console.log(JSON.stringify({
   apiPush: Number(payload.apiPush || 0),
   ownerModelBackfill: ownerBackfillResult,
   ownerIdentityBackfill: ownerIdentityBackfillResult,
+  ownerPricebookSync: ownerPricebookSyncResult,
   ownerModelStatus,
 }, null, 2))

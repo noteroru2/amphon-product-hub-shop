@@ -1000,22 +1000,32 @@ function composeReply(result: IntakeResult, currentCase: CaseRow) {
 
   let operational = ''
   if (result.action === 'ASK_PRODUCT_TYPE' || result.category === 'UNKNOWN') {
-    operational = 'ต้องการขายสินค้าอะไรครับ ส่งรูปมาให้ดูได้เลยครับ'
+    operational = 'ขายสินค้าอะไรครับ ส่งรูปมาได้เลยครับ'
   } else if (result.action === 'ASK_MORE_INFO') {
     const requested = result.requested_inputs.filter((item) => item !== 'PRODUCT_TYPE').slice(0, 2)
     if (sameRequestedInputs(currentCase.metadata, requested)) {
-      operational = 'ส่งรูปตามที่ขอมาได้เลยครับ เดี๋ยวเช็กต่อให้ครับ'
-    } else if (requested.length) {
-      operational = 'ขอ' + requested.map(inputLabel).join(' กับ ') + 'เพิ่มหน่อยครับ'
+      operational = 'ส่งรูปตามที่ขอมาได้เลยครับ'
+    } else if (requested.length === 1 && requested[0] === 'MODEL') {
+      operational = 'รุ่นไหนครับ'
+    } else if (requested.includes('CORE_SPEC')) {
+      operational = 'ส่งรูปและสเปคเครื่องมาได้เลยครับ'
+    } else if (requested.some((item) => [
+      'FULL_DEVICE','FRONT_OPEN','KEYBOARD','BOTTOM_LABEL','SYSTEM_INFO','DEFECT_CLOSEUP',
+      'CHARGER','BACK','FRAME','ABOUT_SCREEN','BATTERY_HEALTH','PC_INTERIOR',
+      'CPU_GPU_SCREEN','CAMERA_FRONT_BACK','LENS_FRONT_REAR','SERIAL_LABEL','ACCESSORIES',
+    ].includes(item))) {
+      operational = requested.length === 1
+        ? 'ขอ' + inputLabel(requested[0]) + 'เพิ่มหน่อยครับ'
+        : 'ส่งรูปมาได้เลยครับ'
     } else {
-      operational = 'ขอข้อมูลหรือรูปเพิ่มอีกนิดครับ จะได้เช็กให้ตรงรุ่นครับ'
+      operational = 'ขอข้อมูลเพิ่มอีกนิดครับ'
     }
   } else if (pricingReadyByPolicy(result)) {
-    operational = 'ข้อมูลพอเช็กราคาแล้วครับ เดี๋ยวขอเช็กราคาให้ครับ'
+    operational = 'ข้อมูลครบแล้วครับ เดี๋ยวเช็กราคาให้ครับ'
   } else if (result.action === 'HUMAN_REVIEW') {
     operational = 'ตัวนี้ขอเช็กเพิ่มนิดนึงครับ เดี๋ยวแอดมินดูให้ครับ'
   } else if (result.intent === 'GENERAL') {
-    operational = 'ได้ครับ ถ้าต้องการขายสินค้า ส่งรูปมาให้ดูได้เลยครับ'
+    operational = 'ได้เลยครับผม'
   }
 
   if (result.asked_if_ai) {
@@ -1343,6 +1353,51 @@ async function sendLineText(
   return true
 }
 
+async function storeOwnerConversationShadow(
+  env: ConversationEngineEnv,
+  batch: IntakeBatch,
+  runId: string,
+  sourceMessageId: string | null,
+  action: string,
+  text: string,
+  currentCase: CaseRow,
+  result: IntakeResult,
+) {
+  const draft = clean(text, 4500)
+  if (!draft) return
+  const insert = await supabaseRequest(
+    env,
+    'ai_buyer_owner_conversation_shadows?on_conflict=dedupe_key',
+    {
+      method: 'POST',
+      headers: { prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        case_id: batch.caseId,
+        conversation_id: batch.conversationId,
+        analysis_run_id: runId,
+        source_message_id: sourceMessageId,
+        dedupe_key: runId + ':' + clean(action, 80),
+        action: clean(action, 80) || 'UNKNOWN',
+        draft_text: draft,
+        category: result.category === 'UNKNOWN' ? currentCase.category : result.category,
+        case_state: currentCase.state,
+        model_name: clean(result.model_name, 200) || null,
+        model_code: clean(result.model_code, 120) || null,
+        metadata: {
+          requestedInputs: result.requested_inputs,
+          pricingReadiness: result.pricing_readiness,
+          ownerStyleVersion: 'OWNER_STYLE_V1',
+          shadowOnly: true,
+        },
+      }),
+    },
+  )
+  if (!insert.ok) {
+    const detail = await insert.text().catch(() => '')
+    throw new Error('OWNER_CONVERSATION_SHADOW_' + insert.status + ':' + detail.slice(0, 300))
+  }
+}
+
 async function failAnalysis(
   env: ConversationEngineEnv,
   runId: string | null,
@@ -1540,6 +1595,19 @@ export async function runConversationIntake(
 
     let sent = false
     if (reply) {
+      const sourceMessageId = unconsumedMessages[unconsumedMessages.length - 1]?.id || null
+      await storeOwnerConversationShadow(
+        env,
+        batch,
+        run.id,
+        sourceMessageId,
+        replyAction,
+        reply,
+        currentCase,
+        result,
+      ).catch((shadowError) => {
+        console.error('AI BUYER owner conversation shadow capture failed', batch.caseId, shadowError)
+      })
       let pendingMetadata: Record<string, unknown> = transition.metadata
       if (flowOutboundActionId || flowOfferId) {
         pendingMetadata = await setPendingReply(env, currentCase.id, transition.metadata, {

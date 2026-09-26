@@ -1156,6 +1156,170 @@ export async function handleHubAdminDealLedger(request: Request, env: HubAdminEn
   }
 }
 
+export async function handleHubAdminOwnerModel(request: Request, env: HubAdminEnv) {
+  try {
+    const { profile } = await authenticateAdmin(request, env)
+
+    await serviceWrite<any>(
+      env,
+      'rpc/ai_buyer_sync_owner_pricebook_reviews',
+      {
+        method: 'POST',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({}),
+      },
+    ).catch(() => [])
+
+    const [
+      statusRows,
+      errorByCategory,
+      promotionGate,
+      pricePairs,
+      pricebookReviews,
+      negotiationPaths,
+      styleRows,
+      economics,
+      conversationPairs,
+    ] = await Promise.all([
+      serviceRows<any>(env, 'ai_buyer_owner_model_v2_status_v?select=*&limit=1'),
+      serviceRows<any>(env, 'ai_buyer_owner_error_by_category_v?select=*&order=category.asc'),
+      serviceRows<any>(env, 'ai_buyer_owner_promotion_gate_v?select=*&order=category.asc'),
+      serviceRows<any>(
+        env,
+        'ai_buyer_owner_price_pair_v?select=*&order=owner_offer_at.desc&limit=50',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_owner_pricebook_reviews?select=*&order=status.desc,updated_at.desc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_owner_negotiation_path_v?select=*&order=last_owner_quote_at.desc&limit=50',
+      ),
+      serviceRows<any>(env, 'ai_buyer_owner_style_profile_v?select=*&limit=1'),
+      serviceRows<any>(
+        env,
+        'ai_buyer_owner_deal_economics_by_category_v?select=*&order=category.asc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_owner_conversation_pair_v?shadow_id=not.is.null&select=*&order=owner_replied_at.desc&limit=30',
+      ),
+    ])
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
+      status: statusRows[0] || null,
+      style: styleRows[0] || null,
+      errorByCategory,
+      promotionGate,
+      pricePairs,
+      pricebookReviews,
+      negotiationPaths,
+      economics,
+      conversationPairs,
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+export async function handleHubAdminOwnerPricebookReview(request: Request, env: HubAdminEnv) {
+  try {
+    const { user } = await authenticateAdmin(request, env)
+    let body: {
+      caseId?: string
+      status?: string
+      openingOffer?: number | null
+      targetBuy?: number | null
+      hardMax?: number | null
+      note?: string | null
+    }
+    try {
+      body = await request.json() as typeof body
+    } catch {
+      return hubAdminResponse(request, env, { ok: false, error: 'JSON_INVALID' }, 400)
+    }
+
+    const caseId = clean(body.caseId, 100)
+    const reviewStatus = clean(body.status, 20).toUpperCase()
+    if (!validUuid(caseId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'CASE_ID_INVALID' }, 400)
+    }
+    if (!['PENDING','APPROVED','REJECTED'].includes(reviewStatus)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'PRICEBOOK_REVIEW_STATUS_INVALID' }, 400)
+    }
+
+    const currentRows = await serviceRows<any>(
+      env,
+      'ai_buyer_owner_pricebook_reviews?case_id=eq.' + encodeURIComponent(caseId)
+        + '&select=*&limit=1',
+    )
+    const current = currentRows[0]
+    if (!current) {
+      return hubAdminResponse(request, env, { ok: false, error: 'PRICEBOOK_REVIEW_NOT_FOUND' }, 404)
+    }
+
+    const openingOffer = moneyValue(body.openingOffer ?? current.final_opening_offer)
+    const targetBuy = moneyValue(body.targetBuy ?? current.final_target_buy)
+    const hardMax = moneyValue(body.hardMax ?? current.final_hard_max)
+    if (openingOffer == null || targetBuy == null || hardMax == null) {
+      return hubAdminResponse(request, env, { ok: false, error: 'PRICEBOOK_REVIEW_PRICE_INVALID' }, 400)
+    }
+    if (openingOffer > targetBuy || targetBuy > hardMax) {
+      return hubAdminResponse(request, env, { ok: false, error: 'PRICEBOOK_REVIEW_PRICE_ORDER_INVALID' }, 400)
+    }
+
+    const reviewed = reviewStatus === 'PENDING' ? null : new Date().toISOString()
+    const rows = await serviceWrite<any>(
+      env,
+      'ai_buyer_owner_pricebook_reviews?case_id=eq.' + encodeURIComponent(caseId),
+      {
+        method: 'PATCH',
+        headers: { prefer: 'return=representation' },
+        body: JSON.stringify({
+          status: reviewStatus,
+          final_opening_offer: openingOffer,
+          final_target_buy: targetBuy,
+          final_hard_max: hardMax,
+          reviewed_by: reviewStatus === 'PENDING' ? null : user.id,
+          reviewed_at: reviewed,
+          review_note: clean(body.note, 1500) || null,
+          updated_at: new Date().toISOString(),
+        }),
+      },
+    )
+
+    const training = await serviceRows<any>(
+      env,
+      'ai_buyer_owner_review_training_v?case_id=eq.' + encodeURIComponent(caseId)
+        + '&select=*&limit=1',
+    )
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      review: rows[0] || null,
+      trainingSignal: training[0] || null,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminDashboard(request: Request, env: HubAdminEnv) {
   try {
     const { profile } = await authenticateAdmin(request, env)
