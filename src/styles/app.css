@@ -350,3 +350,15 @@
 .seo-auto-rollback-head span{font-size:8px;font-weight:800;border-radius:999px;padding:4px 6px;background:#fff;color:#475569}
 .seo-auto-rollback small{font-size:8px;color:#475569;line-height:1.45}
 .seo-auto-rollback code{font-size:8px;color:#0f172a}
+
+
+/* SEO Safety Guards */
+.seo-executor-guard{display:grid;gap:5px;padding:8px 9px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4}
+.seo-executor-guard.guard-page_experiment_lock,.seo-executor-guard.guard-action_budget{border-color:#fde68a;background:#fffbeb}
+.seo-executor-guard.guard-risk_gate,.seo-executor-guard.guard-protected{border-color:#e2e8f0;background:#f8fafc}
+.seo-executor-guard small{font-size:8px;line-height:1.5;color:#475569}
+.seo-measurement-entry{display:grid;gap:4px}
+.seo-integrity-status{font-size:8px;font-weight:800;line-height:1.4}
+.seo-integrity-status.integrity-pass{color:#166534}
+.seo-integrity-status.integrity-blocked{color:#9a3412}
+.seo-integrity-reason{font-size:8px;line-height:1.45;color:#7c2d12}
