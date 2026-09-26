@@ -338,3 +338,15 @@
 .seo-executor-pr{display:inline-flex;width:max-content;max-width:100%;align-items:center;gap:5px;font-size:9px;font-weight:800;color:#5b21b6;text-decoration:none}
 .seo-executor-error{padding:7px 8px;border:1px solid #fecaca;border-radius:9px;background:#fff;color:#b91c1c;font-size:8px;line-height:1.5;overflow-wrap:anywhere}
 .seo-executor-retry{display:inline-flex;width:max-content;align-items:center;gap:5px;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:9px;padding:7px 9px;font-size:8px;font-weight:800}
+
+
+/* SEO Auto Rollback */
+.seo-auto-rollback{display:grid;gap:4px;padding:8px 9px;border:1px solid #fde68a;border-radius:10px;background:#fffbeb}
+.seo-auto-rollback.status-rolled_back{border-color:#bbf7d0;background:#f0fdf4}
+.seo-auto-rollback.status-blocked,.seo-auto-rollback.status-failed{border-color:#fecaca;background:#fff1f2}
+.seo-auto-rollback.status-verifying,.seo-auto-rollback.status-running,.seo-auto-rollback.status-queued{border-color:#bfdbfe;background:#eff6ff}
+.seo-auto-rollback-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.seo-auto-rollback-head strong{font-size:9px;color:#334155}
+.seo-auto-rollback-head span{font-size:8px;font-weight:800;border-radius:999px;padding:4px 6px;background:#fff;color:#475569}
+.seo-auto-rollback small{font-size:8px;color:#475569;line-height:1.45}
+.seo-auto-rollback code{font-size:8px;color:#0f172a}
