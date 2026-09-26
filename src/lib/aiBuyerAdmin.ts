@@ -246,6 +246,132 @@ export type AiBuyerDealSummary = {
   in_stock_lines: number;
 };
 
+export type AiBuyerOwnerModelStatus = {
+  conversation_pairs: number;
+  price_labels: number;
+  verified_price_labels: number;
+  priced_cases: number;
+  pricebook_candidates: number;
+  engine_owner_pairs: number;
+  high_conf_price_labels?: number;
+  priced_contexts?: number;
+  identity_enrichments?: number;
+  negotiation_cases?: number;
+  paired_pricing_cases: number;
+  conversation_shadow_pairs: number;
+  pending_pricebook_reviews: number;
+  approved_pricebook_reviews: number;
+  sold_economic_cases: number;
+  promotion_ready_categories: number;
+};
+
+export type AiBuyerOwnerPricePair = {
+  case_id: string;
+  category?: string | null;
+  title?: string | null;
+  model_name?: string | null;
+  model_code?: string | null;
+  ai_opening_offer?: number | null;
+  ai_target_buy?: number | null;
+  ai_hard_max?: number | null;
+  owner_offer: number;
+  owner_vs_ai_opening_pct?: number | null;
+  owner_vs_ai_target_pct?: number | null;
+  abs_opening_error_pct?: number | null;
+  abs_target_error_pct?: number | null;
+  owner_offer_at?: string | null;
+};
+
+export type AiBuyerOwnerPricebookReview = {
+  id: string;
+  case_id: string;
+  category?: string | null;
+  brand?: string | null;
+  model_name?: string | null;
+  model_code?: string | null;
+  candidate_opening_offer: number;
+  candidate_target_buy: number;
+  candidate_hard_max: number;
+  final_opening_offer: number;
+  final_target_buy: number;
+  final_hard_max: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  candidate_confidence?: string | null;
+  identity_confidence?: number | null;
+  owner_quote_count: number;
+  review_note?: string | null;
+  reviewed_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type AiBuyerOwnerPromotionGate = {
+  category: string;
+  current_mode: string;
+  paired_cases: number;
+  median_abs_opening_error_pct?: number | null;
+  median_abs_target_error_pct?: number | null;
+  unsafe_ai_opening_over_10pct_cases: number;
+  owner_exceeds_ai_hardmax_cases: number;
+  conversation_pairs: number;
+  replay_cases: number;
+  replay_regression_cases: number;
+  latest_replay_status?: string | null;
+  sold_economic_cases: number;
+  ready_for_approval_review: boolean;
+  blockers?: string[] | null;
+};
+
+export type AiBuyerOwnerModelResponse = {
+  ok: true;
+  viewer: { displayName: string; role: string };
+  status: AiBuyerOwnerModelStatus | null;
+  style: {
+    owner_messages?: number;
+    avg_chars?: number | null;
+    median_chars?: number | null;
+    pct_with_khrap?: number | null;
+    pct_question_mark?: number | null;
+    pct_photo_request?: number | null;
+    pct_location_question?: number | null;
+    shadow_owner_pairs?: number;
+    median_length_similarity_pct?: number | null;
+  } | null;
+  errorByCategory: Array<{
+    category?: string | null;
+    paired_cases: number;
+    mae_baht?: number | null;
+    median_abs_opening_error_pct?: number | null;
+    median_abs_target_error_pct?: number | null;
+    avg_owner_vs_ai_opening_pct?: number | null;
+    avg_owner_vs_ai_target_pct?: number | null;
+    unsafe_ai_opening_over_10pct_cases: number;
+    owner_exceeds_ai_hardmax_cases: number;
+  }>;
+  promotionGate: AiBuyerOwnerPromotionGate[];
+  pricePairs: AiBuyerOwnerPricePair[];
+  pricebookReviews: AiBuyerOwnerPricebookReview[];
+  negotiationPaths: Array<Record<string, unknown>>;
+  economics: Array<{
+    category?: string | null;
+    sold_cases: number;
+    avg_gross_profit?: number | null;
+    avg_roi_pct?: number | null;
+    median_holding_days?: number | null;
+    avg_gross_margin_pct?: number | null;
+  }>;
+  conversationPairs: Array<{
+    case_id: string;
+    category?: string | null;
+    title?: string | null;
+    action?: string | null;
+    ai_draft?: string | null;
+    owner_actual?: string | null;
+    length_similarity_pct?: number | null;
+    owner_replied_at?: string | null;
+  }>;
+  generatedAt: string;
+};
+
 export async function loadAiBuyerDashboard(limit = 150) {
   return request<AiBuyerDashboardResponse>(
     `/v1/hub/admin/dashboard?limit=${Math.max(10, Math.min(200, limit))}`,
@@ -329,3 +455,26 @@ export async function saveAiBuyerLedgerLine(input: {
     body: JSON.stringify(input),
   });
 }
+
+export async function loadAiBuyerOwnerModel() {
+  return request<AiBuyerOwnerModelResponse>("/v1/hub/admin/owner-model");
+}
+
+export async function saveAiBuyerOwnerPricebookReview(input: {
+  caseId: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  openingOffer?: number | null;
+  targetBuy?: number | null;
+  hardMax?: number | null;
+  note?: string | null;
+}) {
+  return request<{
+    ok: true;
+    review: AiBuyerOwnerPricebookReview;
+    trainingSignal?: unknown;
+  }>("/v1/hub/admin/owner-model/pricebook-review", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
