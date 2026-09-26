@@ -30,7 +30,7 @@ const checks = [
   ['rollback RPCs are service-role only', rollbackMigration.includes('claim_gsc_rollback_jobs') && rollbackMigration.includes('finish_gsc_rollback_job') && rollbackMigration.includes('to service_role')],
   ['rollback claim uses a cross-statement lease token', rollbackClaimHotfix.includes('v_claim_token') && rollbackClaimHotfix.includes('r.lease_token=v_claim_token')],
   ['gateway exposes rollback claim/finish to GitHub OIDC only', gateway.includes("operation === 'rollback_claim'") && gateway.includes("operation === 'rollback_finish'")],
-  ['Hub exposes automatic rollback lifecycle', client.includes('rollbackActualCommitSha') && center.includes('Auto Rollback') && center.includes('ROLLED_BACK')],
+  ['Hub exposes automatic rollback lifecycle', client.includes('rollbackActualCommitSha') && center.includes('Auto Rollback') && center.includes("execution.rollbackStatus !== 'NONE'")],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
