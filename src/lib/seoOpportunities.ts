@@ -166,6 +166,16 @@ export interface SeoExecutionMeasurement {
   currentQueryShare: number | null
   queryShareShift: number | null
   trafficRatio: number | null
+  causalStatus: 'PASS' | 'CONTAMINATED' | 'UNKNOWN'
+  causalReason: string | null
+  contaminatingCommitCount: number
+  contaminatingCommits: Array<Record<string, any>>
+  volatilityStatus: 'PASS' | 'EXTERNAL_SHIFT' | 'UNKNOWN'
+  volatilityReason: string | null
+  volatilityPeerCount: number
+  volatilityMedianPositionDelta: number | null
+  volatilityWorsenedShare: number | null
+  volatilityImprovedShare: number | null
   measuredAt: string
 }
 
@@ -182,6 +192,16 @@ export interface SeoRollbackRecoveryMeasurement {
   ctrDeltaVsTrigger: number
   postRollbackExposureDays: number | null
   windowPurity: number
+  causalStatus: 'PASS' | 'CONTAMINATED' | 'UNKNOWN'
+  causalReason: string | null
+  contaminatingCommitCount: number
+  contaminatingCommits: Array<Record<string, any>>
+  volatilityStatus: 'PASS' | 'EXTERNAL_SHIFT' | 'UNKNOWN'
+  volatilityReason: string | null
+  volatilityPeerCount: number
+  volatilityMedianPositionDelta: number | null
+  volatilityWorsenedShare: number | null
+  volatilityImprovedShare: number | null
   measuredAt: string
 }
 
@@ -400,6 +420,16 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       currentQueryShare: row.current_query_share === null ? null : Number(row.current_query_share),
       queryShareShift: row.query_share_shift === null ? null : Number(row.query_share_shift),
       trafficRatio: row.traffic_ratio === null ? null : Number(row.traffic_ratio),
+      causalStatus: row.causal_status || 'UNKNOWN',
+      causalReason: row.causal_reason ? String(row.causal_reason) : null,
+      contaminatingCommitCount: Number(row.contaminating_commit_count || 0),
+      contaminatingCommits: Array.isArray(row.contaminating_commits) ? row.contaminating_commits : [],
+      volatilityStatus: row.volatility_status || 'UNKNOWN',
+      volatilityReason: row.volatility_reason ? String(row.volatility_reason) : null,
+      volatilityPeerCount: Number(row.volatility_peer_count || 0),
+      volatilityMedianPositionDelta: row.volatility_median_position_delta === null ? null : Number(row.volatility_median_position_delta),
+      volatilityWorsenedShare: row.volatility_worsened_share === null ? null : Number(row.volatility_worsened_share),
+      volatilityImprovedShare: row.volatility_improved_share === null ? null : Number(row.volatility_improved_share),
       measuredAt: String(row.measured_at || ''),
     })
     measurementsByExecution.set(executionId, items)
@@ -422,6 +452,16 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       ctrDeltaVsTrigger: Number(row.ctr_delta_vs_trigger || 0),
       postRollbackExposureDays: row.post_rollback_exposure_days === null ? null : Number(row.post_rollback_exposure_days),
       windowPurity: Number(row.window_purity || 0),
+      causalStatus: row.causal_status || 'UNKNOWN',
+      causalReason: row.causal_reason ? String(row.causal_reason) : null,
+      contaminatingCommitCount: Number(row.contaminating_commit_count || 0),
+      contaminatingCommits: Array.isArray(row.contaminating_commits) ? row.contaminating_commits : [],
+      volatilityStatus: row.volatility_status || 'UNKNOWN',
+      volatilityReason: row.volatility_reason ? String(row.volatility_reason) : null,
+      volatilityPeerCount: Number(row.volatility_peer_count || 0),
+      volatilityMedianPositionDelta: row.volatility_median_position_delta === null ? null : Number(row.volatility_median_position_delta),
+      volatilityWorsenedShare: row.volatility_worsened_share === null ? null : Number(row.volatility_worsened_share),
+      volatilityImprovedShare: row.volatility_improved_share === null ? null : Number(row.volatility_improved_share),
       measuredAt: String(row.measured_at || ''),
     })
     recoveryMeasurementsByExecution.set(executionId, items)
