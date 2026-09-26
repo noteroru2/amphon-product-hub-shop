@@ -21,17 +21,28 @@ import type { ProductSummary, Profile } from "../types/product";
 import {
   loadAiBuyerCase,
   loadAiBuyerDashboard,
+  loadAiBuyerOwnerModel,
   saveAiBuyerFinalOutcome,
   saveAiBuyerLedgerLine,
+  saveAiBuyerOwnerPricebookReview,
   sendAiBuyerManualReply,
   type AiBuyerCaseDetail,
   type AiBuyerDashboardCase,
   type AiBuyerDealSummary,
   type AiBuyerLedgerLine,
+  type AiBuyerOwnerPricebookReview,
+  type AiBuyerOwnerModelResponse,
 } from "../lib/aiBuyerAdmin";
 import "../styles/aiBuyerAdmin.css";
 
 type CaseFilter = "active" | "needs-label" | "purchased" | "all";
+
+type PricebookReviewDraft = {
+  openingOffer: string;
+  targetBuy: string;
+  hardMax: string;
+  note: string;
+};
 
 type LedgerDraft = {
   id?: string;
@@ -63,6 +74,12 @@ function compactMoney(value: unknown) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
   return new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(n);
+}
+
+function pct(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("th-TH", { maximumFractionDigits: 1 }).format(n) + "%";
 }
 
 function when(value?: string | null) {
@@ -272,6 +289,9 @@ export function AiBuyerAdmin({
   onBack: () => void;
 }) {
   const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof loadAiBuyerDashboard>> | null>(null);
+  const [ownerModel, setOwnerModel] = useState<AiBuyerOwnerModelResponse | null>(null);
+  const [ownerModelLoading, setOwnerModelLoading] = useState(false);
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, PricebookReviewDraft>>({});
   const [detail, setDetail] = useState<AiBuyerCaseDetail | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [filter, setFilter] = useState<CaseFilter>("active");
@@ -313,6 +333,71 @@ export function AiBuyerAdmin({
     }
   }
 
+  async function refreshOwnerModel() {
+    if (!canAccess) return;
+    setOwnerModelLoading(true);
+    try {
+      const next = await loadAiBuyerOwnerModel();
+      setOwnerModel(next);
+      setReviewDrafts((current) => {
+        const output = { ...current };
+        for (const row of next.pricebookReviews) {
+          if (!output[row.case_id]) {
+            output[row.case_id] = {
+              openingOffer: String(row.final_opening_offer),
+              targetBuy: String(row.final_target_buy),
+              hardMax: String(row.final_hard_max),
+              note: row.review_note || "",
+            };
+          }
+        }
+        return output;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOwnerModelLoading(false);
+    }
+  }
+
+  async function reviewPricebook(row: AiBuyerOwnerPricebookReview, status: "APPROVED" | "REJECTED") {
+    const draft = reviewDrafts[row.case_id] || {
+      openingOffer: String(row.final_opening_offer),
+      targetBuy: String(row.final_target_buy),
+      hardMax: String(row.final_hard_max),
+      note: row.review_note || "",
+    };
+    const openingOffer = numberOrNull(draft.openingOffer);
+    const targetBuy = numberOrNull(draft.targetBuy);
+    const hardMax = numberOrNull(draft.hardMax);
+    if (openingOffer == null || targetBuy == null || hardMax == null) {
+      setError("กรุณากรอกราคา Opening / Target / Hard max ให้ครบ");
+      return;
+    }
+    if (openingOffer > targetBuy || targetBuy > hardMax) {
+      setError("ราคาต้องเรียง Opening ≤ Target ≤ Hard max");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await saveAiBuyerOwnerPricebookReview({
+        caseId: row.case_id,
+        status,
+        openingOffer,
+        targetBuy,
+        hardMax,
+        note: draft.note || null,
+      });
+      setNotice(status === "APPROVED" ? "อนุมัติ Owner Price Book candidate แล้ว" : "ปฏิเสธ candidate แล้ว");
+      await refreshOwnerModel();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refreshDetail(caseId = selectedId) {
     if (!caseId || !canAccess) {
       setDetail(null);
@@ -338,6 +423,7 @@ export function AiBuyerAdmin({
 
   useEffect(() => {
     void refreshDashboard(false);
+    void refreshOwnerModel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, profile.role]);
 
@@ -517,8 +603,15 @@ export function AiBuyerAdmin({
           <h1>รับซื้อ / ปิดดีล</h1>
           <small>ตอบ LINE · Final Label · Profit Ledger</small>
         </div>
-        <button className="refresh-button" onClick={() => void refreshDashboard()} disabled={loading}>
-          <RefreshCw className={loading ? "spin" : ""} />
+        <button
+          className="refresh-button"
+          onClick={() => {
+            void refreshDashboard();
+            void refreshOwnerModel();
+          }}
+          disabled={loading || ownerModelLoading}
+        >
+          <RefreshCw className={loading || ownerModelLoading ? "spin" : ""} />
         </button>
       </header>
 
@@ -543,6 +636,244 @@ export function AiBuyerAdmin({
           value={money(dashboard?.summary.grossProfit || 0)}
         />
       </div>
+
+      <section className="ai-owner-model-panel">
+        <div className="ai-owner-model-head">
+          <div>
+            <span className="ai-shadow-chip"><ShieldCheck size={15} /> SHADOW</span>
+            <h2>Owner Model V2 · Compare & Calibrate</h2>
+            <p>AI คิดก่อนคุณตอบ → เทียบราคา/บทสนทนา → เรียนจากกำไรจริง → ยังไม่ปรับราคา live เอง</p>
+          </div>
+          <small>{ownerModelLoading ? "กำลังอัปเดต…" : "Promotion ต้องผ่าน gate ทุกข้อ"}</small>
+        </div>
+
+        <div className="ai-summary-grid owner-model">
+          <SummaryCard
+            label="AI ↔ Owner ราคา"
+            value={String(ownerModel?.status?.paired_pricing_cases || 0)}
+            note="เป้าหมาย ≥ 20 / หมวด"
+          />
+          <SummaryCard
+            label="Shadow Chat ↔ Owner"
+            value={String(ownerModel?.status?.conversation_shadow_pairs || 0)}
+            note="เทียบคำตอบก่อนส่งจริง"
+          />
+          <SummaryCard
+            label="Price Book รอตรวจ"
+            value={String(ownerModel?.status?.pending_pricebook_reviews || 0)}
+            note="อนุมัติ/แก้/ปฏิเสธ"
+          />
+          <SummaryCard
+            label="หมวดผ่าน Gate"
+            value={String(ownerModel?.status?.promotion_ready_categories || 0)}
+            note="ยังต้องอนุมัติโดยคน"
+          />
+        </div>
+
+        <div className="ai-owner-style-strip">
+          <span>ข้อความจริง {ownerModel?.style?.owner_messages || 0}</span>
+          <span>Median {ownerModel?.style?.median_chars ?? "—"} ตัวอักษร</span>
+          <span>ลงท้าย “ครับ” {pct(ownerModel?.style?.pct_with_khrap)}</span>
+          <span>ใช้ ? {pct(ownerModel?.style?.pct_question_mark)}</span>
+          <span>Style pairs {ownerModel?.style?.shadow_owner_pairs || 0}</span>
+        </div>
+
+        <div className="ai-owner-gates">
+          {(ownerModel?.promotionGate || []).map((gate) => (
+            <article key={gate.category} className={gate.ready_for_approval_review ? "ready" : ""}>
+              <div className="ai-owner-gate-title">
+                <strong>{gate.category}</strong>
+                <span>{gate.ready_for_approval_review ? "พร้อม Review" : gate.current_mode}</span>
+              </div>
+              <div className="ai-owner-gate-metrics">
+                <span>ราคา {gate.paired_cases}/20</span>
+                <span>Error {pct(gate.median_abs_opening_error_pct)}</span>
+                <span>Chat {gate.conversation_pairs}/20</span>
+                <span>Replay {gate.replay_regression_cases} regression</span>
+              </div>
+              {!gate.ready_for_approval_review && Boolean(gate.blockers?.length) && (
+                <small>{gate.blockers?.join(" · ")}</small>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <details className="ai-owner-details" open>
+          <summary>
+            <span>Price Book Review</span>
+            <b>{ownerModel?.pricebookReviews.filter((row) => row.status === "PENDING").length || 0} รอตรวจ</b>
+          </summary>
+          <div className="ai-pricebook-review-grid">
+            {(ownerModel?.pricebookReviews || []).map((row) => {
+              const draft = reviewDrafts[row.case_id] || {
+                openingOffer: String(row.final_opening_offer),
+                targetBuy: String(row.final_target_buy),
+                hardMax: String(row.final_hard_max),
+                note: row.review_note || "",
+              };
+              return (
+                <article key={row.case_id} className={"ai-pricebook-review " + row.status.toLowerCase()}>
+                  <div className="ai-pricebook-review-head">
+                    <div>
+                      <strong>{[row.brand, row.model_name || row.model_code].filter(Boolean).join(" ") || row.category || "สินค้า"}</strong>
+                      <small>{row.category || "ไม่ทราบหมวด"} · {row.candidate_confidence || "—"} confidence</small>
+                    </div>
+                    <span>{row.status}</span>
+                  </div>
+                  <div className="ai-review-price-grid">
+                    <label>
+                      <span>Opening</span>
+                      <input
+                        inputMode="numeric"
+                        value={draft.openingOffer}
+                        onChange={(event) =>
+                          setReviewDrafts((current) => ({
+                            ...current,
+                            [row.case_id]: { ...draft, openingOffer: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Target</span>
+                      <input
+                        inputMode="numeric"
+                        value={draft.targetBuy}
+                        onChange={(event) =>
+                          setReviewDrafts((current) => ({
+                            ...current,
+                            [row.case_id]: { ...draft, targetBuy: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Hard max</span>
+                      <input
+                        inputMode="numeric"
+                        value={draft.hardMax}
+                        onChange={(event) =>
+                          setReviewDrafts((current) => ({
+                            ...current,
+                            [row.case_id]: { ...draft, hardMax: event.target.value },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <input
+                    className="ai-review-note"
+                    value={draft.note}
+                    onChange={(event) =>
+                      setReviewDrafts((current) => ({
+                        ...current,
+                        [row.case_id]: { ...draft, note: event.target.value },
+                      }))
+                    }
+                    placeholder="เหตุผลที่แก้ราคา / หมายเหตุ"
+                  />
+                  <div className="ai-review-actions">
+                    <button
+                      type="button"
+                      className="success"
+                      disabled={busy}
+                      onClick={() => void reviewPricebook(row, "APPROVED")}
+                    >
+                      <BadgeCheck size={16} /> อนุมัติ
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      disabled={busy}
+                      onClick={() => void reviewPricebook(row, "REJECTED")}
+                    >
+                      <CircleOff size={16} /> ปฏิเสธ
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </details>
+
+        <details className="ai-owner-details">
+          <summary>
+            <span>AI vs Owner · Pricing Error</span>
+            <b>{ownerModel?.status?.paired_pricing_cases || 0} paired</b>
+          </summary>
+          <div className="ai-owner-table-wrap">
+            <table className="ai-owner-table">
+              <thead>
+                <tr>
+                  <th>หมวด</th><th>Pairs</th><th>MAE</th><th>Median Opening Error</th><th>AI แพงเกิน &gt;10%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(ownerModel?.errorByCategory || []).map((row) => (
+                  <tr key={row.category || "UNKNOWN"}>
+                    <td>{row.category || "UNKNOWN"}</td>
+                    <td>{row.paired_cases}</td>
+                    <td>{money(row.mae_baht)}</td>
+                    <td>{pct(row.median_abs_opening_error_pct)}</td>
+                    <td>{row.unsafe_ai_opening_over_10pct_cases}</td>
+                  </tr>
+                ))}
+                {!ownerModel?.errorByCategory.length && (
+                  <tr><td colSpan={5}>ยังไม่มี paired case ใหม่หลังเปิด V2</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <details className="ai-owner-details">
+          <summary>
+            <span>Deal Economics</span>
+            <b>{ownerModel?.status?.sold_economic_cases || 0} sold cases</b>
+          </summary>
+          <div className="ai-owner-table-wrap">
+            <table className="ai-owner-table">
+              <thead>
+                <tr>
+                  <th>หมวด</th><th>ขายแล้ว</th><th>กำไรเฉลี่ย</th><th>ROI</th><th>ถือสต็อก Median</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(ownerModel?.economics || []).map((row) => (
+                  <tr key={row.category || "UNKNOWN"}>
+                    <td>{row.category || "UNKNOWN"}</td>
+                    <td>{row.sold_cases}</td>
+                    <td>{money(row.avg_gross_profit)}</td>
+                    <td>{pct(row.avg_roi_pct)}</td>
+                    <td>{row.median_holding_days == null ? "—" : row.median_holding_days + " วัน"}</td>
+                  </tr>
+                ))}
+                {!ownerModel?.economics.length && (
+                  <tr><td colSpan={5}>บันทึกราคาซื้อจริงและราคาขายจริงเพื่อเริ่มเรียนกำไร</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        {Boolean(ownerModel?.conversationPairs.length) && (
+          <details className="ai-owner-details">
+            <summary>
+              <span>Conversation Shadow ล่าสุด</span>
+              <b>{ownerModel?.conversationPairs.length} คู่</b>
+            </summary>
+            <div className="ai-shadow-conversation-list">
+              {ownerModel?.conversationPairs.slice(0, 8).map((pair) => (
+                <article key={pair.case_id + String(pair.owner_replied_at)}>
+                  <small>{pair.category || "UNKNOWN"} · similarity {pct(pair.length_similarity_pct)}</small>
+                  <p><b>AI:</b> {pair.ai_draft || "—"}</p>
+                  <p><b>คุณ:</b> {pair.owner_actual || "—"}</p>
+                </article>
+              ))}
+            </div>
+          </details>
+        )}
+      </section>
 
       <div className="ai-admin-toolbar">
         <label>
