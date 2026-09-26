@@ -2529,6 +2529,17 @@ export default {
       return json(request, env, { ok: true, service: 'amphon-product-api', employeeManagement: true, storeApi: true, commerceAdmin: true, shopVersion: 6 })
     }
 
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname === '/robots.txt') {
+      const body = 'User-agent: *\nAllow: /image/\n'
+      return new Response(request.method === 'HEAD' ? null : body, {
+        status: 200,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+        },
+      })
+    }
+
     if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/image/')) {
       const key = url.pathname.slice('/image/'.length).split('/').map(decodeURIComponent).join('/')
       const object = await env.IMAGES.get(key)
