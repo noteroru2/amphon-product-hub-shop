@@ -99,6 +99,19 @@ if (!ownerBackfill.ok) {
 }
 const ownerBackfillResult = await ownerBackfill.json()
 
+const ownerIdentityBackfill = await fetch(
+  base + '/rest/v1/rpc/ai_buyer_backfill_owner_identity_from_text',
+  {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({}),
+  },
+)
+if (!ownerIdentityBackfill.ok) {
+  throw new Error('Owner Model identity backfill failed: ' + (await ownerIdentityBackfill.text()).slice(0, 1000))
+}
+const ownerIdentityBackfillResult = await ownerIdentityBackfill.json()
+
 const ownerStatusResp = await fetch(
   base + '/rest/v1/ai_buyer_owner_model_status_v?select=*',
   { headers },
@@ -117,5 +130,6 @@ console.log(JSON.stringify({
   apiReply: Number(payload.apiReply || 0),
   apiPush: Number(payload.apiPush || 0),
   ownerModelBackfill: ownerBackfillResult,
+  ownerIdentityBackfill: ownerIdentityBackfillResult,
   ownerModelStatus,
 }, null, 2))
