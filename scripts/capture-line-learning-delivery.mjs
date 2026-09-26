@@ -86,6 +86,42 @@ const close = await fetch(
 )
 if (!close.ok) throw new Error('Window close failed: ' + await close.text())
 
+const ownerBackfill = await fetch(
+  base + '/rest/v1/rpc/ai_buyer_backfill_owner_price_labels',
+  {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({}),
+  },
+)
+if (!ownerBackfill.ok) {
+  throw new Error('Owner Model price-label backfill failed: ' + (await ownerBackfill.text()).slice(0, 1000))
+}
+const ownerBackfillResult = await ownerBackfill.json()
+
+const ownerIdentityBackfill = await fetch(
+  base + '/rest/v1/rpc/ai_buyer_backfill_owner_identity_from_text',
+  {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({}),
+  },
+)
+if (!ownerIdentityBackfill.ok) {
+  throw new Error('Owner Model identity backfill failed: ' + (await ownerIdentityBackfill.text()).slice(0, 1000))
+}
+const ownerIdentityBackfillResult = await ownerIdentityBackfill.json()
+
+const ownerStatusResp = await fetch(
+  base + '/rest/v1/ai_buyer_owner_model_status_v?select=*',
+  { headers },
+)
+if (!ownerStatusResp.ok) {
+  throw new Error('Owner Model status read failed: ' + (await ownerStatusResp.text()).slice(0, 1000))
+}
+const ownerStatusRows = await ownerStatusResp.json()
+const ownerModelStatus = ownerStatusRows[0] || null
+
 console.log(JSON.stringify({
   ok: true,
   date: statDate,
@@ -93,4 +129,7 @@ console.log(JSON.stringify({
   lineManagerChatMessages: Number(payload.chat || 0),
   apiReply: Number(payload.apiReply || 0),
   apiPush: Number(payload.apiPush || 0),
+  ownerModelBackfill: ownerBackfillResult,
+  ownerIdentityBackfill: ownerIdentityBackfillResult,
+  ownerModelStatus,
 }, null, 2))
