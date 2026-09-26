@@ -107,7 +107,7 @@ export async function listSeoActions(limit = 100): Promise<SeoAction[]> {
   const { data, error } = await supabase
     .from('commerce_gsc_action_queue')
     .select('*')
-    .in('status', ['OPEN', 'APPROVED', 'PROTECTED'])
+    .in('status', ['OPEN', 'APPROVED', 'PROTECTED', 'APPLIED'])
     .order('priority_score', { ascending: false })
     .limit(limit)
   if (error) throw error
