@@ -36,6 +36,7 @@ import {
   Bot,
   MessageCircle,
   TrendingUp,
+  Bell,
 } from "lucide-react";
 import { db } from "./lib/db";
 import { compressImage } from "./lib/image";
@@ -60,9 +61,11 @@ import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
 import { LineOAChat } from "./components/LineOAChat";
 import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
+import { SeoControlTower } from "./components/SeoControlTower";
 import { MerchantDiagnosticsCenter } from "./components/MerchantDiagnosticsCenter";
 import { TrustReviewCenter } from "./components/TrustReviewCenter";
 import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
+import { loadSeoAlertUnreadCount } from "./lib/seoControlTower";
 import {
   getCategoryDefinition,
   getCompleteness,
@@ -127,6 +130,7 @@ type Tab =
   | "ai-buyer"
   | "line-chat"
   | "seo-opportunities"
+  | "seo-control-tower"
   | "merchant-diagnostics"
   | "trust-reviews";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
@@ -205,6 +209,7 @@ function App() {
   const [activity, setActivity] = useState<ProductActivity[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [lineUnread, setLineUnread] = useState(0);
+  const [seoAlertUnread, setSeoAlertUnread] = useState(0);
   const saveLock = useRef(false);
   const deepLinkHandled = useRef(false);
 
@@ -366,6 +371,37 @@ function App() {
     const timer = window.setInterval(() => void loadUnread(), 15000);
     const onVisible = () => {
       if (document.visibilityState === "visible") void loadUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [profile?.id, profile?.role]);
+
+  useEffect(() => {
+    if (!profile || !["owner", "admin"].includes(profile.role)) {
+      setSeoAlertUnread(0);
+      return;
+    }
+
+    let cancelled = false;
+    const loadAlerts = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const count = await loadSeoAlertUnreadCount();
+        if (!cancelled) setSeoAlertUnread(Math.max(0, count));
+      } catch {
+        // Alert badge must never interrupt normal Hub usage.
+      }
+    };
+
+    void loadAlerts();
+    const timer = window.setInterval(() => void loadAlerts(), 30000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadAlerts();
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -816,6 +852,8 @@ function App() {
             onOrders={() => setTab("orders")}
             onAiBuyer={() => setTab("ai-buyer")}
             onSeo={() => setTab("seo-opportunities")}
+            onSeoTower={() => setTab("seo-control-tower")}
+            seoAlertUnread={seoAlertUnread}
             onMerchant={() => setTab("merchant-diagnostics")}
             onTrustReviews={() => setTab("trust-reviews")}
             onEdit={openEdit}
@@ -867,6 +905,15 @@ function App() {
           profile &&
           ["owner", "admin"].includes(profile.role) && (
             <SeoOpportunityCenter onBack={() => setTab("home")} />
+          )}
+        {tab === "seo-control-tower" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <SeoControlTower
+              onBack={() => setTab("home")}
+              onOpenActions={() => setTab("seo-opportunities")}
+              onAlertCountChange={setSeoAlertUnread}
+            />
           )}
         {tab === "merchant-diagnostics" &&
           profile &&
@@ -1184,6 +1231,8 @@ function HomeScreen({
   onOrders,
   onAiBuyer,
   onSeo,
+  onSeoTower,
+  seoAlertUnread,
   onMerchant,
   onTrustReviews,
   onEdit,
@@ -1199,6 +1248,8 @@ function HomeScreen({
   onOrders: () => void;
   onAiBuyer: () => void;
   onSeo: () => void;
+  onSeoTower: () => void;
+  seoAlertUnread: number;
   onMerchant: () => void;
   onTrustReviews: () => void;
   onEdit: (product: ProductSummary) => void;
@@ -1271,6 +1322,28 @@ function HomeScreen({
               <strong>AI Buyer</strong>
               <small>
                 ตอบ LINE · ปิดผลดีล · ราคาซื้อจริง · Profit Ledger
+              </small>
+            </span>
+          </div>
+          <ChevronRight />
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <button
+          className="publish-center-launch seo-control-tower-home-launch"
+          onClick={onSeoTower}
+        >
+          <div>
+            <span className="seo-control-tower-home-icon">
+              <Bell size={21} />
+              {seoAlertUnread > 0 && (
+                <b>{seoAlertUnread > 99 ? "99+" : seoAlertUnread}</b>
+              )}
+            </span>
+            <span>
+              <strong>SEO Control Tower</strong>
+              <small>
+                Experiments · Alerts · Rollback · Recovery · Learning · Prior
               </small>
             </span>
           </div>
