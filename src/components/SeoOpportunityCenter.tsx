@@ -295,6 +295,24 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
                     ) : (
                       <small>รอ checkpoint 7 / 14 / 28 วันจาก GSC</small>
                     )}
+                    {execution.rollbackStatus !== 'NONE' && (
+                      <div className={`seo-auto-rollback status-${execution.rollbackStatus.toLowerCase()}`}>
+                        <div className="seo-auto-rollback-head">
+                          <strong>Auto Rollback</strong>
+                          <span>{execution.rollbackStatus}</span>
+                        </div>
+                        {execution.rollbackActualCommitSha && (
+                          <small>Revert commit <code>{shortSha(execution.rollbackActualCommitSha)}</code></small>
+                        )}
+                        {execution.rollbackActualDiffSha256 && (
+                          <small>Rollback diff <code>{shortSha(execution.rollbackActualDiffSha256)}</code></small>
+                        )}
+                        {execution.rolledBackAt && (
+                          <small>คืนค่าบนเว็บแล้ว {new Date(execution.rolledBackAt).toLocaleString('th-TH')}</small>
+                        )}
+                        {execution.rollbackError && <div className="seo-executor-error">{execution.rollbackError}</div>}
+                      </div>
+                    )}
                     {execution.rollbackReviewReason && <div className="seo-rollback-note">{execution.rollbackReviewReason}</div>}
                   </div>
                 ))}
