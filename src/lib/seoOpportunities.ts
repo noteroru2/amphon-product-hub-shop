@@ -169,6 +169,43 @@ export interface SeoExecutionMeasurement {
   measuredAt: string
 }
 
+export interface SeoRollbackRecoveryMeasurement {
+  checkpointDays: number
+  maturity: 'EARLY' | 'PROVISIONAL' | 'FINAL'
+  verdict: 'RECOVERED' | 'PARTIAL_RECOVERY' | 'NOT_RECOVERED' | 'FURTHER_REGRESSED' | 'INSUFFICIENT_DATA'
+  integrityStatus: 'PASS' | 'BLOCKED'
+  integrityCodes: string[]
+  integrityReason: string | null
+  positionDeltaVsBaseline: number
+  ctrDeltaVsBaseline: number
+  positionDeltaVsTrigger: number
+  ctrDeltaVsTrigger: number
+  postRollbackExposureDays: number | null
+  windowPurity: number
+  measuredAt: string
+}
+
+export interface SeoLearningLedger {
+  executionId: string
+  actionId: string
+  primaryQuery: string
+  actionType: SeoActionType
+  opportunityType: string
+  latestActionCheckpointDays: number | null
+  latestActionVerdict: string | null
+  rollbackTriggered: boolean
+  rollbackTriggerCheckpointDays: number | null
+  latestRecoveryCheckpointDays: number | null
+  latestRecoveryVerdict: string | null
+  latestRecoveryMaturity: string | null
+  learningSignal: 'PENDING' | 'BENEFIT_CONFIRMED' | 'HARM_CONFIRMED' | 'HARM_LIKELY' | 'HARM_UNCONFIRMED' | 'NO_CLEAR_EFFECT' | 'INSUFFICIENT'
+  confidence: 'PENDING' | 'LOW' | 'MEDIUM' | 'HIGH' | 'INSUFFICIENT'
+  evidenceCount: number
+  confidenceWeight: number
+  signalWeight: number
+  updatedAt: string
+}
+
 export interface SeoActionExecution {
   id: string
   actionId: string
@@ -191,7 +228,13 @@ export interface SeoActionExecution {
   rollbackActualDiffSha256: string | null
   rolledBackAt: string | null
   rollbackError: string | null
+  recoveryStatus: 'NONE' | 'MONITORING' | 'COMPLETE' | 'BLOCKED'
+  recoveryLastMeasuredAt: string | null
+  recoveryFinalVerdict: string | null
+  recoveryCompleteAt: string | null
+  recoveryLockUntil: string | null
   measurements: SeoExecutionMeasurement[]
+  recoveryMeasurements: SeoRollbackRecoveryMeasurement[]
 }
 
 export interface SeoExecutorJob {
@@ -226,16 +269,18 @@ export interface SeoOpsDetailBundle {
   recoveryByAction: Record<string, SeoRecoveryDiagnostic>
   executionsByAction: Record<string, SeoActionExecution[]>
   executorByAction: Record<string, SeoExecutorJob>
+  learningByAction: Record<string, SeoLearningLedger>
 }
 
 export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDetailBundle> {
   if (!supabase) throw new Error('Supabase is not configured')
-  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {}, executorByAction: {} }
+  if (!actionIds.length) return { recoveryByAction: {}, executionsByAction: {}, executorByAction: {}, learningByAction: {} }
 
   const [
     { data: recoveryData, error: recoveryError },
     { data: executionData, error: executionError },
     { data: executorData, error: executorError },
+    { data: learningData, error: learningError },
   ] = await Promise.all([
     supabase
       .from('commerce_gsc_recovery_diagnostics')
@@ -250,22 +295,38 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       .from('commerce_gsc_executor_jobs')
       .select('*')
       .in('action_id', actionIds),
+    supabase
+      .from('commerce_gsc_learning_ledger')
+      .select('*')
+      .in('action_id', actionIds)
+      .order('applied_at', { ascending: false }),
   ])
   if (recoveryError) throw recoveryError
   if (executionError) throw executionError
   if (executorError) throw executorError
+  if (learningError) throw learningError
 
   const executions = (executionData || []) as Array<Record<string, any>>
   const executionIds = executions.map((row) => String(row.id))
   let measurementData: Array<Record<string, any>> = []
+  let rollbackRecoveryData: Array<Record<string, any>> = []
   if (executionIds.length) {
-    const result = await supabase
-      .from('commerce_gsc_action_measurements')
-      .select('*')
-      .in('execution_id', executionIds)
-      .order('checkpoint_days', { ascending: true })
-    if (result.error) throw result.error
-    measurementData = (result.data || []) as Array<Record<string, any>>
+    const [measurementResult, recoveryResult] = await Promise.all([
+      supabase
+        .from('commerce_gsc_action_measurements')
+        .select('*')
+        .in('execution_id', executionIds)
+        .order('checkpoint_days', { ascending: true }),
+      supabase
+        .from('commerce_gsc_rollback_recovery_measurements')
+        .select('*')
+        .in('execution_id', executionIds)
+        .order('checkpoint_days', { ascending: true }),
+    ])
+    if (measurementResult.error) throw measurementResult.error
+    if (recoveryResult.error) throw recoveryResult.error
+    measurementData = (measurementResult.data || []) as Array<Record<string, any>>
+    rollbackRecoveryData = (recoveryResult.data || []) as Array<Record<string, any>>
   }
 
   const recoveryByAction: Record<string, SeoRecoveryDiagnostic> = {}
@@ -311,6 +372,28 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
     measurementsByExecution.set(executionId, items)
   }
 
+  const recoveryMeasurementsByExecution = new Map<string, SeoRollbackRecoveryMeasurement[]>()
+  for (const row of rollbackRecoveryData) {
+    const executionId = String(row.execution_id)
+    const items = recoveryMeasurementsByExecution.get(executionId) || []
+    items.push({
+      checkpointDays: Number(row.checkpoint_days || 0),
+      maturity: row.maturity,
+      verdict: row.verdict,
+      integrityStatus: row.integrity_status || 'BLOCKED',
+      integrityCodes: Array.isArray(row.integrity_codes) ? row.integrity_codes.map(String) : [],
+      integrityReason: row.integrity_reason ? String(row.integrity_reason) : null,
+      positionDeltaVsBaseline: Number(row.position_delta_vs_baseline || 0),
+      ctrDeltaVsBaseline: Number(row.ctr_delta_vs_baseline || 0),
+      positionDeltaVsTrigger: Number(row.position_delta_vs_trigger || 0),
+      ctrDeltaVsTrigger: Number(row.ctr_delta_vs_trigger || 0),
+      postRollbackExposureDays: row.post_rollback_exposure_days === null ? null : Number(row.post_rollback_exposure_days),
+      windowPurity: Number(row.window_purity || 0),
+      measuredAt: String(row.measured_at || ''),
+    })
+    recoveryMeasurementsByExecution.set(executionId, items)
+  }
+
   const executionsByAction: Record<string, SeoActionExecution[]> = {}
   for (const row of executions) {
     const actionId = String(row.action_id)
@@ -336,7 +419,13 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
       rollbackActualDiffSha256: row.rollback_actual_diff_sha256 ? String(row.rollback_actual_diff_sha256) : null,
       rolledBackAt: row.rolled_back_at ? String(row.rolled_back_at) : null,
       rollbackError: row.rollback_error ? String(row.rollback_error) : null,
+      recoveryStatus: row.recovery_status || 'NONE',
+      recoveryLastMeasuredAt: row.recovery_last_measured_at ? String(row.recovery_last_measured_at) : null,
+      recoveryFinalVerdict: row.recovery_final_verdict ? String(row.recovery_final_verdict) : null,
+      recoveryCompleteAt: row.recovery_complete_at ? String(row.recovery_complete_at) : null,
+      recoveryLockUntil: row.recovery_lock_until ? String(row.recovery_lock_until) : null,
       measurements: measurementsByExecution.get(String(row.id)) || [],
+      recoveryMeasurements: recoveryMeasurementsByExecution.get(String(row.id)) || [],
     }
     ;(executionsByAction[actionId] ||= []).push(item)
   }
@@ -372,5 +461,31 @@ export async function loadSeoOpsDetails(actionIds: string[]): Promise<SeoOpsDeta
     }
   }
 
-  return { recoveryByAction, executionsByAction, executorByAction }
+  const learningByAction: Record<string, SeoLearningLedger> = {}
+  for (const row of (learningData || []) as Array<Record<string, any>>) {
+    const actionId = String(row.action_id)
+    if (learningByAction[actionId]) continue
+    learningByAction[actionId] = {
+      executionId: String(row.execution_id),
+      actionId,
+      primaryQuery: String(row.primary_query || ''),
+      actionType: row.action_type,
+      opportunityType: String(row.opportunity_type || ''),
+      latestActionCheckpointDays: row.latest_action_checkpoint_days === null ? null : Number(row.latest_action_checkpoint_days),
+      latestActionVerdict: row.latest_action_verdict ? String(row.latest_action_verdict) : null,
+      rollbackTriggered: Boolean(row.rollback_triggered),
+      rollbackTriggerCheckpointDays: row.rollback_trigger_checkpoint_days === null ? null : Number(row.rollback_trigger_checkpoint_days),
+      latestRecoveryCheckpointDays: row.latest_recovery_checkpoint_days === null ? null : Number(row.latest_recovery_checkpoint_days),
+      latestRecoveryVerdict: row.latest_recovery_verdict ? String(row.latest_recovery_verdict) : null,
+      latestRecoveryMaturity: row.latest_recovery_maturity ? String(row.latest_recovery_maturity) : null,
+      learningSignal: row.learning_signal,
+      confidence: row.confidence,
+      evidenceCount: Number(row.evidence_count || 0),
+      confidenceWeight: Number(row.confidence_weight || 0),
+      signalWeight: Number(row.signal_weight || 0),
+      updatedAt: String(row.updated_at || ''),
+    }
+  }
+
+  return { recoveryByAction, executionsByAction, executorByAction, learningByAction }
 }
