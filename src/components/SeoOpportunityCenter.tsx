@@ -154,7 +154,7 @@ export function SeoOpportunityCenter({ onBack }: { onBack: () => void }) {
         <ShieldCheck size={20} />
         <div>
           <strong>Guard เปิดอยู่</strong>
-          <span>Link Boost ที่ผ่าน Guard ทำอัตโนมัติ • Meta สร้าง PR ให้ตรวจ • Recovery เสี่ยงต้อง Human Review • H1 / URL / Canonical ถูกล็อก</span>
+          <span>Link Boost ที่ผ่าน Guard ทำอัตโนมัติ • Meta สร้าง PR ให้ตรวจ • Recovery เสี่ยงต้อง Human Review • REGRESSED → Auto Rollback • H1 / URL / Canonical ถูกล็อก</span>
         </div>
       </div>
 
