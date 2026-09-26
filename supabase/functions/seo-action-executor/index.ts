@@ -86,6 +86,15 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>
     const operation = String(body.operation || '')
 
+    if (operation === 'site_change_report') {
+      const commits = Array.isArray(body.commits) ? body.commits.slice(0, 100) : []
+      const result = await adminRpc('report_gsc_site_changes', {
+        p_repository: identity.repository,
+        p_commits: commits,
+      })
+      return json({ ok: true, identity, audit: result })
+    }
+
     if (operation === 'claim') {
       const result = await adminRpc('claim_gsc_executor_jobs', {
         p_repository: identity.repository,
