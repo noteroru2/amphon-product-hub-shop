@@ -1,5 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -1888,7 +1889,24 @@ async function logCommerceProductAction(env: Env, actorId: string, productId: st
 
 async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
   if (!url.pathname.startsWith('/commerce')) return null
+  if (url.pathname === '/commerce/channel-connections/oauth/callback' && request.method === 'GET') {
+    try { const result = await oauthCallback(request, env); return new Response(null,{status:302,headers:{location:'https://app.amphontd.com/?channel_oauth='+encodeURIComponent(result.channelKey)+'&status=success'}}) }
+    catch (error) { return new Response(null,{status:302,headers:{location:'https://app.amphontd.com/?channel_oauth=error&message='+encodeURIComponent(error instanceof Error?error.message:String(error))}}) }
+  }
   const context = await assertCommerceStaff(request, env)
+
+  if (url.pathname === '/commerce/channel-connections/authorize' && request.method === 'POST') {
+    try { return json(request, env, await beginOAuth(request, env, context, await request.json().catch(()=>({})))) }
+    catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
+  }
+  if (url.pathname === '/commerce/channel-connections/test' && request.method === 'POST') {
+    try { return json(request, env, await testConnection(env, context, await request.json().catch(()=>({})))) }
+    catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
+  }
+  if (url.pathname === '/commerce/channel-connections/test-publish' && request.method === 'POST') {
+    try { return json(request, env, await markTestPublish(env, context, await request.json().catch(()=>({})))) }
+    catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
+  }
 
   if (url.pathname === '/commerce/channel-connections' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
