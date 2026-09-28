@@ -44,7 +44,8 @@
     "verify:shopee": "node scripts/verify-shopee-auto-publish.mjs",
     "verify:channel-architecture": "node scripts/verify-channel-architecture.mjs",
     "verify:shopee-assisted": "node scripts/verify-shopee-assisted-listing.mjs",
-    "verify:seo-executor": "node scripts/verify-seo-action-executor.mjs"
+    "verify:seo-executor": "node scripts/verify-seo-action-executor.mjs",
+    "verify:central-channels": "tsc -b"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
