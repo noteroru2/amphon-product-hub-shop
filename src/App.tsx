@@ -1319,7 +1319,12 @@ function HomeScreen({
           <ChevronRight />
         </button>
       )}
-      {["owner", "admin"].includes(profile.role) && (\n        <button className="publish-center-launch" onClick={onChannelSettings}>\n          <div><KeyRound size={21}/><span><strong>Sales Channels / API</strong><small>Lazada · TikTok Shop · Facebook · Shopee credentials</small></span></div><ChevronRight/>\n        </button>\n      )}\n      {["owner", "admin"].includes(profile.role) && (
+      {["owner", "admin"].includes(profile.role) && (
+        <button className="publish-center-launch" onClick={onChannelSettings}>
+          <div><KeyRound size={21}/><span><strong>Sales Channels / API</strong><small>Lazada · TikTok Shop · Facebook · Shopee credentials</small></span></div><ChevronRight/>
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
         <button
           className="publish-center-launch ai-buyer-home-launch"
           onClick={onAiBuyer}
