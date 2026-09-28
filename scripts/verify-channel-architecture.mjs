@@ -14,6 +14,8 @@ const [doc, channels, migration, assistedMigration, shopee, workflow] = await Pr
   read('.github/workflows/store-worker-deploy.yml'),
 ])
 
+const channelLine = (key) => channels.split('\n').find((line) => line.includes(`key:'${key}'`)) || ''
+
 const checks = [
   ['System remains canonical stock authority', doc.includes('AMPHON System') && doc.includes('No external channel may become stock master')],
   ['Stable Website/Facebook/Shopee keys exist', ['website','facebook_page','facebook_marketplace','shopee'].every((key) => channels.includes("'" + key + "'"))],
