@@ -1890,6 +1890,43 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
   if (!url.pathname.startsWith('/commerce')) return null
   const context = await assertCommerceStaff(request, env)
 
+  if (url.pathname === '/commerce/channel-connections' && request.method === 'GET') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
+    const rows = await serviceRest<any[]>(env, 'sales_channel_connections?select=channel_key,connection_key,label,external_account_id,status,credential_secret_id,last_synced_at,last_error&order=channel_key,connection_key')
+    return json(request, env, { connections: rows.map((row) => ({
+      channelKey: row.channel_key, connectionKey: row.connection_key, label: row.label,
+      externalAccountId: row.external_account_id || null, status: row.status,
+      hasCredentials: Boolean(row.credential_secret_id), lastSyncedAt: row.last_synced_at || null, lastError: row.last_error || null,
+    })) })
+  }
+
+  if (url.pathname === '/commerce/channel-connections/credentials' && request.method === 'POST') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
+    const body = await request.json().catch(() => ({})) as any
+    const channelKey = cleanCheckoutText(body.channelKey, 40)
+    const connectionKey = cleanCheckoutText(body.connectionKey, 80)
+    if (!['lazada','tiktok_shop','facebook_page','shopee'].includes(channelKey) || !connectionKey) return json(request, env, { error: 'Channel/connection ไม่ถูกต้อง' }, 400)
+    const credentials = {
+      clientId: cleanCheckoutText(body.clientId, 500),
+      clientSecret: cleanCheckoutText(body.clientSecret, 4000),
+      accessToken: cleanCheckoutText(body.accessToken, 8000),
+      refreshToken: cleanCheckoutText(body.refreshToken, 8000),
+    }
+    if (!credentials.clientId && !credentials.clientSecret && !credentials.accessToken && !credentials.refreshToken) return json(request, env, { error: 'กรุณาใส่ Credential อย่างน้อย 1 ค่า' }, 400)
+    await serviceRest(env, 'rpc/central_channel_store_credentials', { method:'POST', body:JSON.stringify({p_channel_key:channelKey,p_connection_key:connectionKey,p_credentials:credentials,p_external_account_id:cleanCheckoutText(body.externalAccountId,300)||null}) })
+    await logEmployeeAction(env, context.user.id, null, 'channel_credentials_updated', { channelKey, connectionKey })
+    return json(request, env, { ok:true })
+  }
+
+  if (url.pathname === '/commerce/channel-connections/disconnect' && request.method === 'POST') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
+    const body = await request.json().catch(() => ({})) as any
+    const channelKey = cleanCheckoutText(body.channelKey, 40), connectionKey = cleanCheckoutText(body.connectionKey, 80)
+    await serviceRest(env, 'rpc/central_channel_clear_credentials', { method:'POST', body:JSON.stringify({p_channel_key:channelKey,p_connection_key:connectionKey}) })
+    await logEmployeeAction(env, context.user.id, null, 'channel_credentials_disconnected', { channelKey, connectionKey })
+    return json(request, env, { ok:true })
+  }
+
   if (url.pathname === '/commerce/orders' && request.method === 'GET') {
     if (!['owner','admin','sales'].includes(context.profile.role)) return json(request, env, { error: 'ไม่มีสิทธิ์ดูคำสั่งซื้อ' }, 403)
     const status = cleanCheckoutText(url.searchParams.get('status'), 32).toUpperCase()
