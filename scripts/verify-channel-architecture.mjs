@@ -19,9 +19,9 @@ const channelLine = (key) => channels.split('\n').find((line) => line.includes(`
 const checks = [
   ['System remains canonical stock authority', doc.includes('AMPHON System') && doc.includes('No external channel may become stock master')],
   ['Stable Website/Facebook/Shopee keys exist', ['website','facebook_page','facebook_marketplace','shopee'].every((key) => channels.includes("'" + key + "'"))],
-  ['Website is native auto channel', /key: 'website'[\\s\\S]*?mode: 'native'[\\s\\S]*?autoPublish: true/.test(channels)],
-  ['Facebook Page is direct API while Marketplace stays assisted', /key: 'facebook_page'[\\s\\S]*?mode: 'direct_api'[\\s\\S]*?autoPublish: true/.test(channels) && /key: 'facebook_marketplace'[\\s\\S]*?mode: 'assisted'[\\s\\S]*?autoPublish: false/.test(channels)],
-  ['Shopee remains fail-closed while API access is unavailable', /key: 'shopee'[\\s\\S]*?mode: 'disabled'[\\s\\S]*?autoPublish: false/.test(channels) && shopee.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'")],
+  ['Website is native auto channel', channelLine('website').includes("mode:'native'") && channelLine('website').includes('autoPublish:true')],
+  ['Facebook Page is direct API while Marketplace stays assisted', channelLine('facebook_page').includes("mode:'direct_api'") && channelLine('facebook_page').includes('autoPublish:false') && channelLine('facebook_marketplace').includes("mode:'assisted'") && channelLine('facebook_marketplace').includes('autoPublish:false')],
+  ['Shopee remains fail-closed while API access is unavailable', channelLine('shopee').includes("mode:'disabled'") && channelLine('shopee').includes('autoPublish:false') && shopee.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'")],
   ['Stock projection is one only for IN_STOCK', channels.includes("oneAvailability === 'IN_STOCK' ? 1 : 0") && migration.includes("p.one_availability = 'IN_STOCK' then 1 else 0")],
   ['Generic registry and durable job tables exist', migration.includes('public.sales_channel_registry') && migration.includes('public.sales_channel_links') && migration.includes('public.sales_channel_jobs')],
   ['Migration DO block uses valid dollar quoting', migration.includes('do ' + dq) && migration.includes('end ' + dq + ';')],
