@@ -3,7 +3,7 @@ import { ChevronLeft, KeyRound, RefreshCw, ShieldCheck } from 'lucide-react'
 import type { Profile } from '../types/product'
 import { listChannelConnections, saveChannelCredentials, disconnectChannel, startChannelAuthorization, testChannelConnection, type ChannelConnectionAdmin } from '../lib/channelSettings'
 const labels:Record<string,string>={lazada:'Lazada',tiktok_shop:'TikTok Shop',facebook_page:'Facebook Page',shopee:'Shopee'}
-const blank={clientId:'',clientSecret:'',accessToken:'',refreshToken:'',externalAccountId:''}
+const blank={clientId:'',clientSecret:'',accessToken:'',refreshToken:'',authorizationUrl:'',externalAccountId:''}
 export function ChannelSettings({profile,onBack}:{profile:Profile;onBack:()=>void}){
  const [rows,setRows]=useState<ChannelConnectionAdmin[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState<string|null>(null);const [editing,setEditing]=useState<string|null>(null);const [form,setForm]=useState(blank)
  const allowed=['owner','admin'].includes(profile.role)
@@ -23,7 +23,7 @@ export function ChannelSettings({profile,onBack}:{profile:Profile;onBack:()=>voi
     <input type="password" autoComplete="new-password" placeholder="Client / App Secret" value={form.clientSecret} onChange={e=>setForm({...form,clientSecret:e.target.value})}/>
     <input type="password" autoComplete="new-password" placeholder="Access Token (ถ้ามี)" value={form.accessToken} onChange={e=>setForm({...form,accessToken:e.target.value})}/>
     <input type="password" autoComplete="new-password" placeholder="Refresh Token (ถ้ามี)" value={form.refreshToken} onChange={e=>setForm({...form,refreshToken:e.target.value})}/>
-    <input placeholder="Shop / Page / Account ID" value={form.externalAccountId} onChange={e=>setForm({...form,externalAccountId:e.target.value})}/>
+    {row.channelKey==='tiktok_shop'&&<input placeholder="TikTok Seller Authorization URL จาก Partner Center" value={form.authorizationUrl} onChange={e=>setForm({...form,authorizationUrl:e.target.value})}/>}\n    <input placeholder="Shop / Page / Account ID" value={form.externalAccountId} onChange={e=>setForm({...form,externalAccountId:e.target.value})}/>
     <div className="settings-actions"><button onClick={()=>void save(row)} disabled={busy}>บันทึก Credentials</button><button onClick={()=>setEditing(null)}>ยกเลิก</button></div>
    </div>:<div className="settings-actions"><button onClick={()=>setEditing(key)}><KeyRound size={16}/>ตั้งค่า Credentials</button>{row.hasCredentials&&row.channelKey!=='shopee'&&<button onClick={async()=>{try{const x=await startChannelAuthorization(row.channelKey,row.connectionKey);window.location.assign(x.authorizationUrl)}catch(e){setError(e instanceof Error?e.message:String(e))}}}>Authorize</button>}{row.hasCredentials&&<button onClick={async()=>{try{const x=await testChannelConnection(row.channelKey,row.connectionKey);setError(x.ok?'เชื่อมต่อสำเร็จและตรวจสอบ Shop/Page แล้ว':null);await load()}catch(e){setError(e instanceof Error?e.message:String(e))}}}>Test Connection</button>}{row.hasCredentials&&<button onClick={async()=>{if(window.confirm('ยืนยันตัดการเชื่อมต่อช่องทางนี้?')){await disconnectChannel(row.channelKey,row.connectionKey);await load()}}}>Disconnect</button>}</div>}
   </article>})}
