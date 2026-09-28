@@ -25,7 +25,7 @@ export const salesChannels: readonly SalesChannelDefinition[] = [
   { key:'tiktok_shop', label:'TikTok Shop', mode:'partner_api', autoPublish:false, capabilities:['publish','update_content','update_price','project_stock','end_listing','orders','webhooks'], stockAuthority:'AMPHON_SYSTEM', note:'API-ready adapter; activation requires seller authorization and mapping validation.' },
   { key:'facebook_page', label:'Facebook Page', mode:'direct_api', autoPublish:false, capabilities:['publish','update_content','update_price','end_listing'], stockAuthority:'AMPHON_SYSTEM', note:'Multi-connection Page adapter. Each Page uses its own connection_key.' },
   { key:'facebook_marketplace', label:'Facebook Marketplace', mode:'assisted', autoPublish:false, capabilities:['publish','update_content','update_price','end_listing'], stockAuthority:'AMPHON_SYSTEM', note:'Assisted only until a supported publishing route is explicitly enabled.' },
-  { key:'shopee', label:'Shopee', mode:'disabled', autoPublish:false, capabilities:[], stockAuthority:'AMPHON_SYSTEM', note:'Shopee-ready contract retained fail-closed while seller API access is unavailable.' },
+  { key:'shopee', label:'Shopee', mode:'disabled', autoPublish:false, capabilities:[], stockAuthority:'AMPHON_SYSTEM', note:'Shopee manual +18% listing remains available; direct API stays fail-closed while seller API access is unavailable.' },
 ] as const
 
 export function channelDefinition(key: SalesChannelKey) {
