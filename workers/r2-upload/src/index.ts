@@ -1929,6 +1929,7 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
       clientSecret: cleanCheckoutText(body.clientSecret, 4000),
       accessToken: cleanCheckoutText(body.accessToken, 8000),
       refreshToken: cleanCheckoutText(body.refreshToken, 8000),
+      authorizationUrl: cleanUrl(body.authorizationUrl),
     }
     if (!credentials.clientId && !credentials.clientSecret && !credentials.accessToken && !credentials.refreshToken) return json(request, env, { error: 'กรุณาใส่ Credential อย่างน้อย 1 ค่า' }, 400)
     await serviceRest(env, 'rpc/central_channel_store_credentials', { method:'POST', body:JSON.stringify({p_channel_key:channelKey,p_connection_key:connectionKey,p_credentials:credentials,p_external_account_id:cleanCheckoutText(body.externalAccountId,300)||null}) })
