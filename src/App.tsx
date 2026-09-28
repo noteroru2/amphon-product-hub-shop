@@ -64,6 +64,7 @@ import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
 import { SeoControlTower } from "./components/SeoControlTower";
 import { MerchantDiagnosticsCenter } from "./components/MerchantDiagnosticsCenter";
 import { TrustReviewCenter } from "./components/TrustReviewCenter";
+import { ChannelSettings } from "./components/ChannelSettings";
 import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import { loadSeoAlertUnreadCount } from "./lib/seoControlTower";
 import {
@@ -132,7 +133,8 @@ type Tab =
   | "seo-opportunities"
   | "seo-control-tower"
   | "merchant-diagnostics"
-  | "trust-reviews";
+  | "trust-reviews"
+  | "channel-settings";
 type StatusFilter = "all" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
@@ -856,6 +858,7 @@ function App() {
             seoAlertUnread={seoAlertUnread}
             onMerchant={() => setTab("merchant-diagnostics")}
             onTrustReviews={() => setTab("trust-reviews")}
+            onChannelSettings={() => setTab("channel-settings")}
             onEdit={openEdit}
           />
         )}
@@ -925,6 +928,9 @@ function App() {
           ["owner", "admin"].includes(profile.role) && (
             <TrustReviewCenter onBack={() => setTab("home")} />
           )}
+        {tab === "channel-settings" && profile && ["owner", "admin"].includes(profile.role) && (
+          <ChannelSettings profile={profile} onBack={() => setTab("home")} />
+        )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
         )}
@@ -1235,6 +1241,7 @@ function HomeScreen({
   seoAlertUnread,
   onMerchant,
   onTrustReviews,
+  onChannelSettings,
   onEdit,
 }: {
   profile: Profile;
@@ -1252,6 +1259,7 @@ function HomeScreen({
   seoAlertUnread: number;
   onMerchant: () => void;
   onTrustReviews: () => void;
+  onChannelSettings: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
   const publishedCount = products.filter(
@@ -1309,6 +1317,11 @@ function HomeScreen({
             </span>
           </div>
           <ChevronRight />
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <button className="publish-center-launch" onClick={onChannelSettings}>
+          <div><KeyRound size={21}/><span><strong>Sales Channels / API</strong><small>Lazada · TikTok Shop · Facebook · Shopee credentials</small></span></div><ChevronRight/>
         </button>
       )}
       {["owner", "admin"].includes(profile.role) && (

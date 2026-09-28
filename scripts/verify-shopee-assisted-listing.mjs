@@ -41,7 +41,7 @@ const checks = [
   ['Content template and ZIP include Shopee', content.includes("id: 'shopee'") && content.includes("channel === 'shopee'") && sales.includes('content-shopee.txt')],
   ['Channel registry enables assisted Shopee but keeps direct auto publish off', assistedMigration.includes("adapter_mode = 'assisted'") && assistedMigration.includes('auto_publish = false') && assistedMigration.includes('auto_publish_enabled = false')],
   ['Latest channel config persists fixed 18 percent only', fixedPriceMigration.includes("'manual_markup_percent', 18") && fixedPriceMigration.includes("'manual_markup_min_percent', 18") && fixedPriceMigration.includes("'manual_markup_max_percent', 18")],
-  ['Source channel contract exposes fixed 18 percent assisted mode', channels.includes("key: 'shopee'") && channels.includes("mode: 'assisted'") && channels.includes('fixed +18%')],
+  ['Source channel contract keeps Shopee manual +18% available while API is fail-closed', channels.includes("key:'shopee'") && channels.includes("mode:'disabled'") && channels.includes('manual +18%')],
   ['Legacy direct API remains disabled by default', shopeeRuntime.includes("env.CHANNEL_SHOPEE_MODE || 'disabled'") && assistedMigration.includes('auto_publish_enabled = false')],
   ['Seller Centre fallback is Thailand seller domain', listing.includes('https://seller.shopee.co.th/') && listing.includes('seller.shopee.co.th')],
 ]
