@@ -1,6 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -2722,10 +2722,10 @@ export default {
 
     if (isManual || cron === '* * * * *') {
       try {
-        const cancelled = await serviceRest<any>(env, 'rpc/facebook_rotation_cancel_sold', { method:'POST', body:'{}' })
-        if (cancelled) console.log('FACEBOOK ROTATION sold guard', cancelled)
+        const rotation = await runFacebookRotationSweep(env)
+        if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
       } catch (error) {
-        console.error('FACEBOOK ROTATION sold guard failed', error)
+        console.error('FACEBOOK ROTATION sweep failed', error)
       }
 
       try {
