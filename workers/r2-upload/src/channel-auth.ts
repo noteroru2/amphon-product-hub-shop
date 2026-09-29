@@ -49,6 +49,26 @@ export async function testConnection(env:Env,ctx:Ctx,body:any){
  await rest(env,'sales_channel_connections?channel_key=eq.'+encodeURIComponent(ch)+'&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({verified_at:new Date().toISOString(),activation_status:'VERIFIED',external_account_id:String(identity.id||identity.seller_id||identity.code||identity.name||c.externalAccountId||'authorized'),last_error:null})})
  return {ok:true,identity}
 }
+export async function facebookTestPublish(env:Env,ctx:Ctx,body:any){
+ if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const ch=String(body.channelKey||''),key=String(body.connectionKey||'');if(ch!=='facebook_page')throw new Error('FACEBOOK_ONLY')
+ const rows=await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status&limit=1');if(rows?.[0]?.activation_status!=='VERIFIED')throw new Error('CONNECTION_MUST_BE_VERIFIED')
+ const c=await creds(env,ch,key);if(!c.pageAccessToken||!c.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+ const message='[AMPHON TEST] ทดสอบการเชื่อมต่อ Amphon Product Hub — '+new Date().toISOString()
+ const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(c.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,access_token:c.pageAccessToken})});const j:any=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_TEST_PUBLISH_FAILED:'+(j.error?.message||r.status))
+ await setCreds(env,ch,key,{...c,testPostId:String(j.id),testPostDeletedAt:null},String(c.pageId));await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({test_publish_at:new Date().toISOString(),last_error:null})})
+ return {ok:true,postId:String(j.id)}
+}
+export async function facebookDeleteTest(env:Env,ctx:Ctx,body:any){
+ if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const key=String(body.connectionKey||''),c=await creds(env,'facebook_page',key);if(!c.pageAccessToken||!c.testPostId)throw new Error('FACEBOOK_TEST_POST_MISSING')
+ const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(c.testPostId)+'?access_token='+encodeURIComponent(c.pageAccessToken),{method:'DELETE'});const j:any=await r.json();if(!r.ok||j.error||j.success!==true)throw new Error('FACEBOOK_TEST_DELETE_FAILED:'+(j.error?.message||r.status))
+ await setCreds(env,'facebook_page',key,{...c,testPostId:null,testPostDeletedAt:new Date().toISOString()},String(c.pageId||''));return {ok:true}
+}
+export async function activateChannel(env:Env,ctx:Ctx,body:any){
+ if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const ch=String(body.channelKey||''),key=String(body.connectionKey||'');if(ch!=='facebook_page')throw new Error('ACTIVATION_NOT_AVAILABLE')
+ const rows=await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status,test_publish_at&limit=1');if(rows?.[0]?.activation_status!=='VERIFIED'||!rows?.[0]?.test_publish_at)throw new Error('TEST_PUBLISH_REQUIRED')
+ const c=await creds(env,ch,key);if(!c.testPostDeletedAt||c.testPostId)throw new Error('DELETE_TEST_POST_REQUIRED')
+ await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({activation_status:'ACTIVE',environment:'PRODUCTION',last_error:null})});return {ok:true}
+}
 export async function markTestPublish(env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const ch=String(body.channelKey||''),key=String(body.connectionKey||''),productId=String(body.productId||'');const rows=await rest(env,'sales_channel_connections?channel_key=eq.'+encodeURIComponent(ch)+'&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status,environment&limit=1');const x=rows?.[0];if(x?.activation_status!=='VERIFIED')throw new Error('CONNECTION_MUST_BE_VERIFIED_FIRST');if(!productId)throw new Error('TEST_PRODUCT_REQUIRED')
  const products=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=id,sku,title,status&limit=1');const p=products?.[0];if(!p||!/^TEST[-_]/i.test(p.sku))throw new Error('TEST_SKU_REQUIRED_PREFIX_TEST')
