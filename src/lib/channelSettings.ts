@@ -17,3 +17,6 @@ export async function activateChannel(channelKey:string,connectionKey:string){re
 export interface FacebookPageOption{id:string;name:string}
 export async function listFacebookPages(connectionKey:string){return call<{ok:boolean;pages:FacebookPageOption[]}>('/commerce/channel-connections/facebook-pages',{method:'POST',body:JSON.stringify({connectionKey})})}
 export async function selectFacebookPage(connectionKey:string,pageId:string){return call<{ok:boolean;page:FacebookPageOption}>('/commerce/channel-connections/facebook-select-page',{method:'POST',body:JSON.stringify({connectionKey,pageId})})}
+
+export async function facebookPublishSelected(productId:string,connectionKeys:string[]){return call<{ok:boolean;results:Array<{connectionKey:string;postId:string;reused:boolean}>}>('/commerce/facebook/publish-selected',{method:'POST',body:JSON.stringify({productId,connectionKeys})})}
+export async function facebookSyncProduct(productId:string){return call<{ok:boolean;results:unknown[]}>('/commerce/facebook/sync-product',{method:'POST',body:JSON.stringify({productId})})}
