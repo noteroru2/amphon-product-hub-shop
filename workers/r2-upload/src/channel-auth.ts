@@ -72,14 +72,59 @@ export async function activateChannel(env:Env,ctx:Ctx,body:any){
  await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({activation_status:'ACTIVE',environment:'PRODUCTION',last_error:null})});return {ok:true}
 }
 export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
- if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const productId=String(body.productId||''),keys=Array.isArray(body.connectionKeys)?body.connectionKeys.map(String):[];if(!productId||!keys.length)throw new Error('PRODUCT_AND_PAGES_REQUIRED')
- const ps=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=id,sku,title,status,price&limit=1');const p=ps?.[0];if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
- const results:any[]=[];for(const key of keys){const rs=await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status,external_account_id&limit=1');if(rs?.[0]?.activation_status!=='ACTIVE')throw new Error('FACEBOOK_PAGE_NOT_ACTIVE:'+key);const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING:'+key)
-  const led=await rest(env,'facebook_post_ledger?product_id=eq.'+encodeURIComponent(productId)+'&connection_key=eq.'+encodeURIComponent(key)+'&select=*&limit=1');if(led?.[0]?.status==='LIVE'){results.push({connectionKey:key,postId:led[0].post_id,reused:true});continue}
-  const price=Number(p.price??0);const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(String(p.sku));const msg=String(p.title||p.sku)+(price?'\nราคา '+price.toLocaleString('th-TH')+' บาท':'')+'\nดูสินค้า: '+shop
-  const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message:msg,link:shop,access_token:cr.pageAccessToken})});const j:any=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+key+':'+(j.error?.message||r.status))
-  await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({product_id:productId,connection_key:key,page_id:String(cr.pageId),post_id:String(j.id),status:'LIVE',external_url:'https://www.facebook.com/'+String(j.id),updated_at:new Date().toISOString(),last_error:null})});results.push({connectionKey:key,postId:String(j.id),reused:false})
- }return {ok:true,results}
+ if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY')
+ const productId=String(body.productId||''),keys=Array.isArray(body.connectionKeys)?body.connectionKeys.map(String):[]
+ if(!productId||!keys.length)throw new Error('PRODUCT_AND_PAGES_REQUIRED')
+ const listings=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,defects,specs,images,slug&limit=1')
+ const p=listings?.[0]
+ if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
+ const price=Number(p.price??0),specs=p.specs||{}
+ const specLines=[
+  specs.cpu&&('CPU: '+specs.cpu), specs.gpu&&('GPU: '+specs.gpu), specs.ram&&('RAM: '+specs.ram),
+  specs.ssd&&('SSD: '+specs.ssd), specs.screen_size&&('จอ: '+specs.screen_size+(specs.resolution?' '+specs.resolution:'')),
+  specs.battery&&('แบตเตอรี่: '+specs.battery), specs.charger&&('อุปกรณ์: '+specs.charger)
+ ].filter(Boolean).slice(0,7)
+ const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(String(p.sku))
+ const message=[
+  '💻 '+String(p.title||p.sku),
+  '',
+  ...specLines,
+  p.condition_percent?('สภาพประมาณ '+p.condition_percent+'%'):null,
+  p.defects?('ตำหนิ/สภาพ: '+p.defects):null,
+  '',
+  price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,
+  '📦 สินค้าจริงตามรูป สนใจสอบถาม/สั่งซื้อทักเพจได้เลยครับ',
+  '🔗 ดูรายละเอียดเพิ่มเติม: '+shop
+ ].filter(x=>x!==null).join('\n')
+ const images=(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)
+ const results:any[]=[]
+ for(const key of keys){
+  const rs=await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status,external_account_id&limit=1')
+  if(rs?.[0]?.activation_status!=='ACTIVE'){results.push({connectionKey:key,ok:false,error:'FACEBOOK_PAGE_NOT_ACTIVE'});continue}
+  try{
+   const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+   const led=await rest(env,'facebook_post_ledger?product_id=eq.'+encodeURIComponent(productId)+'&connection_key=eq.'+encodeURIComponent(key)+'&select=*&limit=1')
+   if(led?.[0]?.status==='LIVE'){results.push({connectionKey:key,ok:true,postId:led[0].post_id,reused:true});continue}
+   let j:any
+   if(images.length){
+    const mediaIds:string[]=[]
+    for(const url of images){
+     const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})})
+     const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))
+    }
+    const params=new URLSearchParams({message,access_token:cr.pageAccessToken})
+    mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})))
+    const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params})
+    j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
+   }else{
+    const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})})
+    j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
+   }
+   await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({product_id:productId,connection_key:key,page_id:String(cr.pageId),post_id:String(j.id),status:'LIVE',external_url:'https://www.facebook.com/'+String(j.id),updated_at:new Date().toISOString(),last_error:null})})
+   results.push({connectionKey:key,ok:true,postId:String(j.id),reused:false,imageCount:images.length})
+  }catch(e){results.push({connectionKey:key,ok:false,error:e instanceof Error?e.message:String(e)})}
+ }
+ return {ok:results.some(x=>x.ok),results}
 }
 export async function facebookSyncProduct(env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const productId=String(body.productId||'');const ps=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=id,sku,title,status,price&limit=1');const p=ps?.[0];if(!p)throw new Error('PRODUCT_NOT_FOUND');const rows=await rest(env,'facebook_post_ledger?product_id=eq.'+encodeURIComponent(productId)+'&status=eq.LIVE&select=*');const results:any[]=[]
