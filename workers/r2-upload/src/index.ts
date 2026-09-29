@@ -1910,11 +1910,11 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
 
   if (url.pathname === '/commerce/channel-connections' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
-    const rows = await serviceRest<any[]>(env, 'sales_channel_connections?select=channel_key,connection_key,label,external_account_id,status,credential_secret_id,last_synced_at,last_error&order=channel_key,connection_key')
+    const rows = await serviceRest<any[]>(env, 'sales_channel_connections?select=channel_key,connection_key,label,external_account_id,status,credential_secret_id,last_synced_at,last_error,activation_status,environment,verified_at,test_publish_at&order=channel_key,connection_key')
     return json(request, env, { connections: rows.map((row) => ({
       channelKey: row.channel_key, connectionKey: row.connection_key, label: row.label,
       externalAccountId: row.external_account_id || null, status: row.status,
-      hasCredentials: Boolean(row.credential_secret_id), lastSyncedAt: row.last_synced_at || null, lastError: row.last_error || null,
+      hasCredentials: Boolean(row.credential_secret_id), lastSyncedAt: row.last_synced_at || null, lastError: row.last_error || null,\n      activationStatus: row.activation_status || 'LOCKED', environment: row.environment || 'TEST', verifiedAt: row.verified_at || null, testPublishAt: row.test_publish_at || null,
     })) })
   }
 
