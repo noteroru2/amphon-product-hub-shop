@@ -1,6 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -1903,6 +1903,9 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     try { return json(request, env, await testConnection(env, context, await request.json().catch(()=>({})))) }
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
   }
+  if (url.pathname === '/commerce/channel-connections/facebook-test-publish' && request.method === 'POST') { try{return json(request,env,await facebookTestPublish(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/channel-connections/facebook-test-delete' && request.method === 'POST') { try{return json(request,env,await facebookDeleteTest(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/channel-connections/activate' && request.method === 'POST') { try{return json(request,env,await activateChannel(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/test-publish' && request.method === 'POST') {
     try { return json(request, env, await markTestPublish(env, context, await request.json().catch(()=>({})))) }
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
