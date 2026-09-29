@@ -521,7 +521,7 @@ export function PublishCenter({
                   <div className="publish-product-copy">
                     <strong>{product.title}</strong>
                     <small>
-                      {product.sku} · {productStatusLabel(product.status)}{fbActiveKeys.length>0&&['ready_to_list','published','reserved'].includes(product.status)&&<button type="button" disabled={fbPublishing===product.id} onClick={()=>void publishFacebookSelected(product)}>โพสต์ Facebook ({fbActiveKeys.length})</button>}{fbActiveKeys.length>0&&['published','reserved','sold'].includes(product.status)&&<button type="button" disabled={fbPublishing===product.id} onClick={()=>void syncFacebook(product)}>Sync Facebook</button>}
+                      {product.sku} · {productStatusLabel(product.status)}
                     </small>
                     <b>
                       {product.price ? money(product.price) : "ยังไม่ตั้งราคา"}
@@ -531,6 +531,30 @@ export function PublishCenter({
                     {count}/{visiblePublicationChannels.length}
                   </span>
                 </div>
+                {fbActiveKeys.length > 0 && (
+                  <div className="publish-facebook-actions" onClick={(event) => event.stopPropagation()}>
+                    {['ready_to_list','published','reserved'].includes(product.status) && (
+                      <button
+                        type="button"
+                        className="facebook-publish-button"
+                        disabled={fbPublishing === product.id}
+                        onClick={(event) => { event.stopPropagation(); void publishFacebookSelected(product); }}
+                      >
+                        {fbPublishing === product.id ? 'กำลังโพสต์…' : `🔵 โพสต์ Facebook (${fbActiveKeys.length})`}
+                      </button>
+                    )}
+                    {['published','reserved','sold'].includes(product.status) && (
+                      <button
+                        type="button"
+                        className="facebook-sync-button"
+                        disabled={fbPublishing === product.id}
+                        onClick={(event) => { event.stopPropagation(); void syncFacebook(product); }}
+                      >
+                        Sync Facebook
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="publish-channel-dots">
                   {visiblePublicationChannels.map((channel) => {
                     const record = channelRecord(
