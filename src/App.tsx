@@ -190,6 +190,7 @@ function initials(name: string) {
 
 function App() {
   const [tab, setTab] = useState<Tab>("home");
+  useEffect(() => { const p=new URLSearchParams(window.location.search); if(p.get("channel_oauth")) { setTab("channel-settings"); window.history.replaceState({}, "", window.location.pathname); } }, []);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [online, setOnline] = useState(navigator.onLine);
