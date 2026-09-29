@@ -71,6 +71,41 @@ export async function activateChannel(env:Env,ctx:Ctx,body:any){
  const c=await creds(env,ch,key);if(!c.testPostDeletedAt||c.testPostId)throw new Error('DELETE_TEST_POST_REQUIRED')
  await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({activation_status:'ACTIVE',environment:'PRODUCTION',last_error:null})});return {ok:true}
 }
+function facebookSalesContent(p:any,templateId='ROT-1'){
+ const price=Number(p.price??0),specs=p.specs||{},title=String(p.title||p.sku),sku=String(p.sku||''),brand=title.trim().split(/\s+/)[0]||''
+ const n=Math.max(1,Number(String(templateId).replace(/\D/g,''))||1), compact=(v:string)=>v.replace(/[^0-9A-Za-zก-๙]/g,'')
+ const specsLines=[specs.cpu&&('CPU: '+specs.cpu),specs.gpu&&('GPU: '+specs.gpu),specs.ram&&('RAM: '+specs.ram),specs.ssd&&('SSD: '+specs.ssd),specs.screen_size&&('จอ: '+specs.screen_size+(specs.resolution?' '+specs.resolution:'')),specs.battery&&('แบตเตอรี่: '+specs.battery),specs.charger&&('อุปกรณ์: '+specs.charger)].filter(Boolean).slice(0,7)
+ const notebook=sku.includes('-NB-')||/notebook|laptop|ideapad|vivobook|aspire|thinkpad|macbook/i.test(title), pc=sku.includes('-PC-')||/desktop|gaming pc|computer/i.test(title)
+ const heads=['🔥 พร้อมส่ง ','✨ สินค้าเข้าใหม่ ','📣 มีของพร้อมขาย ','⭐ รุ่นน่าใช้ ','🛒 พร้อมส่งจากร้าน ','💻 เครื่องพร้อมใช้งาน ','⚡ ของเข้าแล้ว ','📌 แนะนำเครื่องนี้ ']
+ const ctas=['💬 สนใจทักเพจสอบถามหรือสั่งซื้อได้เลยครับ','📩 ทักแอดมินเช็กสินค้าและสอบถามเพิ่มเติมได้ครับ','🛍️ สนใจรับเครื่องนี้ ทักเพจได้เลยครับ','💬 ต้องการรูปหรือรายละเอียดเพิ่ม ทักหาแอดมินได้ครับ']
+ const local=notebook?['#โน๊ตบุ๊คมือสองอุบล','#โน๊ตบุ๊กมือสองอุบล','#คอมมือสองอุบล']:pc?['#คอมมือสองอุบล','#คอมพิวเตอร์มือสองอุบล','#ร้านคอมมือสองอุบล']:['#สินค้าไอทีมือสองอุบล','#ของมือสองอุบล']
+ const buy=notebook?['#รับซื้อโน๊ตบุ๊ค','#รับซื้อโน๊ตบุ๊คอุบล','#รับซื้อโน๊ตบุ๊กมือสอง']:pc?['#รับซื้อคอม','#รับซื้อคอมมือสอง','#รับซื้อคอมอุบล']:['#รับซื้อสินค้าไอที','#รับซื้อสินค้าไอทีอุบล']
+ const warranty=p.warranty_until?new Date(p.warranty_until):null,warrantyText=warranty&&!Number.isNaN(warranty.getTime())&&warranty.getTime()>Date.now()?'🛡️ มีประกันถึง '+warranty.toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}):null
+ const tags=Array.from(new Set(['#อำพลเทรดดิ้ง',...local,...buy,brand&&('#'+compact(brand)),'#'+compact(title.split(/\s+/).slice(0,3).join(''))].filter(Boolean))).slice((n-1)%3,(n-1)%3+9).join(' ')
+ const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(sku)
+ const message=[heads[(n-1)%heads.length]+title,'',...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
+ return {message,shop,images:(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)}
+}
+
+async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
+ const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
+ if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
+ const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+ const {message,shop,images}=facebookSalesContent(p,templateId);let j:any
+ if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
+ const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
+ else {const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
+ return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
+}
+
+export async function runFacebookRotationSweep(env:Env){
+ await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'})
+ const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
+ const results:any[]=[]
+ for(const job of Array.isArray(jobs)?jobs:[]){try{const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id));await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:out.postId,posted_at:new Date().toISOString(),last_error:null,claim_token:null})});results.push({id:job.id,ok:true,postId:out.postId})}catch(e){const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE';await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})});results.push({id:job.id,ok:false,error:msg})}}
+ return results
+}
+
 export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY')
  const productId=String(body.productId||''),keys=Array.isArray(body.connectionKeys)?body.connectionKeys.map(String):[]
