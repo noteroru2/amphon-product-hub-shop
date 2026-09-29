@@ -1916,6 +1916,12 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
   }
 
+  if (url.pathname === '/commerce/facebook/active-pages' && request.method === 'GET') {
+    if (!['owner','admin','sales'].includes(context.profile.role)) return json(request, env, { error: 'ไม่มีสิทธิ์ดูช่องทางขาย' }, 403)
+    const rows = await serviceRest<any[]>(env, 'sales_channel_connections?channel_key=eq.facebook_page&activation_status=eq.ACTIVE&environment=eq.PRODUCTION&select=connection_key,label,external_account_id,activation_status,environment&order=connection_key')
+    return json(request, env, { pages: rows.map((row) => ({ connectionKey: row.connection_key, label: row.label, pageId: row.external_account_id })) })
+  }
+
   if (url.pathname === '/commerce/channel-connections' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'Owner/Admin เท่านั้น' }, 403)
     const rows = await serviceRest<any[]>(env, 'sales_channel_connections?select=channel_key,connection_key,label,external_account_id,status,credential_secret_id,last_synced_at,last_error,activation_status,environment,verified_at,test_publish_at&order=channel_key,connection_key')
