@@ -20,3 +20,5 @@ export async function selectFacebookPage(connectionKey:string,pageId:string){ret
 
 export async function facebookPublishSelected(productId:string,connectionKeys:string[]){return call<{ok:boolean;results:Array<{connectionKey:string;postId:string;reused:boolean}>}>('/commerce/facebook/publish-selected',{method:'POST',body:JSON.stringify({productId,connectionKeys})})}
 export async function facebookSyncProduct(productId:string){return call<{ok:boolean;results:unknown[]}>('/commerce/facebook/sync-product',{method:'POST',body:JSON.stringify({productId})})}
+
+export async function listActiveFacebookPages(){return call<{pages:Array<{connectionKey:string;label:string;pageId:string|null}>}>('/commerce/facebook/active-pages')}
