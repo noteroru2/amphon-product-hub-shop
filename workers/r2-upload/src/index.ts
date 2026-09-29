@@ -2722,6 +2722,13 @@ export default {
 
     if (isManual || cron === '* * * * *') {
       try {
+        const cancelled = await serviceRest<any>(env, 'rpc/facebook_rotation_cancel_sold', { method:'POST', body:'{}' })
+        if (cancelled) console.log('FACEBOOK ROTATION sold guard', cancelled)
+      } catch (error) {
+        console.error('FACEBOOK ROTATION sold guard failed', error)
+      }
+
+      try {
         await runCommerceAutoPublishSweep(env)
       } catch (error) {
         console.error('SHOP AUTO PUBLISH sweep failed', error)
