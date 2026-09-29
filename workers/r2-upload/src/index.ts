@@ -1890,8 +1890,8 @@ async function logCommerceProductAction(env: Env, actorId: string, productId: st
 async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promise<Response | null> {
   if (!url.pathname.startsWith('/commerce')) return null
   if (url.pathname === '/commerce/channel-connections/oauth/callback' && request.method === 'GET') {
-    try { const result = await oauthCallback(request, env); return new Response(null,{status:302,headers:{location:'https://app.amphontd.com/?channel_oauth='+encodeURIComponent(result.channelKey)+'&status=success'}}) }
-    catch (error) { return new Response(null,{status:302,headers:{location:'https://app.amphontd.com/?channel_oauth=error&message='+encodeURIComponent(error instanceof Error?error.message:String(error))}}) }
+    try { const result = await oauthCallback(request, env); return new Response(null,{status:302,headers:{location:'https://hub.amphon.co.th/?channel_oauth='+encodeURIComponent(result.channelKey)+'&status=success'}}) }
+    catch (error) { return new Response(null,{status:302,headers:{location:'https://hub.amphon.co.th/?channel_oauth=error&message='+encodeURIComponent(error instanceof Error?error.message:String(error))}}) }
   }
   const context = await assertCommerceStaff(request, env)
 
