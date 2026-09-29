@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
+import { listChannelConnections, facebookPublishSelected, facebookSyncProduct } from "../lib/channelSettings";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -166,6 +167,8 @@ export function PublishCenter({
   const [autoPublishQueue, setAutoPublishQueue] = useState<AutoPublishQueueItem[]>([]);
   const [autoPublishEnabled, setAutoPublishEnabled] = useState(true);
   const [autoPublishDelaySeconds, setAutoPublishDelaySeconds] = useState(180);
+  const [fbActiveKeys,setFbActiveKeys]=useState<string[]>([]);
+  const [fbPublishing,setFbPublishing]=useState<string|null>(null);
   const canManage = ["owner", "admin", "sales"].includes(profile.role);
 
   const eligible = useMemo(() => {
@@ -221,6 +224,7 @@ export function PublishCenter({
         // Keep safe defaults; publication status itself is still authoritative.
       }
 
+      try { const conns=await listChannelConnections(); setFbActiveKeys(conns.filter(x=>x.channelKey==='facebook_page'&&x.activationStatus==='ACTIVE').map(x=>x.connectionKey)); } catch { setFbActiveKeys([]); }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -229,6 +233,9 @@ export function PublishCenter({
       setRefreshing(false);
     }
   }
+
+  async function publishFacebookSelected(product:ProductSummary){if(!canManage||fbPublishing||fbActiveKeys.length===0)return;if(!window.confirm('ยืนยันโพสต์ '+product.sku+' ไป Facebook Page ที่ ACTIVE ทั้ง '+fbActiveKeys.length+' เพจ?'))return;setFbPublishing(product.id);try{const x=await facebookPublishSelected(product.id,fbActiveKeys);setBulkMessage('Facebook โพสต์สำเร็จ '+x.results.length+' เพจ');setError(null)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setFbPublishing(null)}}
+  async function syncFacebook(product:ProductSummary){setFbPublishing(product.id);try{const x=await facebookSyncProduct(product.id);setBulkMessage('Facebook Sync สำเร็จ '+x.results.length+' เพจ');setError(null)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setFbPublishing(null)}}
 
   async function publishAllReady() {
     if (!canManage || bulkPublishing || bulkReady.length === 0) return;
@@ -514,7 +521,7 @@ export function PublishCenter({
                   <div className="publish-product-copy">
                     <strong>{product.title}</strong>
                     <small>
-                      {product.sku} · {productStatusLabel(product.status)}
+                      {product.sku} · {productStatusLabel(product.status)}{fbActiveKeys.length>0&&['ready_to_list','published','reserved'].includes(product.status)&&<button type="button" disabled={fbPublishing===product.id} onClick={()=>void publishFacebookSelected(product)}>โพสต์ Facebook ({fbActiveKeys.length})</button>}{fbActiveKeys.length>0&&['published','reserved','sold'].includes(product.status)&&<button type="button" disabled={fbPublishing===product.id} onClick={()=>void syncFacebook(product)}>Sync Facebook</button>}
                     </small>
                     <b>
                       {product.price ? money(product.price) : "ยังไม่ตั้งราคา"}
