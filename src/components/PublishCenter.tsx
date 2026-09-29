@@ -505,11 +505,15 @@ export function PublishCenter({
               product.images[0];
             const autoPublish = autoPublishByProduct.get(product.id);
             return (
-              <button
+              <article
                 key={product.id}
                 className={`publish-product-card state-${state}`}
-                onClick={() => setSelectedId(product.id)}
               >
+                <button
+                  type="button"
+                  className="publish-product-open"
+                  onClick={() => setSelectedId(product.id)}
+                >
                 <div className="publish-product-main">
                   <div className="publish-thumb">
                     {cover?.publicUrl ? (
@@ -531,6 +535,7 @@ export function PublishCenter({
                     {count}/{visiblePublicationChannels.length}
                   </span>
                 </div>
+                </button>
                 {fbActiveKeys.length > 0 && (
                   <div className="publish-facebook-actions" onClick={(event) => event.stopPropagation()}>
                     {['ready_to_list','published','reserved'].includes(product.status) && (
@@ -598,7 +603,7 @@ export function PublishCenter({
                     {activeListingCount(product.id, publications)} ช่องทาง
                   </div>
                 )}
-              </button>
+              </article>
             );
           })}
           {!visible.length && (
