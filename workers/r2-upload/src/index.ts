@@ -1916,6 +1916,24 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
   }
 
+  if (url.pathname === '/commerce/facebook/rotation-status' && request.method === 'GET') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
+    const settings = await serviceRest<any[]>(env, 'facebook_rotation_settings?select=*&limit=1')
+    const queue = await serviceRest<any[]>(env, 'facebook_rotation_queue?select=id,product_id,connection_key,scheduled_at,rotation_no,template_id,status,post_id,last_error&order=scheduled_at.asc&limit=250')
+    const ids = Array.from(new Set(queue.map((row:any)=>row.product_id))).filter(Boolean)
+    const products = ids.length ? await serviceRest<any[]>(env, 'products?id=in.('+ids.join(',')+')&select=id,sku,title,status,price') : []
+    const byId = new Map(products.map((row:any)=>[row.id,row]))
+    return json(request, env, { settings: settings[0]||null, queue: queue.map((row:any)=>({ ...row, product: byId.get(row.product_id)||null })) })
+  }
+  if (url.pathname === '/commerce/facebook/rotation-settings' && request.method === 'PATCH') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
+    const body:any = await request.json().catch(()=>({}))
+    const patch:any = { updated_at: new Date().toISOString() }
+    if (typeof body.enabled === 'boolean') patch.enabled = body.enabled
+    if (typeof body.dryRun === 'boolean') patch.dry_run = body.dryRun
+    await serviceRest(env, 'facebook_rotation_settings?id=eq.true', { method:'PATCH', headers:{ prefer:'return=minimal' }, body:JSON.stringify(patch) })
+    return json(request, env, { ok:true })
+  }
   if (url.pathname === '/commerce/facebook/active-pages' && request.method === 'GET') {
     if (!['owner','admin','sales'].includes(context.profile.role)) return json(request, env, { error: 'ไม่มีสิทธิ์ดูช่องทางขาย' }, 403)
     const rows = await serviceRest<any[]>(env, 'sales_channel_connections?channel_key=eq.facebook_page&activation_status=eq.ACTIVE&environment=eq.PRODUCTION&select=connection_key,label,external_account_id,activation_status,environment&order=connection_key')
