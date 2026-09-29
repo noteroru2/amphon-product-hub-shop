@@ -13,3 +13,7 @@ export async function testChannelPublish(channelKey:string,connectionKey:string,
 export async function facebookTestPublish(connectionKey:string){return call<{ok:boolean;postId:string}>('/commerce/channel-connections/facebook-test-publish',{method:'POST',body:JSON.stringify({channelKey:'facebook_page',connectionKey})})}
 export async function facebookDeleteTest(connectionKey:string){return call<{ok:boolean}>('/commerce/channel-connections/facebook-test-delete',{method:'POST',body:JSON.stringify({channelKey:'facebook_page',connectionKey})})}
 export async function activateChannel(channelKey:string,connectionKey:string){return call<{ok:boolean}>('/commerce/channel-connections/activate',{method:'POST',body:JSON.stringify({channelKey,connectionKey})})}
+
+export interface FacebookPageOption{id:string;name:string}
+export async function listFacebookPages(connectionKey:string){return call<{ok:boolean;pages:FacebookPageOption[]}>('/commerce/channel-connections/facebook-pages',{method:'POST',body:JSON.stringify({connectionKey})})}
+export async function selectFacebookPage(connectionKey:string,pageId:string){return call<{ok:boolean;page:FacebookPageOption}>('/commerce/channel-connections/facebook-select-page',{method:'POST',body:JSON.stringify({connectionKey,pageId})})}
