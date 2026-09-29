@@ -9,7 +9,7 @@ function state(){const a=new Uint8Array(32);crypto.getRandomValues(a);return [..
 export async function beginOAuth(request:Request,env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY')
  const ch=String(body.channelKey||''),key=String(body.connectionKey||'');const c=await creds(env,ch,key);if(!c.clientId)throw new Error('CLIENT_ID_REQUIRED')
- const st=state(),callback=new URL('/commerce/channel-connections/oauth/callback',new URL(request.url).origin).toString()
+ const st=state(),callback='https://api.amphontd.com/commerce/channel-connections/oauth/callback'
  await rest(env,'sales_channel_oauth_sessions',{method:'POST',headers:{prefer:'return=minimal'},body:JSON.stringify({state:st,channel_key:ch,connection_key:key,actor_id:ctx.user.id,redirect_uri:callback})})
  let authorizationUrl=''
  if(ch==='lazada'){const u=new URL('https://auth.lazada.com/oauth/authorize');u.search=new URLSearchParams({response_type:'code',force_auth:'true',redirect_uri:callback,client_id:c.clientId,state:st}).toString();authorizationUrl=u.toString()}
