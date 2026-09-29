@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
-import { listChannelConnections, facebookPublishSelected, facebookSyncProduct } from "../lib/channelSettings";
+import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct } from "../lib/channelSettings";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -224,7 +224,7 @@ export function PublishCenter({
         // Keep safe defaults; publication status itself is still authoritative.
       }
 
-      try { const conns=await listChannelConnections(); setFbActiveKeys(conns.filter(x=>x.channelKey==='facebook_page'&&x.activationStatus==='ACTIVE').map(x=>x.connectionKey)); } catch { setFbActiveKeys([]); }
+      try { const active=await listActiveFacebookPages(); setFbActiveKeys(active.pages.map(x=>x.connectionKey)); } catch (fbError) { setFbActiveKeys([]); setError('โหลด Facebook Pages ไม่สำเร็จ: '+(fbError instanceof Error?fbError.message:String(fbError))); }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -440,6 +440,10 @@ export function PublishCenter({
             มีปัญหา <b>{autoPublishCounts.failed}</b>
           </span>
         </div>
+      </div>
+
+      <div className="security-note">
+        <span>Facebook Production: <strong>{fbActiveKeys.length} เพจ ACTIVE</strong>{fbActiveKeys.length > 0 ? ' · ปุ่มโพสต์จะแสดงในสินค้าที่พร้อมลงขาย' : ' · ยังไม่พบเพจ ACTIVE สำหรับ Publish Center'}</span>
       </div>
 
       {canManage && (
