@@ -18,7 +18,8 @@
     "SHOPEE_API_BASE_URL": "https://partner.shopeemobile.com",
     "SHOPEE_AUTH_URL": "https://open.shopee.com/auth",
     "SHOPEE_REDIRECT_URI": "https://amphon-product-images.noteroru2.workers.dev/shopee/callback",
-    "SHOPEE_HUB_REDIRECT_URL": "https://hub.amphon.co.th/"
+    "SHOPEE_HUB_REDIRECT_URL": "https://hub.amphon.co.th/",
+    "CHANNEL_OAUTH_CALLBACK_URL": "https://amphon-product-images.noteroru2.workers.dev/commerce/channel-connections/oauth/callback"
   },
   "triggers": {
     "crons": [
