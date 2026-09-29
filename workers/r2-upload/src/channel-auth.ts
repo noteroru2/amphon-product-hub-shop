@@ -1,4 +1,4 @@
-type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string}
+type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
 type Ctx={user:{id:string};profile:{role:string}}
 const enc=(s:string)=>new TextEncoder().encode(s)
 async function hmac(secret:string,input:string){const k=await crypto.subtle.importKey('raw',enc(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,enc(input)))].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -9,7 +9,7 @@ function state(){const a=new Uint8Array(32);crypto.getRandomValues(a);return [..
 export async function beginOAuth(request:Request,env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY')
  const ch=String(body.channelKey||''),key=String(body.connectionKey||'');const c=await creds(env,ch,key);if(!c.clientId)throw new Error('CLIENT_ID_REQUIRED')
- const st=state(),callback='https://api.amphontd.com/commerce/channel-connections/oauth/callback'
+ const st=state(),callback=String(env.CHANNEL_OAUTH_CALLBACK_URL||'https://amphon-product-images.noteroru2.workers.dev/commerce/channel-connections/oauth/callback').trim()
  await rest(env,'sales_channel_oauth_sessions',{method:'POST',headers:{prefer:'return=minimal'},body:JSON.stringify({state:st,channel_key:ch,connection_key:key,actor_id:ctx.user.id,redirect_uri:callback})})
  let authorizationUrl=''
  if(ch==='lazada'){const u=new URL('https://auth.lazada.com/oauth/authorize');u.search=new URLSearchParams({response_type:'code',force_auth:'true',redirect_uri:callback,client_id:c.clientId,state:st}).toString();authorizationUrl=u.toString()}
