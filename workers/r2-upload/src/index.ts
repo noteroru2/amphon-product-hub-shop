@@ -1914,7 +1914,8 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     return json(request, env, { connections: rows.map((row) => ({
       channelKey: row.channel_key, connectionKey: row.connection_key, label: row.label,
       externalAccountId: row.external_account_id || null, status: row.status,
-      hasCredentials: Boolean(row.credential_secret_id), lastSyncedAt: row.last_synced_at || null, lastError: row.last_error || null,\n      activationStatus: row.activation_status || 'LOCKED', environment: row.environment || 'TEST', verifiedAt: row.verified_at || null, testPublishAt: row.test_publish_at || null,
+      hasCredentials: Boolean(row.credential_secret_id), lastSyncedAt: row.last_synced_at || null, lastError: row.last_error || null,
+      activationStatus: row.activation_status || 'LOCKED', environment: row.environment || 'TEST', verifiedAt: row.verified_at || null, testPublishAt: row.test_publish_at || null,
     })) })
   }
 
