@@ -9,3 +9,7 @@ export async function disconnectChannel(channelKey:string,connectionKey:string){
 export async function startChannelAuthorization(channelKey:string,connectionKey:string){return call<{authorizationUrl:string}>('/commerce/channel-connections/authorize',{method:'POST',body:JSON.stringify({channelKey,connectionKey})})}
 export async function testChannelConnection(channelKey:string,connectionKey:string){return call<{ok:boolean;identity?:Record<string,unknown>}>('/commerce/channel-connections/test',{method:'POST',body:JSON.stringify({channelKey,connectionKey})})}
 export async function testChannelPublish(channelKey:string,connectionKey:string,productId:string){return call<{ok:boolean;result?:unknown}>('/commerce/channel-connections/test-publish',{method:'POST',body:JSON.stringify({channelKey,connectionKey,productId})})}
+
+export async function facebookTestPublish(connectionKey:string){return call<{ok:boolean;postId:string}>('/commerce/channel-connections/facebook-test-publish',{method:'POST',body:JSON.stringify({channelKey:'facebook_page',connectionKey})})}
+export async function facebookDeleteTest(connectionKey:string){return call<{ok:boolean}>('/commerce/channel-connections/facebook-test-delete',{method:'POST',body:JSON.stringify({channelKey:'facebook_page',connectionKey})})}
+export async function activateChannel(channelKey:string,connectionKey:string){return call<{ok:boolean}>('/commerce/channel-connections/activate',{method:'POST',body:JSON.stringify({channelKey,connectionKey})})}
