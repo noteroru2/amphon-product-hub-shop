@@ -22,3 +22,7 @@ export async function facebookPublishSelected(productId:string,connectionKeys:st
 export async function facebookSyncProduct(productId:string){return call<{ok:boolean;results:unknown[]}>('/commerce/facebook/sync-product',{method:'POST',body:JSON.stringify({productId})})}
 
 export async function listActiveFacebookPages(){return call<{pages:Array<{connectionKey:string;label:string;pageId:string|null}>}>('/commerce/facebook/active-pages')}
+
+export type FacebookRotationStatus={settings:{enabled:boolean;dry_run:boolean;posts_per_product_per_week:number;min_page_gap_minutes:number;min_product_gap_hours:number;page_daily_budget:number}|null;queue:Array<{id:string;product_id:string;connection_key:string;scheduled_at:string;rotation_no:number;template_id:string;status:string;post_id?:string|null;last_error?:string|null;product?:{id:string;sku:string;title:string;status:string;price:number}|null}>}
+export async function getFacebookRotationStatus(){return call<FacebookRotationStatus>('/commerce/facebook/rotation-status')}
+export async function updateFacebookRotationSettings(patch:{enabled?:boolean;dryRun?:boolean}){return call<{ok:boolean}>('/commerce/facebook/rotation-settings',{method:'PATCH',body:JSON.stringify(patch)})}
