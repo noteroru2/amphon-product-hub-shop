@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
-import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct } from "../lib/channelSettings";
+import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, type FacebookRotationStatus } from "../lib/channelSettings";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -169,6 +169,7 @@ export function PublishCenter({
   const [autoPublishDelaySeconds, setAutoPublishDelaySeconds] = useState(180);
   const [fbActiveKeys,setFbActiveKeys]=useState<string[]>([]);
   const [fbPublishing,setFbPublishing]=useState<string|null>(null);
+  const [fbRotation,setFbRotation]=useState<FacebookRotationStatus|null>(null);
   const canManage = ["owner", "admin", "sales"].includes(profile.role);
 
   const eligible = useMemo(() => {
@@ -225,6 +226,7 @@ export function PublishCenter({
       }
 
       try { const active=await listActiveFacebookPages(); setFbActiveKeys(active.pages.map(x=>x.connectionKey)); } catch (fbError) { setFbActiveKeys([]); setError('โหลด Facebook Pages ไม่สำเร็จ: '+(fbError instanceof Error?fbError.message:String(fbError))); }
+      try { setFbRotation(await getFacebookRotationStatus()); } catch { setFbRotation(null); }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -445,6 +447,19 @@ export function PublishCenter({
       <div className="security-note">
         <span>Facebook Production: <strong>{fbActiveKeys.length} เพจ ACTIVE</strong>{fbActiveKeys.length > 0 ? ' · ปุ่มโพสต์จะแสดงในสินค้าที่พร้อมลงขาย' : ' · ยังไม่พบเพจ ACTIVE สำหรับ Publish Center'}</span>
       </div>
+
+      {fbRotation?.settings && (
+        <div className="auto-publish-banner">
+          <div>
+            <strong>Facebook Rotation: {fbRotation.settings.enabled ? 'เปิดใช้งาน' : 'DRY RUN / ยังไม่โพสต์อัตโนมัติ'}</strong>
+            <span>เป้าหมาย {fbRotation.settings.posts_per_product_per_week} ครั้ง/สินค้า/สัปดาห์ · เว้นโพสต์อย่างน้อย {fbRotation.settings.min_page_gap_minutes} นาที · งบสูงสุด {fbRotation.settings.page_daily_budget} โพสต์/เพจ/วัน</span>
+          </div>
+          <div className="auto-publish-stats">
+            <span>คิว 7 วัน <b>{fbRotation.queue.filter(x=>x.status==='PLANNED').length}</b></span>
+            <span>ขายแล้วถูกตัด <b>{fbRotation.queue.filter(x=>x.status==='SKIPPED_SOLD').length}</b></span>
+          </div>
+        </div>
+      )}
 
       {canManage && (
         <div className="publish-bulk-panel">
