@@ -85,16 +85,23 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
   specs.battery&&('แบตเตอรี่: '+specs.battery), specs.charger&&('อุปกรณ์: '+specs.charger)
  ].filter(Boolean).slice(0,7)
  const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(String(p.sku))
+ const rawTitle=String(p.title||p.sku),brand=rawTitle.trim().split(/\s+/)[0]||''
+ const compact=(value:string)=>value.replace(/[^0-9A-Za-zก-๙]/g,'')
+ const categoryTag=String(p.sku||'').includes('-NB-')?'โน๊ตบุ๊คมือสอง':'สินค้าไอทีมือสอง'
+ const tags=Array.from(new Set([brand&&('#'+compact(brand)),'#'+compact(rawTitle.split(/\s+/).slice(0,2).join('')),'#'+categoryTag,'#สินค้าไอทีมือสอง','#AmphonTrading'].filter(Boolean))).join(' ')
  const message=[
-  '💻 '+String(p.title||p.sku),
+  '🔥 พร้อมส่ง '+rawTitle,
   '',
   ...specLines,
-  p.condition_percent?('สภาพประมาณ '+p.condition_percent+'%'):null,
-  p.defects?('ตำหนิ/สภาพ: '+p.defects):null,
+  p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,
+  p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,
   '',
   price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,
-  '📦 สินค้าจริงตามรูป สนใจสอบถาม/สั่งซื้อทักเพจได้เลยครับ',
-  '🔗 ดูรายละเอียดเพิ่มเติม: '+shop
+  '📸 รูปสินค้าจริงทุกภาพ รายละเอียดแจ้งตามสภาพจริง',
+  '💬 สนใจเครื่องนี้ ทักข้อความเพจเพื่อสอบถามหรือสั่งซื้อได้เลยครับ',
+  '🔗 ดูรายละเอียดเพิ่มเติม: '+shop,
+  '',
+  tags
  ].filter(x=>x!==null).join('\n')
  const images=(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)
  const results:any[]=[]
