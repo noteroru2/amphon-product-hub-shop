@@ -159,7 +159,7 @@ export function PublishCenter({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<PublishFilter>("todo");
+  const [filter, setFilter] = useState<PublishFilter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
