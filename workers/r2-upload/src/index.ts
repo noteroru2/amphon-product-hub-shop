@@ -1,6 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -1905,6 +1905,9 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
   }
   if (url.pathname === '/commerce/channel-connections/facebook-pages' && request.method === 'POST') { try{return json(request,env,await listFacebookPages(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/facebook-select-page' && request.method === 'POST') { try{return json(request,env,await selectFacebookPage(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/facebook/publish-selected' && request.method === 'POST') { try{return json(request,env,await facebookPublishSelected(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/facebook/sync-product' && request.method === 'POST') { try{return json(request,env,await facebookSyncProduct(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/facebook/ledger' && request.method === 'POST') { try{return json(request,env,await facebookLedger(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/facebook-test-publish' && request.method === 'POST') { try{return json(request,env,await facebookTestPublish(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/facebook-test-delete' && request.method === 'POST') { try{return json(request,env,await facebookDeleteTest(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/activate' && request.method === 'POST') { try{return json(request,env,await activateChannel(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
