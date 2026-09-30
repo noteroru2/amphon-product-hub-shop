@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
-import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, updateFacebookRotationSettings, type FacebookRotationStatus } from "../lib/channelSettings";
+import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, updateFacebookRotationSettings, getFacebookLearningDashboard, type FacebookRotationStatus, type FacebookLearningDashboard } from "../lib/channelSettings";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -170,6 +170,7 @@ export function PublishCenter({
   const [fbActiveKeys,setFbActiveKeys]=useState<string[]>([]);
   const [fbPublishing,setFbPublishing]=useState<string|null>(null);
   const [fbRotation,setFbRotation]=useState<FacebookRotationStatus|null>(null);
+  const [fbLearning,setFbLearning]=useState<FacebookLearningDashboard|null>(null);
   const canManage = ["owner", "admin", "sales"].includes(profile.role);
 
   const eligible = useMemo(() => {
@@ -227,6 +228,7 @@ export function PublishCenter({
 
       try { const active=await listActiveFacebookPages(); setFbActiveKeys(active.pages.map(x=>x.connectionKey)); } catch (fbError) { setFbActiveKeys([]); setError('โหลด Facebook Pages ไม่สำเร็จ: '+(fbError instanceof Error?fbError.message:String(fbError))); }
       try { setFbRotation(await getFacebookRotationStatus()); } catch { setFbRotation(null); }
+      if(['owner','admin'].includes(profile.role)){try{setFbLearning(await getFacebookLearningDashboard())}catch{setFbLearning(null)}}
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -465,6 +467,25 @@ export function PublishCenter({
             <button type="button" onClick={async()=>{await updateFacebookRotationSettings({enabled:!fbRotation.settings!.enabled,dryRun:fbRotation.settings!.enabled?true:false});await refresh(true)}}>{fbRotation.settings.enabled?'⏸ Pause ทั้งหมด':'▶ เปิด Rotation'}</button>
             {(fbRotation.settings.active_connection_keys||[]).map(key=>{const paused=(fbRotation.settings!.paused_connection_keys||[]).includes(key);return <button type="button" key={key} onClick={async()=>{const set=new Set(fbRotation.settings!.paused_connection_keys||[]);paused?set.delete(key):set.add(key);await updateFacebookRotationSettings({pausedConnectionKeys:Array.from(set)});await refresh(true)}}>{paused?'▶ เปิด '+key:'⏸ '+key}</button>})}
           </div>}
+        </div>
+      )}
+
+      {fbLearning && ['owner','admin'].includes(profile.role) && (
+        <div className="auto-publish-banner">
+          <div>
+            <strong>🧠 Facebook Learning Dashboard</strong>
+            <span>Learning {fbLearning.settings?.learning_enabled?'ON':'OFF'} · เริ่มปรับเมื่อ ≥ {fbLearning.settings?.learning_min_samples??5} samples · ขยับเวลาได้ ±{fbLearning.settings?.learning_max_shift_minutes??60} นาที · Exploration {fbLearning.settings?.learning_exploration_percent??20}%</span>
+            <span>{fbLearning.feedback.some(x=>x.eligible)?'Adaptive พร้อมใช้กับกลุ่มที่ผ่าน Sample Guard แล้ว':'กำลังเรียนรู้ · ตอนนี้ยังใช้ตารางและ Template เดิมเป็นหลัก'}</span>
+          </div>
+          <div className="auto-publish-stats">
+            {fbLearning.pageSummary.map(p=><span key={p.connectionKey}>{p.connectionKey} <b>{p.collected}/{p.posts}</b> วัดแล้ว · Reach เฉลี่ย <b>{p.avgReach??'—'}</b></span>)}
+          </div>
+          <div style={{width:'100%',overflowX:'auto'}}>
+            <table style={{width:'100%',fontSize:13,borderCollapse:'collapse'}}>
+              <thead><tr><th style={{textAlign:'left'}}>Page</th><th>Template</th><th>เวลา</th><th>Samples</th><th>Reach</th><th>Engaged</th><th>Score</th><th>สถานะ</th></tr></thead>
+              <tbody>{fbLearning.feedback.slice(0,8).map((x,i)=><tr key={x.connection_key+x.template_id+x.local_dow+x.local_hour+i}><td>{x.connection_key}</td><td style={{textAlign:'center'}}>{x.template_id}</td><td style={{textAlign:'center'}}>{String(x.local_hour).padStart(2,'0')}:00</td><td style={{textAlign:'center'}}>{x.samples}</td><td style={{textAlign:'center'}}>{x.avg_reach??'—'}</td><td style={{textAlign:'center'}}>{x.avg_engaged??'—'}</td><td style={{textAlign:'center'}}>{x.learning_score??'—'}</td><td style={{textAlign:'center'}}>{x.eligible?'🟢 Adaptive':'🟡 เก็บข้อมูล'}</td></tr>)}</tbody>
+            </table>
+          </div>
         </div>
       )}
 
