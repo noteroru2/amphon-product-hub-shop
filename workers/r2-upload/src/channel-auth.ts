@@ -98,12 +98,26 @@ async function publishFacebookRotationPost(env:Env,productId:string,key:string,t
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
+async function recordFacebookLearning(env:Env,job:any,postId:string,postedAt:string){
+ const d=new Date(new Date(postedAt).getTime()+7*60*60*1000)
+ await rest(env,'facebook_learning_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({queue_id:job.id,product_id:job.product_id,connection_key:job.connection_key,post_id:postId,template_id:job.template_id,posted_at:postedAt,local_hour:d.getUTCHours(),local_dow:d.getUTCDay(),metric_status:'PENDING',updated_at:new Date().toISOString()})})
+}
+async function collectFacebookLearning(env:Env){
+ const rows=await rest(env,'facebook_learning_ledger?metric_status=in.(PENDING,ERROR)&posted_at=lt.'+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+'&select=*&order=posted_at.asc&limit=5')
+ for(const row of Array.isArray(rows)?rows:[]){try{const cr=await creds(env,'facebook_page',String(row.connection_key));if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+   const url='https://graph.facebook.com/v23.0/'+encodeURIComponent(String(row.post_id))+'/insights?metric=post_impressions,post_impressions_unique,post_engaged_users&access_token='+encodeURIComponent(cr.pageAccessToken)
+   const rr=await fetch(url),j:any=await rr.json();if(!rr.ok||j.error)throw new Error(j.error?.message||('GRAPH_'+rr.status))
+   const val=(name:string)=>Number(j.data?.find((x:any)=>x.name===name)?.values?.[0]?.value??0)
+   await rest(env,'facebook_learning_ledger?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({impressions:val('post_impressions'),reach:val('post_impressions_unique'),engaged_users:val('post_engaged_users'),metric_status:'COLLECTED',metric_error:null,measured_at:new Date().toISOString(),updated_at:new Date().toISOString()})})
+  }catch(e){const msg=e instanceof Error?e.message:String(e);await rest(env,'facebook_learning_ledger?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({metric_status:/permission|metric|unsupported/i.test(msg)?'UNAVAILABLE':'ERROR',metric_error:msg.slice(0,800),measured_at:new Date().toISOString(),updated_at:new Date().toISOString()})})}}
+}
 export async function runFacebookRotationSweep(env:Env){
  const bkk=new Date(Date.now()+7*60*60*1000);if(bkk.getUTCDay()===1&&bkk.getUTCHours()>=0&&bkk.getUTCHours()<2){try{await rest(env,'rpc/facebook_rotation_generate_week',{method:'POST',body:JSON.stringify({target_date:bkk.toISOString().slice(0,10)})})}catch(e){console.error('FACEBOOK ROTATION weekly generation failed',e)}}
  await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'})
  const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
  const results:any[]=[]
- for(const job of Array.isArray(jobs)?jobs:[]){try{const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id));await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:out.postId,posted_at:new Date().toISOString(),last_error:null,claim_token:null})});results.push({id:job.id,ok:true,postId:out.postId})}catch(e){const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE';await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})});results.push({id:job.id,ok:false,error:msg})}}
+ for(const job of Array.isArray(jobs)?jobs:[]){try{const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id));const postedAt=new Date().toISOString();await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:out.postId,posted_at:postedAt,last_error:null,claim_token:null})});await recordFacebookLearning(env,job,out.postId,postedAt);results.push({id:job.id,ok:true,postId:out.postId})}catch(e){const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE';await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})});results.push({id:job.id,ok:false,error:msg})}}
+ try{await collectFacebookLearning(env)}catch(e){console.error('FACEBOOK LEARNING collection failed',e)}
  return results
 }
 
