@@ -1,0 +1,2 @@
+-- Harden weekly Facebook rotation generation: enforce daily page budget and >=48h product gap.
+-- Production function applied via migration; see database migration history for canonical function body.
