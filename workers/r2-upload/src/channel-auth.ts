@@ -99,6 +99,7 @@ async function publishFacebookRotationPost(env:Env,productId:string,key:string,t
 }
 
 export async function runFacebookRotationSweep(env:Env){
+ const bkk=new Date(Date.now()+7*60*60*1000);if(bkk.getUTCDay()===1&&bkk.getUTCHours()>=0&&bkk.getUTCHours()<2){try{await rest(env,'rpc/facebook_rotation_generate_week',{method:'POST',body:JSON.stringify({target_date:bkk.toISOString().slice(0,10)})})}catch(e){console.error('FACEBOOK ROTATION weekly generation failed',e)}}
  await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'})
  const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
  const results:any[]=[]
