@@ -1931,6 +1931,8 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     const patch:any = { updated_at: new Date().toISOString() }
     if (typeof body.enabled === 'boolean') patch.enabled = body.enabled
     if (typeof body.dryRun === 'boolean') patch.dry_run = body.dryRun
+    if (Array.isArray(body.activeConnectionKeys)) patch.active_connection_keys = body.activeConnectionKeys.map(String)
+    if (Array.isArray(body.pausedConnectionKeys)) patch.paused_connection_keys = body.pausedConnectionKeys.map(String)
     await serviceRest(env, 'facebook_rotation_settings?id=eq.true', { method:'PATCH', headers:{ prefer:'return=minimal' }, body:JSON.stringify(patch) })
     return json(request, env, { ok:true })
   }
