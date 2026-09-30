@@ -1,0 +1,13 @@
+alter table public.facebook_rotation_settings add column if not exists learning_enabled boolean not null default true, add column if not exists learning_min_samples integer not null default 5, add column if not exists learning_max_shift_minutes integer not null default 60, add column if not exists learning_exploration_percent integer not null default 20;
+drop view if exists public.facebook_learning_feedback_v;
+create view public.facebook_learning_feedback_v as with x as (
+select connection_key,template_id,local_dow,local_hour,count(*) filter(where metric_status='COLLECTED') samples,
+(avg(reach) filter(where metric_status='COLLECTED'))::numeric(12,2) avg_reach,(avg(impressions) filter(where metric_status='COLLECTED'))::numeric(12,2) avg_impressions,(avg(coalesce(engaged_users,0)) filter(where metric_status='COLLECTED'))::numeric(12,2) avg_engaged from public.facebook_learning_ledger group by 1,2,3,4)
+select *,case when samples>=5 then round((coalesce(avg_reach,0)*0.65+coalesce(avg_engaged,0)*3.5+coalesce(avg_impressions,0)*0.10)::numeric,2) else null end learning_score,samples>=5 eligible from x;
+grant select on public.facebook_learning_feedback_v to service_role;
+create or replace function public.facebook_learning_pick(p_connection_key text,p_dow smallint,p_hour smallint,p_default_template text) returns table(template_id text,hour smallint,score numeric,reason text) language plpgsql security definer set search_path=public as $$
+declare s public.facebook_rotation_settings%rowtype; begin select * into s from public.facebook_rotation_settings where id=true;
+if not coalesce(s.learning_enabled,false) then return query select p_default_template,p_hour,null::numeric,'LEARNING_DISABLED'::text; return; end if;
+return query with c as (select f.template_id,f.local_hour,f.learning_score,f.samples from public.facebook_learning_feedback_v f where f.connection_key=p_connection_key and f.local_dow=p_dow and f.samples>=s.learning_min_samples and abs(f.local_hour::int-p_hour::int)*60<=s.learning_max_shift_minutes order by f.learning_score desc,f.samples desc limit 1)
+select c.template_id,c.local_hour,c.learning_score,'LEARNED'::text from c union all select p_default_template,p_hour,null::numeric,'INSUFFICIENT_SAMPLE'::text where not exists(select 1 from c) limit 1; end $$;
+revoke all on function public.facebook_learning_pick(text,smallint,smallint,text) from public; grant execute on function public.facebook_learning_pick(text,smallint,smallint,text) to service_role;
