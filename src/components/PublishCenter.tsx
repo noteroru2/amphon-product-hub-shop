@@ -475,7 +475,7 @@ export function PublishCenter({
           <div>
             <strong>🧠 Facebook Learning Dashboard</strong>
             <span>Learning {fbLearning.settings?.learning_enabled?'ON':'OFF'} · เริ่มปรับเมื่อ ≥ {fbLearning.settings?.learning_min_samples??5} samples · ขยับเวลาได้ ±{fbLearning.settings?.learning_max_shift_minutes??60} นาที · Exploration {fbLearning.settings?.learning_exploration_percent??20}%</span>
-            <span>{fbLearning.feedback.some(x=>x.eligible)?'Adaptive พร้อมใช้กับกลุ่มที่ผ่าน Sample Guard แล้ว':'กำลังเรียนรู้ · ตอนนี้ยังใช้ตารางและ Template เดิมเป็นหลัก'}</span>
+            <span>{fbLearning.feedback.some(x=>x.eligible)?'Adaptive พร้อมใช้กับกลุ่มที่ผ่าน Sample Guard แล้ว':'กำลังเรียนรู้ · ตอนนี้ยังใช้ตารางและ Template เดิมเป็นหลัก'}</span>\n            {fbLearning.health && <span>Health: FAILED <b>{fbLearning.health.failed_jobs}</b> · Queue stuck <b>{fbLearning.health.stuck_jobs}</b> · Metric errors <b>{fbLearning.health.metric_errors}</b> · Pending <b>{fbLearning.health.metric_pending}</b>{(fbLearning.health.failed_jobs||fbLearning.health.stuck_jobs||fbLearning.health.metric_errors>=3)?' · ⚠️ ต้องตรวจสอบ':' · ✅ ปกติ'}</span>}
           </div>
           <div className="auto-publish-stats">
             {fbLearning.pageSummary.map(p=><span key={p.connectionKey}>{p.connectionKey} <b>{p.collected}/{p.posts}</b> วัดแล้ว · Reach เฉลี่ย <b>{p.avgReach??'—'}</b></span>)}
