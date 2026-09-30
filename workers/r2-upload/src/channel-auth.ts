@@ -88,6 +88,8 @@ function facebookSalesContent(p:any,templateId='ROT-1'){
 }
 
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
+ const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version&limit=1'),stock=authority?.[0]
+ if(!stock||stock.one_availability!=='IN_STOCK'||!['ready_to_list','published','reserved'].includes(stock.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
