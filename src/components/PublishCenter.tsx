@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
-import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, type FacebookRotationStatus } from "../lib/channelSettings";
+import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, updateFacebookRotationSettings, type FacebookRotationStatus } from "../lib/channelSettings";
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -451,13 +451,20 @@ export function PublishCenter({
       {fbRotation?.settings && (
         <div className="auto-publish-banner">
           <div>
-            <strong>Facebook Rotation: {fbRotation.settings.enabled ? 'เปิดใช้งาน' : 'DRY RUN / ยังไม่โพสต์อัตโนมัติ'}</strong>
-            <span>เป้าหมาย {fbRotation.settings.posts_per_product_per_week} ครั้ง/สินค้า/สัปดาห์ · เว้นโพสต์อย่างน้อย {fbRotation.settings.min_page_gap_minutes} นาที · งบสูงสุด {fbRotation.settings.page_daily_budget} โพสต์/เพจ/วัน</span>
+            <strong>Facebook Control Tower: {fbRotation.settings.enabled && !fbRotation.settings.dry_run ? 'PRODUCTION' : 'PAUSED / DRY RUN'}</strong>
+            <span>เป้าหมาย {fbRotation.settings.posts_per_product_per_week} ครั้ง/สินค้า/สัปดาห์ · เว้นอย่างน้อย {fbRotation.settings.min_page_gap_minutes} นาที · สูงสุด {fbRotation.settings.page_daily_budget} โพสต์/เพจ/วัน</span>
+            <span>สร้างคิวล่าสุด {fbRotation.settings.last_generated_week || 'คิวเริ่มต้น'} {fbRotation.settings.last_generated_at ? '· '+formatDate(fbRotation.settings.last_generated_at) : ''}</span>
           </div>
           <div className="auto-publish-stats">
-            <span>คิว 7 วัน <b>{fbRotation.queue.filter(x=>x.status==='PLANNED').length}</b></span>
-            <span>ขายแล้วถูกตัด <b>{fbRotation.queue.filter(x=>x.status==='SKIPPED_SOLD').length}</b></span>
+            <span>รอโพสต์ <b>{fbRotation.queue.filter(x=>x.status==='PLANNED').length}</b></span>
+            <span>โพสต์แล้ว <b>{fbRotation.queue.filter(x=>x.status==='POSTED').length}</b></span>
+            <span className={fbRotation.queue.some(x=>x.status==='FAILED')?'has-error':''}>FAILED <b>{fbRotation.queue.filter(x=>x.status==='FAILED').length}</b></span>
+            <span>ตัด SOLD <b>{fbRotation.queue.filter(x=>x.status==='SKIPPED_SOLD').length}</b></span>
           </div>
+          {['owner','admin'].includes(profile.role) && <div className="publish-facebook-actions">
+            <button type="button" onClick={async()=>{await updateFacebookRotationSettings({enabled:!fbRotation.settings!.enabled,dryRun:fbRotation.settings!.enabled?true:false});await refresh(true)}}>{fbRotation.settings.enabled?'⏸ Pause ทั้งหมด':'▶ เปิด Rotation'}</button>
+            {(fbRotation.settings.active_connection_keys||[]).map(key=>{const paused=(fbRotation.settings!.paused_connection_keys||[]).includes(key);return <button type="button" key={key} onClick={async()=>{const set=new Set(fbRotation.settings!.paused_connection_keys||[]);paused?set.delete(key):set.add(key);await updateFacebookRotationSettings({pausedConnectionKeys:Array.from(set)});await refresh(true)}}>{paused?'▶ เปิด '+key:'⏸ '+key}</button>})}
+          </div>}
         </div>
       )}
 
