@@ -1916,6 +1916,14 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
   }
 
+  if (url.pathname === '/commerce/facebook/learning-dashboard' && request.method === 'GET') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
+    const settings = await serviceRest<any[]>(env, 'facebook_rotation_settings?select=learning_enabled,learning_min_samples,learning_max_shift_minutes,learning_exploration_percent&limit=1')
+    const ledger = await serviceRest<any[]>(env, 'facebook_learning_ledger?select=connection_key,template_id,posted_at,local_hour,local_dow,impressions,reach,engaged_users,metric_status,metric_error,measured_at&order=posted_at.desc&limit=200')
+    const feedback = await serviceRest<any[]>(env, 'facebook_learning_feedback_v?select=*&order=learning_score.desc.nullslast,samples.desc&limit=100')
+    const pageSummary = Array.from(new Set(ledger.map((x:any)=>x.connection_key))).map(key=>{const rows=ledger.filter((x:any)=>x.connection_key===key),col=rows.filter((x:any)=>x.metric_status==='COLLECTED');return {connectionKey:key,posts:rows.length,collected:col.length,pending:rows.filter((x:any)=>x.metric_status==='PENDING').length,avgReach:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.reach||0),0)/col.length):null,avgImpressions:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.impressions||0),0)/col.length):null,avgEngaged:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.engaged_users||0),0)/col.length):null}})
+    return json(request,env,{settings:settings[0]||null,pageSummary,feedback,ledger})
+  }
   if (url.pathname === '/commerce/facebook/rotation-status' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
     const settings = await serviceRest<any[]>(env, 'facebook_rotation_settings?select=*&limit=1')
