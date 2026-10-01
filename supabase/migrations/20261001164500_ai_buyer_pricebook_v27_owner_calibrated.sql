@@ -120,13 +120,13 @@ begin
       observed_price_thb,observed_at,note
     ) values
       (
-        v_new,v_entry,null,
+        v_new,v_entry,'owner://case/4b91f6cd-1fa8-4e0d-a879-7eb5beeb06f2',
         'Owner manual offer: Acer Aspire Lite 16 AL16-71M-54E6',
         'OWNER_MANUAL_QUOTE',7000,date '2026-09-22',
         'Owner opening observed: 7,000-8,000 THB; calibrated opening=7,000 target=8,000 hard-max=9,000'
       ),
       (
-        v_new,v_entry,null,
+        v_new,v_entry,'owner://case/4b91f6cd-1fa8-4e0d-a879-7eb5beeb06f2#negotiated',
         'Owner negotiated ceiling: Acer Aspire Lite 16 AL16-71M-54E6',
         'OWNER_NEGOTIATED_QUOTE',9000,date '2026-09-22',
         'Observed owner final quote after negotiation: 9,000 THB'
@@ -161,7 +161,7 @@ begin
       version_id,entry_id,source_url,source_title,source_kind,
       observed_price_thb,observed_at,note
     ) values (
-      v_new,v_entry,null,
+      v_new,v_entry,'owner://case/6eec094c-f5c9-4d3e-bbea-13bbb15127a3',
       'Owner manual offer: iPhone 17 Pro Max 256GB',
       'OWNER_MANUAL_QUOTE',34000,date '2026-09-22',
       'Exact owner offer 34,000 THB; storage-specific row prevents cross-capacity matching'
@@ -187,7 +187,7 @@ begin
       version_id,entry_id,source_url,source_title,source_kind,
       observed_price_thb,observed_at,note
     ) values (
-      v_new,v_entry,null,
+      v_new,v_entry,'owner://case/bd11e73a-73f4-4574-9061-c277dd68f56c',
       'Owner manual offer: Sony ZV-E10',
       'OWNER_MANUAL_QUOTE',8000,date '2026-09-22',
       'Inactive review evidence because body/kit/lens bundle was not confirmed'
@@ -212,7 +212,7 @@ begin
       version_id,entry_id,source_url,source_title,source_kind,
       observed_price_thb,observed_at,note
     ) values (
-      v_new,v_entry,null,
+      v_new,v_entry,'owner://case/2b90f4e9-addb-4213-aeac-24e6fe1d75f9',
       'Owner manual range: iPad Air 11-inch M4',
       'OWNER_MANUAL_QUOTE',14000,date '2026-09-22',
       'Owner range 14,000-15,000 THB; inactive until storage variant is confirmed'
