@@ -305,7 +305,7 @@ for (const token of [
   '"AI_BUYER_BATCH_DEBOUNCE_MS"',
   '"OPENAI_VISION_MODEL"',
   '"OPENAI_PRICING_MODEL"',
-  '"AI_BUYER_PAUSED": "true"',
+  '"AI_BUYER_PAUSED": "false"',
 ]) {
   if (!wrangler.includes(token)) throw new Error(`AI Buyer runtime config missing: ${token}`)
 }
