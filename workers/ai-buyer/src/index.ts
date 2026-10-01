@@ -3,6 +3,7 @@ import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pric
 import { runPricingForCase } from './pricing-router'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 import {
+  handleHubAdminApproveOffer,
   handleHubAdminCaseDetail,
   handleHubAdminChatCase,
   handleHubAdminChatList,
@@ -1506,7 +1507,7 @@ export default {
     }
 
     if (
-      ['/v1/hub/admin/case','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/chat-unread','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger','/v1/hub/admin/owner-model','/v1/hub/admin/owner-model/pricebook-review'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/chat-unread','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/offer/approve','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger','/v1/hub/admin/owner-model','/v1/hub/admin/owner-model/pricebook-review'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
@@ -1522,6 +1523,10 @@ export default {
 
     if (url.pathname === '/v1/hub/admin/manual-reply' && request.method === 'POST') {
       return handleHubAdminManualReply(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/offer/approve' && request.method === 'POST') {
+      return handleHubAdminApproveOffer(request, env)
     }
 
     if (url.pathname === '/v1/hub/admin/final-outcome' && request.method === 'POST') {
