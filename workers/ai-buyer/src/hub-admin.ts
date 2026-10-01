@@ -1,3 +1,5 @@
+import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
+
 export interface HubAdminEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
@@ -5,6 +7,7 @@ export interface HubAdminEnv {
   AI_BUYER_HUB_ORIGINS?: string
   OPENAI_ADMIN_KEY?: string
   LINE_CHANNEL_ACCESS_TOKEN: string
+  OPENAI_API_KEY: string
 }
 
 type HubUser = { id: string; email?: string | null }
@@ -1144,6 +1147,129 @@ export async function handleHubAdminDealLedger(request: Request, env: HubAdminEn
       ok: true,
       line: saved[0] || null,
       summary: summary[0] || null,
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
+export async function handleHubAdminApproveOffer(request: Request, env: HubAdminEnv) {
+  try {
+    const { user, profile } = await authenticateAdmin(request, env)
+    let body: { caseId?: string; offerId?: string }
+    try {
+      body = await request.json() as typeof body
+    } catch {
+      return hubAdminResponse(request, env, { ok: false, error: 'JSON_INVALID' }, 400)
+    }
+
+    const caseId = clean(body.caseId, 100)
+    const offerId = clean(body.offerId, 100)
+    if (!validUuid(caseId) || !validUuid(offerId)) {
+      return hubAdminResponse(request, env, { ok: false, error: 'APPROVAL_INPUT_INVALID' }, 400)
+    }
+
+    const flow = await approvePreparedOffer(env, caseId, offerId)
+    if (!flow.handled || !flow.reply || !flow.lineUserId) {
+      return hubAdminResponse(
+        request,
+        env,
+        { ok: false, error: flow.reason || 'OFFER_NOT_APPROVABLE' },
+        400,
+      )
+    }
+
+    const sent = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: flow.lineUserId,
+        messages: [{ type: 'text', text: flow.reply }],
+      }),
+    })
+
+    if (!sent.ok) {
+      const detail = await sent.text().catch(() => '')
+      await markOfferFlowFailure(
+        env,
+        flow.outboundActionId,
+        'LINE_PUSH_' + sent.status + ':' + detail,
+      ).catch(() => undefined)
+      return hubAdminResponse(request, env, { ok: false, error: 'LINE_PUSH_' + sent.status }, 502)
+    }
+
+    await markOfferFlowDelivery(env, {
+      offerId: flow.offerId,
+      outboundActionId: flow.outboundActionId,
+    })
+
+    const cases = await serviceRows<any>(
+      env,
+      'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(caseId)
+        + '&select=conversation_id&limit=1',
+    )
+
+    if (cases[0]?.conversation_id) {
+      await serviceWrite<any>(
+        env,
+        'ai_buyer_messages',
+        {
+          method: 'POST',
+          headers: { prefer: 'return=representation' },
+          body: JSON.stringify({
+            conversation_id: cases[0].conversation_id,
+            case_id: caseId,
+            direction: 'OUTBOUND',
+            message_type: 'TEXT',
+            text_content: flow.reply,
+            metadata: {
+              source: 'ADMIN_APPROVAL',
+              action: 'OFFER',
+              offerId,
+              actorUserId: user.id,
+              actorName: profile.display_name || 'Admin',
+            },
+            line_timestamp: new Date().toISOString(),
+          }),
+        },
+      )
+    }
+
+    await serviceWrite<any>(
+      env,
+      'ai_buyer_admin_tasks?case_id=eq.' + encodeURIComponent(caseId)
+        + '&task_type=eq.OFFER_APPROVAL&status=in.(ACTION_REQUIRED,IN_PROGRESS)',
+      {
+        method: 'PATCH',
+        headers: { prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: 'COMPLETED',
+          assigned_to: user.id,
+          updated_at: new Date().toISOString(),
+        }),
+      },
+    ).catch(() => [])
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      sent: true,
+      caseId,
+      offerId,
+      approvedBy: {
+        id: user.id,
+        displayName: profile.display_name || 'Admin',
+      },
+      reply: flow.reply,
+      amountGuarded: true,
     })
   } catch (error) {
     const code = clean((error as Error)?.message || error, 1000)
