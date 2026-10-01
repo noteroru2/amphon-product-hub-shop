@@ -188,6 +188,100 @@ export type AiBuyerChatListData = {
   generatedAt: string;
 };
 
+export type AiBuyerApprovalQueueItem = {
+  task: {
+    id: string;
+    status: string;
+    priority?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+  };
+  case: {
+    id: string;
+    title: string;
+    category?: string | null;
+    state: string;
+    controlMode: string;
+    identityConfidence?: number | null;
+    pricingReadiness?: number | null;
+  } | null;
+  customer?: {
+    displayName?: string | null;
+    pictureUrl?: string | null;
+    phone?: string | null;
+  } | null;
+  product: {
+    modelName?: string | null;
+    modelCode?: string | null;
+    confirmed?: Record<string, unknown>;
+  };
+  lastCustomerMessage?: {
+    type: string;
+    text?: string | null;
+    createdAt?: string | null;
+  } | null;
+  offer?: {
+    id: string;
+    amount?: number | null;
+    actor?: string | null;
+    round?: number | null;
+    createdAt?: string | null;
+  } | null;
+  pricing?: {
+    id: string;
+    source?: string | null;
+    estimatedResale?: number | null;
+    openingOffer?: number | null;
+    targetBuy?: number | null;
+    hardMax?: number | null;
+    currentAuthorizedOffer?: number | null;
+    confidence?: number | null;
+    adjustments?: unknown;
+    rationale?: unknown;
+    createdAt?: string | null;
+  } | null;
+  priceBook: {
+    versionId?: string | null;
+    versionName?: string | null;
+    versionStatus?: string | null;
+    entryId?: string | null;
+    brand?: string | null;
+    model?: string | null;
+    modelCode?: string | null;
+    conditionKey?: string | null;
+    estimatedResale?: number | null;
+    openingOffer?: number | null;
+    targetBuy?: number | null;
+    hardMax?: number | null;
+    active?: boolean | null;
+  };
+  guard: {
+    canApprove: boolean;
+    amountWithinHardMax: boolean;
+    roomToHardMax?: number | null;
+    amountVsTargetPct?: number | null;
+    reason: string;
+  };
+};
+
+export type AiBuyerApprovalQueueData = {
+  ok: true;
+  viewer: { displayName: string; role: string };
+  summary: {
+    pending: number;
+    readyToSend: number;
+    blocked: number;
+    averageConfidence?: number | null;
+  };
+  modes: Array<{
+    category: string;
+    mode: string;
+    active: boolean;
+  }>;
+  items: AiBuyerApprovalQueueItem[];
+  generatedAt: string;
+};
+
 export type AiBuyerDashboardCase = {
   id: string;
   title: string;
@@ -563,6 +657,12 @@ export type AiBuyerOwnerModelResponse = {
 export async function loadAiBuyerDashboard(limit = 150) {
   return request<AiBuyerDashboardData>(
     `/v1/hub/admin/dashboard?limit=${Math.max(10, Math.min(200, limit))}`,
+  );
+}
+
+export async function loadAiBuyerApprovalQueue(limit = 120) {
+  return request<AiBuyerApprovalQueueData>(
+    `/v1/hub/admin/approval-queue?limit=${Math.max(10, Math.min(200, limit))}`,
   );
 }
 
