@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { ProductSummary, Profile } from "../types/product";
 import {
+  approveAiBuyerOffer,
   loadAiBuyerCase,
   loadAiBuyerDashboard,
   loadAiBuyerOwnerModel,
@@ -474,6 +475,26 @@ export function AiBuyerAdmin({
     );
   }
 
+  async function approvePreparedPrice() {
+    if (!selectedId || !selected?.offer?.id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await approveAiBuyerOffer(selectedId, selected.offer.id);
+      setNotice(`อนุมัติและส่งราคา ${money(selected.offer.amount)} ไป LINE แล้ว`);
+      await Promise.all([
+        refreshDashboard(),
+        refreshDetail(selectedId),
+        refreshOwnerModel(),
+      ]);
+      if (!result.sent) setError("ระบบอนุมัติแล้วแต่ยังไม่ได้ส่ง LINE");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveOutcome(label = outcome) {
     if (!selectedId || !label) return;
     const agreed = numberOrNull(agreedPrice);
@@ -904,6 +925,30 @@ export function AiBuyerAdmin({
                   )}
                 </div>
                 <PriceStrip detail={detail} />
+
+                {selected?.task?.type === "OFFER_APPROVAL"
+                  && selected.offer
+                  && !selected.offer.deliveredAt && (
+                  <div className="ai-approval-card">
+                    <div>
+                      <span className="ai-approval-chip">APPROVAL</span>
+                      <strong>AI เตรียมราคา {money(selected.offer.amount)}</strong>
+                      <small>
+                        Target {money(selected.pricing?.targetBuy)} · Hard max {money(selected.pricing?.hardMax)}
+                      </small>
+                      <p>ราคานี้จะยังไม่ส่งหาลูกค้าจนกว่า Owner/Admin จะกดอนุมัติ</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void approvePreparedPrice()}
+                    >
+                      <BadgeCheck size={17} />
+                      {busy ? "กำลังส่ง…" : "อนุมัติส่งราคา"}
+                    </button>
+                  </div>
+                )}
+
                 <p className="ai-chat-moved-note">
                   แชทถูกย้ายไปเมนู <b>LINE OA Chat</b> ด้านล่างแล้ว เพื่อให้ตอบลูกค้าและดูรูปได้สะดวกกว่า
                 </p>
