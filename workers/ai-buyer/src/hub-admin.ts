@@ -619,6 +619,296 @@ export async function handleHubAdminChatMarkRead(request: Request, env: HubAdmin
   }
 }
 
+export async function handleHubAdminApprovalQueue(request: Request, env: HubAdminEnv) {
+  try {
+    const { profile } = await authenticateAdmin(request, env)
+    const url = new URL(request.url)
+    const rawLimit = Number(url.searchParams.get('limit') || 120)
+    const limit = Math.max(10, Math.min(200, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 120))
+
+    const tasks = await serviceRows<any>(
+      env,
+      'ai_buyer_admin_tasks?task_type=eq.OFFER_APPROVAL'
+        + '&status=in.(ACTION_REQUIRED,IN_PROGRESS)'
+        + '&select=id,case_id,task_type,status,priority,assigned_to,payload,created_at,updated_at'
+        + '&order=created_at.asc'
+        + '&limit=' + limit,
+    )
+
+    if (!tasks.length) {
+      const modes = await serviceRows<any>(
+        env,
+        'ai_buyer_category_automation_modes?select=category,mode,active&order=category.asc',
+      )
+      return hubAdminResponse(request, env, {
+        ok: true,
+        viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
+        summary: {
+          pending: 0,
+          readyToSend: 0,
+          blocked: 0,
+          averageConfidence: null,
+        },
+        modes,
+        items: [],
+        generatedAt: new Date().toISOString(),
+      })
+    }
+
+    const caseIds = Array.from(new Set(tasks.map((row: any) => clean(row.case_id, 100)).filter(validUuid)))
+    const inCases = caseIds.join(',')
+
+    const [cases, pricingRows, offerRows, observationRows, messageRows, modes] = await Promise.all([
+      serviceRows<any>(
+        env,
+        'ai_buyer_valuation_cases?id=in.(' + inCases + ')'
+          + '&select=id,conversation_id,customer_id,state,category,title,control_mode,identity_confidence,spec_completeness,condition_completeness,pricing_readiness,updated_at',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_pricing_decisions?case_id=in.(' + inCases + ')'
+          + '&select=id,case_id,price_source,price_book_version_id,price_book_entry_id,estimated_resale,opening_offer,target_buy,hard_max,current_authorized_offer,pricing_confidence,adjustments,rationale,created_at'
+          + '&order=created_at.desc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_offers?case_id=in.(' + inCases + ')'
+          + '&actor=in.(AI,ADMIN)&status=eq.PROPOSED&delivered_at=is.null'
+          + '&select=id,case_id,pricing_decision_id,amount,actor,status,round_no,delivered_at,created_at'
+          + '&order=created_at.desc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_product_observations?case_id=in.(' + inCases + ')'
+          + '&select=id,case_id,model_name,model_code,category,identity_confidence,confirmed,created_at'
+          + '&order=created_at.desc',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_messages?case_id=in.(' + inCases + ')&direction=eq.INBOUND'
+          + '&select=id,case_id,message_type,text_content,created_at'
+          + '&order=created_at.desc&limit=500',
+      ),
+      serviceRows<any>(
+        env,
+        'ai_buyer_category_automation_modes?select=category,mode,active&order=category.asc',
+      ),
+    ])
+
+    const customerIds = Array.from(new Set(cases.map((row: any) => clean(row.customer_id, 100)).filter(validUuid)))
+    const versionIds = Array.from(new Set(pricingRows.map((row: any) => clean(row.price_book_version_id, 100)).filter(validUuid)))
+    const entryIds = Array.from(new Set(pricingRows.map((row: any) => clean(row.price_book_entry_id, 100)).filter(validUuid)))
+
+    const [customers, versions, entries] = await Promise.all([
+      customerIds.length
+        ? serviceRows<any>(
+          env,
+          'ai_buyer_customers?id=in.(' + customerIds.join(',') + ')'
+            + '&select=id,display_name,picture_url,phone',
+        )
+        : Promise.resolve([]),
+      versionIds.length
+        ? serviceRows<any>(
+          env,
+          'ai_buyer_price_book_versions?id=in.(' + versionIds.join(',') + ')'
+            + '&select=id,version_name,status,source_name,activated_at',
+        )
+        : Promise.resolve([]),
+      entryIds.length
+        ? serviceRows<any>(
+          env,
+          'ai_buyer_price_book_entries?id=in.(' + entryIds.join(',') + ')'
+            + '&select=id,version_id,category,brand,model,model_code,condition_key,estimated_resale,opening_offer,target_buy,hard_max,adjustments,active',
+        )
+        : Promise.resolve([]),
+    ])
+
+    const caseById = new Map(cases.map((row: any) => [String(row.id), row]))
+    const customerById = new Map(customers.map((row: any) => [String(row.id), row]))
+    const versionById = new Map(versions.map((row: any) => [String(row.id), row]))
+    const entryById = new Map(entries.map((row: any) => [String(row.id), row]))
+
+    const pricingByCase = new Map<string, any>()
+    for (const row of pricingRows) {
+      const key = String(row.case_id)
+      if (!pricingByCase.has(key)) pricingByCase.set(key, row)
+    }
+
+    const offersByCase = new Map<string, any[]>()
+    const offerById = new Map<string, any>()
+    for (const row of offerRows) {
+      const key = String(row.case_id)
+      const list = offersByCase.get(key) || []
+      list.push(row)
+      offersByCase.set(key, list)
+      offerById.set(String(row.id), row)
+    }
+
+    const observationByCase = new Map<string, any>()
+    for (const row of observationRows) {
+      const key = String(row.case_id)
+      if (!observationByCase.has(key)) observationByCase.set(key, row)
+    }
+
+    const messageByCase = new Map<string, any>()
+    for (const row of messageRows) {
+      const key = String(row.case_id)
+      if (!messageByCase.has(key)) messageByCase.set(key, row)
+    }
+
+    const items = tasks.map((task: any) => {
+      const caseId = String(task.case_id)
+      const caseRow = caseById.get(caseId) || null
+      const decision = pricingByCase.get(caseId) || null
+      const requestedOfferId = clean(task.payload?.offer_id, 100)
+      const offer = (requestedOfferId && offerById.get(requestedOfferId))
+        || offersByCase.get(caseId)?.[0]
+        || null
+      const observation = observationByCase.get(caseId) || null
+      const lastMessage = messageByCase.get(caseId) || null
+      const customer = caseRow ? customerById.get(String(caseRow.customer_id)) || null : null
+      const version = decision?.price_book_version_id
+        ? versionById.get(String(decision.price_book_version_id)) || null
+        : null
+      const entry = decision?.price_book_entry_id
+        ? entryById.get(String(decision.price_book_entry_id)) || null
+        : null
+
+      const amount = numberValue(offer?.amount)
+      const target = numberValue(decision?.target_buy)
+      const hardMax = numberValue(decision?.hard_max)
+      const confidence = numberValue(decision?.pricing_confidence)
+      const canApprove = Boolean(
+        caseRow
+        && decision
+        && offer
+        && offer.status === 'PROPOSED'
+        && !offer.delivered_at
+        && amount != null
+        && hardMax != null
+        && amount <= hardMax
+      )
+
+      return {
+        task: {
+          id: task.id,
+          status: task.status,
+          priority: task.priority,
+          createdAt: task.created_at,
+          updatedAt: task.updated_at,
+        },
+        case: caseRow ? {
+          id: caseRow.id,
+          title: caseRow.title || observation?.model_name || 'ยังไม่ระบุสินค้า',
+          category: caseRow.category,
+          state: caseRow.state,
+          controlMode: caseRow.control_mode,
+          identityConfidence: numberValue(caseRow.identity_confidence),
+          pricingReadiness: numberValue(caseRow.pricing_readiness),
+        } : null,
+        customer: customer ? {
+          displayName: customer.display_name || 'ลูกค้า LINE',
+          pictureUrl: customer.picture_url || null,
+          phone: customer.phone || null,
+        } : null,
+        product: {
+          modelName: observation?.model_name || null,
+          modelCode: observation?.model_code || null,
+          confirmed: observation?.confirmed || {},
+        },
+        lastCustomerMessage: lastMessage ? {
+          type: lastMessage.message_type,
+          text: clean(lastMessage.text_content, 280) || null,
+          createdAt: lastMessage.created_at,
+        } : null,
+        offer: offer ? {
+          id: offer.id,
+          amount,
+          actor: offer.actor,
+          round: Number(offer.round_no || 0),
+          createdAt: offer.created_at,
+        } : null,
+        pricing: decision ? {
+          id: decision.id,
+          source: decision.price_source,
+          estimatedResale: numberValue(decision.estimated_resale),
+          openingOffer: numberValue(decision.opening_offer),
+          targetBuy: target,
+          hardMax,
+          currentAuthorizedOffer: numberValue(decision.current_authorized_offer),
+          confidence,
+          adjustments: decision.adjustments || null,
+          rationale: decision.rationale || null,
+          createdAt: decision.created_at,
+        } : null,
+        priceBook: {
+          versionId: version?.id || null,
+          versionName: version?.version_name || null,
+          versionStatus: version?.status || null,
+          entryId: entry?.id || null,
+          brand: entry?.brand || null,
+          model: entry?.model || null,
+          modelCode: entry?.model_code || null,
+          conditionKey: entry?.condition_key || null,
+          estimatedResale: numberValue(entry?.estimated_resale),
+          openingOffer: numberValue(entry?.opening_offer),
+          targetBuy: numberValue(entry?.target_buy),
+          hardMax: numberValue(entry?.hard_max),
+          active: entry ? Boolean(entry.active) : null,
+        },
+        guard: {
+          canApprove,
+          amountWithinHardMax: amount != null && hardMax != null ? amount <= hardMax : false,
+          roomToHardMax: amount != null && hardMax != null ? Math.max(0, hardMax - amount) : null,
+          amountVsTargetPct: amount != null && target && target > 0
+            ? Number((((amount - target) / target) * 100).toFixed(2))
+            : null,
+          reason: canApprove
+            ? 'READY'
+            : !caseRow
+              ? 'CASE_MISSING'
+              : !decision
+                ? 'PRICING_DECISION_MISSING'
+                : !offer
+                  ? 'PENDING_OFFER_MISSING'
+                  : amount != null && hardMax != null && amount > hardMax
+                    ? 'HARD_MAX_EXCEEDED'
+                    : 'NOT_APPROVABLE',
+        },
+      }
+    })
+
+    const ready = items.filter((item: any) => item.guard.canApprove)
+    const confidenceValues = items
+      .map((item: any) => item.pricing?.confidence)
+      .filter((value: any) => typeof value === 'number' && Number.isFinite(value))
+
+    return hubAdminResponse(request, env, {
+      ok: true,
+      viewer: { displayName: profile.display_name || 'Admin', role: profile.role },
+      summary: {
+        pending: items.length,
+        readyToSend: ready.length,
+        blocked: items.length - ready.length,
+        averageConfidence: confidenceValues.length
+          ? confidenceValues.reduce((sum: number, value: number) => sum + value, 0) / confidenceValues.length
+          : null,
+      },
+      modes,
+      items,
+      generatedAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminCaseDetail(request: Request, env: HubAdminEnv) {
   try {
     await authenticateAdmin(request, env)
