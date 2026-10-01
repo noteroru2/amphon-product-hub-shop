@@ -627,6 +627,21 @@ export async function sendAiBuyerManualReply(input: {
   });
 }
 
+export async function approveAiBuyerOffer(caseId: string, offerId: string) {
+  return request<{
+    ok: true;
+    sent: boolean;
+    caseId: string;
+    offerId: string;
+    reply: string;
+    amountGuarded: boolean;
+    approvedBy?: { id: string; displayName: string };
+  }>("/v1/hub/admin/offer/approve", {
+    method: "POST",
+    body: JSON.stringify({ caseId, offerId }),
+  });
+}
+
 export async function saveAiBuyerFinalOutcome(input: {
   caseId: string;
   finalLabel: string;
