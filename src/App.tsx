@@ -2641,15 +2641,39 @@ function ReviewStep({
         onChange={(value) => update({ title: value })}
         placeholder="ชื่อสินค้า"
       />
-      <Field
-        label="ราคาขาย"
-        value={draft.price ? String(draft.price) : ""}
-        onChange={(value) =>
-          update({ price: Number(value.replace(/\D/g, "")) || undefined })
-        }
-        placeholder="42900"
-        inputMode="numeric"
-      />
+      {draft.oneManaged ? (
+        <section className="system-pricing-panel">
+          <div className="system-pricing-head">
+            <div>
+              <strong>ราคาจาก AMPHON System</strong>
+              <small>อ่านอย่างเดียว · System เป็น Source of Truth</small>
+            </div>
+            <span>{draft.dealerEligibility || draft.priceStrategy || "SYSTEM"}</span>
+          </div>
+          <div className="system-pricing-grid">
+            <div><small>Retail</small><strong>{baht(draft.retailPrice ?? draft.price ?? 0)}</strong></div>
+            <div><small>Quick</small><strong>{baht(draft.quickSalePrice ?? 0)}</strong></div>
+            <div><small>Dealer</small><strong>{baht(draft.dealerPrice ?? 0)}</strong></div>
+            <div className="floor"><small>Floor · ห้ามต่ำกว่า</small><strong>{baht(draft.absoluteFloorPrice ?? 0)}</strong></div>
+          </div>
+          <div className="system-pricing-meta">
+            <span>Stock Age: <b>{draft.stockAgeDays ?? 0} วัน</b></span>
+            <span>{draft.agingBucket || "-"}</span>
+            {draft.turnoverRuleVersion && <span>Rule: {draft.turnoverRuleVersion}</span>}
+            {draft.turnoverRuleCohort && <span>{draft.turnoverRuleCohort}</span>}
+          </div>
+        </section>
+      ) : (
+        <Field
+          label="ราคาขาย"
+          value={draft.price ? String(draft.price) : ""}
+          onChange={(value) =>
+            update({ price: Number(value.replace(/\D/g, "")) || undefined })
+          }
+          placeholder="42900"
+          inputMode="numeric"
+        />
+      )}
       {showCost && (
         <Field
           label="ต้นทุน (Owner/Admin เท่านั้น)"
@@ -3385,9 +3409,18 @@ function ProductCard({
         </div>
         <p>{productSubtitle(product) || "ยังไม่มีรายละเอียดสเปก"}</p>
         <div className="product-meta">
-          <strong>{baht(product.price)}</strong>
+          <strong>{baht(product.retailPrice ?? product.price)}</strong>
           <span>{product.sku}</span>
         </div>
+        {product.oneManaged && product.dealerPrice != null && (
+          <div className="turnover-price-strip">
+            <span><small>Quick</small><b>{baht(product.quickSalePrice ?? 0)}</b></span>
+            <span><small>Dealer</small><b>{baht(product.dealerPrice)}</b></span>
+            <span><small>Floor</small><b>{baht(product.absoluteFloorPrice ?? 0)}</b></span>
+            <span><small>อายุ</small><b>{product.stockAgeDays ?? 0} วัน</b></span>
+            <em>{product.dealerEligibility || product.priceStrategy || "SYSTEM"}</em>
+          </div>
+        )}
       </div>
     </button>
   );
