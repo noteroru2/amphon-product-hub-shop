@@ -2360,10 +2360,10 @@ async function handleEmployeeRoutes(request: Request, env: Env, url: URL): Promi
     const userId = String(user?.id || '')
     if (!userId) throw new Error('AUTH_USER_CREATE_FAILED')
     try {
-      await serviceRest(env, `profiles?id=eq.${encodeURIComponent(userId)}`, {
-        method: 'PATCH',
-        headers: { prefer: 'return=minimal' },
-        body: JSON.stringify({ display_name: displayName, role, active: true }),
+      await serviceRest(env, 'profiles?on_conflict=id', {
+        method: 'POST',
+        headers: { prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ id: userId, display_name: displayName, role, active: true }),
       })
     } catch (error) {
       try { await authAdmin(env, `users/${encodeURIComponent(userId)}`, { method: 'DELETE' }) } catch { /* best effort rollback */ }
