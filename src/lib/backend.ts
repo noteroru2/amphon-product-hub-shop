@@ -71,6 +71,18 @@ function mapProduct(row: any, financial?: any): ProductSummary {
     title: row.title,
     price: numberOrUndefined(row.price) ?? 0,
     cost: numberOrUndefined(financial?.cost),
+    oneManaged: Boolean(row.one_managed),
+    retailPrice: numberOrUndefined(row.one_retail_price),
+    quickSalePrice: numberOrUndefined(row.one_quick_sale_price),
+    dealerPrice: numberOrUndefined(row.one_dealer_price),
+    absoluteFloorPrice: numberOrUndefined(row.one_absolute_floor_price),
+    stockAgeDays: numberOrUndefined(row.one_stock_age_days),
+    agingBucket: row.one_aging_bucket ?? undefined,
+    dealerEligibility: row.one_dealer_eligibility ?? undefined,
+    priceStrategy: row.one_price_strategy ?? undefined,
+    turnoverRuleVersion: row.one_turnover_rule_version ?? undefined,
+    turnoverRuleCohort: row.one_turnover_rule_cohort ?? undefined,
+    pricingUpdatedAt: row.one_pricing_updated_at ?? undefined,
     status: row.status,
     conditionPercent: numberOrUndefined(row.condition_percent),
     warrantyUntil: row.warranty_until ?? undefined,
@@ -105,7 +117,7 @@ export async function listProducts(role: UserRole): Promise<ProductSummary[]> {
   const db = client()
   const { data, error } = await db
     .from('products')
-    .select('id,sku,category,subtype,brand,model,title,serial_number,status,condition_percent,price,warranty_until,defects,notes,specs,created_at,updated_at,sold_at,product_images(id,object_key,public_url,sort_order,is_cover,image_role)')
+    .select('id,sku,category,subtype,brand,model,title,serial_number,status,condition_percent,price,warranty_until,defects,notes,specs,created_at,updated_at,sold_at,one_managed,one_retail_price,one_quick_sale_price,one_dealer_price,one_absolute_floor_price,one_stock_age_days,one_aging_bucket,one_dealer_eligibility,one_price_strategy,one_turnover_rule_version,one_turnover_rule_cohort,one_pricing_updated_at,product_images(id,object_key,public_url,sort_order,is_cover,image_role)')
     // AMPHON System owns inventory availability. Once System projects SOLD,
     // the item must disappear from normal Hub inventory instead of lingering
     // as a historical product card. NULL keeps legacy/non-ONE records visible.
@@ -219,6 +231,18 @@ export function draftFromProduct(product: ProductSummary, ownerUserId?: string):
     title: product.title,
     price: product.price || undefined,
     cost: product.cost,
+    oneManaged: product.oneManaged,
+    retailPrice: product.retailPrice,
+    quickSalePrice: product.quickSalePrice,
+    dealerPrice: product.dealerPrice,
+    absoluteFloorPrice: product.absoluteFloorPrice,
+    stockAgeDays: product.stockAgeDays,
+    agingBucket: product.agingBucket,
+    dealerEligibility: product.dealerEligibility,
+    priceStrategy: product.priceStrategy,
+    turnoverRuleVersion: product.turnoverRuleVersion,
+    turnoverRuleCohort: product.turnoverRuleCohort,
+    pricingUpdatedAt: product.pricingUpdatedAt,
     conditionPercent: product.conditionPercent,
     warrantyUntil: product.warrantyUntil,
     defects: product.defects,
@@ -354,11 +378,13 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   let sku = draft.sku || ''
   let existingStatus: ProductStatus | undefined
   let existingSerial = ''
+  let existingOneManaged = false
   if (productId) {
-    const { data: existing, error: existingError } = await db.from('products').select('status,serial_number').eq('id', productId).single()
+    const { data: existing, error: existingError } = await db.from('products').select('status,serial_number,one_managed,one_retail_price').eq('id', productId).single()
     if (existingError) throw existingError
     existingStatus = existing.status as ProductStatus
     existingSerial = String(existing.serial_number ?? '')
+    existingOneManaged = Boolean(existing.one_managed)
     const allowed = allowedStatuses(existingStatus, profile.role)
     if (!allowed.includes(desiredStatus)) {
       throw new Error(`ไม่อนุญาตให้เปลี่ยนสถานะจาก ${existingStatus} เป็น ${desiredStatus}`)
@@ -378,7 +404,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     serial_number: draft.serialNumber?.trim() || null,
     status: statusDuringUpload,
     condition_percent: draft.conditionPercent ?? null,
-    price: draft.price ?? null,
+    ...(existingOneManaged ? {} : { price: draft.price ?? null }),
     warranty_until: draft.warrantyUntil || null,
     defects: draft.defects || null,
     notes: draft.notes || null,
