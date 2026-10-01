@@ -1,0 +1,3 @@
+update public.products set one_availability='IN_STOCK' where status='published' and one_availability is null;
+update public.products set one_availability='SOLD' where status='sold' and one_availability is null;
+update public.sales_channel_connections set activation_status='ACTIVE',environment='PRODUCTION',last_error=null where channel_key='facebook_page' and connection_key in('page_1','page_2') and status='CONNECTED' and verified_at is not null;
