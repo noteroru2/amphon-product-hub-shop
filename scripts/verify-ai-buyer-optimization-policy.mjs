@@ -10,7 +10,10 @@ for (const path of [jsonPath, specPath, rulesPath]) {
 
 const policy = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
 if (policy.version !== 'AMPHON_AI_BUYER_OPTIMIZATION_V1') throw new Error('Optimization policy version mismatch')
-if (policy.runtime?.aiPausedDuringOptimization !== true) throw new Error('Optimization policy must keep AI paused')
+if (policy.runtime?.aiPausedDuringOptimization !== false) throw new Error('Approval phase must unpause AI intake')
+if (policy.runtime?.runtimePhase !== 'APPROVAL') throw new Error('Runtime phase must be APPROVAL')
+if (policy.runtime?.outboundAiRepliesAllowed !== false) throw new Error('Approval phase must not allow automated outbound replies')
+if (policy.runtime?.approvalRequiredForOutboundOffer !== true) throw new Error('Approval requirement missing')
 if (policy.global?.rules?.neverAskForSameEvidenceTwice !== true) throw new Error('Duplicate evidence guard missing')
 if (policy.global?.rules?.photosAreOptionalWhenPricingEvidenceSufficient !== true) throw new Error('Photo optionality rule missing')
 if (policy.global?.rules?.sellIntentRequiredForPricing !== true) throw new Error('SELL_ITEM pricing gate missing')
