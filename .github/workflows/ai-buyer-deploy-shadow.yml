@@ -1,4 +1,4 @@
-name: AI Buyer Production Deploy (SHADOW)
+name: AI Buyer Production Deploy (APPROVAL)
 
 on:
   push:
@@ -198,7 +198,7 @@ jobs:
           echo "::error::AI Buyer health endpoint did not become fully configured"
           exit 1
 
-      - name: Verify all categories remain SHADOW
+      - name: Verify all categories remain APPROVAL
         env:
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash
@@ -213,10 +213,10 @@ jobs:
             console.error('Expected 7 rollout categories, got', modes.length)
             process.exit(1)
           }
-          const bad = modes.filter(x => x.mode !== 'SHADOW' || x.active !== true)
+          const bad = modes.filter(x => x.mode !== 'APPROVAL' || x.active !== true)
           if (bad.length) {
-            console.error('Non-SHADOW rollout detected:', JSON.stringify(bad))
+            console.error('Non-APPROVAL rollout detected:', JSON.stringify(bad))
             process.exit(1)
           }
-          console.log('SHADOW verification PASS:', modes.map(x => x.category).sort().join(', '))
+          console.log('APPROVAL verification PASS:', modes.map(x => x.category).sort().join(', '))
           NODE
