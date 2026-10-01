@@ -114,6 +114,7 @@ begin
 
   update public.products
   set one_retail_price = nullif(v_payload ->> 'retailPrice','')::numeric,
+      price = coalesce(nullif(v_payload ->> 'retailPrice','')::numeric, price),
       one_quick_sale_price = nullif(v_payload ->> 'quickSalePrice','')::numeric,
       one_dealer_price = nullif(v_payload ->> 'dealerPrice','')::numeric,
       one_absolute_floor_price = nullif(v_payload ->> 'absoluteFloorPrice','')::numeric,
