@@ -28,6 +28,7 @@ type ConsumeResult = {
   availabilityVersion?: number | string | null
   hubStatus?: string | null
   ackEventId?: string | null
+  dealerEligibility?: string | null
 }
 
 function response(data: unknown, status = 200) {
@@ -235,6 +236,54 @@ async function consumeAvailability(env: Env, envelope: BridgeEnvelope) {
   return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
 }
 
+async function consumePricing(env: Env, envelope: BridgeEnvelope) {
+  const consumed = await callRpc(env, 'one_pricing_consume_event', envelope.eventId)
+  const outcome = String(consumed.outcome || '').toUpperCase()
+
+  if (outcome === 'APPLIED') {
+    return response({
+      ok: true,
+      accepted: true,
+      duplicate: false,
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      pricing: {
+        hubProductId: consumed.hubProductId || null,
+        sku: consumed.sku || null,
+        dealerEligibility: consumed.dealerEligibility || null,
+      },
+    }, 202)
+  }
+
+  if (outcome === 'DUPLICATE') {
+    return response({
+      ok: true,
+      accepted: false,
+      duplicate: true,
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+    }, 200)
+  }
+
+  if (outcome === 'RETRY') {
+    return response({
+      ok: false,
+      error: consumed.error || 'PRICING_MAPPING_NOT_READY',
+      eventId: envelope.eventId,
+    }, 503)
+  }
+
+  if (outcome === 'CONFLICT' || outcome === 'DEAD') {
+    return response({
+      ok: false,
+      error: consumed.error || 'PRICING_PROJECTION_CONFLICT',
+      eventId: envelope.eventId,
+    }, 409)
+  }
+
+  return response({ ok: false, error: 'PRICING_PROJECTION_UNAVAILABLE' }, 503)
+}
+
 async function maybeConsume(requestCopy: Request, baseResponse: Response, env: Env) {
   if (![200, 202].includes(baseResponse.status)) return baseResponse
 
@@ -286,6 +335,16 @@ async function maybeConsume(requestCopy: Request, baseResponse: Response, env: E
         console.error('ONE-3C failed to mark inbox retryable', { eventId: envelope.eventId, markError })
       })
       return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
+    }
+  }
+
+  if (envelope.eventType === 'product.pricing_changed') {
+    try {
+      return await consumePricing(env, envelope)
+    } catch (error) {
+      console.error('Pricing projection consumer error', { eventId: envelope.eventId, error })
+      await markInboxFailed(env, envelope.eventId, 'PRICING_CONSUMER', error).catch(() => undefined)
+      return response({ ok: false, error: 'PRICING_PROJECTION_UNAVAILABLE' }, 503)
     }
   }
 
