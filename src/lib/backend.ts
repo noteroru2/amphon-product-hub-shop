@@ -86,7 +86,13 @@ function mapProduct(row: any, financial?: any): ProductSummary {
 
 export async function loadProfile(userId: string): Promise<Profile> {
   const { data, error } = await client().from('profiles').select('id,display_name,role,active').eq('id', userId).single()
-  if (error) throw error
+  if (error) {
+    const detail = [error.message, error.details, error.hint].filter(Boolean).join(' · ')
+    if (error.code === 'PGRST116') {
+      throw new Error('ไม่พบโปรไฟล์พนักงาน กรุณาให้ผู้ดูแลระบบตรวจสอบบัญชีนี้')
+    }
+    throw new Error(detail || 'โหลดโปรไฟล์พนักงานไม่สำเร็จ')
+  }
   return {
     id: data.id,
     displayName: data.display_name || 'พนักงาน',
