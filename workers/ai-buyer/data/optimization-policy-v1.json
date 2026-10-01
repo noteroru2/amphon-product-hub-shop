@@ -2,10 +2,12 @@
   "version": "AMPHON_AI_BUYER_OPTIMIZATION_V1",
   "effectiveDate": "2026-09-22",
   "runtime": {
-    "aiPausedDuringOptimization": true,
+    "aiPausedDuringOptimization": false,
     "lineWebhookCollectionContinues": true,
     "outboundAiRepliesAllowed": false,
-    "objective": "Do not block pricing on non-essential photos. Price from sufficient model/spec evidence, preserve defects, and escalate only material ambiguity/risk."
+    "objective": "Run live intake and pricing in APPROVAL mode. No automated LINE offer may be delivered without explicit admin approval.",
+    "runtimePhase": "APPROVAL",
+    "approvalRequiredForOutboundOffer": true
   },
   "global": {
     "evidencePriority": [
