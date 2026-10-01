@@ -59,6 +59,7 @@ import { ProductImageExportControls } from "./components/ProductImageExportActio
 import { useProductImageExport } from "./hooks/useProductImageExport";
 import { OrderManagement } from "./components/OrderManagement";
 import { AiBuyerAdmin } from "./components/AiBuyerAdmin";
+import { AiBuyerApprovalQueue } from "./components/AiBuyerApprovalQueue";
 import { LineOAChat } from "./components/LineOAChat";
 import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
 import { SeoControlTower } from "./components/SeoControlTower";
@@ -129,6 +130,7 @@ type Tab =
   | "profile"
   | "employees"
   | "ai-buyer"
+  | "ai-approval"
   | "line-chat"
   | "seo-opportunities"
   | "seo-control-tower"
@@ -854,6 +856,7 @@ function App() {
             onPublish={() => setTab("publish")}
             onOrders={() => setTab("orders")}
             onAiBuyer={() => setTab("ai-buyer")}
+            onApproval={() => setTab("ai-approval")}
             onSeo={() => setTab("seo-opportunities")}
             onSeoTower={() => setTab("seo-control-tower")}
             seoAlertUnread={seoAlertUnread}
@@ -897,6 +900,14 @@ function App() {
             <AiBuyerAdmin
               profile={profile}
               products={products}
+              onBack={() => setTab("home")}
+            />
+          )}
+        {tab === "ai-approval" &&
+          profile &&
+          ["owner", "admin"].includes(profile.role) && (
+            <AiBuyerApprovalQueue
+              profile={profile}
               onBack={() => setTab("home")}
             />
           )}
@@ -1237,6 +1248,7 @@ function HomeScreen({
   onPublish,
   onOrders,
   onAiBuyer,
+  onApproval,
   onSeo,
   onSeoTower,
   seoAlertUnread,
@@ -1255,6 +1267,7 @@ function HomeScreen({
   onPublish: () => void;
   onOrders: () => void;
   onAiBuyer: () => void;
+  onApproval: () => void;
   onSeo: () => void;
   onSeoTower: () => void;
   seoAlertUnread: number;
@@ -1336,6 +1349,23 @@ function HomeScreen({
               <strong>AI Buyer</strong>
               <small>
                 ตอบ LINE · ปิดผลดีล · ราคาซื้อจริง · Profit Ledger
+              </small>
+            </span>
+          </div>
+          <ChevronRight />
+        </button>
+      )}
+      {["owner", "admin"].includes(profile.role) && (
+        <button
+          className="publish-center-launch ai-approval-home-launch"
+          onClick={onApproval}
+        >
+          <div>
+            <CheckCircle2 size={21} />
+            <span>
+              <strong>AI Approval Queue</strong>
+              <small>
+                ตรวจราคา AI · PriceBook · Hard Max · Confidence · อนุมัติส่ง LINE
               </small>
             </span>
           </div>
