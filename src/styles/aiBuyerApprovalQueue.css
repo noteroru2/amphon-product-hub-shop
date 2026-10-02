@@ -92,7 +92,7 @@
 .approval-summary {
   margin: 10px 14px 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -118,6 +118,50 @@
 .approval-summary strong {
   margin-top: 3px;
   font-size: 18px;
+}
+
+.approval-backlog-banner {
+  margin: 10px 14px 0;
+  border: 1px solid #f2d08a;
+  border-radius: 14px;
+  background: #fff8e8;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.approval-backlog-banner > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a5512;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.approval-backlog-banner svg {
+  width: 18px;
+  flex: 0 0 auto;
+}
+
+.approval-backlog-banner button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 11px;
+  background: #e69a16;
+  color: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.approval-backlog-banner button:disabled {
+  opacity: .55;
 }
 
 .approval-filters {
@@ -628,6 +672,15 @@
 @media (max-width: 720px) {
   .approval-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .approval-backlog-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .approval-backlog-banner button {
+    width: 100%;
   }
 
   .approval-price-grid {
