@@ -227,13 +227,13 @@ jobs:
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash
         run: |
-          for batch in 1 2 3; do
+          for batch in 1 2 3 4 5 6; do
             echo "Approval bootstrap batch $batch"
             body="$(curl -fsS --max-time 120 -X POST \
               'https://amphon-ai-buyer.noteroru2.workers.dev/v1/admin/approval/bootstrap' \
               -H "x-ai-buyer-admin-token: $AI_BUYER_ADMIN_TOKEN" \
               -H 'Content-Type: application/json' \
-              --data '{"limit":4}')"
+              --data '{"limit":1}')"
             echo "$body"
             BOOTSTRAP_JSON="$body" node -e "const x=JSON.parse(process.env.BOOTSTRAP_JSON||'{}');if(x.ok!==true){console.error('Approval bootstrap failed:',JSON.stringify(x));process.exit(1)};console.log('attempted=',x.attempted,'remainingReadyToPrice=',x.remainingReadyToPrice,'priced=',(x.results||[]).filter(r=>r.pricingOk).length)"
           done
