@@ -15,6 +15,7 @@ import {
 import type { Profile } from "../types/product";
 import {
   approveAiBuyerOffer,
+  bootstrapAiBuyerApprovalQueue,
   loadAiBuyerApprovalQueue,
   type AiBuyerApprovalQueueItem,
 } from "../lib/aiBuyerAdmin";
@@ -257,6 +258,7 @@ export function AiBuyerApprovalQueue({
   const [data, setData] = useState<Awaited<ReturnType<typeof loadAiBuyerApprovalQueue>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(false);
   const [confirmId, setConfirmId] = useState("");
   const [busyId, setBusyId] = useState("");
   const [filter, setFilter] = useState<"all" | "ready" | "blocked">("all");
@@ -308,6 +310,25 @@ export function AiBuyerApprovalQueue({
     if (filter === "blocked") return rows.filter((item) => !item.guard.canApprove);
     return rows;
   }, [data, filter]);
+
+  async function syncBacklog() {
+    if (!canAccess || bootstrapping) return;
+    setBootstrapping(true);
+    setError(null);
+    try {
+      const result = await bootstrapAiBuyerApprovalQueue(4);
+      setNotice(
+        result.attempted > 0
+          ? "ประมวลผลคิวราคา " + result.attempted + " เคสแล้ว"
+          : "ไม่มีเคส READY_TO_PRICE เพิ่มเติม",
+      );
+      await refresh(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBootstrapping(false);
+    }
+  }
 
   async function approve(item: AiBuyerApprovalQueueItem) {
     if (!item.case?.id || !item.offer?.id || !item.guard.canApprove) return;
@@ -374,8 +395,24 @@ export function AiBuyerApprovalQueue({
         <div><span>รออนุมัติ</span><strong>{data?.summary.pending ?? 0}</strong></div>
         <div><span>พร้อมส่ง</span><strong>{data?.summary.readyToSend ?? 0}</strong></div>
         <div><span>ติด Guard</span><strong>{data?.summary.blocked ?? 0}</strong></div>
+        <div><span>รอตีราคา</span><strong>{data?.summary.backlogReadyToPrice ?? 0}</strong></div>
         <div><span>Confidence เฉลี่ย</span><strong>{pct(data?.summary.averageConfidence)}</strong></div>
       </div>
+
+      {(data?.summary.backlogReadyToPrice ?? 0) > 0 && (
+        <div className="approval-backlog-banner">
+          <div>
+            <LoaderCircle className={bootstrapping ? "spin" : ""} />
+            <span>
+              มี <b>{data?.summary.backlogReadyToPrice ?? 0} เคส</b> ที่ READY_TO_PRICE
+              แต่ยังไม่ได้สร้าง Offer สำหรับ Approval
+            </span>
+          </div>
+          <button type="button" onClick={() => void syncBacklog()} disabled={bootstrapping}>
+            {bootstrapping ? "กำลังประมวลผล…" : "สร้างคิวราคา"}
+          </button>
+        </div>
+      )}
 
       <div className="approval-filters">
         <button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
@@ -424,16 +461,30 @@ export function AiBuyerApprovalQueue({
           ))
         ) : (
           <div className="approval-empty">
-            <CheckCircle2 />
-            <strong>{filter === "all" ? "ไม่มีราคาใหม่รออนุมัติ" : "ไม่มีรายการในตัวกรองนี้"}</strong>
-            <span>เมื่อ AI ตีราคาเสร็จใน APPROVAL mode รายการจะขึ้นหน้านี้อัตโนมัติ</span>
+            {(data?.summary.backlogReadyToPrice ?? 0) > 0 ? (
+              <LoaderCircle className={bootstrapping ? "spin" : ""} />
+            ) : (
+              <CheckCircle2 />
+            )}
+            <strong>
+              {(data?.summary.backlogReadyToPrice ?? 0) > 0
+                ? "มีเคสรอตีราคา แต่ยังไม่ถูก Materialize"
+                : filter === "all"
+                  ? "ไม่มีราคาใหม่รออนุมัติ"
+                  : "ไม่มีรายการในตัวกรองนี้"}
+            </strong>
+            <span>
+              {(data?.summary.backlogReadyToPrice ?? 0) > 0
+                ? "กด “สร้างคิวราคา” เพื่อให้ Pricing Engine สร้าง Offer แล้วรายการจะขึ้นให้อนุมัติทันที"
+                : "เมื่อ AI ตีราคาเสร็จใน APPROVAL mode รายการจะขึ้นหน้านี้อัตโนมัติ"}
+            </span>
           </div>
         )}
       </div>
 
       <footer className="approval-footer-note">
         <Clock3 />
-        <span>รีเฟรชอัตโนมัติทุก 8 วินาที · ราคาเกิน Hard Max จะกดส่งไม่ได้</span>
+        <span>รีเฟรชอัตโนมัติทุก 8 วินาที · READY_TO_PRICE จะถูกเติมเข้าคิวอัตโนมัติ · ราคาเกิน Hard Max จะกดส่งไม่ได้</span>
       </footer>
     </section>
   );
