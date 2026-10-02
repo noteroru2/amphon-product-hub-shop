@@ -1,4 +1,5 @@
-import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure } from './negotiation-engine'
+import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
+import { runPricingForCase } from './pricing-router'
 
 export interface HubAdminEnv {
   IMAGES: R2Bucket
@@ -619,6 +620,80 @@ export async function handleHubAdminChatMarkRead(request: Request, env: HubAdmin
   }
 }
 
+async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 4) {
+  const limit = Math.max(1, Math.min(8, Math.floor(Number(rawLimit) || 4)))
+  const readyCases = await serviceRows<any>(
+    env,
+    'ai_buyer_valuation_cases?state=eq.READY_TO_PRICE'
+      + '&category=not.is.null'
+      + '&control_mode=eq.AUTO'
+      + '&identity_confidence=gte.0.88'
+      + '&select=id,category,title,identity_confidence,updated_at'
+      + '&order=identity_confidence.desc,updated_at.asc'
+      + '&limit=' + limit,
+  )
+
+  const results: Array<Record<string, unknown>> = []
+  for (const row of readyCases) {
+    const caseId = clean(row.id, 100)
+    if (!validUuid(caseId)) continue
+    try {
+      const pricing = await runPricingForCase(env, caseId)
+      const pricingOk = Boolean(
+        pricing
+        && typeof pricing === 'object'
+        && (pricing as { ok?: boolean }).ok,
+      )
+      let offerFlow: unknown = null
+      if (pricingOk) {
+        offerFlow = await startOfferAfterPricing(env, caseId)
+      }
+      results.push({
+        caseId,
+        category: row.category || null,
+        pricingOk,
+        pricing,
+        offerFlow,
+      })
+    } catch (error) {
+      results.push({
+        caseId,
+        category: row.category || null,
+        pricingOk: false,
+        error: clean((error as Error)?.message || error, 500),
+      })
+    }
+  }
+
+  const remainingRows = await serviceRows<any>(
+    env,
+    'ai_buyer_valuation_cases?state=eq.READY_TO_PRICE&select=id&limit=200',
+  )
+
+  return {
+    attempted: readyCases.length,
+    remainingReadyToPrice: remainingRows.length,
+    results,
+  }
+}
+
+export async function handleHubAdminApprovalBootstrap(request: Request, env: HubAdminEnv) {
+  try {
+    await authenticateAdmin(request, env)
+    const body = await request.json().catch(() => ({})) as { limit?: number }
+    const result = await materializeApprovalBacklog(env, body.limit ?? 4)
+    return hubAdminResponse(request, env, { ok: true, ...result })
+  } catch (error) {
+    const code = clean((error as Error)?.message || error, 1000)
+    const status = code === 'AUTH_REQUIRED' || code === 'AUTH_INVALID'
+      ? 401
+      : code === 'ADMIN_ACCESS_DENIED'
+        ? 403
+        : 400
+    return hubAdminResponse(request, env, { ok: false, error: code }, status)
+  }
+}
+
 export async function handleHubAdminApprovalQueue(request: Request, env: HubAdminEnv) {
   try {
     const { profile } = await authenticateAdmin(request, env)
@@ -626,7 +701,7 @@ export async function handleHubAdminApprovalQueue(request: Request, env: HubAdmi
     const rawLimit = Number(url.searchParams.get('limit') || 120)
     const limit = Math.max(10, Math.min(200, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 120))
 
-    const tasks = await serviceRows<any>(
+    const loadTasks = () => serviceRows<any>(
       env,
       'ai_buyer_admin_tasks?task_type=eq.OFFER_APPROVAL'
         + '&status=in.(ACTION_REQUIRED,IN_PROGRESS)'
@@ -634,6 +709,24 @@ export async function handleHubAdminApprovalQueue(request: Request, env: HubAdmi
         + '&order=created_at.asc'
         + '&limit=' + limit,
     )
+
+    let tasks = await loadTasks()
+    let materialization: Awaited<ReturnType<typeof materializeApprovalBacklog>> | null = null
+
+    // APPROVAL was opened after many cases were already READY_TO_PRICE.
+    // Materialize a small bounded batch so the queue never looks empty while
+    // eligible pricing work is waiting. Each successful case becomes PRICING
+    // and startOfferAfterPricing creates the OFFER_APPROVAL task.
+    if (tasks.length < 4) {
+      materialization = await materializeApprovalBacklog(env, 4 - tasks.length)
+      if (materialization.attempted > 0) tasks = await loadTasks()
+    }
+
+    const readyBacklogRows = await serviceRows<any>(
+      env,
+      'ai_buyer_valuation_cases?state=eq.READY_TO_PRICE&select=id&limit=200',
+    )
+    const backlogReadyToPrice = readyBacklogRows.length
 
     if (!tasks.length) {
       const modes = await serviceRows<any>(
@@ -648,7 +741,9 @@ export async function handleHubAdminApprovalQueue(request: Request, env: HubAdmi
           readyToSend: 0,
           blocked: 0,
           averageConfidence: null,
+          backlogReadyToPrice,
         },
+        materialization,
         modes,
         items: [],
         generatedAt: new Date().toISOString(),
@@ -893,7 +988,9 @@ export async function handleHubAdminApprovalQueue(request: Request, env: HubAdmi
         averageConfidence: confidenceValues.length
           ? confidenceValues.reduce((sum: number, value: number) => sum + value, 0) / confidenceValues.length
           : null,
+        backlogReadyToPrice,
       },
+      materialization,
       modes,
       items,
       generatedAt: new Date().toISOString(),
