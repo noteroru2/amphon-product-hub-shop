@@ -235,16 +235,5 @@ jobs:
               -H 'Content-Type: application/json' \
               --data '{"limit":4}')"
             echo "$body"
-            BOOTSTRAP_JSON="$body" node - <<'NODE'
-            const x = JSON.parse(process.env.BOOTSTRAP_JSON || '{}')
-            if (x.ok !== true) {
-              console.error('Approval bootstrap failed:', JSON.stringify(x))
-              process.exit(1)
-            }
-            console.log(
-              'attempted=', x.attempted,
-              'remainingReadyToPrice=', x.remainingReadyToPrice,
-              'priced=', (x.results || []).filter(r => r.pricingOk).length
-            )
-            NODE
+            BOOTSTRAP_JSON="$body" node -e "const x=JSON.parse(process.env.BOOTSTRAP_JSON||'{}');if(x.ok!==true){console.error('Approval bootstrap failed:',JSON.stringify(x));process.exit(1)};console.log('attempted=',x.attempted,'remainingReadyToPrice=',x.remainingReadyToPrice,'priced=',(x.results||[]).filter(r=>r.pricingOk).length)"
           done
