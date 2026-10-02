@@ -620,7 +620,7 @@ export async function handleHubAdminChatMarkRead(request: Request, env: HubAdmin
   }
 }
 
-async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 4) {
+export async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 4) {
   const limit = Math.max(1, Math.min(8, Math.floor(Number(rawLimit) || 4)))
   const readyCases = await serviceRows<any>(
     env,
