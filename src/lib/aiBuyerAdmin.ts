@@ -272,7 +272,18 @@ export type AiBuyerApprovalQueueData = {
     readyToSend: number;
     blocked: number;
     averageConfidence?: number | null;
+    backlogReadyToPrice?: number;
   };
+  materialization?: {
+    attempted: number;
+    remainingReadyToPrice: number;
+    results: Array<{
+      caseId?: string;
+      category?: string | null;
+      pricingOk?: boolean;
+      error?: string | null;
+    }>;
+  } | null;
   modes: Array<{
     category: string;
     mode: string;
@@ -664,6 +675,23 @@ export async function loadAiBuyerApprovalQueue(limit = 120) {
   return request<AiBuyerApprovalQueueData>(
     `/v1/hub/admin/approval-queue?limit=${Math.max(10, Math.min(200, limit))}`,
   );
+}
+
+export async function bootstrapAiBuyerApprovalQueue(limit = 4) {
+  return request<{
+    ok: true;
+    attempted: number;
+    remainingReadyToPrice: number;
+    results: Array<{
+      caseId?: string;
+      category?: string | null;
+      pricingOk?: boolean;
+      error?: string | null;
+    }>;
+  }>("/v1/hub/admin/approval-bootstrap", {
+    method: "POST",
+    body: JSON.stringify({ limit: Math.max(1, Math.min(8, limit)) }),
+  });
 }
 
 export async function loadAiBuyerChatList(limit = 120) {
