@@ -620,8 +620,11 @@ export async function handleHubAdminChatMarkRead(request: Request, env: HubAdmin
   }
 }
 
-export async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 4) {
-  const limit = Math.max(1, Math.min(8, Math.floor(Number(rawLimit) || 4)))
+export async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 1) {
+  // Keep one pricing case per request. A single pricing pass can issue several
+  // Supabase/OpenAI subrequests; batching multiple cases in one Worker request
+  // can exceed Cloudflare's subrequest budget and leave the queue half-built.
+  const limit = Math.max(1, Math.min(1, Math.floor(Number(rawLimit) || 1)))
   const readyCases = await serviceRows<any>(
     env,
     'ai_buyer_valuation_cases?state=eq.READY_TO_PRICE'
@@ -648,12 +651,20 @@ export async function materializeApprovalBacklog(env: HubAdminEnv, rawLimit = 4)
       if (pricingOk) {
         offerFlow = await startOfferAfterPricing(env, caseId)
       }
+      const pricingRecord = pricing && typeof pricing === 'object'
+        ? pricing as Record<string, unknown>
+        : {}
+      const flowRecord = offerFlow && typeof offerFlow === 'object'
+        ? offerFlow as Record<string, unknown>
+        : {}
       results.push({
         caseId,
         category: row.category || null,
         pricingOk,
-        pricing,
-        offerFlow,
+        pricingReason: clean(pricingRecord.reason, 160) || null,
+        offerId: clean(flowRecord.offerId, 100) || null,
+        offerFlowReason: clean(flowRecord.reason, 160) || null,
+        rolloutMode: clean(flowRecord.mode, 30) || null,
       })
     } catch (error) {
       results.push({
@@ -681,7 +692,7 @@ export async function handleHubAdminApprovalBootstrap(request: Request, env: Hub
   try {
     await authenticateAdmin(request, env)
     const body = await request.json().catch(() => ({})) as { limit?: number }
-    const result = await materializeApprovalBacklog(env, body.limit ?? 4)
+    const result = await materializeApprovalBacklog(env, body.limit ?? 1)
     return hubAdminResponse(request, env, { ok: true, ...result })
   } catch (error) {
     const code = clean((error as Error)?.message || error, 1000)
@@ -718,7 +729,7 @@ export async function handleHubAdminApprovalQueue(request: Request, env: HubAdmi
     // eligible pricing work is waiting. Each successful case becomes PRICING
     // and startOfferAfterPricing creates the OFFER_APPROVAL task.
     if (tasks.length < 4) {
-      materialization = await materializeApprovalBacklog(env, 4 - tasks.length)
+      materialization = await materializeApprovalBacklog(env, 1)
       if (materialization.attempted > 0) tasks = await loadTasks()
     }
 
