@@ -5,6 +5,7 @@ import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, star
 import {
   handleHubAdminApproveOffer,
   handleHubAdminApprovalQueue,
+  handleHubAdminApprovalBootstrap,
   handleHubAdminCaseDetail,
   handleHubAdminChatCase,
   handleHubAdminChatList,
@@ -18,6 +19,7 @@ import {
   handleHubAdminOwnerModel,
   handleHubAdminOwnerPricebookReview,
   handleHubAdminPreflight,
+  materializeApprovalBacklog,
 } from './hub-admin'
 
 interface Env {
@@ -1107,6 +1109,22 @@ async function requireAdmin(request: Request, env: Env) {
   return constantTimeEqual(await sha256(expected), await sha256(provided))
 }
 
+async function handleApprovalBootstrap(request: Request, env: Env) {
+  if (!(await requireAdmin(request, env))) {
+    return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+  }
+
+  let payload: { limit?: number } = {}
+  try {
+    payload = await request.json().catch(() => ({})) as { limit?: number }
+  } catch {
+    payload = {}
+  }
+
+  const result = await materializeApprovalBacklog(env, payload.limit ?? 6)
+  return response({ ok: true, ...result })
+}
+
 async function handleCaseRetryPricing(request: Request, env: Env) {
   if (!(await requireAdmin(request, env))) {
     return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
@@ -1508,7 +1526,7 @@ export default {
     }
 
     if (
-      ['/v1/hub/admin/case','/v1/hub/admin/approval-queue','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/chat-unread','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/offer/approve','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger','/v1/hub/admin/owner-model','/v1/hub/admin/owner-model/pricebook-review'].includes(url.pathname)
+      ['/v1/hub/admin/case','/v1/hub/admin/approval-queue','/v1/hub/admin/approval-bootstrap','/v1/hub/admin/chat-list','/v1/hub/admin/chat-case','/v1/hub/admin/chat-read','/v1/hub/admin/chat-unread','/v1/hub/admin/image','/v1/hub/admin/manual-reply','/v1/hub/admin/offer/approve','/v1/hub/admin/final-outcome','/v1/hub/admin/deal-ledger','/v1/hub/admin/owner-model','/v1/hub/admin/owner-model/pricebook-review'].includes(url.pathname)
       && request.method === 'OPTIONS'
     ) {
       return handleHubAdminPreflight(request, env)
@@ -1524,6 +1542,10 @@ export default {
 
     if (url.pathname === '/v1/hub/admin/approval-queue' && request.method === 'GET') {
       return handleHubAdminApprovalQueue(request, env)
+    }
+
+    if (url.pathname === '/v1/hub/admin/approval-bootstrap' && request.method === 'POST') {
+      return handleHubAdminApprovalBootstrap(request, env)
     }
 
     if (url.pathname === '/v1/hub/admin/manual-reply' && request.method === 'POST') {
@@ -1543,6 +1565,10 @@ export default {
       && (request.method === 'GET' || request.method === 'POST')
     ) {
       return handleHubAdminDealLedger(request, env)
+    }
+
+    if (url.pathname === '/v1/admin/approval/bootstrap' && request.method === 'POST') {
+      return handleApprovalBootstrap(request, env)
     }
 
     if (url.pathname === '/v1/admin/case/reprocess' && request.method === 'POST') {
