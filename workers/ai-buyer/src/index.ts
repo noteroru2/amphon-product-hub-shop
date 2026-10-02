@@ -1121,7 +1121,7 @@ async function handleApprovalBootstrap(request: Request, env: Env) {
     payload = {}
   }
 
-  const result = await materializeApprovalBacklog(env, payload.limit ?? 6)
+  const result = await materializeApprovalBacklog(env, payload.limit ?? 1)
   return response({ ok: true, ...result })
 }
 
