@@ -48,6 +48,7 @@ const SYSTEM_EVENT_ALLOWLIST = new Set([
   'product.mark_sold_requested',
   'product.price_change_requested',
   'product.pricing_changed',
+  'product.sale_completed',
   'publication.end_requested',
   'product.legacy_link_requested',
 ])
