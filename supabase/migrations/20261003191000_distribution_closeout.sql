@@ -6,7 +6,7 @@ create table if not exists public.distribution_alerts (
   id uuid primary key default gen_random_uuid(),
   alert_key text not null unique,
   alert_type text not null check (alert_type in (
-    'DISTRIBUTION_GAP','FACEBOOK_QUEUE_STUCK','FACEBOOK_FAILED',
+    'DISTRIBUTION_GAP','FACEBOOK_QUEUE_STUCK','FACEBOOK_FAILED','FACEBOOK_STALLED',
     'FACEBOOK_PAGE_ERROR','SOLD_ORPHAN_FACEBOOK','SOLD_ORPHAN_MARKETPLACE'
   )),
   severity text not null default 'WARNING' check (severity in ('INFO','WARNING','CRITICAL')),
@@ -291,6 +291,41 @@ begin
      and not exists (
        select 1 from public.facebook_rotation_queue q
        where a.alert_key='FBFAIL:'||q.id::text and q.status='FAILED'
+     );
+
+  -- Facebook scheduler stalled: sellable products exist but no successful post for >6h.
+  insert into public.distribution_alerts(alert_key,alert_type,severity,details,last_seen_at,resolved_at,status)
+  select
+    'FBSTALLED','FACEBOOK_STALLED','CRITICAL',
+    jsonb_build_object(
+      'lastPostedAt',(select max(posted_at) from public.facebook_rotation_queue where status='POSTED'),
+      'eligibleProducts',(select count(*) from public.products where one_availability='IN_STOCK' and status in('ready_to_list','published','reserved')),
+      'plannedJobs',(select count(*) from public.facebook_rotation_queue where status in('PLANNED','CLAIMED','FAILED'))
+    ),
+    now(),null,'OPEN'
+  where exists(
+      select 1 from public.products
+      where one_availability='IN_STOCK' and status in('ready_to_list','published','reserved')
+    )
+    and coalesce(
+      (select max(posted_at) from public.facebook_rotation_queue where status='POSTED'),
+      timestamp with time zone '1970-01-01 00:00:00+00'
+    ) < now()-interval '6 hours'
+  on conflict(alert_key) do update set
+    severity=excluded.severity,details=excluded.details,last_seen_at=now(),resolved_at=null,status='OPEN';
+
+  update public.distribution_alerts
+     set status='RESOLVED',resolved_at=now(),last_seen_at=now()
+   where alert_key='FBSTALLED' and status='OPEN'
+     and (
+       not exists(
+         select 1 from public.products
+         where one_availability='IN_STOCK' and status in('ready_to_list','published','reserved')
+       )
+       or coalesce(
+         (select max(posted_at) from public.facebook_rotation_queue where status='POSTED'),
+         now()
+       ) >= now()-interval '6 hours'
      );
 
   -- Facebook connection health.
