@@ -156,7 +156,7 @@ select
       + case when s.marketplace_required and coalesce(pub.marketplace_verified,false) then 1 else 0 end
     ) / nullif((1 + ap.n + case when s.marketplace_required then 1 else 0 end),0)
   ,1) as coverage_pct,
-  f.last_live_at
+  fb.last_live_at
 from public.distribution_strategy_v s
 cross join active_pages ap
 left join fb on fb.product_id=s.product_id
