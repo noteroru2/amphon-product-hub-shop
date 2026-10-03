@@ -1,6 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep, runFacebookSoldSyncSweep } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -1916,6 +1916,48 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     catch(error){ return json(request, env, {error:error instanceof Error?error.message:String(error)}, 400) }
   }
 
+  if (url.pathname === '/commerce/distribution/control-tower' && request.method === 'GET') {
+    if (!['owner','admin','sales'].includes(context.profile.role)) return json(request, env, { error: 'ไม่มีสิทธิ์ดู Distribution' }, 403)
+    const [coverage,alerts,health,contentSales,outcomes,connections] = await Promise.all([
+      serviceRest<any[]>(env, 'distribution_coverage_v?select=*&order=coverage_pct.asc,stock_age_days.desc&limit=300'),
+      serviceRest<any[]>(env, 'distribution_alerts?status=eq.OPEN&select=*&order=severity.desc,last_seen_at.desc&limit=200'),
+      serviceRest<any[]>(env, 'facebook_rotation_health_v?select=*'),
+      serviceRest<any[]>(env, 'facebook_content_sale_performance_v?select=*&order=direct_sales.desc,posts.desc&limit=100'),
+      serviceRest<any[]>(env, 'distribution_sale_outcomes?select=id,product_id,sku,sale_channel,buyer_type,actual_unit_price,actual_profit,sold_at,attribution_mode&order=sold_at.desc&limit=100'),
+      serviceRest<any[]>(env, 'sales_channel_connections?channel_key=eq.facebook_page&environment=eq.PRODUCTION&select=connection_key,label,status,activation_status,last_error,last_synced_at&order=connection_key'),
+    ])
+    const total=coverage.length
+    const full=coverage.filter((x:any)=>Number(x.coverage_pct||0)>=100).length
+    const marketplacePending=coverage.filter((x:any)=>x.marketplace_required&&!x.marketplace_published).length
+    const facebookGap=coverage.filter((x:any)=>Number(x.facebook_live_pages||0)<Number(x.facebook_required_pages||0)).length
+    const websiteGap=coverage.filter((x:any)=>!x.website_published).length
+    const openCritical=alerts.filter((x:any)=>x.severity==='CRITICAL').length
+    return json(request,env,{
+      generatedAt:new Date().toISOString(),
+      summary:{
+        totalEligible:total,
+        fullyDistributed:full,
+        coveragePct:total?Math.round((full/total)*1000)/10:100,
+        missing:Math.max(0,total-full),
+        marketplacePending,facebookGap,websiteGap,
+        openAlerts:alerts.length,criticalAlerts:openCritical,
+      },
+      matrix:coverage,
+      alerts,
+      facebookHealth:health[0]||null,
+      facebookConnections:connections,
+      contentSales,
+      saleOutcomes:outcomes,
+    })
+  }
+
+  if (url.pathname === '/commerce/distribution/refresh' && request.method === 'POST') {
+    if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
+    const soldSync=await runFacebookSoldSyncSweep(env)
+    const refreshed=await serviceRest<any>(env,'rpc/distribution_refresh_alerts',{method:'POST',body:'{}'})
+    return json(request,env,{ok:true,soldSync,alerts:refreshed})
+  }
+
   if (url.pathname === '/commerce/facebook/learning-dashboard' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
     const settings = await serviceRest<any[]>(env, 'facebook_rotation_settings?select=learning_enabled,learning_min_samples,learning_max_shift_minutes,learning_exploration_percent&limit=1')
@@ -2737,6 +2779,19 @@ export default {
         if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
       } catch (error) {
         console.error('FACEBOOK ROTATION sweep failed', error)
+      }
+
+      try {
+        const soldSync = await runFacebookSoldSyncSweep(env)
+        if (soldSync.length) console.log('DISTRIBUTION sold sync', soldSync)
+      } catch (error) {
+        console.error('DISTRIBUTION sold sync failed', error)
+      }
+
+      try {
+        await serviceRest<any>(env, 'rpc/distribution_refresh_alerts', { method:'POST', body:'{}' })
+      } catch (error) {
+        console.error('DISTRIBUTION alert refresh failed', error)
       }
 
       try {
