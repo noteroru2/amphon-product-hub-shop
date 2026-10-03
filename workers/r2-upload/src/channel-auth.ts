@@ -72,7 +72,13 @@ export async function activateChannel(env:Env,ctx:Ctx,body:any){
  await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({activation_status:'ACTIVE',environment:'PRODUCTION',last_error:null})});return {ok:true}
 }
 function facebookSalesContent(p:any,templateId='ROT-1'){
- const price=Number(p.price??0),specs=p.specs||{},title=String(p.title||p.sku),sku=String(p.sku||''),brand=title.trim().split(/\s+/)[0]||''
+ const retailPrice=Number(p.price??0)
+ const quickPrice=Number(p.one_quick_sale_price??0)
+ const ageDays=Number(p.one_stock_age_days??0)
+ const eligibility=String(p.one_dealer_eligibility||'')
+ const strategy=ageDays>60||eligibility==='CLEARANCE'?'CLEARANCE':ageDays>45?'PUSH_DEALER':ageDays>30?'QUICK_SALE':'HOLD_RETAIL'
+ const price=(strategy==='QUICK_SALE'||strategy==='CLEARANCE')&&quickPrice>0?quickPrice:retailPrice
+ const specs=p.specs||{},title=String(p.title||p.sku),sku=String(p.sku||''),brand=title.trim().split(/\s+/)[0]||''
  const n=Math.max(1,Number(String(templateId).replace(/\D/g,''))||1), compact=(v:string)=>v.replace(/[^0-9A-Za-zก-๙]/g,'')
  const specsLines=[specs.cpu&&('CPU: '+specs.cpu),specs.gpu&&('GPU: '+specs.gpu),specs.ram&&('RAM: '+specs.ram),specs.ssd&&('SSD: '+specs.ssd),specs.screen_size&&('จอ: '+specs.screen_size+(specs.resolution?' '+specs.resolution:'')),specs.battery&&('แบตเตอรี่: '+specs.battery),specs.charger&&('อุปกรณ์: '+specs.charger)].filter(Boolean).slice(0,7)
  const notebook=sku.includes('-NB-')||/notebook|laptop|ideapad|vivobook|aspire|thinkpad|macbook/i.test(title), pc=sku.includes('-PC-')||/desktop|gaming pc|computer/i.test(title)
@@ -83,17 +89,18 @@ function facebookSalesContent(p:any,templateId='ROT-1'){
  const warranty=p.warranty_until?new Date(p.warranty_until):null,warrantyText=warranty&&!Number.isNaN(warranty.getTime())&&warranty.getTime()>Date.now()?'🛡️ มีประกันถึง '+warranty.toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}):null
  const tags=Array.from(new Set(['#อำพลเทรดดิ้ง',...local,...buy,brand&&('#'+compact(brand)),'#'+compact(title.split(/\s+/).slice(0,3).join(''))].filter(Boolean))).slice((n-1)%3,(n-1)%3+9).join(' ')
  const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(sku)
- const message=[heads[(n-1)%heads.length]+title,'',...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
+ const strategyLine=strategy==='CLEARANCE'?'⚡ Clearance — ราคาพิเศษเพื่อหมุนสต๊อก':strategy==='PUSH_DEALER'?'🤝 ร้านค้า/Dealer สนใจรับไปขายต่อ ทักสอบถามราคาส่งได้':strategy==='QUICK_SALE'?'🔥 Quick Sale — ปรับราคาพิเศษสำหรับรอบนี้':null
+ const message=[heads[(n-1)%heads.length]+title,'',strategyLine,...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
  return {message,shop,images:(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)}
 }
 
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
- const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version&limit=1'),stock=authority?.[0]
+ const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version,one_stock_age_days,one_quick_sale_price,one_dealer_price,one_dealer_eligibility&limit=1'),stock=authority?.[0]
  if(!stock||stock.one_availability!=='IN_STOCK'||!['ready_to_list','published','reserved'].includes(stock.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
- const {message,shop,images}=facebookSalesContent(p,templateId);let j:any
+ const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
  if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
  const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
  else {const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
