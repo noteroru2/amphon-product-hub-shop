@@ -100,6 +100,20 @@ async function publishFacebookRotationPost(env:Env,productId:string,key:string,t
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
+async function verifyFacebookPost(env:Env,connectionKey:string,postId:string){
+ const cr=await creds(env,'facebook_page',connectionKey)
+ if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+ const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token='+encodeURIComponent(cr.pageAccessToken))
+ const j:any=await r.json()
+ if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_VERIFY_FAILED:'+(j.error?.message||r.status))
+ return {postId:String(j.id),permalinkUrl:String(j.permalink_url||('https://www.facebook.com/'+j.id))}
+}
+async function recordFacebookLedger(env:Env,input:{productId:string;connectionKey:string;pageId:string;postId:string;externalUrl:string}){
+ await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({
+  product_id:input.productId,connection_key:input.connectionKey,page_id:input.pageId,post_id:input.postId,
+  status:'LIVE',external_url:input.externalUrl,updated_at:new Date().toISOString(),last_error:null
+ })})
+}
 async function recordFacebookLearning(env:Env,job:any,postId:string,postedAt:string){
  const d=new Date(new Date(postedAt).getTime()+7*60*60*1000)
  await rest(env,'facebook_learning_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({queue_id:job.id,product_id:job.product_id,connection_key:job.connection_key,post_id:postId,template_id:job.template_id,posted_at:postedAt,local_hour:d.getUTCHours(),local_dow:d.getUTCDay(),metric_status:'PENDING',updated_at:new Date().toISOString()})})
@@ -118,8 +132,51 @@ export async function runFacebookRotationSweep(env:Env){
  await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_reconcile_false_skips',{method:'POST',body:'{}'})
  const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
  const results:any[]=[]
- for(const job of Array.isArray(jobs)?jobs:[]){try{const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id));const postedAt=new Date().toISOString();await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:out.postId,posted_at:postedAt,last_error:null,claim_token:null})});await recordFacebookLearning(env,job,out.postId,postedAt);results.push({id:job.id,ok:true,postId:out.postId})}catch(e){const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE';await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})});results.push({id:job.id,ok:false,error:msg})}}
+ for(const job of Array.isArray(jobs)?jobs:[]){
+  try{
+   const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id))
+   const verified=await verifyFacebookPost(env,String(job.connection_key),String(out.postId))
+   const postedAt=new Date().toISOString()
+   await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:verified.postId,posted_at:postedAt,last_error:null,claim_token:null})})
+   await recordFacebookLedger(env,{productId:String(job.product_id),connectionKey:String(job.connection_key),pageId:String(out.pageId),postId:verified.postId,externalUrl:verified.permalinkUrl})
+   await recordFacebookLearning(env,job,verified.postId,postedAt)
+   results.push({id:job.id,ok:true,postId:verified.postId,verified:true})
+  }catch(e){
+   const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE'
+   await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})})
+   results.push({id:job.id,ok:false,error:msg})
+  }
+ }
  try{await collectFacebookLearning(env)}catch(e){console.error('FACEBOOK LEARNING collection failed',e)}
+ return results
+}
+
+export async function runFacebookSoldSyncSweep(env:Env){
+ const ledger=await rest(env,'facebook_post_ledger?status=eq.LIVE&select=id,product_id,connection_key,post_id&order=updated_at.asc&limit=20')
+ const rows=Array.isArray(ledger)?ledger:[]
+ if(!rows.length)return []
+ const ids=Array.from(new Set(rows.map((x:any)=>String(x.product_id)).filter(Boolean)))
+ const products=ids.length?await rest(env,'products?id=in.('+ids.join(',')+')&select=id,sku,title,status,one_availability'):[] 
+ const byId=new Map((Array.isArray(products)?products:[]).map((x:any)=>[String(x.id),x]))
+ const results:any[]=[]
+ for(const x of rows){
+  const p:any=byId.get(String(x.product_id))
+  if(!p||!(p.status==='sold'||p.one_availability==='SOLD'))continue
+  try{
+   const cr=await creds(env,'facebook_page',String(x.connection_key))
+   if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+   const msg='ขายแล้ว · '+String(p.title||p.sku)
+   const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(String(x.post_id)),{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message:msg,access_token:cr.pageAccessToken})})
+   const j:any=await r.json()
+   if(!r.ok||j.error)throw new Error('FACEBOOK_SOLD_SYNC_FAILED:'+x.connection_key)
+   await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'SOLD',sold_at:new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
+   results.push({productId:x.product_id,connectionKey:x.connection_key,ok:true})
+  }catch(e){
+   const msg=e instanceof Error?e.message:String(e)
+   await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({last_error:msg.slice(0,800),updated_at:new Date().toISOString()})})
+   results.push({productId:x.product_id,connectionKey:x.connection_key,ok:false,error:msg})
+  }
+ }
  return results
 }
 
@@ -179,8 +236,9 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
     const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})})
     j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
    }
-   await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({product_id:productId,connection_key:key,page_id:String(cr.pageId),post_id:String(j.id),status:'LIVE',external_url:'https://www.facebook.com/'+String(j.id),updated_at:new Date().toISOString(),last_error:null})})
-   results.push({connectionKey:key,ok:true,postId:String(j.id),reused:false,imageCount:images.length})
+   const verified=await verifyFacebookPost(env,key,String(j.id))
+   await recordFacebookLedger(env,{productId,connectionKey:key,pageId:String(cr.pageId),postId:verified.postId,externalUrl:verified.permalinkUrl})
+   results.push({connectionKey:key,ok:true,postId:verified.postId,reused:false,imageCount:images.length,verified:true,externalUrl:verified.permalinkUrl})
   }catch(e){results.push({connectionKey:key,ok:false,error:e instanceof Error?e.message:String(e)})}
  }
  return {ok:results.some(x=>x.ok),results}
