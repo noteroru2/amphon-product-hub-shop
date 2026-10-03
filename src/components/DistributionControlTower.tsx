@@ -97,7 +97,7 @@ export default function DistributionControlTower({
                 <td><span className={"strategy "+row.distribution_strategy.toLowerCase()}>{row.distribution_strategy}</span><small>FB {row.facebook_posts_per_week}x/wk</small></td>
                 <td>{row.website_published?<CheckCircle2/>:<AlertTriangle/>}</td>
                 <td><b>{row.facebook_live_pages}/{row.facebook_required_pages}</b></td>
-                <td>{row.marketplace_required?(row.marketplace_published?<CheckCircle2/>:<span className="pending"><ShoppingBag/>รอลง</span>):<span className="muted">ไม่บังคับ</span>}</td>
+                <td>{row.marketplace_required?(row.marketplace_published?<CheckCircle2/>:row.marketplace_posted?<span className="pending"><ShoppingBag/>รอ Verify URL</span>:<span className="pending"><ShoppingBag/>รอลง</span>):<span className="muted">ไม่บังคับ</span>}</td>
                 <td>{row.line_shared?"✓":"—"}</td>
                 <td><b>{pct(Number(row.coverage_pct))}%</b></td>
                 <td>{product&&<button type="button" onClick={()=>onEdit(product)}>เปิดสินค้า</button>}</td>
