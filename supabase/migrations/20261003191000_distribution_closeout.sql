@@ -115,7 +115,8 @@ fb as (
 pub as (
   select product_id,
     bool_or(channel='website' and status='published') as website_published,
-    bool_or(channel='marketplace' and status='published') as marketplace_published,
+    bool_or(channel='marketplace' and status='published') as marketplace_posted,
+    bool_or(channel='marketplace' and status='published' and external_url is not null) as marketplace_verified,
     max(published_at) filter (where channel='marketplace' and status='published') as marketplace_published_at,
     max(external_url) filter (where channel='marketplace' and status='published') as marketplace_url,
     bool_or(channel='line' and status='published') as line_shared
@@ -137,7 +138,8 @@ select
   coalesce(pub.website_published,false) as website_published,
   coalesce(fb.live_count,0) as facebook_live_pages,
   ap.n as facebook_required_pages,
-  coalesce(pub.marketplace_published,false) as marketplace_published,
+  coalesce(pub.marketplace_posted,false) as marketplace_posted,
+  coalesce(pub.marketplace_verified,false) as marketplace_published,
   pub.marketplace_published_at,
   pub.marketplace_url,
   coalesce(pub.line_shared,false) as line_shared,
@@ -145,13 +147,13 @@ select
   (
     case when coalesce(pub.website_published,false) then 1 else 0 end
     + least(coalesce(fb.live_count,0),ap.n)
-    + case when s.marketplace_required and coalesce(pub.marketplace_published,false) then 1 else 0 end
+    + case when s.marketplace_required and coalesce(pub.marketplace_verified,false) then 1 else 0 end
   )::int as covered_channel_points,
   round(
     100.0 * (
       case when coalesce(pub.website_published,false) then 1 else 0 end
       + least(coalesce(fb.live_count,0),ap.n)
-      + case when s.marketplace_required and coalesce(pub.marketplace_published,false) then 1 else 0 end
+      + case when s.marketplace_required and coalesce(pub.marketplace_verified,false) then 1 else 0 end
     ) / nullif((1 + ap.n + case when s.marketplace_required then 1 else 0 end),0)
   ,1) as coverage_pct,
   f.last_live_at
