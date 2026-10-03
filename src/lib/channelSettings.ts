@@ -36,7 +36,7 @@ export type DistributionCoverageRow={
   stock_age_days:number;aging_bucket?:string|null;dealer_eligibility?:string|null;
   distribution_strategy:string;facebook_posts_per_week:number;marketplace_required:boolean;
   website_published:boolean;facebook_live_pages:number;facebook_required_pages:number;
-  marketplace_published:boolean;marketplace_published_at?:string|null;marketplace_url?:string|null;
+  marketplace_posted:boolean;marketplace_published:boolean;marketplace_published_at?:string|null;marketplace_url?:string|null;
   line_shared:boolean;required_channel_points:number;covered_channel_points:number;
   coverage_pct:number;last_live_at?:string|null;
 }
