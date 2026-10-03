@@ -72,7 +72,13 @@ export async function activateChannel(env:Env,ctx:Ctx,body:any){
  await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({activation_status:'ACTIVE',environment:'PRODUCTION',last_error:null})});return {ok:true}
 }
 function facebookSalesContent(p:any,templateId='ROT-1'){
- const price=Number(p.price??0),specs=p.specs||{},title=String(p.title||p.sku),sku=String(p.sku||''),brand=title.trim().split(/\s+/)[0]||''
+ const retailPrice=Number(p.price??0)
+ const quickPrice=Number(p.one_quick_sale_price??0)
+ const ageDays=Number(p.one_stock_age_days??0)
+ const eligibility=String(p.one_dealer_eligibility||'')
+ const strategy=ageDays>60||eligibility==='CLEARANCE'?'CLEARANCE':ageDays>45?'PUSH_DEALER':ageDays>30?'QUICK_SALE':'HOLD_RETAIL'
+ const price=(strategy==='QUICK_SALE'||strategy==='CLEARANCE')&&quickPrice>0?quickPrice:retailPrice
+ const specs=p.specs||{},title=String(p.title||p.sku),sku=String(p.sku||''),brand=title.trim().split(/\s+/)[0]||''
  const n=Math.max(1,Number(String(templateId).replace(/\D/g,''))||1), compact=(v:string)=>v.replace(/[^0-9A-Za-zก-๙]/g,'')
  const specsLines=[specs.cpu&&('CPU: '+specs.cpu),specs.gpu&&('GPU: '+specs.gpu),specs.ram&&('RAM: '+specs.ram),specs.ssd&&('SSD: '+specs.ssd),specs.screen_size&&('จอ: '+specs.screen_size+(specs.resolution?' '+specs.resolution:'')),specs.battery&&('แบตเตอรี่: '+specs.battery),specs.charger&&('อุปกรณ์: '+specs.charger)].filter(Boolean).slice(0,7)
  const notebook=sku.includes('-NB-')||/notebook|laptop|ideapad|vivobook|aspire|thinkpad|macbook/i.test(title), pc=sku.includes('-PC-')||/desktop|gaming pc|computer/i.test(title)
@@ -83,23 +89,38 @@ function facebookSalesContent(p:any,templateId='ROT-1'){
  const warranty=p.warranty_until?new Date(p.warranty_until):null,warrantyText=warranty&&!Number.isNaN(warranty.getTime())&&warranty.getTime()>Date.now()?'🛡️ มีประกันถึง '+warranty.toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'}):null
  const tags=Array.from(new Set(['#อำพลเทรดดิ้ง',...local,...buy,brand&&('#'+compact(brand)),'#'+compact(title.split(/\s+/).slice(0,3).join(''))].filter(Boolean))).slice((n-1)%3,(n-1)%3+9).join(' ')
  const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(sku)
- const message=[heads[(n-1)%heads.length]+title,'',...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
+ const strategyLine=strategy==='CLEARANCE'?'⚡ Clearance — ราคาพิเศษเพื่อหมุนสต๊อก':strategy==='PUSH_DEALER'?'🤝 ร้านค้า/Dealer สนใจรับไปขายต่อ ทักสอบถามราคาส่งได้':strategy==='QUICK_SALE'?'🔥 Quick Sale — ปรับราคาพิเศษสำหรับรอบนี้':null
+ const message=[heads[(n-1)%heads.length]+title,'',strategyLine,...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
  return {message,shop,images:(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)}
 }
 
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
- const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version&limit=1'),stock=authority?.[0]
+ const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version,one_stock_age_days,one_quick_sale_price,one_dealer_price,one_dealer_eligibility&limit=1'),stock=authority?.[0]
  if(!stock||stock.one_availability!=='IN_STOCK'||!['ready_to_list','published','reserved'].includes(stock.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
- const {message,shop,images}=facebookSalesContent(p,templateId);let j:any
+ const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
  if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
  const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
  else {const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})});j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))}
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
+async function verifyFacebookPost(env:Env,connectionKey:string,postId:string){
+ const cr=await creds(env,'facebook_page',connectionKey)
+ if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+ const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token='+encodeURIComponent(cr.pageAccessToken))
+ const j:any=await r.json()
+ if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_VERIFY_FAILED:'+(j.error?.message||r.status))
+ return {postId:String(j.id),permalinkUrl:String(j.permalink_url||('https://www.facebook.com/'+j.id))}
+}
+async function recordFacebookLedger(env:Env,input:{productId:string;connectionKey:string;pageId:string;postId:string;externalUrl:string}){
+ await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({
+  product_id:input.productId,connection_key:input.connectionKey,page_id:input.pageId,post_id:input.postId,
+  status:'LIVE',external_url:input.externalUrl,updated_at:new Date().toISOString(),last_error:null
+ })})
+}
 async function recordFacebookLearning(env:Env,job:any,postId:string,postedAt:string){
  const d=new Date(new Date(postedAt).getTime()+7*60*60*1000)
  await rest(env,'facebook_learning_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({queue_id:job.id,product_id:job.product_id,connection_key:job.connection_key,post_id:postId,template_id:job.template_id,posted_at:postedAt,local_hour:d.getUTCHours(),local_dow:d.getUTCDay(),metric_status:'PENDING',updated_at:new Date().toISOString()})})
@@ -118,8 +139,51 @@ export async function runFacebookRotationSweep(env:Env){
  await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_reconcile_false_skips',{method:'POST',body:'{}'})
  const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
  const results:any[]=[]
- for(const job of Array.isArray(jobs)?jobs:[]){try{const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id));const postedAt=new Date().toISOString();await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:out.postId,posted_at:postedAt,last_error:null,claim_token:null})});await recordFacebookLearning(env,job,out.postId,postedAt);results.push({id:job.id,ok:true,postId:out.postId})}catch(e){const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE';await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})});results.push({id:job.id,ok:false,error:msg})}}
+ for(const job of Array.isArray(jobs)?jobs:[]){
+  try{
+   const out=await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id))
+   const verified=await verifyFacebookPost(env,String(job.connection_key),String(out.postId))
+   const postedAt=new Date().toISOString()
+   await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'POSTED',post_id:verified.postId,posted_at:postedAt,last_error:null,claim_token:null})})
+   await recordFacebookLedger(env,{productId:String(job.product_id),connectionKey:String(job.connection_key),pageId:String(out.pageId),postId:verified.postId,externalUrl:verified.permalinkUrl})
+   await recordFacebookLearning(env,job,verified.postId,postedAt)
+   results.push({id:job.id,ok:true,postId:verified.postId,verified:true})
+  }catch(e){
+   const msg=e instanceof Error?e.message:String(e),terminal=msg==='PRODUCT_NOT_PUBLISHABLE'
+   await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:terminal?'SKIPPED_SOLD':'FAILED',last_error:msg.slice(0,1000),next_attempt_at:terminal?null:new Date(Date.now()+15*60*1000).toISOString(),claim_token:null})})
+   results.push({id:job.id,ok:false,error:msg})
+  }
+ }
  try{await collectFacebookLearning(env)}catch(e){console.error('FACEBOOK LEARNING collection failed',e)}
+ return results
+}
+
+export async function runFacebookSoldSyncSweep(env:Env){
+ const ledger=await rest(env,'facebook_post_ledger?status=eq.LIVE&select=id,product_id,connection_key,post_id&order=updated_at.asc&limit=20')
+ const rows=Array.isArray(ledger)?ledger:[]
+ if(!rows.length)return []
+ const ids=Array.from(new Set(rows.map((x:any)=>String(x.product_id)).filter(Boolean)))
+ const products=ids.length?await rest(env,'products?id=in.('+ids.join(',')+')&select=id,sku,title,status,one_availability'):[] 
+ const byId=new Map((Array.isArray(products)?products:[]).map((x:any)=>[String(x.id),x]))
+ const results:any[]=[]
+ for(const x of rows){
+  const p:any=byId.get(String(x.product_id))
+  if(!p||!(p.status==='sold'||p.one_availability==='SOLD'))continue
+  try{
+   const cr=await creds(env,'facebook_page',String(x.connection_key))
+   if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+   const msg='ขายแล้ว · '+String(p.title||p.sku)
+   const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(String(x.post_id)),{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message:msg,access_token:cr.pageAccessToken})})
+   const j:any=await r.json()
+   if(!r.ok||j.error)throw new Error('FACEBOOK_SOLD_SYNC_FAILED:'+x.connection_key)
+   await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'SOLD',sold_at:new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
+   results.push({productId:x.product_id,connectionKey:x.connection_key,ok:true})
+  }catch(e){
+   const msg=e instanceof Error?e.message:String(e)
+   await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({last_error:msg.slice(0,800),updated_at:new Date().toISOString()})})
+   results.push({productId:x.product_id,connectionKey:x.connection_key,ok:false,error:msg})
+  }
+ }
  return results
 }
 
@@ -179,8 +243,9 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
     const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})})
     j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
    }
-   await rest(env,'facebook_post_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({product_id:productId,connection_key:key,page_id:String(cr.pageId),post_id:String(j.id),status:'LIVE',external_url:'https://www.facebook.com/'+String(j.id),updated_at:new Date().toISOString(),last_error:null})})
-   results.push({connectionKey:key,ok:true,postId:String(j.id),reused:false,imageCount:images.length})
+   const verified=await verifyFacebookPost(env,key,String(j.id))
+   await recordFacebookLedger(env,{productId,connectionKey:key,pageId:String(cr.pageId),postId:verified.postId,externalUrl:verified.permalinkUrl})
+   results.push({connectionKey:key,ok:true,postId:verified.postId,reused:false,imageCount:images.length,verified:true,externalUrl:verified.permalinkUrl})
   }catch(e){results.push({connectionKey:key,ok:false,error:e instanceof Error?e.message:String(e)})}
  }
  return {ok:results.some(x=>x.ok),results}

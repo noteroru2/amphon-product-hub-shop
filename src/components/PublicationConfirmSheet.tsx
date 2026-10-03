@@ -36,6 +36,10 @@ export function PublicationConfirmSheet({
   const actionId = useMemo(() => crypto.randomUUID(), []);
 
   async function confirm() {
+    if (channel === "marketplace" && !externalUrl.trim()) {
+      setError("Marketplace ต้องใส่ลิงก์ประกาศก่อนจึงจะนับว่า Verified");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -97,7 +101,7 @@ export function PublicationConfirmSheet({
         </label>
         {definition.supportsExternalUrl ? (
           <label className="field">
-            <span>ลิงก์ประกาศ (ไม่บังคับ)</span>
+            <span>{channel === "marketplace" ? "ลิงก์ประกาศ (บังคับเพื่อ Verify)" : "ลิงก์ประกาศ (ไม่บังคับ)"}</span>
             <input
               type="url"
               inputMode="url"

@@ -28,6 +28,7 @@ import {
   type AutoPublishQueueItem,
 } from "../lib/autoPublish";
 import { MerchantSettingsModal, ProductCommerceEditor } from "./CommerceAdmin";
+import DistributionControlTower from "./DistributionControlTower";
 import {
   listProductPublications,
   publicationChannels,
@@ -392,6 +393,8 @@ export function PublishCenter({
           </button>
         </div>
       </header>
+
+      <DistributionControlTower profile={profile} products={products} onEdit={onEdit} />
 
       <div className="publish-summary-grid">
         <button

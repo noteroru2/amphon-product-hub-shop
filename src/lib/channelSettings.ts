@@ -29,3 +29,38 @@ export async function updateFacebookRotationSettings(patch:{enabled?:boolean;dry
 
 export type FacebookLearningDashboard={settings:{learning_enabled:boolean;learning_min_samples:number;learning_max_shift_minutes:number;learning_exploration_percent:number}|null;pageSummary:Array<{connectionKey:string;posts:number;collected:number;pending:number;avgReach:number|null;avgImpressions:number|null;avgEngaged:number|null}>;feedback:Array<{connection_key:string;template_id:string;local_dow:number;local_hour:number;samples:number;avg_reach:number|null;avg_impressions:number|null;avg_engaged:number|null;learning_score:number|null;eligible:boolean}>;ledger:Array<{connection_key:string;template_id:string;posted_at:string;local_hour:number;local_dow:number;impressions:number|null;reach:number|null;engaged_users:number|null;metric_status:string;metric_error?:string|null;measured_at?:string|null}>;health:{failed_jobs:number;stuck_jobs:number;metric_errors:number;metric_pending:number;last_posted_at:string|null}|null}
 export async function getFacebookLearningDashboard(){return call<FacebookLearningDashboard>('/commerce/facebook/learning-dashboard')}
+
+
+export type DistributionCoverageRow={
+  product_id:string;sku:string;title:string;status:string;one_availability:string;
+  stock_age_days:number;aging_bucket?:string|null;dealer_eligibility?:string|null;
+  distribution_strategy:string;facebook_posts_per_week:number;marketplace_required:boolean;
+  website_published:boolean;facebook_live_pages:number;facebook_required_pages:number;
+  marketplace_posted:boolean;marketplace_published:boolean;marketplace_published_at?:string|null;marketplace_url?:string|null;
+  line_shared:boolean;required_channel_points:number;covered_channel_points:number;
+  coverage_pct:number;last_live_at?:string|null;
+}
+export type DistributionAlert={
+  id:string;alert_key:string;alert_type:string;severity:'INFO'|'WARNING'|'CRITICAL';
+  product_id?:string|null;connection_key?:string|null;status:string;details:Record<string,unknown>;
+  first_seen_at:string;last_seen_at:string;
+}
+export type DistributionControlTower={
+  generatedAt:string;
+  summary:{
+    totalEligible:number;fullyDistributed:number;coveragePct:number;missing:number;
+    marketplacePending:number;facebookGap:number;websiteGap:number;openAlerts:number;criticalAlerts:number;
+  };
+  matrix:DistributionCoverageRow[];
+  alerts:DistributionAlert[];
+  facebookHealth:{failed_jobs:number;stuck_jobs:number;metric_errors:number;metric_pending:number;last_posted_at:string|null}|null;
+  facebookConnections:Array<{connection_key:string;label:string;status:string;activation_status:string;last_error?:string|null;last_synced_at?:string|null}>;
+  contentSales:Array<{connection_key:string;template_id:string;posts:number;measured_posts:number;avg_reach:number|null;avg_impressions:number|null;avg_engaged:number|null;direct_sales:number;direct_profit:number;direct_sales_per_100_posts:number}>;
+  saleOutcomes:Array<{id:string;product_id:string;sku:string;sale_channel:string;buyer_type?:string|null;actual_unit_price?:number|null;actual_profit?:number|null;sold_at:string;attribution_mode:string}>;
+}
+export async function getDistributionControlTower(){
+  return call<DistributionControlTower>('/commerce/distribution/control-tower')
+}
+export async function refreshDistributionControlTower(){
+  return call<{ok:boolean;soldSync:unknown[];alerts:unknown}>('/commerce/distribution/refresh',{method:'POST',body:JSON.stringify({})})
+}
