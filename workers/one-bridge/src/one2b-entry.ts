@@ -284,6 +284,32 @@ async function consumePricing(env: Env, envelope: BridgeEnvelope) {
   return response({ ok: false, error: 'PRICING_PROJECTION_UNAVAILABLE' }, 503)
 }
 
+async function consumeSaleOutcome(env: Env, envelope: BridgeEnvelope) {
+  const consumed = await callRpc(env, 'distribution_consume_sale_event', envelope.eventId)
+  const outcome = String(consumed.outcome || '').toUpperCase()
+
+  if (outcome === 'APPLIED') {
+    return response({
+      ok: true,
+      accepted: true,
+      duplicate: false,
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      sale: { hubProductId: consumed.hubProductId || null, sku: consumed.sku || null },
+    }, 202)
+  }
+  if (outcome === 'DUPLICATE') {
+    return response({ ok: true, accepted: false, duplicate: true, eventId: envelope.eventId, status: 'PROCESSED' }, 200)
+  }
+  if (outcome === 'RETRY') {
+    return response({ ok: false, error: consumed.error || 'SALE_MAPPING_NOT_READY', eventId: envelope.eventId }, 503)
+  }
+  if (outcome === 'CONFLICT' || outcome === 'DEAD') {
+    return response({ ok: false, error: consumed.error || 'SALE_OUTCOME_CONFLICT', eventId: envelope.eventId }, 409)
+  }
+  return response({ ok: false, error: 'SALE_OUTCOME_UNAVAILABLE' }, 503)
+}
+
 async function maybeConsume(requestCopy: Request, baseResponse: Response, env: Env) {
   if (![200, 202].includes(baseResponse.status)) return baseResponse
 
@@ -345,6 +371,16 @@ async function maybeConsume(requestCopy: Request, baseResponse: Response, env: E
       console.error('Pricing projection consumer error', { eventId: envelope.eventId, error })
       await markInboxFailed(env, envelope.eventId, 'PRICING_CONSUMER', error).catch(() => undefined)
       return response({ ok: false, error: 'PRICING_PROJECTION_UNAVAILABLE' }, 503)
+    }
+  }
+
+  if (envelope.eventType === 'product.sale_completed') {
+    try {
+      return await consumeSaleOutcome(env, envelope)
+    } catch (error) {
+      console.error('Sale outcome consumer error', { eventId: envelope.eventId, error })
+      await markInboxFailed(env, envelope.eventId, 'SALE_OUTCOME_CONSUMER', error).catch(() => undefined)
+      return response({ ok: false, error: 'SALE_OUTCOME_UNAVAILABLE' }, 503)
     }
   }
 
