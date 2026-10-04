@@ -1977,6 +1977,9 @@ function AddProduct({
     draft.category && (!categoryDefinition?.subtypes.length || draft.subtype),
   );
   const hasUploadErrors = uploadQueue.some((item) => item.state === "error");
+  useEffect(() => {
+    if (error) document.querySelector(".save-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [error]);
   return (
     <section className="screen add-screen">
       <header className="add-header">
@@ -2115,6 +2118,7 @@ function CategoryStep({
 }) {
   const definition = getCategoryDefinition(draft.category);
   function selectCategory(category: ProductCategory) {
+    if (category === draft.category) return;
     const nextDefinition = getCategoryDefinition(category);
     const automaticSubtype =
       nextDefinition?.subtypes.length === 1
@@ -2123,8 +2127,6 @@ function CategoryStep({
     update({
       category,
       subtype: automaticSubtype,
-      specs: {},
-      title: undefined,
     });
   }
   return (
@@ -2161,7 +2163,9 @@ function CategoryStep({
                 className={
                   draft.subtype === subtype.value ? "subtype active" : "subtype"
                 }
-                onClick={() => update({ subtype: subtype.value, specs: {} })}
+                onClick={() => {
+                  if (subtype.value !== draft.subtype) update({ subtype: subtype.value });
+                }}
               >
                 {subtype.label}
               </button>

@@ -369,6 +369,7 @@ async function deleteObject(productId: string, objectKey: string) {
 }
 
 export interface SaveProductHooks {
+  onStage?: (stage: string) => void
   onRemoteCreated?: (productId: string, sku: string) => Promise<void> | void
   onUploadStart?: (imageId: string) => void
   onUploadDone?: (imageId: string, remote: { remoteImageId: string; objectKey: string; publicUrl?: string }) => Promise<void> | void
@@ -376,6 +377,39 @@ export interface SaveProductHooks {
 }
 
 export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: SaveProductHooks = {}): Promise<ProductSummary> {
+  const attemptId = crypto.randomUUID()
+  let productId = draft.remoteProductId
+  let stage = 'validate'
+  const startedAt = Date.now()
+  const diagnostic = (action: string, extra: Record<string, unknown> = {}) => {
+    if (!productId) return
+    void logActivity(productId, action, {
+      attempt_id: attemptId, stage, client_revision: 'save-diagnostics-v2',
+      requested_status: draft.status, spec_field_count: Object.keys(draft.specs ?? {}).length,
+      image_count: draft.images.length, duration_ms: Date.now() - startedAt, ...extra,
+    })
+  }
+  diagnostic('product_save_started')
+  try {
+    const saved = await saveProductCore(draft, profile, {
+      ...hooks,
+      onStage: (next) => { stage = next; hooks.onStage?.(next) },
+      onRemoteCreated: async (id, sku) => {
+        productId = id
+        diagnostic('product_save_started')
+        await hooks.onRemoteCreated?.(id, sku)
+      },
+    })
+    diagnostic('product_save_verified', { saved_status: saved.status, saved_spec_field_count: Object.keys(saved.specs ?? {}).length })
+    return saved
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined
+    diagnostic('product_save_failed', { error: errorMessage(error), error_code: code })
+    throw error
+  }
+}
+
+async function saveProductCore(draft: ProductDraft, profile: Profile, hooks: SaveProductHooks): Promise<ProductSummary> {
   // Keep retry checkpoints on the submitted snapshot as well as in React.
   draft = { ...draft, images: draft.images.map(image => ({ ...image })) }
   if (!draft.category) throw new Error('กรุณาเลือกประเภทสินค้า')
@@ -386,6 +420,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   const desiredStatus = draft.status
   const newImages = draft.images.filter((image) => image.blob && !image.remoteImageId)
 
+  hooks.onStage?.('check_duplicate')
   const duplicate = await findDuplicateIdentifier(draft.serialNumber, draft.remoteProductId)
   if (duplicate) {
     throw new Error(`Serial / IMEI นี้มีอยู่ในสต๊อกแล้ว: ${duplicate.sku} — ${duplicate.title}`)
@@ -399,6 +434,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   let existingImages: any[] = []
   const statusRequested = !productId || desiredStatus !== (draft.originalStatus ?? desiredStatus)
   if (productId) {
+    hooks.onStage?.('load_current_product')
     const { data: existing, error: existingError } = await db.from('products').select('status,serial_number,one_managed,one_retail_price,product_images(id,sort_order,is_cover,image_role)').eq('id', productId).single()
     if (existingError) throw existingError
     existingStatus = existing.status as ProductStatus
@@ -444,6 +480,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     updated_by: profile.id,
   }
 
+  hooks.onStage?.('write_details')
   if (!productId) {
     const { data, error } = await db.from('products').insert({ ...basePayload, created_by: profile.id }).select('id,sku').single()
     if (error) throw error
@@ -465,6 +502,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   const savedProductId = productId
 
   if (canSeeFinancials(profile.role)) {
+    hooks.onStage?.('write_financials')
     const { error } = await db.from('product_financials').upsert({
       product_id: savedProductId,
       cost: draft.cost ?? null,
@@ -474,6 +512,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     if (error) throw error
   }
 
+  hooks.onStage?.('delete_images')
   let deletedImageCount = 0
   for (const deleted of draft.deletedRemoteImages ?? []) {
     await deleteObject(savedProductId, deleted.objectKey)
@@ -483,6 +522,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   }
   if (deletedImageCount) await logActivity(savedProductId, 'images_deleted', { count: deletedImageCount })
 
+  hooks.onStage?.('upload_images')
   let uploadFailed = false
   let uploadedCount = 0
   for (const image of newImages) {
@@ -511,6 +551,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   }
   if (uploadedCount) await logActivity(savedProductId, 'images_uploaded', { count: uploadedCount })
 
+  hooks.onStage?.('reorder_images')
   const currentImages = [...draft.images].filter((image) => !(draft.deletedRemoteImages ?? []).some((deleted) => deleted.id === image.remoteImageId))
   const orderedRemote = currentImages.filter((image) => image.remoteImageId)
   for (let i = 0; i < orderedRemote.length; i++) {
@@ -532,6 +573,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   }
 
   if (statusRequested) {
+    hooks.onStage?.('finalize_status')
     let finalize = db.from('products').update({ status: desiredStatus, updated_by: profile.id }).eq('id', savedProductId)
     // Don't restore a stale availability after System/a colleague changes it.
     if (existingStatus) {
@@ -549,6 +591,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   await logActivity(savedProductId, 'product_saved', { status: desiredStatus, image_count: draft.images.length })
 
   try {
+    hooks.onStage?.('read_saved_product')
     return await loadProduct(savedProductId, profile.role)
   } catch (error) {
     throw new Error(`บันทึก ${sku} แล้ว แต่โหลดข้อมูลกลับไม่สำเร็จ: ${errorMessage(error)}`)

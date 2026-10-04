@@ -149,3 +149,14 @@ test('ONE-managed stock actions stay in System while ordinary detail edits stay 
   assert.deepEqual(f.api.allowedStatuses('reserved','owner',true),['reserved']);
   assert.equal(f.api.allowedStatuses('published','owner',false).includes('sold'),true);
 });
+
+test('failed saves record the database error and write stage for system diagnosis',async()=>{
+ const f=fixture();f.rejectUpdate();
+ await assert.rejects(f.api.saveProduct(f.draft,profile));
+ await new Promise(resolve=>setImmediate(resolve));
+ const failure=f.calls.find(c=>c.table==='activity_logs'&&c.payload?.action==='product_save_failed');
+ assert.equal(failure.payload.metadata.stage,'write_details');
+ assert.equal(failure.payload.metadata.error_code,'PGRST116');
+ assert.equal(failure.payload.metadata.error,'No visible row');
+ assert.ok(failure.payload.metadata.attempt_id);
+});
