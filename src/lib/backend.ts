@@ -2,6 +2,7 @@ import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { DuplicateIdentifierMatch, EmployeeActivity, EmployeeSummary, ProductActivity, ProductDraft, ProductImageDraft, ProductStatus, ProductSummary, Profile, UserRole } from '../types/product'
 import { validateReadyToList } from './productSchemas'
+import { errorMessage } from './errors'
 
 const r2Api = (import.meta.env.VITE_R2_UPLOAD_API as string | undefined)?.replace(/\/$/, '')
 
@@ -24,9 +25,14 @@ export const STATUS_TRANSITIONS: Record<ProductStatus, ProductStatus[]> = {
   cancelled: ['cancelled'],
 }
 
-export function allowedStatuses(current: ProductStatus | undefined, role: UserRole): ProductStatus[] {
+export function allowedStatuses(current: ProductStatus | undefined, role: UserRole, oneManaged = false): ProductStatus[] {
   if (!current) return ['draft', 'photo_ready', 'ready_to_list', 'repair', 'consignment']
   const base = STATUS_TRANSITIONS[current] ?? [current]
+  if (oneManaged) {
+    const systemOwned: ProductStatus[] = ['reserved', 'sold', 'repair', 'returned', 'cancelled']
+    if (systemOwned.includes(current)) return [current]
+    return base.filter(status => !systemOwned.includes(status))
+  }
   if (role === 'owner' || role === 'admin') {
     if (current === 'returned' || current === 'cancelled') return Array.from(new Set([...base, 'draft']))
   }
@@ -154,6 +160,22 @@ export async function findDuplicateIdentifier(identifier?: string, excludeProduc
   }
 }
 
+// A save must read its own product, not search the filtered/limited inventory.
+export async function loadProduct(productId: string, role: UserRole): Promise<ProductSummary> {
+  const db = client()
+  const { data, error } = await db.from('products')
+    .select('*,product_images(id,object_key,public_url,sort_order,is_cover,image_role)')
+    .eq('id', productId).single()
+  if (error) throw error
+  let financial
+  if (canSeeFinancials(role)) {
+    const result = await db.from('product_financials').select('cost').eq('product_id', productId).maybeSingle()
+    if (result.error) throw result.error
+    financial = result.data
+  }
+  return mapProduct(data, financial)
+}
+
 export async function listProductActivity(productId: string, limit = 20): Promise<ProductActivity[]> {
   const db = client()
   const { data, error } = await db
@@ -186,13 +208,13 @@ export async function quickChangeProductStatus(productId: string, desiredStatus:
   const db = client()
   const { data: existing, error: existingError } = await db
     .from('products')
-    .select('status')
+    .select('status,one_managed')
     .eq('id', productId)
     .single()
   if (existingError) throw existingError
 
   const currentStatus = existing.status as ProductStatus
-  const allowed = allowedStatuses(currentStatus, profile.role)
+  const allowed = allowedStatuses(currentStatus, profile.role, Boolean(existing.one_managed))
   if (!allowed.includes(desiredStatus)) {
     throw new Error(`ไม่อนุญาตให้เปลี่ยนสถานะจาก ${currentStatus} เป็น ${desiredStatus}`)
   }
@@ -203,7 +225,7 @@ export async function quickChangeProductStatus(productId: string, desiredStatus:
   const { error } = await db
     .from('products')
     .update({ status: desiredStatus, updated_by: profile.id })
-    .eq('id', productId)
+    .eq('id', productId).eq('status', currentStatus).select('id').single()
   if (error) throw error
 
   if (currentStatus !== desiredStatus) {
@@ -211,10 +233,7 @@ export async function quickChangeProductStatus(productId: string, desiredStatus:
     await logActivity(productId, 'quick_status_action', { status: desiredStatus })
   }
 
-  const products = await listProducts(profile.role)
-  const saved = products.find((product) => product.id === productId)
-  if (!saved) throw new Error('เปลี่ยนสถานะสำเร็จ แต่โหลดสินค้ากลับมาไม่สำเร็จ')
-  return saved
+  return loadProduct(productId, profile.role)
 }
 
 export function draftFromProduct(product: ProductSummary, ownerUserId?: string): ProductDraft {
@@ -357,6 +376,8 @@ export interface SaveProductHooks {
 }
 
 export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: SaveProductHooks = {}): Promise<ProductSummary> {
+  // Keep retry checkpoints on the submitted snapshot as well as in React.
+  draft = { ...draft, images: draft.images.map(image => ({ ...image })) }
   if (!draft.category) throw new Error('กรุณาเลือกประเภทสินค้า')
   const db = client()
   const title = (draft.title || [draft.brand, draft.model].filter(Boolean).join(' ')).trim()
@@ -364,10 +385,6 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
 
   const desiredStatus = draft.status
   const newImages = draft.images.filter((image) => image.blob && !image.remoteImageId)
-  if (['photo_ready', 'ready_to_list', 'published'].includes(desiredStatus) && draft.images.length === 0) {
-    throw new Error('สถานะนี้ต้องมีรูปสินค้าอย่างน้อย 1 รูป')
-  }
-  if (['ready_to_list', 'published'].includes(desiredStatus)) validateReadyToList(draft)
 
   const duplicate = await findDuplicateIdentifier(draft.serialNumber, draft.remoteProductId)
   if (duplicate) {
@@ -379,16 +396,31 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   let existingStatus: ProductStatus | undefined
   let existingSerial = ''
   let existingOneManaged = false
+  let existingImages: any[] = []
+  const statusRequested = !productId || desiredStatus !== (draft.originalStatus ?? desiredStatus)
   if (productId) {
-    const { data: existing, error: existingError } = await db.from('products').select('status,serial_number,one_managed,one_retail_price').eq('id', productId).single()
+    const { data: existing, error: existingError } = await db.from('products').select('status,serial_number,one_managed,one_retail_price,product_images(id,sort_order,is_cover,image_role)').eq('id', productId).single()
     if (existingError) throw existingError
     existingStatus = existing.status as ProductStatus
     existingSerial = String(existing.serial_number ?? '')
     existingOneManaged = Boolean(existing.one_managed)
-    const allowed = allowedStatuses(existingStatus, profile.role)
-    if (!allowed.includes(desiredStatus)) {
+    existingImages = existing.product_images ?? []
+    const allowed = allowedStatuses(existingStatus, profile.role, existingOneManaged)
+    if (statusRequested && !allowed.includes(desiredStatus)) {
       throw new Error(`ไม่อนุญาตให้เปลี่ยนสถานะจาก ${existingStatus} เป็น ${desiredStatus}`)
     }
+  }
+
+  // Existing listings may predate the current required fields. Editing their
+  // notes/specs must not be blocked by the gate for publishing a new listing.
+  if (statusRequested) {
+    if (['photo_ready', 'ready_to_list', 'published'].includes(desiredStatus) && draft.images.length === 0) {
+      throw new Error('สถานะนี้ต้องมีรูปสินค้าอย่างน้อย 1 รูป')
+    }
+    if (['ready_to_list', 'published'].includes(desiredStatus)) validateReadyToList(draft)
+  }
+  if (['photo_ready', 'ready_to_list', 'published'].includes((statusRequested ? desiredStatus : existingStatus) ?? '') && existingImages.length > 0 && draft.images.length === 0) {
+    throw new Error('สินค้าที่ลงขายต้องเหลือรูปอย่างน้อย 1 รูป หรือเปลี่ยนสถานะเป็นร่างก่อน')
   }
 
   const statusDuringUpload: ProductStatus = productId
@@ -402,7 +434,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     model: draft.model || null,
     title,
     serial_number: draft.serialNumber?.trim() || null,
-    status: statusDuringUpload,
+    ...(!productId ? { status: statusDuringUpload } : {}),
     condition_percent: draft.conditionPercent ?? null,
     ...(existingOneManaged ? {} : { price: draft.price ?? null }),
     warranty_until: draft.warrantyUntil || null,
@@ -421,7 +453,7 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     await hooks.onRemoteCreated?.(createdProductId, sku)
     await logActivity(createdProductId, 'product_created', { category: draft.category, status: desiredStatus })
   } else {
-    const { error } = await db.from('products').update(basePayload).eq('id', productId)
+    const { error } = await db.from('products').update(basePayload).eq('id', productId).select('id').single()
     if (error) throw error
     await logActivity(productId, 'product_updated', { title })
     if (normalizeIdentifier(existingSerial) !== normalizeIdentifier(draft.serialNumber)) {
@@ -469,10 +501,11 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
       }).select('id').single()
       if (error) throw error
       uploadedCount += 1
+      Object.assign(image, { remoteImageId: data.id, objectKey: uploaded.objectKey, publicUrl: uploaded.publicUrl })
       await hooks.onUploadDone?.(image.id, { remoteImageId: data.id, objectKey: uploaded.objectKey, publicUrl: uploaded.publicUrl })
     } catch (error) {
       uploadFailed = true
-      const message = error instanceof Error ? error.message : String(error)
+      const message = errorMessage(error)
       hooks.onUploadError?.(image.id, message)
     }
   }
@@ -482,7 +515,10 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
   const orderedRemote = currentImages.filter((image) => image.remoteImageId)
   for (let i = 0; i < orderedRemote.length; i++) {
     const image = orderedRemote[i]
-    const { error } = await db.from('product_images').update({ sort_order: i, is_cover: image.isCover, image_role: image.imageRole || (image.isCover ? 'cover' : 'other') }).eq('id', image.remoteImageId!)
+    const role = image.imageRole || (image.isCover ? 'cover' : 'other')
+    const previous = existingImages.find(item => item.id === image.remoteImageId)
+    if (previous && previous.sort_order === i && previous.is_cover === image.isCover && previous.image_role === role) continue
+    const { error } = await db.from('product_images').update({ sort_order: i, is_cover: image.isCover, image_role: role }).eq('id', image.remoteImageId!).eq('product_id', savedProductId).select('id').single()
     if (error) throw error
   }
 
@@ -495,17 +531,28 @@ export async function saveProduct(draft: ProductDraft, profile: Profile, hooks: 
     throw new Error('บันทึกข้อมูลแล้ว แต่มีบางรูปอัปโหลดไม่สำเร็จ รูปที่สำเร็จถูกจำไว้แล้ว กด “ลองอัปโหลดอีกครั้ง” เพื่อส่งเฉพาะรูปที่ค้าง')
   }
 
-  const { error: finalizeError } = await db.from('products').update({ status: desiredStatus, updated_by: profile.id }).eq('id', savedProductId)
-  if (finalizeError) throw finalizeError
-  if (existingStatus && existingStatus !== desiredStatus) {
+  if (statusRequested) {
+    let finalize = db.from('products').update({ status: desiredStatus, updated_by: profile.id }).eq('id', savedProductId)
+    // Don't restore a stale availability after System/a colleague changes it.
+    if (existingStatus) {
+      const listingStatuses = ['draft', 'photo_ready', 'ready_to_list', 'published']
+      finalize = listingStatuses.includes(existingStatus)
+        ? finalize.in('status', listingStatuses)
+        : finalize.eq('status', existingStatus)
+    }
+    const { error: finalizeError } = await finalize.select('id').single()
+    if (finalizeError) throw finalizeError
+  }
+  if (statusRequested && existingStatus && existingStatus !== desiredStatus) {
     await logActivity(savedProductId, 'status_changed', { from: existingStatus, to: desiredStatus })
   }
   await logActivity(savedProductId, 'product_saved', { status: desiredStatus, image_count: draft.images.length })
 
-  const products = await listProducts(profile.role)
-  const saved = products.find((product) => product.id === savedProductId)
-  if (!saved) throw new Error(`บันทึกสำเร็จ แต่โหลดสินค้า ${sku} กลับมาไม่สำเร็จ`)
-  return saved
+  try {
+    return await loadProduct(savedProductId, profile.role)
+  } catch (error) {
+    throw new Error(`บันทึก ${sku} แล้ว แต่โหลดข้อมูลกลับไม่สำเร็จ: ${errorMessage(error)}`)
+  }
 }
 
 export async function deleteProduct(product: ProductSummary) {
@@ -518,6 +565,7 @@ export async function deleteProduct(product: ProductSummary) {
 }
 
 export async function logActivity(productId: string, action: string, metadata: Record<string, unknown>) {
+  try {
   const session = await currentSession()
   const { error } = await client().from('activity_logs').insert({
     actor_id: session.user.id,
@@ -526,6 +574,9 @@ export async function logActivity(productId: string, action: string, metadata: R
     metadata,
   })
   if (error) console.warn('activity log failed', error.message)
+  } catch (error) {
+    console.warn('activity log failed', errorMessage(error))
+  }
 }
 
 export function subscribeInventory(onChange: () => void): RealtimeChannel | null {

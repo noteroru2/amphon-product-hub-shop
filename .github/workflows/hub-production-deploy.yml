@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify save and navigation regressions
+        run: node --test tests/save-navigation.test.mjs
+
       - name: Verify and build Hub
         run: npm run build
 

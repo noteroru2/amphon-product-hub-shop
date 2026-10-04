@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { errorMessage } from "./lib/errors";
+import { createHubNavigation, type HubRoute } from "./lib/hubNavigation";
 import type { Session } from "@supabase/supabase-js";
 import {
   Camera,
@@ -191,12 +193,41 @@ function initials(name: string) {
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>("home");
-  useEffect(() => { const p=new URLSearchParams(window.location.search); if(p.get("channel_oauth")) { setTab("channel-settings"); window.history.replaceState({}, "", window.location.pathname); } }, []);
+  const [route, setRoute] = useState<HubRoute>({ tab: "home" });
+  const tab = route.tab as Tab;
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  const navigation = useRef<ReturnType<typeof createHubNavigation> | null>(null);
+  const setTab = (next: Tab) => {
+    if (saveLock.current) return;
+    navigation.current?.navigate({ tab: next });
+  };
+  const goBack = () => navigation.current?.back();
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [online, setOnline] = useState(navigator.onLine);
-  const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
+  const [draft, setDraftState] = useState<ProductDraft>(emptyDraft);
+  const draftRef = useRef(draft);
+  const draftCache = useRef(new Map<string, ProductDraft>());
+  const draftWrites = useRef(Promise.resolve());
+  function setDraft(value: ProductDraft | ((current: ProductDraft) => ProductDraft)) {
+    const next = typeof value === "function" ? value(draftRef.current) : value;
+    draftRef.current = next;
+    draftCache.current.set(next.localId, next);
+    setDraftState(next);
+  }
+  function persistDraft(next: ProductDraft) {
+    const write = draftWrites.current.then(async () => {
+      await db.drafts.put(next);
+      return true;
+    }).catch((error) => {
+      setNotice(`เก็บร่างในเครื่องไม่สำเร็จ: ${errorMessage(error)}`);
+      return false;
+    });
+    draftWrites.current = write.then(() => undefined);
+    return write;
+  }
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!isBackendConfigured);
@@ -217,6 +248,30 @@ function App() {
   const [seoAlertUnread, setSeoAlertUnread] = useState(0);
   const saveLock = useRef(false);
   const deepLinkHandled = useRef(false);
+  const savedDraftIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    navigation.current = createHubNavigation(window, { tab: "home" }, setRoute, () => {
+      if (saveLock.current) return false;
+      if (routeRef.current.tab === "add" && !savedDraftIds.current.has(draftRef.current.localId)) {
+        void persistDraft({ ...draftRef.current, updatedAt: Date.now() });
+      }
+      return true;
+    });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("channel_oauth")) {
+      navigation.current.navigate({ tab: "channel-settings" });
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+    }
+    return () => navigation.current?.dispose();
+  }, []);
+
+  useEffect(() => {
+    if (route.tab !== "add" || !route.draftId) return;
+    const cached = draftCache.current.get(route.draftId);
+    if (cached) setDraft({ ...cached, currentStep: route.step ?? cached.currentStep });
+  }, [route]);
+
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -271,9 +326,9 @@ function App() {
     try {
       const next = await listProducts(currentProfile.role);
       setProducts(next);
-      setBackendError(null);
+      if (routeRef.current.tab !== "add") setBackendError(null);
     } catch (error) {
-      setBackendError(error instanceof Error ? error.message : String(error));
+      setBackendError(errorMessage(error));
     } finally {
       setLoadingProducts(false);
     }
@@ -307,7 +362,7 @@ function App() {
       } catch (error) {
         if (!cancelled)
           setBackendError(
-            error instanceof Error ? error.message : String(error),
+            errorMessage(error),
           );
       }
     })();
@@ -335,10 +390,12 @@ function App() {
   }, [session?.user.id, profile?.id, profile?.role, profile?.active]);
 
   useEffect(() => {
-    if (tab !== "add") return;
+    if (tab !== "add" || saving || savedDraftIds.current.has(draft.localId)) return;
     const t = setTimeout(async () => {
+      if (saveLock.current) return;
       const next = { ...draft, updatedAt: Date.now() };
-      await db.drafts.put(next);
+      const stored = await persistDraft(next);
+      if (!stored || saveLock.current) return;
       setSavedAt(next.updatedAt);
       setLocalDrafts((current) =>
         [next, ...current.filter((item) => item.localId !== next.localId)].sort(
@@ -347,7 +404,7 @@ function App() {
       );
     }, 350);
     return () => clearTimeout(t);
-  }, [draft, tab]);
+  }, [draft, tab, saving]);
 
   useEffect(() => {
     if (!notice) return;
@@ -430,6 +487,7 @@ function App() {
       return;
     }
     let cancelled = false;
+    setDuplicateMatch(null);
     setDuplicateChecking(true);
     const timer = window.setTimeout(() => {
       void findDuplicateIdentifier(identifier, draft.remoteProductId)
@@ -468,6 +526,7 @@ function App() {
   }, [products, query, statusFilter]);
 
   const openAdd = () => {
+    if (saveLock.current) return;
     setDraft(emptyDraft(profile?.id));
     setSavedAt(null);
     setUploadQueue([]);
@@ -475,10 +534,11 @@ function App() {
     setActivity([]);
     setActivityLoading(false);
     setBackendError(null);
-    setTab("add");
+    navigation.current?.navigate({ tab: "add", draftId: draftRef.current.localId, step: draftRef.current.currentStep });
   };
 
   const openEdit = (product: ProductSummary) => {
+    if (saveLock.current) return;
     setDraft(draftFromProduct(product, profile?.id));
     setSavedAt(null);
     setUploadQueue([]);
@@ -486,7 +546,7 @@ function App() {
     setActivity([]);
     setActivityLoading(false);
     setBackendError(null);
-    setTab("add");
+    navigation.current?.navigate({ tab: "add", draftId: draftRef.current.localId, step: draftRef.current.currentStep });
     if (profile && ["owner", "admin"].includes(profile.role)) {
       setActivityLoading(true);
       void listProductActivity(product.id)
@@ -505,7 +565,7 @@ function App() {
     }
     const product = findProductByScannedValue(products, sku);
     deepLinkHandled.current = true;
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState(window.history.state, "", window.location.pathname);
     if (product) {
       openEdit(product);
       setNotice(`เปิด ${product.sku} จาก QR แล้ว`);
@@ -518,6 +578,8 @@ function App() {
   }, [profile?.id, products.length]);
 
   const resumeDraft = (savedDraft: ProductDraft) => {
+    if (saveLock.current) return;
+    savedDraftIds.current.delete(savedDraft.localId);
     setDraft(hydrateDraft(savedDraft));
     setSavedAt(savedDraft.updatedAt);
     setUploadQueue([]);
@@ -525,14 +587,21 @@ function App() {
     setActivity([]);
     setActivityLoading(false);
     setBackendError(null);
-    setTab("add");
+    navigation.current?.navigate({ tab: "add", draftId: draftRef.current.localId, step: draftRef.current.currentStep });
   };
 
-  const update = (patch: Partial<ProductDraft>) =>
+  const update = (patch: Partial<ProductDraft>) => {
+    if (saveLock.current) return;
+    if (Object.keys(patch).some((key) => key !== "currentStep")) savedDraftIds.current.delete(draftRef.current.localId);
     setDraft((current) => ({ ...current, ...patch }));
+    if (patch.currentStep !== undefined) {
+      navigation.current?.navigate({ tab: "add", draftId: draftRef.current.localId, step: patch.currentStep });
+    }
+  };
 
   async function addImages(files: FileList | null) {
     if (!files?.length) return;
+    const targetDraftId = draftRef.current.localId;
     const items: ProductImageDraft[] = [];
     for (const file of Array.from(files).slice(0, 20 - draft.images.length)) {
       const blob = await compressImage(file);
@@ -547,10 +616,21 @@ function App() {
         order: draft.images.length + items.length,
       });
     }
-    update({ images: [...draft.images, ...items] });
+    if (saveLock.current || draftRef.current.localId !== targetDraftId) {
+      for (const image of items) if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+      return;
+    }
+    const currentImages = draftRef.current.images;
+    update({ images: [...currentImages, ...items.slice(0, 20 - currentImages.length).map((image, i) => ({
+      ...image, order: currentImages.length + i,
+      isCover: currentImages.length === 0 && i === 0,
+      imageRole: currentImages.length === 0 && i === 0 ? "cover" : "other",
+    }))] });
   }
 
   function removeImage(imageId: string) {
+    if (saveLock.current) return;
+    savedDraftIds.current.delete(draftRef.current.localId);
     setDraft((current) => {
       const target = current.images.find((image) => image.id === imageId);
       if (!target) return current;
@@ -599,46 +679,22 @@ function App() {
   }
 
   async function persistRemoteCreated(productId: string, sku: string) {
-    setDraft((current) => {
-      const next = {
-        ...current,
-        remoteProductId: productId,
-        sku,
-        originalStatus: current.originalStatus ?? "draft",
-        updatedAt: Date.now(),
-      };
-      void db.drafts.put(next);
-      return next;
-    });
+    setDraft((current) => ({ ...current, remoteProductId: productId, sku,
+      originalStatus: current.originalStatus ?? "draft", updatedAt: Date.now() }));
+    await persistDraft(draftRef.current);
   }
 
   async function persistUploadedImage(
     imageId: string,
     remote: { remoteImageId: string; objectKey: string; publicUrl?: string },
   ) {
-    setDraft((current) => {
-      const target = current.images.find((image) => image.id === imageId);
-      if (target?.previewUrl?.startsWith("blob:"))
-        URL.revokeObjectURL(target.previewUrl);
-      const next = {
-        ...current,
-        images: current.images.map((image) =>
-          image.id === imageId
-            ? {
-                ...image,
-                blob: undefined,
-                remoteImageId: remote.remoteImageId,
-                objectKey: remote.objectKey,
-                publicUrl: remote.publicUrl,
-                previewUrl: remote.publicUrl || image.previewUrl,
-              }
-            : image,
-        ),
-        updatedAt: Date.now(),
-      };
-      void db.drafts.put(next);
-      return next;
-    });
+    const target = draftRef.current.images.find((image) => image.id === imageId);
+    setDraft((current) => ({ ...current,
+      images: current.images.map((image) => image.id === imageId
+        ? { ...image, ...remote, blob: undefined, previewUrl: remote.publicUrl || image.previewUrl }
+        : image), updatedAt: Date.now() }));
+    if (target?.previewUrl?.startsWith("blob:") && remote.publicUrl) URL.revokeObjectURL(target.previewUrl);
+    await persistDraft(draftRef.current);
   }
 
   async function saveCurrentDraft() {
@@ -649,12 +705,7 @@ function App() {
       );
       return;
     }
-    if (duplicateMatch) {
-      setBackendError(
-        `Serial / IMEI ซ้ำกับ ${duplicateMatch.sku} — ${duplicateMatch.title} กรุณาตรวจสอบก่อนบันทึก`,
-      );
-      return;
-    }
+
 
     const originalStatus = draft.originalStatus;
     if (
@@ -688,7 +739,7 @@ function App() {
         })),
     );
     try {
-      const saved = await saveProduct(draft, profile, {
+      const saved = await saveProduct(draftRef.current, profile, {
         onRemoteCreated: persistRemoteCreated,
         onUploadStart: (imageId) =>
           setUploadQueue((queue) =>
@@ -717,7 +768,10 @@ function App() {
             ),
           ),
       });
-      await db.drafts.delete(draft.localId);
+      await draftWrites.current;
+      await db.drafts.delete(draft.localId).catch((error) => {
+        console.warn("Saved remotely; local draft cleanup failed", errorMessage(error));
+      });
       setLocalDrafts((current) =>
         current.filter((item) => item.localId !== draft.localId),
       );
@@ -726,13 +780,16 @@ function App() {
         ...current.filter((product) => product.id !== saved.id),
       ]);
       setNotice(`บันทึก ${saved.sku} เรียบร้อย`);
-      setTab("products");
-      setDraft(emptyDraft(profile.id));
+      // Preserve this editor's identity for browser Back, with saved values.
+      setDraft({ ...draftFromProduct(saved, profile.id), localId: draft.localId });
+      savedDraftIds.current.add(draft.localId);
+      saveLock.current = false;
+      navigation.current?.exitEditor();
       setUploadQueue([]);
       setDuplicateMatch(null);
       void refreshInventory(profile);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       setBackendError(
         message.includes("DUPLICATE_ACTIVE_IDENTIFIER")
           ? "Serial / IMEI นี้มีอยู่ในสต๊อกแล้ว กรุณาค้นหาและตรวจสอบสินค้ารายการเดิม"
@@ -773,7 +830,7 @@ function App() {
       setNotice(`ลบ ${product.sku} แล้ว`);
       setTab("products");
     } catch (error) {
-      setBackendError(error instanceof Error ? error.message : String(error));
+      setBackendError(errorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -815,7 +872,7 @@ function App() {
           .catch(() => setActivity([]));
       }
     } catch (error) {
-      setBackendError(error instanceof Error ? error.message : String(error));
+      setBackendError(errorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -884,7 +941,7 @@ function App() {
           <PublishCenter
             profile={profile}
             products={products}
-            onBack={() => setTab("home")}
+            onBack={goBack}
             onEdit={openEdit}
             onProductsRefresh={() => refreshInventory(profile)}
           />
@@ -892,7 +949,7 @@ function App() {
         {tab === "orders" &&
           profile &&
           ["owner", "admin", "sales"].includes(profile.role) && (
-            <OrderManagement profile={profile} onBack={() => setTab("home")} />
+            <OrderManagement profile={profile} onBack={goBack} />
           )}
         {tab === "ai-buyer" &&
           profile &&
@@ -900,7 +957,7 @@ function App() {
             <AiBuyerAdmin
               profile={profile}
               products={products}
-              onBack={() => setTab("home")}
+              onBack={goBack}
             />
           )}
         {tab === "ai-approval" &&
@@ -908,7 +965,7 @@ function App() {
           ["owner", "admin"].includes(profile.role) && (
             <AiBuyerApprovalQueue
               profile={profile}
-              onBack={() => setTab("home")}
+              onBack={goBack}
             />
           )}
         {tab === "line-chat" &&
@@ -919,13 +976,13 @@ function App() {
         {tab === "seo-opportunities" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
-            <SeoOpportunityCenter onBack={() => setTab("home")} />
+            <SeoOpportunityCenter onBack={goBack} />
           )}
         {tab === "seo-control-tower" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
             <SeoControlTower
-              onBack={() => setTab("home")}
+              onBack={goBack}
               onOpenActions={() => setTab("seo-opportunities")}
               onAlertCountChange={setSeoAlertUnread}
             />
@@ -933,15 +990,15 @@ function App() {
         {tab === "merchant-diagnostics" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
-            <MerchantDiagnosticsCenter onBack={() => setTab("home")} />
+            <MerchantDiagnosticsCenter onBack={goBack} />
           )}
         {tab === "trust-reviews" &&
           profile &&
           ["owner", "admin"].includes(profile.role) && (
-            <TrustReviewCenter onBack={() => setTab("home")} />
+            <TrustReviewCenter onBack={goBack} />
           )}
         {tab === "channel-settings" && profile && ["owner", "admin"].includes(profile.role) && (
-          <ChannelSettings profile={profile} onBack={() => setTab("home")} />
+          <ChannelSettings profile={profile} onBack={goBack} />
         )}
         {tab === "scanner" && (
           <ScannerScreen products={products} onOpen={openEdit} />
@@ -966,7 +1023,7 @@ function App() {
             onSave={() => void saveCurrentDraft()}
             onDelete={() => void removeCurrentProduct()}
             onQuickStatus={(status) => void quickStatusCurrent(status)}
-            onClose={() => setTab("home")}
+            onClose={goBack}
           />
         )}
         {tab === "profile" && profile && (
@@ -982,7 +1039,7 @@ function App() {
           ["owner", "admin"].includes(profile.role) && (
             <EmployeeManagementScreen
               profile={profile}
-              onBack={() => setTab("profile")}
+              onBack={goBack}
             />
           )}
       </main>
@@ -1067,7 +1124,7 @@ function LoginScreen() {
           setMessage("สร้างบัญชีแล้ว กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ");
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -1170,7 +1227,7 @@ function ForcePasswordChangeScreen({ session }: { session: Session }) {
       if (error) throw error;
       await supabase.auth.refreshSession();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -1912,8 +1969,7 @@ function AddProduct({
 }) {
   const step = draft.currentStep;
   const next = () => update({ currentStep: Math.min(4, step + 1) });
-  const back = () =>
-    step === 1 ? onClose() : update({ currentStep: step - 1 });
+  const back = onClose;
   const editing = Boolean(draft.remoteProductId);
   const canDelete = editing && ["owner", "admin"].includes(profile.role);
   const categoryDefinition = getCategoryDefinition(draft.category);
@@ -1944,7 +2000,7 @@ function AddProduct({
           <span key={number} className={number <= step ? "done" : ""} />
         ))}
       </div>
-      <div className="form-body">
+      <fieldset className="form-body" disabled={saving} style={{ border: 0, margin: 0, minWidth: 0 }}>
         {error && <div className="save-error">{error}</div>}
         {uploadQueue.length > 0 && <UploadQueue queue={uploadQueue} />}
         {step === 1 && <CategoryStep draft={draft} update={update} />}
@@ -1979,7 +2035,7 @@ function AddProduct({
             activityLoading={activityLoading}
           />
         )}
-      </div>
+      </fieldset>
       <div className="sticky-action">
         {step < 4 ? (
           <button
@@ -2718,6 +2774,7 @@ function ReviewStep({
             const blockedByWorkflow = !allowed.includes(option.value);
             const blockedByCompleteness =
               ["ready_to_list", "published"].includes(option.value) &&
+              option.value !== draft.originalStatus &&
               !completeness.ready;
             return (
               <option
@@ -2769,6 +2826,7 @@ function ProductWorkflowTools({
   const allowed = allowedStatuses(
     draft.originalStatus || draft.status,
     profile.role,
+    Boolean(draft.oneManaged),
   );
   const canReserve =
     allowed.includes("reserved") && draft.status !== "reserved";
@@ -2827,6 +2885,7 @@ function ProductWorkflowTools({
           <span>{draft.status === "sold" ? "ขายแล้ว" : "ขายแล้ว"}</span>
         </button>
       </div>
+      {draft.oneManaged && <p>การจองและขายสินค้านี้ให้ทำใน AMPHON System</p>}
       {draft.sku && <ProductCodeCard draft={draft} />}
     </section>
   );
@@ -2845,7 +2904,7 @@ function ProductCodeCard({ draft }: { draft: ProductDraft }) {
       })
       .catch((error) => {
         if (!cancelled)
-          setMessage(error instanceof Error ? error.message : String(error));
+          setMessage(errorMessage(error));
       });
     return () => {
       cancelled = true;
@@ -3118,7 +3177,7 @@ function SalesToolkit({
       await copyText(value);
       setMessage(`✓ ${label}แล้ว`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorMessage(error));
     }
   }
 
