@@ -537,6 +537,30 @@ button:active:not(:disabled) {
   border-radius: 14px;
 }
 
+.sticky-action.wizard-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+}
+
+.wizard-actions .wizard-back {
+  min-height: 54px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+  color: #334155;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.wizard-actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
 /* Publish Center: keep information dense but less noisy */
 .publish-summary-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));

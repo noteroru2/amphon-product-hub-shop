@@ -1023,7 +1023,7 @@ function App() {
             onSave={() => void saveCurrentDraft()}
             onDelete={() => void removeCurrentProduct()}
             onQuickStatus={(status) => void quickStatusCurrent(status)}
-            onClose={goBack}
+            onClose={() => navigation.current?.exitEditor()}
           />
         )}
         {tab === "profile" && profile && (
@@ -1969,7 +1969,10 @@ function AddProduct({
 }) {
   const step = draft.currentStep;
   const next = () => update({ currentStep: Math.min(4, step + 1) });
-  const back = onClose;
+  const back = () => {
+    if (step > 1) update({ currentStep: step - 1 });
+    else onClose();
+  };
   const editing = Boolean(draft.remoteProductId);
   const canDelete = editing && ["owner", "admin"].includes(profile.role);
   const categoryDefinition = getCategoryDefinition(draft.category);
@@ -1978,12 +1981,15 @@ function AddProduct({
   );
   const hasUploadErrors = uploadQueue.some((item) => item.state === "error");
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [step]);
+  useEffect(() => {
     if (error) document.querySelector(".save-error")?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [error]);
   return (
     <section className="screen add-screen">
       <header className="add-header">
-        <button className="icon-btn" onClick={back} disabled={saving}>
+        <button className="icon-btn" onClick={back} disabled={saving} aria-label="กลับไป">
           <ChevronLeft />
         </button>
         <div className="add-title">
@@ -1994,7 +2000,7 @@ function AddProduct({
             {savedAt ? "✓ บันทึกร่างอัตโนมัติ" : "ร่างถูกเก็บในเครื่อง"}
           </small>
         </div>
-        <button className="icon-btn" onClick={onClose} disabled={saving}>
+        <button className="icon-btn" onClick={onClose} disabled={saving} aria-label="ปิดการแก้ไข">
           <X />
         </button>
       </header>
@@ -2039,7 +2045,10 @@ function AddProduct({
           />
         )}
       </fieldset>
-      <div className="sticky-action">
+      <div className="sticky-action wizard-actions">
+        <button className="wizard-back" onClick={back} disabled={saving}>
+          <ChevronLeft size={20} /> กลับไป
+        </button>
         {step < 4 ? (
           <button
             className="primary-wide"
@@ -2050,7 +2059,7 @@ function AddProduct({
               (step === 2 && Boolean(duplicateMatch))
             }
           >
-            ต่อไป <ChevronRight size={20} />
+            ถัดไป <ChevronRight size={20} />
           </button>
         ) : (
           <button
@@ -2867,7 +2876,7 @@ function ProductWorkflowTools({
         </div>
       </div>
       <div className="quick-action-grid">
-        <button type="button" onClick={() => update({ currentStep: 2 })}>
+        <button type="button" onClick={() => update({ currentStep: 1 })}>
           <Pencil />
           <span>แก้ข้อมูล</span>
         </button>
