@@ -2388,6 +2388,9 @@ function SmartSpecField({
           }
         >
           <option value="">เลือก...</option>
+          {field.key === "battery" && field.label === "สุขภาพแบตเตอรี่" && value && !field.options?.includes(value) && (
+            <option value={value} disabled>ข้อมูลเดิม — กรุณาเลือกสภาพหลังตรวจแบตเตอรี่</option>
+          )}
           {field.options?.map((option) => (
             <option key={option} value={option}>
               {option}

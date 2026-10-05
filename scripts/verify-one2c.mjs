@@ -60,7 +60,7 @@ check('no QC_PENDING state', !migration.includes('QC_PENDING') && !hardening.inc
 
 check('queue component feature gated', component.includes("VITE_ONE2C_ENRICHMENT_ENABLED === 'true'"))
 check('queue shows independent flags', component.includes('one_photos_complete') && component.includes('one_specs_complete') && component.includes('one_listing_content_complete'))
-check('queue supports Thai battery grades', component.includes("LOW: 'ต่ำ'") && component.includes("GOOD: 'ดี'") && component.includes("VERY_GOOD: 'ดีมาก'") && component.includes("UNKNOWN: 'ไม่ทราบ'"))
+check('queue supports Thai battery grades', component.includes("LOW: 'เสื่อม'") && component.includes("GOOD: 'เก็บไฟได้'") && component.includes("VERY_GOOD: 'เก็บไฟได้ดี'") && component.includes('<option value="UNKNOWN" disabled>'))
 check('queue opens existing SKU product', component.includes("url.searchParams.set('sku', sku)"))
 check('queue never references service role secret', !component.toLowerCase().includes('service_role') && !component.includes('SUPABASE_SECRET'))
 check('main mounts queue dock', main.includes("import { EnrichmentQueueDock }") && main.includes('<EnrichmentQueueDock />'))

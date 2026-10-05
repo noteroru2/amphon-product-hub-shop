@@ -45,10 +45,10 @@ const readinessOrder: Record<Exclude<ListingReadiness, null>, number> = {
 }
 
 const batteryLabel: Record<Exclude<BatteryHealthGrade, null>, string> = {
-  LOW: 'ต่ำ',
-  GOOD: 'ดี',
-  VERY_GOOD: 'ดีมาก',
-  UNKNOWN: 'ไม่ทราบ',
+  LOW: 'เสื่อม',
+  GOOD: 'เก็บไฟได้',
+  VERY_GOOD: 'เก็บไฟได้ดี',
+  UNKNOWN: 'เลือกสุขภาพแบตเตอรี่หลังตรวจ',
 }
 
 function batteryApplicable(product: EnrichmentProduct) {
@@ -233,13 +233,14 @@ export function EnrichmentQueueDock() {
 
                   {batteryApplicable(product) && (
                     <label className="one2c-battery">
-                      <span>แบต</span>
+                      <span>สุขภาพแบตเตอรี่</span>
                       <select
                         value={product.battery_health_grade || 'UNKNOWN'}
                         disabled={batterySavingId === product.id}
                         onChange={(event) => void changeBattery(product, event.target.value)}
                       >
-                        {(['UNKNOWN', 'LOW', 'GOOD', 'VERY_GOOD'] as const).map((grade) => (
+                        <option value="UNKNOWN" disabled>{batteryLabel.UNKNOWN}</option>
+                        {(['LOW', 'GOOD', 'VERY_GOOD'] as const).map((grade) => (
                           <option key={grade} value={grade}>{batteryLabel[grade]}</option>
                         ))}
                       </select>

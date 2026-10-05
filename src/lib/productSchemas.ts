@@ -37,6 +37,11 @@ export interface ProductCategoryDefinition {
 
 const yesNoUnknown = ['ปกติ', 'มีปัญหา', 'ไม่ได้ตรวจ']
 const normalUnknown = ['ปกติ', 'ไม่ปกติ', 'ไม่ได้ตรวจ']
+export const batteryConditionOptions = ['เสื่อม', 'เก็บไฟได้', 'เก็บไฟได้ดี']
+const batteryConditionField: SmartFieldDefinition = {
+  key: 'battery', label: 'สุขภาพแบตเตอรี่', importance: 'recommended',
+  type: 'select', options: batteryConditionOptions,
+}
 const commonImageRoles: ImageRoleDefinition[] = [
   { value: 'cover', label: 'รูปหลัก', recommended: true },
   { value: 'front', label: 'ด้านหน้า', recommended: true },
@@ -149,7 +154,7 @@ export const productSchemas: ProductCategoryDefinition[] = [
       { key: 'screen_size', label: 'ขนาดหน้าจอ', importance: 'recommended', placeholder: 'เช่น 15.6 นิ้ว' },
       { key: 'resolution', label: 'ความละเอียดจอ', importance: 'recommended', placeholder: 'เช่น FHD 1920x1080' },
       { key: 'refresh_rate', label: 'Refresh Rate', importance: 'recommended', placeholder: 'เช่น 144Hz', whenSubtypes: ['gaming'] },
-      { key: 'battery', label: 'Battery Health', importance: 'recommended', placeholder: 'เช่น 89% / ปกติ' },
+      batteryConditionField,
       { key: 'battery_cycle', label: 'Battery Cycle', importance: 'optional', placeholder: 'เช่น 120 รอบ', whenSubtypes: ['macbook'] },
       { key: 'keyboard_layout', label: 'ภาษาแป้นพิมพ์', importance: 'recommended', placeholder: 'เช่น TH/EN หรือ KR' },
       { key: 'charger', label: 'Adapter / Charger', importance: 'recommended', placeholder: 'เช่น แท้ 240W', section: 'accessory' },
@@ -184,7 +189,7 @@ export const productSchemas: ProductCategoryDefinition[] = [
     fields: [
       modelCodeField, storageField, colorField,
       { key: 'region', label: 'รหัสเครื่อง / Region', importance: 'recommended', placeholder: 'เช่น TH/A, LL/A' },
-      { key: 'battery', label: 'Battery Health', importance: 'required', placeholder: 'เช่น 89%' },
+      { ...batteryConditionField, importance: 'required' },
       { key: 'battery_cycle', label: 'Battery Cycle', importance: 'optional', placeholder: 'เช่น 230 รอบ' },
       { key: 'sim_type', label: 'SIM', importance: 'recommended', placeholder: 'เช่น Dual SIM / eSIM' },
       { key: 'face_id', label: 'Face ID', importance: 'required', type: 'select', options: normalUnknown, section: 'condition' },
@@ -202,7 +207,7 @@ export const productSchemas: ProductCategoryDefinition[] = [
       modelCodeField,
       { key: 'chipset', label: 'Chipset / CPU', importance: 'required', placeholder: 'เช่น Snapdragon 8 Gen 3' },
       { key: 'ram', label: 'RAM', importance: 'required', placeholder: 'เช่น 12GB' }, storageField, colorField,
-      { key: 'battery', label: 'Battery / Battery Health', importance: 'recommended', placeholder: 'เช่น ปกติ / 5000mAh' },
+      batteryConditionField,
       { key: 'sim_type', label: 'SIM / 5G', importance: 'recommended', placeholder: 'เช่น Dual SIM 5G' },
       { key: 'screen_condition', label: 'หน้าจอ', importance: 'required', type: 'select', options: ['ปกติ', 'มีรอย', 'Burn-in', 'มีเส้น/จุด', 'แตก', 'ไม่ได้ตรวจ'], section: 'condition' },
       { key: 'fingerprint', label: 'Fingerprint', importance: 'recommended', type: 'select', options: normalUnknown, section: 'condition' },
@@ -218,7 +223,7 @@ export const productSchemas: ProductCategoryDefinition[] = [
       modelCodeField, storageField, colorField,
       { key: 'chipset', label: 'Chip / CPU', importance: 'recommended', placeholder: 'เช่น Apple M2 / Snapdragon 8 Gen 2' },
       { key: 'connectivity', label: 'การเชื่อมต่อ', importance: 'required', type: 'select', options: ['Wi-Fi', 'Wi-Fi + Cellular'], section: 'spec' },
-      { key: 'battery', label: 'Battery Health', importance: 'recommended', placeholder: 'เช่น 92% / ปกติ' },
+      batteryConditionField,
       { key: 'pencil_support', label: 'ปากกาที่รองรับ', importance: 'optional', placeholder: 'เช่น Apple Pencil Pro', whenSubtypes: ['ipad'] },
       { key: 'screen_condition', label: 'หน้าจอ / Touch', importance: 'required', type: 'select', options: ['ปกติ', 'มีรอย', 'มีเส้น/จุด', 'Touch มีปัญหา', 'ไม่ได้ตรวจ'], section: 'condition' },
       { key: 'box_accessories', label: 'กล่อง / อุปกรณ์', importance: 'recommended', placeholder: 'เช่น กล่อง + Adapter + สาย', section: 'accessory' },
@@ -282,7 +287,7 @@ export const productSchemas: ProductCategoryDefinition[] = [
       modelCodeField, storageField,
       { key: 'edition', label: 'Edition', importance: 'recommended', placeholder: 'เช่น OLED Splatoon 3 Edition' },
       { key: 'region', label: 'Region', importance: 'optional', placeholder: 'เช่น JP / US / TH' },
-      { key: 'battery', label: 'Battery Health', importance: 'recommended', placeholder: 'เช่น ปกติ / 92%', whenSubtypes: ['switch', 'steam_deck', 'handheld'] },
+      { ...batteryConditionField, whenSubtypes: ['switch', 'steam_deck', 'handheld'] },
       { key: 'stick_drift', label: 'Stick Drift', importance: 'required', type: 'select', options: ['ไม่พบ', 'มี', 'ไม่ได้ตรวจ'], section: 'condition' },
       { key: 'screen_condition', label: 'หน้าจอ', importance: 'recommended', type: 'select', options: ['ปกติ', 'มีรอย', 'มีปัญหา', 'ไม่มีหน้าจอ', 'ไม่ได้ตรวจ'], section: 'condition' },
       { key: 'gaming_accessories', label: 'อุปกรณ์', importance: 'required', placeholder: 'เช่น Dock + Charger + Joy-Con / Controller', section: 'accessory' },
