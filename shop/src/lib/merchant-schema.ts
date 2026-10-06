@@ -133,6 +133,8 @@ export function buildProductMerchantSchema(input: {
     ...(specs.length ? {
       additionalProperty: specs.slice(0, 24).map(([name, value]) => ({ '@type': 'PropertyValue', name, value })),
     } : {}),
-    ...(settings?.purchaseEnabled && product.merchantEnabled ? { offers: offer } : {}),
+    // Sold pages retain their factual last price and unavailable Offer even after
+    // merchant feed eligibility is revoked by stock sync.
+    ...((settings?.purchaseEnabled && product.merchantEnabled) || (product.availability === 'out_of_stock' && product.price > 0) ? { offers: offer } : {}),
   }
 }

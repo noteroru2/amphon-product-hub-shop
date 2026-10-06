@@ -510,6 +510,7 @@ function App() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((product) => {
+      if (product.status === "sold") return false;
       const matchStatus =
         statusFilter === "all" || product.status === statusFilter;
       if (!matchStatus) return false;
@@ -776,8 +777,8 @@ function App() {
         current.filter((item) => item.localId !== draft.localId),
       );
       setProducts((current) => [
-        saved,
-        ...current.filter((product) => product.id !== saved.id),
+        ...(saved.status === "sold" ? [] : [saved]),
+        ...current.filter((product) => product.id !== saved.id && product.status !== "sold"),
       ]);
       setNotice(`บันทึก ${saved.sku} เรียบร้อย`);
       // Preserve this editor's identity for browser Back, with saved values.
@@ -861,8 +862,8 @@ function App() {
         profile,
       );
       setProducts((current) => [
-        saved,
-        ...current.filter((item) => item.id !== saved.id),
+        ...(saved.status === "sold" ? [] : [saved]),
+        ...current.filter((item) => item.id !== saved.id && item.status !== "sold"),
       ]);
       setDraft(draftFromProduct(saved, profile.id));
       setNotice(`${saved.sku} → ${statusText(nextStatus)} แล้ว`);
@@ -1539,7 +1540,7 @@ function HomeScreen({
         <ListSkeleton />
       ) : (
         <div className="product-list">
-          {products.slice(0, 6).map((product) => (
+          {products.filter((product) => product.status !== "sold").slice(0, 6).map((product) => (
             <ProductCard
               key={product.id}
               product={product}

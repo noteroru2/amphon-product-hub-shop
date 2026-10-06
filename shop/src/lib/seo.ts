@@ -55,7 +55,8 @@ export function formatThaiDate(value: string | null | undefined) {
 }
 
 export function productDescription(product: StoreProduct) {
-  if (product.seoDescription?.trim()) return product.seoDescription.trim()
+  const stockNote = product.availability === 'out_of_stock' ? 'สินค้าหมด • ' : ''
+  if (product.seoDescription?.trim()) return `${stockNote}${product.seoDescription.trim()}`.slice(0, 165)
   const parts = [
     `${product.title} มือสอง`,
     product.brand ? `แบรนด์ ${product.brand}` : '',
@@ -63,7 +64,7 @@ export function productDescription(product: StoreProduct) {
     `ราคา ${formatPrice(product.price)}`,
     'ดูรูปและสเปกสินค้าจริงจาก AMPHON TRADING',
   ].filter(Boolean)
-  return parts.join(' • ').slice(0, 165)
+  return `${stockNote}${parts.join(' • ')}`.slice(0, 165)
 }
 
 export function availabilitySchema(product: StoreProduct) {

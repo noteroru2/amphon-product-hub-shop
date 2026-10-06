@@ -47,7 +47,7 @@ jobs:
         run: npm ci
 
       - name: Verify save and navigation regressions
-        run: node --test tests/save-navigation.test.mjs
+        run: node --test tests/save-navigation.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
 
       - name: Verify and build Hub
         run: npm run build

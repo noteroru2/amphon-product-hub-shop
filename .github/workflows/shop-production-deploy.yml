@@ -91,3 +91,7 @@ jobs:
 
           echo "::error::shop.amphon.co.th did not expose the expected storefront + Google Merchant feed"
           exit 1
+
+      - name: Verify retained sold product pages
+        working-directory: shop
+        run: node scripts/verify-sold-pages-live.mjs

@@ -99,7 +99,7 @@ for (const slug of gatedSlugs) {
 }
 
 const keywordMatches = [...categoryContent.matchAll(/primaryKeyword:\s*'([^']+)'/g)].map((match) => match[1].trim().toLowerCase())
-checks.push(['11 strategic category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length + stockGatedSlugs.length])
+checks.push(['all category keyword owners defined', keywordMatches.length === strategicIndexSlugs.length + stockGatedSlugs.length + gatedSlugs.length])
 checks.push(['strategic category keyword owners are unique', new Set(keywordMatches).size === keywordMatches.length])
 
 const failures = checks.filter(([, ok]) => !ok)

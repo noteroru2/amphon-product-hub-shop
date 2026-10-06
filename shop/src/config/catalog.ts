@@ -42,9 +42,9 @@ const categories: CatalogCategory[] = [
   },
   {
     key: 'desktop-pcs', slug: 'desktop-pcs', name: 'คอมพิวเตอร์มือสอง', navName: 'คอมมือสอง',
-    h1: 'คอมพิวเตอร์มือสอง พร้อมใช้งาน',
-    title: 'คอมพิวเตอร์มือสอง พร้อมใช้งาน | AMPHON TRADING',
-    description: 'คอมพิวเตอร์ตั้งโต๊ะมือสองและชุด PC พร้อมดูสเปก ราคา รูปจริงและสถานะสินค้าก่อนสั่งซื้อ',
+    h1: 'คอมมือสอง คอมพิวเตอร์ตั้งโต๊ะ พร้อมสเปกและราคา',
+    title: 'คอมมือสอง คอมพิวเตอร์ตั้งโต๊ะ พร้อมราคา | AMPHON TRADING',
+    description: 'เลือกซื้อคอมมือสอง คอมพิวเตอร์ตั้งโต๊ะและชุด PC จากอำพล เทรดดิ้ง ดู CPU การ์ดจอ RAM SSD ราคา รูปจริง สภาพและสถานะสินค้าก่อนซื้อ',
     sourceCategory: 'pc', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 1, minHistoricalStockForIndex: 1, order: 30,
   },
   {
@@ -101,35 +101,35 @@ const categories: CatalogCategory[] = [
     h1: 'เลนส์กล้องมือสอง พร้อมดูสภาพและราคา',
     title: 'เลนส์กล้องมือสอง | AMPHON TRADING',
     description: 'เลือกซื้อเลนส์กล้องมือสอง ดูรุ่น เมาท์ สภาพ ราคาและรูปสินค้าจริง',
-    sourceCategory: 'lens', indexPolicy: 'HOLD', order: 105,
+    sourceCategory: 'lens', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 3, minHistoricalStockForIndex: 3, order: 105,
   },
   {
     key: 'graphics-cards', slug: 'graphics-cards', name: 'การ์ดจอมือสอง', navName: 'การ์ดจอ',
     h1: 'การ์ดจอมือสอง NVIDIA และ AMD',
     title: 'การ์ดจอมือสอง NVIDIA AMD | AMPHON TRADING',
     description: 'รวมการ์ดจอมือสองสำหรับคอมพิวเตอร์และเกมมิ่ง พร้อมดูรุ่น ราคาและสภาพจริง',
-    sourceCategory: 'component', indexPolicy: 'HOLD', order: 110,
+    sourceCategory: 'component', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 3, minHistoricalStockForIndex: 3, order: 110,
   },
   {
     key: 'pc-components', slug: 'pc-components', name: 'อุปกรณ์คอมมือสอง', navName: 'อะไหล่คอม',
     h1: 'อุปกรณ์คอมพิวเตอร์มือสอง',
     title: 'อุปกรณ์คอมมือสอง | AMPHON TRADING',
     description: 'เลือกซื้ออุปกรณ์คอมพิวเตอร์มือสองจากสินค้าจริง พร้อมราคา สเปกและสภาพสินค้า',
-    sourceCategory: 'component', indexPolicy: 'HOLD', order: 120,
+    sourceCategory: 'component', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 3, minHistoricalStockForIndex: 3, order: 120,
   },
   {
     key: 'accessories', slug: 'accessories', name: 'อุปกรณ์ไอทีมือสอง', navName: 'อุปกรณ์ไอที',
     h1: 'อุปกรณ์ไอทีมือสอง',
     title: 'อุปกรณ์ไอทีมือสอง | AMPHON TRADING',
     description: 'รวมอุปกรณ์ไอทีมือสองจากสินค้าจริง พร้อมราคาและรายละเอียดก่อนสั่งซื้อ',
-    sourceCategory: 'accessory', indexPolicy: 'HOLD', order: 130,
+    sourceCategory: 'accessory', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 3, minHistoricalStockForIndex: 3, order: 130,
   },
   {
     key: 'other-it', slug: 'other-it', name: 'สินค้าไอทีมือสองอื่น ๆ', navName: 'สินค้าอื่น',
     h1: 'สินค้าไอทีมือสองอื่น ๆ',
     title: 'สินค้าไอทีมือสองอื่น ๆ | AMPHON TRADING',
     description: 'สินค้าไอทีมือสองประเภทอื่นจากสต๊อกจริงของ AMPHON TRADING',
-    sourceCategory: 'other', indexPolicy: 'HOLD', order: 140,
+    sourceCategory: 'other', indexPolicy: 'HOLD', autoIndexWhenStocked: true, minCurrentStockForIndex: 3, minHistoricalStockForIndex: 3, order: 140,
   },
 ]
 

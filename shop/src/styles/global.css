@@ -303,3 +303,7 @@ h2 { font-size: clamp(1.45rem, 3vw, 2.15rem); letter-spacing: -.025em; }
   .review-submit-panel { padding:18px; }
   .verified-review-head { align-items:flex-start; flex-direction:column; }
 }
+
+.badge-out-of-stock { background: #e5e7eb; color: #374151; }
+.sold-product-archive .product-card { border-color: #d1d5db; }
+.product-price small { font-size: .75rem; font-weight: 400; }

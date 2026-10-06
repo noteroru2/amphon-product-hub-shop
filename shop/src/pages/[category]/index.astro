@@ -18,19 +18,22 @@ Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-re
 
 let products: StoreProduct[] = []
 let brands: EvergreenPage[] = []
+let soldProducts: StoreProduct[] = []
 let currentStockCount = 0
 let historicalStockCount = 0
 let apiError = false
 try {
-  const [productResult, historyResult, brandResult] = await Promise.all([
+  const [productResult, historyResult, brandResult, soldResult] = await Promise.all([
     listStoreProducts({ categorySlug: category.slug, limit: 48 }),
     listStoreProducts({ categorySlug: category.slug, availability: 'all', limit: 1 }),
     listEvergreenPages({ pageType: 'BRAND', category: category.slug, effectiveIndexPolicy: 'INDEX', limit: 100 }),
+    listStoreProducts({ categorySlug: category.slug, availability: 'out_of_stock', limit: 12 }),
   ])
   products = productResult.products
   currentStockCount = productResult.pagination.total
   historicalStockCount = historyResult.pagination.total
   brands = brandResult.pages
+  soldProducts = soldResult.products
 } catch (error) {
   apiError = true
   console.error('SHOP_CATEGORY_STORE_API', category.key, error)
@@ -133,6 +136,15 @@ if (searchIntent?.faqs.length) {
       )}
     </div>
   </section>
+
+  {soldProducts.length > 0 && (
+    <section class="section sold-product-archive" aria-labelledby="sold-products-title">
+      <div class="container">
+        <div class="section-head human-section-head"><div><div class="eyebrow">ดูข้อมูลสินค้าเดิม</div><h2 id="sold-products-title">{category.name} — สินค้าหมด</h2><p class="muted">รายการเหล่านี้ขายแล้ว ดูรูป สเปก สภาพ และราคาล่าสุดเพื่อประกอบการเลือกซื้อได้ สินค้าพร้อมขายอยู่ด้านบน</p></div></div>
+        <div class="product-grid">{soldProducts.map((product) => <ProductCard product={product} />)}</div>
+      </div>
+    </section>
+  )}
 
   <BuybackCTA categorySlug={category.slug} />
 

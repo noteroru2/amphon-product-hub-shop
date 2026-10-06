@@ -97,6 +97,14 @@ if (product) {
             : { category: product.category }
     const related = await listStoreProducts({ ...filters, availability: 'available', limit: 9 })
     relatedProducts = related.products.filter((item) => item.sku !== product?.sku).slice(0, 6)
+    // A sold one-off model may have no replacement in its exact model/series.
+    // Broaden to the category so the archived page still leads to real stock.
+    if (relatedProducts.length < 6 && product.categorySlug) {
+      const categoryStock = await listStoreProducts({ categorySlug: product.categorySlug, availability: 'available', limit: 9 })
+      const seen = new Set([product.sku, ...relatedProducts.map((item) => item.sku)])
+      relatedProducts.push(...categoryStock.products.filter((item) => !seen.has(item.sku)))
+      relatedProducts = relatedProducts.slice(0, 6)
+    }
   } catch (error) {
     console.error('SHOP3_RELATED_PRODUCTS', product.sku, error)
   }
@@ -126,7 +134,7 @@ const title = product
     : `${product.title} มือสอง ราคา ${formatPrice(product.price)} | AMPHON TRADING`
   : 'ไม่พบสินค้า | AMPHON SHOP'
 const description = product ? productDescription(product) : 'ไม่พบสินค้าที่ต้องการใน AMPHON SHOP'
-const socialTitle = product ? `${product.title} • ${formatPrice(product.price)} | AMPHON SHOP` : title
+const socialTitle = product ? `${product.title} • ${product.availability === 'out_of_stock' ? 'สินค้าหมด • ' : ''}${formatPrice(product.price)} | AMPHON SHOP` : title
 const socialImageAlt = product ? `${product.title} ราคา ${formatPrice(product.price)}` : null
 const robots = product && product.indexPolicy !== 'NOINDEX' && product.indexPolicy !== 'HOLD' && product.indexPolicy !== 'RETIRED'
   ? 'index,follow,max-image-preview:large'
@@ -195,7 +203,7 @@ const conditionLabel = product ? (() => {
 })() : ''
 
 const availabilityLabel = product?.availability === 'out_of_stock'
-  ? 'ขายแล้ว'
+  ? 'สินค้าหมด'
   : product?.availability === 'reserved'
     ? 'มีคนจองแล้ว'
     : 'พร้อมขาย'
@@ -351,7 +359,7 @@ if (product && evidence?.hasProductEvidence) {
             {matchingSpecPages.map((page) => <a class="button button-secondary" href={page.canonicalPath}>ดู {page.label} มือสอง</a>)}
           </div>}
 
-          <div class="price-large">{formatPrice(product.price)}</div>
+          <div class="price-large">{product.availability === 'out_of_stock' && <span class="muted">ราคาล่าสุด </span>}{formatPrice(product.price)}</div>
 
           <div class="trust-summary-grid" aria-label="สรุปข้อมูลสินค้า">
             <div><span>สภาพ</span><strong>{product.conditionPercent !== null && product.conditionPercent !== undefined ? `${product.conditionPercent}%` : 'ดูด้านล่าง'}</strong></div>
@@ -390,7 +398,8 @@ if (product && evidence?.hasProductEvidence) {
           )}
 
           {product.availability === 'reserved' && <div class="notice"><strong>มีลูกค้าจองชิ้นนี้ไว้แล้ว</strong><br />ตอนนี้ยังกดสั่งไม่ได้ หากหลุดจองสถานะจะอัปเดตบนหน้านี้ครับ</div>}
-          {product.availability === 'out_of_stock' && <div class="notice"><strong>ชิ้นนี้ขายแล้วครับ</strong><br />ลองดูรุ่นใกล้เคียงที่ยังพร้อมขายด้านล่างได้เลย</div>}
+          {product.availability === 'out_of_stock' && <div class="notice"><strong>สินค้าหมด</strong><br />สินค้าชิ้นนี้ขายแล้ว เก็บรูป สเปก และข้อมูลสภาพไว้ให้ดูประกอบการเลือกซื้อครับ
+            <div class="chips"><a class="button button-secondary" href={product.categorySlug ? `/${product.categorySlug}/` : '/'}>ดูสินค้าหมวดเดียวกันที่พร้อมขาย</a><a class="button button-secondary" href={lineUrl} rel="nofollow noopener" target="_blank">สอบถามสินค้ารุ่นใกล้เคียง</a></div></div>}
 
           {publishedDate && <p class="muted product-date">ลงขายเมื่อ {publishedDate}</p>}
         </aside>

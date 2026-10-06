@@ -127,6 +127,7 @@ export async function listProducts(role: UserRole): Promise<ProductSummary[]> {
     // AMPHON System owns inventory availability. Once System projects SOLD,
     // the item must disappear from normal Hub inventory instead of lingering
     // as a historical product card. NULL keeps legacy/non-ONE records visible.
+    .neq('status', 'sold')
     .or('one_availability.is.null,one_availability.neq.SOLD')
     .order('updated_at', { ascending: false })
     .limit(500)
