@@ -139,6 +139,67 @@ async function consumeShell(env: Env, envelope: BridgeEnvelope) {
   return response({ ok: false, error: 'BRIDGE_SHELL_CONSUMER_UNAVAILABLE' }, 503)
 }
 
+async function consumeIntakeCancel(env: Env, envelope: BridgeEnvelope) {
+  const consumed = await callRpc(env, 'one2b_consume_intake_cancel_event', envelope.eventId)
+  const outcome = String(consumed.outcome || '').toUpperCase()
+  const projection = {
+    hubProductId: consumed.hubProductId || null,
+    productIdentityId: consumed.productIdentityId || null,
+    sku: consumed.sku || null,
+    availability: consumed.availability || null,
+    availabilityVersion: consumed.availabilityVersion ?? null,
+    hubStatus: consumed.hubStatus || null,
+  }
+
+  if (outcome === 'APPLIED') {
+    return response({
+      ok: true,
+      accepted: true,
+      duplicate: false,
+      stale: false,
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      projection,
+    }, 202)
+  }
+
+  if (outcome === 'DUPLICATE' || outcome === 'STALE') {
+    return response({
+      ok: true,
+      accepted: false,
+      duplicate: outcome === 'DUPLICATE',
+      stale: outcome === 'STALE',
+      eventId: envelope.eventId,
+      status: 'PROCESSED',
+      projection,
+    }, 200)
+  }
+
+  if (outcome === 'RETRY') {
+    return response({
+      ok: false,
+      error: consumed.error || 'INTAKE_CANCEL_MAPPING_NOT_READY',
+      eventId: envelope.eventId,
+      sku: consumed.sku || null,
+    }, 503)
+  }
+
+  if (outcome === 'CONFLICT' || outcome === 'DEAD') {
+    return response({
+      ok: false,
+      error: consumed.error || 'BRIDGE_INTAKE_CANCEL_CONFLICT',
+      eventId: envelope.eventId,
+      sku: consumed.sku || null,
+    }, 409)
+  }
+
+  console.error('ONE-2B intake cancel unexpected consumer outcome', {
+    eventId: envelope.eventId,
+    outcome,
+  })
+  return response({ ok: false, error: 'BRIDGE_INTAKE_CANCEL_CONSUMER_UNAVAILABLE' }, 503)
+}
+
 async function consumeLegacyLink(env: Env, envelope: BridgeEnvelope) {
   const consumed = await callRpc(env, 'one2d_consume_legacy_link_event', envelope.eventId)
   const outcome = String(consumed.outcome || '').toUpperCase()
@@ -335,6 +396,19 @@ async function maybeConsume(requestCopy: Request, baseResponse: Response, env: E
         console.error('ONE-2B failed to mark inbox retryable', { eventId: envelope.eventId, markError })
       })
       return response({ ok: false, error: 'BRIDGE_SHELL_CONSUMER_UNAVAILABLE' }, 503)
+    }
+  }
+
+  if (envelope.eventType === 'product.intake_cancelled') {
+    if (!enabled(env.ONE2B_SHELL_CONSUMER_ENABLED)) return baseResponse
+    try {
+      return await consumeIntakeCancel(env, envelope)
+    } catch (error) {
+      console.error('ONE-2B intake cancel consumer error', { eventId: envelope.eventId, error })
+      await markInboxFailed(env, envelope.eventId, 'ONE2B_CANCEL_CONSUMER', error).catch((markError) => {
+        console.error('ONE-2B failed to mark intake cancel retryable', { eventId: envelope.eventId, markError })
+      })
+      return response({ ok: false, error: 'BRIDGE_INTAKE_CANCEL_CONSUMER_UNAVAILABLE' }, 503)
     }
   }
 
