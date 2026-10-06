@@ -1,4 +1,6 @@
 ---
+import BuyingResources from '../../components/BuyingResources.astro'
+import StockComparison from '../../components/StockComparison.astro'
 import ProductCard from '../../components/ProductCard.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
@@ -159,6 +161,9 @@ if (searchIntent?.faqs.length) {
       </div>
     </section>
   )}
+
+  <BuyingResources categorySlug={category.slug} />
+  <StockComparison products={products} />
 
   <BuybackCTA categorySlug={category.slug} />
 

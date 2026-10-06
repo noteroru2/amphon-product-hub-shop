@@ -95,3 +95,7 @@ jobs:
       - name: Verify retained sold product pages
         working-directory: shop
         run: node scripts/verify-sold-pages-live.mjs
+
+      - name: Verify buying guides and budget collections
+        working-directory: shop
+        run: node scripts/verify-buying-pages-live.mjs

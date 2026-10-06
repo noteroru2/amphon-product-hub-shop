@@ -1,0 +1,14 @@
+---
+import { buyingCollections, buyingGuides, guidePath } from '../config/buying-guides'
+interface Props { categorySlug?: string }
+const { categorySlug } = Astro.props
+const guides = buyingGuides.filter((item) => !categorySlug || item.categories.includes(categorySlug))
+const collections = buyingCollections.filter((item) => !categorySlug || item.categories.includes(categorySlug))
+---
+{guides.length > 0 && <section class="section buying-resources"><div class="container">
+  <div class="section-head"><div><h2>เลือกตามงบ งานที่ใช้ และข้อมูลก่อนซื้อ</h2><p class="muted">เริ่มจากโจทย์ของคุณ แล้วเทียบสินค้าและหลักฐานของแต่ละชิ้น</p></div></div>
+  <div class="category-grid">
+    {collections.map((item) => <a class="category-card" href={`/collections/${item.slug}/`}><strong>{item.title}</strong><span>ดูเกณฑ์และรายการจริง →</span></a>)}
+    {guides.map((item) => <a class="category-card" href={guidePath(item.slug)}><strong>{item.title}</strong><span>อ่านคู่มือเลือกซื้อ →</span></a>)}
+  </div>
+</div></section>}

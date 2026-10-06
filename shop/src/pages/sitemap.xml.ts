@@ -5,6 +5,7 @@ import { xmlEscape, xmlResponse } from '../lib/xml'
 export const GET: APIRoute = () => {
   const sitemaps = [
     absoluteUrl('/sitemap-static.xml'),
+    absoluteUrl('/sitemap-collections.xml'),
     absoluteUrl('/sitemap-categories.xml'),
     absoluteUrl('/sitemap-evergreen.xml'),
     absoluteUrl('/sitemap-specs.xml'),

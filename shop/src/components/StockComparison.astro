@@ -1,0 +1,29 @@
+---
+import type { StoreProduct } from '../lib/store-api'
+import { formatPrice, formatThaiDate, productPath } from '../lib/seo'
+import { productEvidence, specValue } from '../lib/product-trust'
+interface Props { products: StoreProduct[]; title?: string }
+const { products, title = 'เปรียบเทียบข้อมูลของแต่ละชิ้น' } = Astro.props
+const rows = products.slice(0, 12)
+const priced = rows.filter((p) => p.availability === 'available' && p.status === 'published' && p.price > 0)
+const prices = priced.map((p) => p.price)
+---
+{rows.length > 0 && <section class="section"><div class="container"><div class="panel editorial-panel">
+  <h2>{title}</h2>
+  {prices.length > 0 && <p>ราคาใน {prices.length} รายการพร้อมขายที่นำมาเทียบ: {formatPrice(Math.min(...prices))}–{formatPrice(Math.max(...prices))} ดูอุปกรณ์และเงื่อนไขของแต่ละชิ้นประกอบ</p>}
+  <p class="muted">ตารางแสดงไม่เกิน 12 รายการ ราคาเป็นราคาที่ระบุในร้าน วันที่คือวันปรับปรุงรายการ ไม่ใช่วันที่ขาย ราคาของสินค้าหมดเป็นราคาล่าสุดในรายการ ไม่ใช่ราคาขายจริงหรือค่าเฉลี่ยตลาด ช่องที่ยังไม่ระบุต้องสอบถามร้านเพิ่ม</p>
+  <div class="comparison-scroll" role="region" aria-label={title} tabindex="0">
+    <table class="stock-comparison"><thead><tr><th scope="col">สินค้า / สถานะ</th><th scope="col">ราคา / ปรับปรุงรายการ</th><th scope="col">สเปกที่ระบุ</th><th scope="col">สภาพ / หลักฐานตรวจ</th></tr></thead><tbody>
+    {rows.map((product) => {
+      const evidence = productEvidence(product)
+      const specs = ['cpu', 'gpu', 'ram', 'ssd', 'storage'].map((key) => [key.toUpperCase(), specValue(product.specs?.[key])]).filter(([, value]) => value)
+      return <tr>
+        <th scope="row"><a href={productPath(product)}>{product.title}</a><br /><small>{product.availability === 'out_of_stock' ? 'สินค้าหมด' : product.availability === 'reserved' ? 'จองแล้ว' : 'พร้อมขาย'} · {product.sku}</small></th>
+        <td>{product.price > 0 ? formatPrice(product.price) : 'ยังไม่ระบุราคา'}<br /><small>{formatThaiDate(product.updatedAt) || 'ยังไม่ระบุวันที่'}</small></td>
+        <td>{specs.length ? specs.map(([label, value]) => <div>{label}: {value}</div>) : 'ยังไม่ระบุสเปก'}</td>
+        <td><div>ตำหนิ: {product.defects || 'ยังไม่ระบุ โปรดยืนยันกับร้าน'}</div><div>วันที่ตรวจ: {formatThaiDate(evidence.inspectionDate) || 'ยังไม่ระบุ'}</div><div>ผลตรวจ: {evidence.inspectionResult || 'ยังไม่ระบุ'}</div><div>{evidence.evidenceFieldCount} ช่องข้อมูลตรวจ · {evidence.evidenceImageCount} รูปประกอบการตรวจ</div><a href={`${productPath(product)}#condition`}>ดูรายละเอียดและประกันของชิ้นนี้ →</a></td>
+      </tr>
+    })}
+    </tbody></table>
+  </div>
+</div></div></section>}

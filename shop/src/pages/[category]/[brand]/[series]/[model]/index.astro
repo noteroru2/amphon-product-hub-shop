@@ -13,16 +13,19 @@ if (!category) Astro.response.status = 404
 
 let page: EvergreenPage | null = null
 let products: StoreProduct[] = []
+let history: StoreProduct[] = []
 let related: EvergreenPage[] = []
 try {
   if (category) {
     page = await resolveEvergreenPage({ category: categorySlug, brand: brandSlug, series: seriesSlug, model: modelSlug })
     if (page) {
-      const [productResult, relatedResult] = await Promise.all([
+      const [productResult, relatedResult, soldResult] = await Promise.all([
         listStoreProducts({ categorySlug, brandSlug, seriesSlug, modelSlug, limit: 48 }),
         listEvergreenPages({ pageType: 'MODEL', category: categorySlug, brand: brandSlug, series: seriesSlug, effectiveIndexPolicy: 'INDEX', limit: 12 }),
+        listStoreProducts({ categorySlug, brandSlug, seriesSlug, modelSlug, availability: 'out_of_stock', limit: 12 }).catch(() => null),
       ])
       products = productResult.products
+      history = soldResult?.products || []
       related = relatedResult.pages.filter((candidate) => candidate.entityId !== page?.entityId).slice(0, 8)
     }
   }
@@ -32,7 +35,7 @@ if (page) Astro.response.headers.set('Cache-Control', 'public, s-maxage=120, sta
 const unavailable = Astro.response.status === 503
 ---
 {page && category ? (
-  <EvergreenPageView page={page} products={products} related={related} trail={[
+  <EvergreenPageView page={page} products={products} history={history} related={related} trail={[
     { name: 'หน้าแรก', path: '/', link: true },
     { name: category.name, path: `/${category.slug}/`, link: true },
     { name: page.brand.name, path: `/${category.slug}/${page.brand.slug}/`, link: page.effectiveIndexPolicy === 'INDEX' },

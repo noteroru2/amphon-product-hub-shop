@@ -307,3 +307,11 @@ h2 { font-size: clamp(1.45rem, 3vw, 2.15rem); letter-spacing: -.025em; }
 .badge-out-of-stock { background: #e5e7eb; color: #374151; }
 .sold-product-archive .product-card { border-color: #d1d5db; }
 .product-price small { font-size: .75rem; font-weight: 400; }
+
+/* Accessible comparison tables: preserve readable columns on mobile. */
+.comparison-scroll { overflow-x: auto; max-width: 100%; margin: 18px 0; }
+.stock-comparison { border-collapse: collapse; width: 100%; min-width: 620px; font-size: .94rem; }
+.stock-comparison th, .stock-comparison td { text-align: left; vertical-align: top; border-bottom: 1px solid #dce3ea; padding: 14px 12px; overflow-wrap: anywhere; }
+.stock-comparison thead th { background: #f1f5f9; color: #18253b; }
+.stock-comparison small { color: #526074; font-weight: 400; }
+.buying-resources .category-card strong { line-height: 1.6; }

@@ -1,4 +1,6 @@
 ---
+import BuyingResources from './BuyingResources.astro'
+import StockComparison from './StockComparison.astro'
 import ProductCard from './ProductCard.astro'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import type { EvergreenPage, StoreProduct } from '../lib/store-api'
@@ -8,12 +10,13 @@ interface TrailItem { name: string; path: string; link: boolean }
 interface Props {
   page: EvergreenPage
   products: StoreProduct[]
+  history?: StoreProduct[]
   children?: EvergreenPage[]
   related?: EvergreenPage[]
   trail: TrailItem[]
 }
 
-const { page, products, children = [], related = [], trail } = Astro.props
+const { page, products, history = [], children = [], related = [], trail } = Astro.props
 const robots = page.effectiveIndexPolicy === 'INDEX'
   ? 'index,follow,max-image-preview:large'
   : 'noindex,follow'
@@ -111,6 +114,9 @@ if (page.faq.length > 0) {
       )}
     </div>
   </section>
+
+  <StockComparison products={[...products, ...history]} title="ราคา สเปก และหลักฐานจากรายการจริง" />
+  <BuyingResources categorySlug={page.category.slug} />
 
   {editorialParagraphs.length > 0 && (
     <section class="section">

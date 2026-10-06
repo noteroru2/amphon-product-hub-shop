@@ -1,4 +1,5 @@
 ---
+import BuyingResources from '../components/BuyingResources.astro'
 import ProductCard from '../components/ProductCard.astro'
 import BaseLayout from '../layouts/BaseLayout.astro'
 import { catalogCategories } from '../config/catalog'
@@ -242,6 +243,8 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
       </article>
     </div>
   </section>
+
+  <BuyingResources />
 
   <BuybackCTA />
 

@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import BuyingResources from '../../components/BuyingResources.astro'
+import { buyingGuides, guidePath } from '../../config/buying-guides'
+import { absoluteUrl } from '../../lib/seo'
+const title = 'คู่มือเลือกซื้อคอม โน๊ตบุ๊ก และสินค้าไอทีมือสอง | AMPHON SHOP'
+const description = 'คู่มือเช็กโน้ตบุ๊กมือสอง เลือกคอมออฟฟิศ และเทียบราคา สภาพ ผลตรวจ อุปกรณ์ และประกัน พร้อมลิงก์รายการจริงของร้าน'
+const schema = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, url: absoluteUrl('/guides/'), mainEntity: { '@type': 'ItemList', itemListElement: buyingGuides.map((guide, index) => ({ '@type': 'ListItem', position: index + 1, name: guide.title, url: absoluteUrl(guidePath(guide.slug)) })) } }
+---
+<BaseLayout title={title} description={description} canonicalPath="/guides/" jsonLd={schema}>
+  <div class="container breadcrumbs"><ol><li><a href="/">หน้าแรก</a></li><li>คู่มือเลือกซื้อ</li></ol></div>
+  <section class="hero"><div class="container"><h1>คู่มือเลือกซื้อสินค้าไอทีมือสอง</h1><p class="lead">เช็กข้อมูลที่มีผลกับงาน งบ และความมั่นใจก่อนซื้อคอมมือสองหรือโน๊ตบุ๊กมือสอง</p></div></section>
+  <BuyingResources />
+</BaseLayout>
