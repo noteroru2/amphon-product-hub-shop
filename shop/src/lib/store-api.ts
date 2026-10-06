@@ -250,7 +250,7 @@ async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
 function queryString(params: object) {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === '' || value === 'all') continue
+    if (value === undefined || value === '' || (value === 'all' && key !== 'availability')) continue
     query.set(key, String(value))
   }
   return query.size ? `?${query.toString()}` : ''

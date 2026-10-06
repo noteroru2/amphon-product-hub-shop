@@ -20,7 +20,7 @@ for (const product of sampled) {
   assert.match(html, /สินค้าหมด/)
   assert.ok(!/name="robots"[^>]*content="noindex/.test(html), 'Sold page stays indexable')
   assert.ok(!/id="add-to-cart"/.test(html), 'Sold page has no cart action')
-  assert.ok(!/สั่งซื้อผ่าน LINE/.test(html), 'Sold page cannot invite buying the sold item')
+  assert.ok(!/class="[^"]*line-primary-purchase/.test(html), 'Sold item has no direct purchase action')
   const schemas = [...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(m => JSON.parse(m[1]))
   const schema = schemas.flat().find(s => s['@type'] === 'Product')
   assert.ok(schema?.offers, 'Sold page retains unavailable Offer even with merchantEnabled=false')

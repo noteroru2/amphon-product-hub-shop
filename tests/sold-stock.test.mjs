@@ -84,3 +84,23 @@ test('Hub inventory excludes both local sold status and System SOLD before the r
   const products = await listProducts('staff')
   assert.deepEqual(products.map(p => p.sku), ['LIVE', 'RESALE'])
 })
+
+test('Shop all-stock requests preserve availability=all for sold URLs and category history, including pagination', async () => {
+  let js = ts.transpileModule(await readFile(new URL('../shop/src/lib/store-api.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
+    .replace(/^import .*$/gm, '').replace(/^export /gm, '').replaceAll('import.meta.env', "({PUBLIC_AMPHON_STORE_API: 'https://store.test/store'})")
+  const requested = []
+  const fetch = async url => {
+    const parsed = new URL(url)
+    requested.push(parsed)
+    assert.equal(parsed.searchParams.get('availability'), 'all')
+    const page = parsed.searchParams.get('offset') === '100'
+      ? { products: [{ sku: 'SOLD', status: 'sold' }], pagination: { hasMore: false } }
+      : { products: [{ sku: 'LIVE', status: 'published' }], pagination: { hasMore: true } }
+    return { ok: true, json: async () => page }
+  }
+  const { getAllStoreProducts, listStoreProducts } = new Function('fetch', `${js}\nreturn { getAllStoreProducts, listStoreProducts }`)(fetch)
+  const products = await getAllStoreProducts()
+  assert.deepEqual(products.map(p => p.sku), ['LIVE', 'SOLD'])
+  await listStoreProducts({ availability: 'all', categorySlug: 'notebooks', limit: 1 })
+  assert.equal(requested[2].searchParams.get('categorySlug'), 'notebooks')
+})
