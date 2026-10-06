@@ -33,3 +33,12 @@ for (const product of sampled) {
   }
   console.log(`PASS retained sold page ${product.sku}: HTTP 200, index, sitemap, unavailable Offer, no purchase action`)
 }
+if (products.some(p => ['desktop-pcs', 'gaming-pcs'].includes(p.categorySlug))) {
+  const html = await (await get(`${site}/desktop-pcs/`)).text()
+  assert.match(html, /คอมมือสอง/)
+  assert.ok(!/name="robots"[^>]*content="noindex/.test(html), 'General PC collection stays indexable with stock/history in its gaming subcategory')
+  assert.match(html, /product-card/)
+  const categories = await (await get(`${site}/sitemap-categories.xml`)).text()
+  assert.ok(categories.includes(`${site}/desktop-pcs/`))
+  console.log('PASS คอมมือสอง category: real PC subcategory stock/history, indexable page, category sitemap')
+}

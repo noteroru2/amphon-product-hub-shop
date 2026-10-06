@@ -104,3 +104,14 @@ test('Shop all-stock requests preserve availability=all for sold URLs and catego
   await listStoreProducts({ availability: 'all', categorySlug: 'notebooks', limit: 1 })
   assert.equal(requested[2].searchParams.get('categorySlug'), 'notebooks')
 })
+
+test('general PC collection includes gaming PCs so คอมมือสอง remains a stock-backed indexable category', () => {
+  const state = categoryStockStateFromProducts('desktop-pcs', [
+    { ...product, categorySlug: 'gaming-pcs' },
+    { ...product, categorySlug: 'gaming-pcs', status: 'sold' },
+    { ...product, categorySlug: 'notebooks' },
+  ])
+  assert.deepEqual(state, { currentStockCount: 1, historicalStockCount: 2 })
+  const category = catalogCategories.find(c => c.slug === 'desktop-pcs')
+  assert.equal(effectiveCategoryIndexPolicy(category, state), 'INDEX')
+})

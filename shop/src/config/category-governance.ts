@@ -1,4 +1,4 @@
-import type { CatalogCategory, IndexPolicy } from './catalog'
+import { categoryCollectionSlugs, type CatalogCategory, type IndexPolicy } from './catalog'
 import type { StoreProduct } from '../lib/store-api'
 
 export interface CategoryStockState {
@@ -13,8 +13,9 @@ export function categoryStockStateFromProducts(
   let currentStockCount = 0
   let historicalStockCount = 0
 
+  const collectionSlugs = categoryCollectionSlugs(categorySlug)
   for (const product of products) {
-    if (product.categorySlug !== categorySlug) continue
+    if (!collectionSlugs.includes(product.categorySlug || '')) continue
     historicalStockCount += 1
     if (product.status === 'published' || product.status === 'reserved') currentStockCount += 1
   }

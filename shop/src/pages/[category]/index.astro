@@ -2,7 +2,7 @@
 import ProductCard from '../../components/ProductCard.astro'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import BuybackCTA from '../../components/BuybackCTA.astro'
-import { catalogCategories, getCategoryBySlug } from '../../config/catalog'
+import { catalogCategories, categoryCollectionSlugs, getCategoryBySlug } from '../../config/catalog'
 import { getCategorySeoContent } from '../../config/category-seo-content'
 import { getCategorySearchIntent } from '../../config/search-intent-content'
 import { effectiveCategoryIndexPolicy } from '../../config/category-governance'
@@ -23,17 +23,31 @@ let currentStockCount = 0
 let historicalStockCount = 0
 let apiError = false
 try {
-  const [productResult, historyResult, brandResult, soldResult] = await Promise.all([
+  const [productResult, historyResult, brandResult, soldResult, childResults] = await Promise.all([
     listStoreProducts({ categorySlug: category.slug, limit: 48 }),
     listStoreProducts({ categorySlug: category.slug, availability: 'all', limit: 1 }),
     listEvergreenPages({ pageType: 'BRAND', category: category.slug, effectiveIndexPolicy: 'INDEX', limit: 100 }),
     listStoreProducts({ categorySlug: category.slug, availability: 'out_of_stock', limit: 12 }),
+    Promise.all(categoryCollectionSlugs(category.slug).filter((slug) => slug !== category.slug).map((slug) => Promise.all([
+      listStoreProducts({ categorySlug: slug, limit: 48 }),
+      listStoreProducts({ categorySlug: slug, availability: 'all', limit: 1 }),
+      listStoreProducts({ categorySlug: slug, availability: 'out_of_stock', limit: 12 }),
+    ]))),
   ])
   products = productResult.products
   currentStockCount = productResult.pagination.total
   historicalStockCount = historyResult.pagination.total
   brands = brandResult.pages
   soldProducts = soldResult.products
+  for (const [current, history, sold] of childResults) {
+    products.push(...current.products)
+    currentStockCount += current.pagination.total
+    historicalStockCount += history.pagination.total
+    soldProducts.push(...sold.products)
+  }
+  const newestFirst = (a: StoreProduct, b: StoreProduct) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
+  products = products.sort(newestFirst).slice(0, 48)
+  soldProducts = soldProducts.sort(newestFirst).slice(0, 12)
 } catch (error) {
   apiError = true
   console.error('SHOP_CATEGORY_STORE_API', category.key, error)

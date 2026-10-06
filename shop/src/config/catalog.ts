@@ -140,3 +140,9 @@ export const indexCategories = catalogCategories.filter((category) => category.i
 export function getCategoryBySlug(slug: string | undefined) {
   return catalogCategories.find((category) => category.slug === slug)
 }
+
+// The general PC collection includes its gaming subcategory without moving
+// products or changing their individual canonical category/URL.
+export function categoryCollectionSlugs(slug: string) {
+  return slug === 'desktop-pcs' ? ['desktop-pcs', 'gaming-pcs'] : [slug]
+}
