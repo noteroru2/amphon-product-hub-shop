@@ -4,15 +4,24 @@ import { test } from 'node:test'
 import ts from 'typescript'
 
 async function load(path) {
-  const code = ts.transpileModule(await readFile(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
+  const code = ts.transpileModule(await readFile(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText.replaceAll('import.meta.env.PUBLIC_SITE_URL', "'https://shop.amphon.co.th'")
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
 }
 const { buyingCollections } = await load('../shop/src/config/buying-guides.ts')
 const { matchesBuyingCollection, collectionStock } = await load('../shop/src/lib/buying-collections.ts')
+const { formatThaiDate } = await load('../shop/src/lib/seo.ts')
 const laptopBudget = buyingCollections.find(c => c.slug === 'notebooks-under-10000')
 const study = buyingCollections.find(c => c.slug === 'notebooks-for-study')
 const pcBudget = buyingCollections.find(c => c.slug === 'pcs-under-10000')
 const p = { categorySlug: 'notebooks', price: 10000, status: 'published', availability: 'available', specs: { ram: '8GB DDR4', ssd: '256GB' } }
+
+test('inspection dates in Buddhist and Gregorian ISO years render the same Thai date; invalid dates stay unknown', () => {
+  assert.equal(formatThaiDate('2569-09-30'), formatThaiDate('2026-09-30'))
+  assert.match(formatThaiDate('2569-09-30'), /2569/)
+  assert.equal(formatThaiDate('2026-02-30'), null)
+  assert.equal(formatThaiDate('not-a-date'), null)
+  assert.equal(formatThaiDate(null), null)
+})
 
 test('budget pages use the inclusive ceiling, reject unknown/invalid prices and do not mix product categories', () => {
   assert.equal(matchesBuyingCollection(p, laptopBudget), true)

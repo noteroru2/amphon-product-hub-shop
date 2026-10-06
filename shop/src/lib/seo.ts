@@ -44,7 +44,19 @@ export function formatPrice(price: number) {
 
 export function formatThaiDate(value: string | null | undefined) {
   if (!value) return null
-  const date = new Date(value)
+  // Inspection records may use a Buddhist year in an otherwise ISO date.
+  // Normalize the year once before Intl formats it into the Thai calendar.
+  const normalized = value.replace(/^(\d{4})(?=-)/, (year) => {
+    const numeric = Number(year)
+    return numeric >= 2400 && numeric <= 3000 ? String(numeric - 543) : year
+  })
+  const parts = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/)
+  if (parts) {
+    const [, year, month, day] = parts.map(Number)
+    const calendarDate = new Date(Date.UTC(year, month - 1, day))
+    if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day) return null
+  }
+  const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return null
   return new Intl.DateTimeFormat('th-TH', {
     day: 'numeric',
