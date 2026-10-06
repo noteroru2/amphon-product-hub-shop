@@ -7,7 +7,8 @@ export function matchesBuyingCollection(product: StoreProduct, collection: Buyin
   if (collection.budget !== undefined && product.price > collection.budget) return false
   if (collection.requireOfficeSpecs) {
     const ram = String(product.specs?.ram ?? '').trim()
-    const ramMatch = ram.match(/^(\d+(?:\.\d+)?)\s*(?:gb|g|กิกะไบต์)?(?:\s|$)/i)
+    const ramMatch = ram.match(/\b(\d+(?:\.\d+)?)\s*(?:gb|กิกะไบต์)\b/i)
+      || ram.match(/^(\d+(?:\.\d+)?)(?:\s|$)/)
     if (!ramMatch || Number(ramMatch[1]) < 8) return false
     const ssd = String(product.specs?.ssd ?? '').trim()
     const storage = `${product.specs?.storage ?? ''} ${product.specs?.storage_type ?? ''}`

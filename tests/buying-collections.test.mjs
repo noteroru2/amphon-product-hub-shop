@@ -37,6 +37,8 @@ test('study selection requires actual RAM and SSD fields, without inferring spec
     assert.equal(matchesBuyingCollection({ ...p, title: 'RAM 16GB SSD 512GB', specs }, study), false)
   }
   assert.equal(matchesBuyingCollection({ ...p, specs: { ram: 16, storage: '512GB', storage_type: 'NVMe SSD' } }, study), true)
+  assert.equal(matchesBuyingCollection({ ...p, specs: { ram: 'Kingston HyperX 8GB DDR4 Bus 3200', ssd: '240GB' } }, study), true)
+  assert.equal(matchesBuyingCollection({ ...p, specs: { ram: 'DDR4 Bus 3200', ssd: '240GB' } }, study), false)
 })
 
 test('reserved and sold pieces never become purchasable stock; sold history preserves collection eligibility', () => {
