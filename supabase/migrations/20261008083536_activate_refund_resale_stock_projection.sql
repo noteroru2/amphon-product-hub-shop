@@ -1,0 +1,8 @@
+-- Production migration history marker for 20261008083536.
+-- The actual idempotent function definition lives in:
+-- 20261004182000_refund_resale_stock_projection.sql
+-- That migration supports System-authoritative SOLD -> IN_STOCK refund/re-sale
+-- projection and clears sold_at when a refunded product returns to stock.
+-- Production was explicitly activated and historical v2/v3 events were replayed
+-- on 2026-10-08 after the earlier source migration was found not present in
+-- the production migration history.
