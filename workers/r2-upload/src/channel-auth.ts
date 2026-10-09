@@ -187,7 +187,7 @@ export async function recoverFacebookHistory(env:Env){
   if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
   const params=new URLSearchParams({fields:'id,message,created_time',limit:'100',since:'2026-09-18T00:00:00Z',access_token:cr.pageAccessToken})
   if(state.after_cursor)params.set('after',String(state.after_cursor))
-  const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed?'+params),j:any=await r.json()
+  const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/published_posts?'+params),j:any=await r.json()
   if(!r.ok||j.error)throw new Error('FACEBOOK_HISTORY_READ_FAILED:'+(j.error?.message||r.status))
   const posts=(Array.isArray(j.data)?j.data:[]).map((x:any)=>({...x,sku:String(x.message||'').match(/https:\/\/shop\.amphon\.co\.th\/product\/(AT-[A-Z0-9-]+)/i)?.[1]})).filter((x:any)=>x.sku)
   const skus=Array.from(new Set(posts.map((x:any)=>x.sku)))
