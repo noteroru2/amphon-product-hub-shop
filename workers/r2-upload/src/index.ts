@@ -1974,7 +1974,25 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     const ids = Array.from(new Set(queue.map((row:any)=>row.product_id))).filter(Boolean)
     const products = ids.length ? await serviceRest<any[]>(env, 'products?id=in.('+ids.join(',')+')&select=id,sku,title,status,price') : []
     const byId = new Map(products.map((row:any)=>[row.id,row]))
-    return json(request, env, { settings: settings[0]||null, queue: queue.map((row:any)=>({ ...row, product: byId.get(row.product_id)||null })) })
+    // New-arrival reliability is independent of the weekly rotation queue limit.
+    // Show historical SLA misses and overdue arrivals to the Owner, read-only.
+    const arrivalSince = new Date(Date.now() - 7 * 86400000).toISOString()
+    const arrivals = await serviceRest<any[]>(env, 'facebook_rotation_queue?lane=eq.NEW_ARRIVAL&created_at=gte.'+encodeURIComponent(arrivalSince)+'&select=id,connection_key,product_id,status,created_at,scheduled_at,posted_at,last_error&order=created_at.desc&limit=500')
+    const nowMs = Date.now(), slaMs = 10 * 60000
+    const arrivalStats = ['page_1','page_2'].map((connectionKey) => {
+      const rows = arrivals.filter((row:any)=>row.connection_key===connectionKey)
+      const posted = rows.filter((row:any)=>row.status==='POSTED' && row.posted_at)
+      const late = posted.filter((row:any)=>Date.parse(row.posted_at)-Date.parse(row.created_at)>slaMs)
+      const overdue = rows.filter((row:any)=>['PLANNED','FAILED','CLAIMED'].includes(row.status) && nowMs-Date.parse(row.created_at)>slaMs)
+      const minutes = (row:any) => Math.round((Date.parse(row.posted_at)-Date.parse(row.created_at))/60000*10)/10
+      return {
+        connectionKey, posted:posted.length, late:late.length, overdue:overdue.length,
+        slaPct:posted.length?Math.round((posted.length-late.length)/posted.length*1000)/10:null,
+        latestLate:late.slice(0,5).map((row:any)=>({productId:row.product_id,postedAt:row.posted_at,delayMinutes:minutes(row)})),
+        overdueItems:overdue.slice(0,5).map((row:any)=>({productId:row.product_id,status:row.status,createdAt:row.created_at,lastError:row.last_error})),
+      }
+    })
+    return json(request, env, { settings: settings[0]||null, newArrivalSla: {targetMinutes:10,windowDays:7,perPage:arrivalStats}, queue: queue.map((row:any)=>({ ...row, product: byId.get(row.product_id)||null })) })
   }
   if (url.pathname === '/commerce/facebook/rotation-settings' && request.method === 'PATCH') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
