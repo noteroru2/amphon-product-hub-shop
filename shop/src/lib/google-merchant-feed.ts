@@ -213,7 +213,8 @@ function customLabelTags(product: StoreProduct) {
 }
 
 export function merchantFeedEligible(product: StoreProduct) {
-  return product.availability === 'available'
+  return product.status === 'published'
+    && product.availability === 'available'
     && product.indexPolicy === 'INDEX'
     && product.merchantEnabled === true
     && Number(product.price) > 0
