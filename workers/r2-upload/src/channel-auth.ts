@@ -179,9 +179,28 @@ async function updateFacebookSoldPost(env:Env,x:any,p:any){
  if(!r.ok||j.error||j.success!==true)throw new Error('FACEBOOK_SOLD_SYNC_FAILED:'+(j.error?.message||r.status))
  await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'SOLD',content_hash:soldContentVersion,sold_at:x.sold_at||new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
 }
+export async function recoverFacebookHistory(env:Env){
+ const states=await rest(env,'facebook_history_recovery?completed_at=is.null&select=*&order=updated_at.asc&limit=1'),state=states?.[0]
+ if(!state)return
+ try{
+  const cr=await creds(env,'facebook_page',String(state.connection_key))
+  if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
+  const params=new URLSearchParams({fields:'id,message,created_time',limit:'100',since:'2026-09-18T00:00:00Z',access_token:cr.pageAccessToken})
+  if(state.after_cursor)params.set('after',String(state.after_cursor))
+  const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed?'+params),j:any=await r.json()
+  if(!r.ok||j.error)throw new Error('FACEBOOK_HISTORY_READ_FAILED:'+(j.error?.message||r.status))
+  const posts=(Array.isArray(j.data)?j.data:[]).map((x:any)=>({...x,sku:String(x.message||'').match(/https:\/\/shop\.amphon\.co\.th\/product\/(AT-[A-Z0-9-]+)/i)?.[1]})).filter((x:any)=>x.sku)
+  const skus=Array.from(new Set(posts.map((x:any)=>x.sku)))
+  const products=skus.length?await rest(env,'products?sku=in.('+skus.join(',')+')&select=id,sku'):[]
+  const bySku=new Map((products||[]).map((x:any)=>[String(x.sku),String(x.id)]))
+  const entries=posts.filter((x:any)=>bySku.has(x.sku)).map((x:any)=>({product_id:bySku.get(x.sku),connection_key:state.connection_key,page_id:String(cr.pageId),post_id:String(x.id),external_url:'https://www.facebook.com/'+x.id,published_at:x.created_time,status:'LIVE'}))
+  if(entries.length)await rest(env,'facebook_post_ledger?on_conflict=post_id',{method:'POST',headers:{prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(entries)})
+  await rest(env,'facebook_history_recovery?connection_key=eq.'+encodeURIComponent(state.connection_key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({after_cursor:j.paging?.next?j.paging?.cursors?.after:null,completed_at:j.paging?.next?null:new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
+ }catch(e){await rest(env,'facebook_history_recovery?connection_key=eq.'+encodeURIComponent(state.connection_key),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({updated_at:new Date().toISOString(),last_error:(e instanceof Error?e.message:String(e)).slice(0,800)})})}
+}
 export async function runFacebookSoldSyncSweep(env:Env){
  // Filter sold stock in SQL before the batch limit; live stock cannot starve it.
- const rows=await rest(env,'rpc/facebook_sold_sync_candidates',{method:'POST',body:JSON.stringify({max_posts:20})})
+ const rows=await rest(env,'rpc/facebook_sold_sync_candidates',{method:'POST',body:JSON.stringify({max_posts:5})})
  const results:any[]=[]
  for(const x of Array.isArray(rows)?rows:[]){
   try{

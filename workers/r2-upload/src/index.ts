@@ -1,6 +1,6 @@
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep, runFacebookSoldSyncSweep } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep, runFacebookSoldSyncSweep, recoverFacebookHistory } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -2775,17 +2775,21 @@ export default {
 
     if (isManual || cron === '* * * * *') {
       try {
-        const rotation = await runFacebookRotationSweep(env)
-        if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
+        await recoverFacebookHistory(env)
       } catch (error) {
-        console.error('FACEBOOK ROTATION sweep failed', error)
+        console.error('FACEBOOK history recovery failed', error)
       }
-
       try {
         const soldSync = await runFacebookSoldSyncSweep(env)
         if (soldSync.length) console.log('DISTRIBUTION sold sync', soldSync)
       } catch (error) {
         console.error('DISTRIBUTION sold sync failed', error)
+      }
+      try {
+        const rotation = await runFacebookRotationSweep(env)
+        if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
+      } catch (error) {
+        console.error('FACEBOOK ROTATION sweep failed', error)
       }
 
       try {
