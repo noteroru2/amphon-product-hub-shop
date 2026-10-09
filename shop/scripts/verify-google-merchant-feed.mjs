@@ -8,7 +8,7 @@ const [feedLib, feedRoute] = await Promise.all([
 ])
 
 const checks = [
-  ['feed keeps only live merchant-eligible inventory', feedLib.includes("product.availability === 'available'") && feedLib.includes("product.indexPolicy === 'INDEX'") && feedLib.includes('product.merchantEnabled === true')],
+  ['feed keeps only live merchant-eligible inventory', feedLib.includes("product.status === 'published'") && feedLib.includes("product.availability === 'available'") && feedLib.includes("product.indexPolicy === 'INDEX'") && feedLib.includes('product.merchantEnabled === true')],
   ['required Merchant attributes are emitted', ['<g:id>','<title>','<description>','<link>','<g:image_link>','<g:availability>','<g:price>','<g:condition>'].every((tag) => feedLib.includes(tag))],
   ['feed exposes multiple product images', feedLib.includes('<g:additional_image_link>') && feedLib.includes('slice(0, 10)')],
   ['used IT taxonomy is explicit', feedLib.includes('GOOGLE_CATEGORY_BY_SHOP_SLUG') && feedLib.includes('<g:google_product_category>') && feedLib.includes('<g:product_type>')],
@@ -17,7 +17,7 @@ const checks = [
   ['branded products do not falsely claim identifiers are absent', feedLib.includes("brand.toLowerCase() === 'custom pc'") && feedLib.includes('<g:identifier_exists>false</g:identifier_exists>')],
   ['feed includes campaign labels for future Shopping optimization', feedLib.includes('custom_label_') && feedLib.includes('conditionLabel(product)')],
   ['feed uses live store settings', feedRoute.includes('getStoreSettings') && feedRoute.includes('buildGoogleMerchantFeed(products, settings)')],
-  ['feed endpoint is noindex and short-cache', feedRoute.includes("'x-robots-tag': 'noindex'") && feedRoute.includes('max-age=300')],
+  ['feed endpoint is noindex with bounded freshness (no stale-while-revalidate)', feedRoute.includes("'x-robots-tag': 'noindex'") && feedRoute.includes('max-age=60, must-revalidate') && !feedRoute.includes('stale-while-revalidate')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
