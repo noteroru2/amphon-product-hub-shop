@@ -1,0 +1,24 @@
+name: Facebook P0 Reliability Gate
+on:
+  pull_request:
+    paths:
+      - 'workers/r2-upload/src/**'
+      - 'tests/facebook-*.test.mjs'
+      - '.github/workflows/facebook-p0-reliability.yml'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked Worker dependencies
+        run: npm ci --prefix workers/r2-upload
+      - name: Worker typecheck
+        run: npm --prefix workers/r2-upload run typecheck
+      - name: Facebook idempotency and sold-copy tests
+        run: node --test tests/facebook-publish-retry.test.mjs tests/facebook-sold-content.test.mjs
