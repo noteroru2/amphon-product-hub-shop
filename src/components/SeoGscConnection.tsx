@@ -26,7 +26,7 @@ export function SeoGscConnection({ onChanged }: { onChanged: () => void }) {
     const url=new URL(window.location.href); const result=url.searchParams.get('gsc')
     if(result) {
       setMessage(messages[result] || 'ตรวจสถานะการเชื่อม Google'); setExpanded(true)
-      url.searchParams.delete('gsc'); window.history.replaceState(null,'',url.toString())
+      url.searchParams.delete('gsc'); window.history.replaceState(window.history.state,'',url.toString())
     }
     void load()
     const timer=window.setInterval(()=>{ if(document.visibilityState==='visible') void load() },60_000)
