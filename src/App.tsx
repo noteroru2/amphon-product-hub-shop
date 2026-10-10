@@ -263,6 +263,9 @@ function App() {
       navigation.current.navigate({ tab: "channel-settings" });
       window.history.replaceState(window.history.state, "", window.location.pathname);
     }
+    if (params.has("gsc")) {
+      navigation.current.navigate({ tab: "seo-control-tower" });
+    }
     return () => navigation.current?.dispose();
   }, []);
 
