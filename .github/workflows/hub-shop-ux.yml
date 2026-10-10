@@ -53,7 +53,7 @@ jobs:
         run: npm ci
 
       - name: SEO monitoring state regressions
-        run: node --test tests/seo-network.test.mjs
+        run: node --test tests/seo-network.test.mjs tests/seo-gsc.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck

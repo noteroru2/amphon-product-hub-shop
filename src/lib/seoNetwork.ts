@@ -11,6 +11,9 @@ export interface SeoNetworkSite {
   gsc_state: string
   gsc_note: string
   source_at: string | null
+  data_start_date?: string | null
+  data_end_date?: string | null
+  last_data_date?: string | null
   clicks: number | null
   impressions: number | null
   ctr: number | null
@@ -55,6 +58,10 @@ export interface SeoNetworkSnapshot {
   position: number | null
   coverage: string
   queries: SeoNetworkQuery[]
+  data_start_date?: string | null
+  data_end_date?: string | null
+  last_data_date?: string | null
+  query_truncated?: boolean | null
 }
 
 export async function loadSeoNetwork(): Promise<SeoNetworkSite[]> {
@@ -66,8 +73,17 @@ export async function loadSeoNetwork(): Promise<SeoNetworkSite[]> {
 
 export async function loadSeoNetworkHistory(siteId: string): Promise<SeoNetworkSnapshot[]> {
   if (!supabase) throw new Error('ยังไม่ได้ตั้งค่าการเชื่อมต่อข้อมูล')
-  const { data, error } = await supabase.from('commerce_seo_network_snapshots').select('*')
+  const { data, error } = await supabase.from('commerce_seo_network_snapshots')
+    .select('id,source_at,captured_at,window_days,clicks,impressions,ctr,position,coverage,data_start_date,data_end_date,last_data_date,query_truncated')
     .eq('site_id', siteId).order('source_at', { ascending: false }).limit(12)
   if (error) throw new Error(error.message)
-  return (data || []) as SeoNetworkSnapshot[]
+  const rows = (data || []).map(row => ({ ...row, queries: [] })) as SeoNetworkSnapshot[]
+  const latest = rows[0]
+  if (!latest) return rows
+  const previous = rows.find(row => Date.parse(latest.source_at) - Date.parse(row.source_at) >= 3 * 86_400_000 && row.coverage === latest.coverage)
+  const { data: details, error: detailError } = await supabase.from('commerce_seo_network_snapshots')
+    .select('id,queries').in('id', [latest.id, ...(previous ? [previous.id] : [])]).eq('site_id', siteId)
+  if (detailError) throw new Error(detailError.message)
+  const queries = new Map((details || []).map(row => [row.id, row.queries as SeoNetworkQuery[]]))
+  return rows.map(row => ({ ...row, queries: queries.get(row.id) || [] }))
 }

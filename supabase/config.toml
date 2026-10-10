@@ -4,6 +4,10 @@
 # working directory name when running `supabase init`.
 project_id = "amphon-product-hub-shop6-1"
 
+[functions.seo-gsc]
+# getUser + server-side role checks; public OAuth callback uses one-use state/PKCE.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.
