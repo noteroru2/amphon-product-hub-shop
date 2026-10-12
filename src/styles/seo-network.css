@@ -19,3 +19,10 @@
 .seo-gsc-connection label { display: grid; gap: 6px; margin: 12px 0; }
 .seo-gsc-connection input { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
 .seo-gsc-account { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.seo-growth-center select, .seo-growth-center input { max-width: 100%; padding: 10px; border: 1px solid #dbe4ee; border-radius: 8px; background: white; color: #172033; }
+.seo-growth-center button { min-height: 40px; }
+.seo-growth-center td p { max-width: 330px; font-size: 13px; line-height: 1.6; }
+.seo-growth-center a { overflow-wrap: anywhere; }
+.seo-growth-form { display: grid; gap: 12px; padding: 18px; margin-top: 16px; background: #f8fafc; border: 1px solid #dbe4ee; border-radius: 14px; }
+.seo-growth-form label { display: grid; gap: 6px; }
+.seo-growth-form input, .seo-growth-form select { width: 100%; box-sizing: border-box; }

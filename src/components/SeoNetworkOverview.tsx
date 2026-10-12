@@ -4,6 +4,7 @@ import { AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react'
 import { loadSeoNetwork, loadSeoNetworkHistory, type SeoNetworkSite, type SeoNetworkSnapshot } from '../lib/seoNetwork'
 import { networkIssues, sourceState } from '../lib/seoNetworkSignals'
 import { SeoGscConnection } from './SeoGscConnection'
+import { SeoGrowthCenter } from './SeoGrowthCenter'
 
 const healthLabels: Record<string, string> = { OK: 'ตรวจผ่าน', ATTENTION: 'ควรตรวจสอบ', RUNNING: 'กำลังตรวจ', WAITING: 'รอรอบตรวจ', STALE: 'ผลตรวจเก่า', REDIRECT: 'เปลี่ยนเส้นทาง' }
 const sourceLabels: Record<string, string> = { FRESH: 'ข้อมูลล่าสุด', STALE: 'ข้อมูลเก่า', MISSING: 'ยังไม่มีข้อมูล', BLOCKED: 'ดึงข้อมูลถูกระงับ' }
@@ -86,6 +87,7 @@ export function SeoNetworkOverview({ refreshSignal = 0 }: { refreshSignal?: numb
           <td><strong>{healthLabels[row.health_state] || row.health_state}</strong><small>{time(row.last_check_at)}</small></td>
         </tr>)}</tbody>
       </table></div>
+      <SeoGrowthCenter sites={sites} />
       <section className="seo-tower-section"><h2>สิ่งที่ควรตรวจต่อ</h2><div className="seo-network-priorities">
         {priorities.length === 0 ? <p>ไม่พบประเด็นจากผลตรวจที่มีอยู่</p> : priorities.slice(0, 8).map((issue, index) => <button key={`${issue.site.id}:${index}`} className={issue.level} onClick={() => { setSelected(issue.site.id); setView(issue.level === 'critical' ? 'health' : 'queries') }}>
           <strong>{issue.site.label} • {issue.text}</strong><span>{issue.action}</span>
