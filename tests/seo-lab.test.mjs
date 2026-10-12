@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from 'typescript'
+import vm from 'node:vm'
 const compile=source=>ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText
 const url=code=>`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 const core=await import(url(compile(readFileSync(new URL('../supabase/functions/seo-workbench/core.ts',import.meta.url),'utf8'))))
@@ -39,8 +40,8 @@ test('Google referrers do not masquerade as AI, while no referrer remains unknow
 })
 test('anonymous management and fake scheduler keys cannot claim experiments; contacts only prefill LINE',async()=>{
  const code=compile(readFileSync(new URL('../supabase/functions/seo-workbench/index.ts',import.meta.url),'utf8'))
- let handler;globalThis.Deno={env:{get:()=> 'fake'},serve:fn=>handler=fn}
- const fakeDb={auth:{getUser:async()=>({data:{user:null},error:null})},rpc:async(name,args)=>({data:name==='commerce_gsc_internal'?'real-test-key':{token:'1234567890abcdef'},error:null})}
+ let handler;globalThis.Deno={env:{get:name=>name==='SUPABASE_URL'?'https://project.supabase.co':'fake'},serve:fn=>handler=fn}
+ const fakeDb={auth:{getUser:async()=>({data:{user:null},error:null})},rpc:async(name,args)=>({data:name==='commerce_gsc_internal'?'real-test-key':{token:'1234567890abcdef'},error:null}),from:()=>{const q={select:()=>q,eq:()=>q,single:async()=>({data:{id:'amphon',origin:'https://amphon.co.th'}})};return q}}
  const mock=url(`export const createClient=()=>globalThis.__seoLabMock`);globalThis.__seoLabMock=fakeDb
  const joseMock=url(`export const createRemoteJWKSet=()=>({});export const jwtVerify=async()=>{throw new Error('UNAUTHORIZED')}`)
  await import(url(code.replace(/from ['"]npm:@supabase\/supabase-js@2\.116\.0['"]/g,`from '${mock}'`).replace(/from ['"]npm:jose@6\.1\.0['"]/g,`from '${joseMock}'`).replace(/from ['"]\.\/core\.ts['"]/g,`from '${url(compile(readFileSync(new URL('../supabase/functions/seo-workbench/core.ts',import.meta.url),'utf8')))}'`)))
@@ -49,5 +50,12 @@ test('anonymous management and fake scheduler keys cannot claim experiments; con
  const render=await handler(new Request('https://example/seo-workbench',{method:'POST',body:'{"action":"render_claim"}'}));assert.equal(render.status,401)
  const contact=await handler(new Request('https://example/seo-workbench/contact?site=shop&page=https%3A%2F%2Fshop.amphon.co.th%2F&session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'))
  assert.equal(contact.status,302);assert.ok(contact.headers.get('location').includes('oaMessage/%40webuy'));assert.ok(decodeURIComponent(contact.headers.get('location')).includes('[AMPHON:1234567890abcdef]'))
+ const tracker=await handler(new Request('https://example/seo-workbench/tracker.js?site=amphon'));const script=await tracker.text()
+ for(const href of ['https://line.me/R/ti/p/@webuy','https://line.me/ti/p/~@webuy','https://line.me/R/ti/p/%40WEBUY','https://line.me/R/ti/p/@webuy_fake']){
+  let listener;class Element{closest(){return this}};const anchor=new Element();anchor.href=href
+  const context={location:{hostname:'amphon.co.th',origin:'https://amphon.co.th',pathname:'/'},document:{referrer:'https://www.google.co.th/search?q=private',addEventListener:(event,fn)=>listener=fn},sessionStorage:{getItem:()=>null,setItem:()=>{}},crypto:globalThis.crypto,URL,URLSearchParams,Date,Element}
+  vm.runInNewContext(script,context);listener({target:anchor})
+  if(href.includes('webuy_fake'))assert.equal(anchor.href,href);else{const u=new URL(anchor.href);assert.equal(u.searchParams.get('site'),'amphon');assert.equal(u.searchParams.get('referrer'),'www.google.co.th');assert.ok(!anchor.href.includes('q=private'))}
+ }
  delete globalThis.Deno;delete globalThis.__seoLabMock
 })
