@@ -1,0 +1,27 @@
+# Content, AI visibility and business attribution
+
+## Content workflow
+
+An OPEN, fresh opportunity creates a content job. Owner/admin requests rendered evidence from a main-branch GitHub Actions worker. GitHub OIDC is restricted to this repository, main ref and exact workflow identity. The isolated browser has no user session, no backend headers and only allowlisted public GET requests; up to two jobs per claim with five-minute leases. Rendering handles JavaScript sites. Direct raw-HTML capture is also available through the authenticated API but rejects insufficient text. Source hash and text excerpt are immutable evidence. Starter drafts copy source excerpts into an editable outline; no LLM or invented business claims. Owner checks facts and approves saved body. Saving revisions clears approval. Unresolved starter placeholders cannot be approved.
+
+Approval does not deploy or start experiments. After a separate approved website change, the owner provides a full GitHub commit URL and a new approved-body excerpt (>=80 characters). The server requires changed live HTML and the excerpt absent from prior evidence but present on the current public page. Commit URL is an owner-supplied reference, not a GitHub-verified change receipt. No auto-executor or website mutation occurs in this service.
+
+## Direct GSC experiments
+
+Content experiments appear in the existing Experiments section, separate from legacy action/executor measurements. Before windows are 7/14/28 days before captured pre-change evidence; after windows are the corresponding number of days after verified publication. The change/verification gap is excluded, so delayed verification cannot pollute baseline with deployed content. Dates use Pacific time; latest three days are excluded. Schedule starts at verification + checkpoint +4 days. Uses matching canonical host aliases, same path and case-insensitive exact-query regex; totals are independently fetched via OAuth, no rolling-28-day overlap.
+
+Empty or <50-impression windows remain INSUFFICIENT_DATA. Verdicts describe observed position changes; known overlapping content/legacy changes are CONFOUNDED. Unlogged changes, seasonality and external shifts may remain unknown. No causal claims or automatic rollback. Cron claims one checkpoint with a 5-minute lease and retries failures after one hour. Existing Google refresh tokens remain in Vault, returned only to service-role worker; never logged or sent to browsers.
+
+## AI visibility
+
+Ten proposed Thai prompts cover nationwide buyback, geographic services and used-product purchasing. The connected Ubersuggest free account permits one brand and ten prompts; onboarding stopped at the required review stage. No external project/brand exists yet and no brand-operation credit has been spent. User must confirm the exact list before `onboard_project(confirm:true)`; saved review inputs are shown in Hub. External first report takes about one day after activation. This version does not claim automatic Ubersuggest-to-Hub report ingestion.
+
+Hub supports manual evidence samples for ChatGPT, Gemini, Google AI Overviews, Perplexity, Copilot and Claude. Recorded answers/reference URLs are user-supplied evidence, not independently verified engine rankings. COMPLETED samples have an explicit brand-mentioned decision; FAILED/NO_DATA have null decision and are excluded from the denominator. Citation hostnames are matched to registered site hostnames. Thirty-day sampled summary is capped at 500 rows; no samples means unknown, not zero visibility. GSC Web totals do not substitute for AI-specific visibility reports.
+
+## Business linkage
+
+Shop installs first-party contact attribution on official LINE @webuy links only. A 24-hour tab-scoped random session ID and referring hostname are stored in sessionStorage. No names, IPs, message history, full referrer URLs or fingerprints collected. Headerless or unknown referrers remain UNKNOWN; Google referrers are organic, not assumed to be AI. Source labels are browser-reported and spoofable, not authenticated attribution.
+
+The click opens the LINE message composer with an opaque AMPHON token; nothing is auto-sent. Repeated same-session/page/day clicks deduplicate. Owner/admin confirms a real business case reference, then explicitly matches a later System sale event. One sale ID can be attached to only one contact, so profit is never double counted. Actual profit is taken as recorded from distribution_sale_outcomes, not multiplied by quantity and not replaced with estimated margin. Unknown profit remains null. This is recorded sale-event profit, not net profit after returns/all operating costs. Old sales cannot be attributed without a confirmed source linkage.
+
+Shop is the only website automatically instrumented in this release. Other sites have a ready allowlisted `/seo-workbench/tracker.js?site=...` snippet, which needs installation in their own layout before automatic capture. Their traffic is not claimed as captured. Public click endpoint is read/redirect plus limited event append; rate-bounds 20 events/session/day and 2,000/day globally. Invalid input falls back to normal LINE contact. All management endpoints validate active owner/admin JWTs; only owners approve/publish. Tables and public views have RLS/security_invoker with no anon reads.
