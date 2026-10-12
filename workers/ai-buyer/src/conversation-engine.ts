@@ -1,6 +1,6 @@
 import { preferredLineSend } from './line-transport'
-import { informationTemplate, missingInformationTemplate } from './reply-templates'
-import { guardedOpenAIFetch, runtimeControl, type RuntimeControlEnv } from './runtime-control'
+import { contextualReplyPlan, safeCustomerReply, type ConversationMemory } from './conversation-policy'
+import { guardedOpenAIFetch, runtimeControl, isQuotaExhausted, type RuntimeControlEnv } from './runtime-control'
 import { runPricingForCase } from './pricing-router'
 import { handleOfferFlow, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 
@@ -154,6 +154,7 @@ const PRICING_TAGS: PricingTag[] = [
 
 type IntakeResult = {
   intent: 'SELL_ITEM' | 'GENERAL' | 'UNKNOWN'
+  customer_reply: string
   category: ProductCategory
   product_title: string
   model_name: string
@@ -199,6 +200,7 @@ const VISION_SCHEMA = {
   properties: {
     intent: { type: 'string', enum: ['SELL_ITEM', 'GENERAL', 'UNKNOWN'] },
     category: { type: 'string', enum: CATEGORIES },
+    customer_reply: { type: 'string', description: 'Short contextual Thai reply, no prices or unsupported purchase/stock guarantees; empty if pricing or human review is needed.' },
     product_title: { type: 'string' },
     model_name: { type: 'string' },
     model_code: { type: 'string' },
@@ -241,7 +243,7 @@ const VISION_SCHEMA = {
     flags: { type: 'array', items: { type: 'string' }, maxItems: 12 },
   },
   required: [
-    'intent','category','product_title','model_name','model_code','confirmed','inferred',
+    'intent','customer_reply','category','product_title','model_name','model_code','confirmed','inferred',
     'unknown_fields','requested_inputs','identity_confidence','spec_completeness',
     'condition_completeness','pricing_readiness','action','asked_if_ai',
     'handoff_requested','pricing_tags','flags',
@@ -272,6 +274,7 @@ const SYSTEM_PROMPT = [
   'Use HUMAN_REVIEW for rare products, complex damage, contradictory identity, or persistent ambiguity.',
   'For pricing_tags, use only directly supported condition/accessory tags. Do not infer damage from weak visual evidence.',
   'If the customer explicitly asks for a human/admin, set handoff_requested=true.',
+  'customer_reply must be concise Thai shop-admin wording, normally one or two sentences. Examples of tone: ขอสเปคทีครับ; ส่งรูปมาได้เลยครับ. Answer the current intent; if the customer does not know the model, help find it rather than asking it again. Never claim unknown models are unsupported or fabricate stock, policy, price, appointments or pickup availability.',
   'If the customer asks whether this is AI/bot/automatic, set asked_if_ai=true.',
   'Product categories are strictly NOTEBOOK, MACBOOK, DESKTOP_PC, SMARTPHONE, TABLET, CAMERA, OTHER, UNKNOWN.',
   'For NOTEBOOK and DESKTOP_PC, put confirmed pricing facts under canonical keys whenever known: brand, series, cpu, gpu, ram, storage, display, motherboard, psu, case, cooler, system_class, condition, warranty, defects.',
@@ -422,7 +425,7 @@ function evidenceList(result: IntakeResult) {
   ]
 }
 
-function contextText(messages: MessageRow[], observations: ObservationRow[]) {
+function contextText(messages: MessageRow[], observations: ObservationRow[], memory?: ConversationMemory) {
   const recent = messages.map((message) => {
     const speaker = message.direction === 'INBOUND' ? 'CUSTOMER' : message.direction === 'OUTBOUND' ? 'SHOP' : 'SYSTEM'
     const value = message.text_content
@@ -444,6 +447,8 @@ function contextText(messages: MessageRow[], observations: ObservationRow[]) {
   })).join('\n')
 
   return [
+    'Conversation memory (customer-supplied modelCandidate is unverified; never price from it): ' + JSON.stringify(memory || {}),
+    'For IDENTIFY_MODEL/BUY_ITEM/GENERAL intent, answer the actual question. Do not treat the customer as a seller or ask storage for choosing a case. Never repeat a delivered question or request facts already supplied.',
     'Recent conversation:',
     recent || '(none)',
     '',
@@ -827,6 +832,7 @@ function normalizeIntake(value: unknown): IntakeResult {
 
   const normalized: IntakeResult = {
     intent,
+    customer_reply: safeCustomerReply(raw.customer_reply),
     category,
     product_title: clean(raw.product_title, 240),
     model_name: clean(raw.model_name, 200),
@@ -857,6 +863,7 @@ async function callVision(
   messages: MessageRow[],
   observations: ObservationRow[],
   images: ImageRow[],
+  memory?: ConversationMemory,
 ) {
   if (!env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY_NOT_CONFIGURED')
   const model = clean(env.OPENAI_VISION_MODEL, 100) || 'gpt-5.6-sol'
@@ -866,7 +873,7 @@ async function callVision(
     { type: 'input_text'; text: string }
     | { type: 'input_image'; image_url: string; detail: 'auto' }
   > = [
-    { type: 'input_text', text: contextText(messages, observations) },
+    { type: 'input_text', text: contextText(messages, observations, memory) },
     ...prepared.output,
   ]
 
@@ -1031,7 +1038,11 @@ function composeReply(result: IntakeResult, currentCase: CaseRow) {
   } else if (result.action === 'HUMAN_REVIEW') {
     operational = 'ตัวนี้ขอเช็กเพิ่มนิดนึงครับ เดี๋ยวแอดมินดูให้ครับ'
   } else if (result.intent === 'GENERAL') {
-    operational = 'ได้เลยครับผม'
+    operational = safeCustomerReply(result.customer_reply)
+  }
+
+  if (!pricingReadyByPolicy(result) && result.action !== 'HUMAN_REVIEW' && safeCustomerReply(result.customer_reply)) {
+    operational = safeCustomerReply(result.customer_reply)
   }
 
   if (result.asked_if_ai) {
@@ -1301,7 +1312,7 @@ async function sendLineText(
   const trimmed = clean(text, 4500)
   if (!trimmed) return false
 
-  const gate = await outboundAutomationGate(env, batch, action === 'RULE_INFORMATION')
+  const gate = await outboundAutomationGate(env, batch, ['RULE_INFORMATION', 'ASK_MORE_INFO', 'ASK_PRODUCT_TYPE'].includes(action))
   if (!gate.allowed) {
     console.warn(
       'AI BUYER outbound suppressed by automation gate',
@@ -1397,6 +1408,36 @@ async function failAnalysis(
   if (runId) await completeAnalysisRun(env, runId, 'FAILED', null, null, message).catch(() => undefined)
 }
 
+async function handoffConversation(
+  env: ConversationEngineEnv, batch: IntakeBatch, currentCase: CaseRow,
+  memory: ConversationMemory, messages: MessageRow[], reason: string,
+  reply = 'ส่งให้พนักงานตรวจข้อมูลและตอบต่อครับ',
+) {
+  const existing = await readRows<{ id: string }>(await supabaseRequest(env,
+    'ai_buyer_admin_tasks?case_id=eq.' + encodeURIComponent(currentCase.id)
+      + '&task_type=eq.CONVERSATION_REVIEW&status=in.(ACTION_REQUIRED,IN_PROGRESS)&select=id&limit=1'))
+  if (!existing.length) {
+    const task = await supabaseRequest(env, 'ai_buyer_admin_tasks', {
+      method: 'POST', headers: { prefer: 'return=minimal' }, body: JSON.stringify({
+        case_id: currentCase.id, task_type: 'CONVERSATION_REVIEW', status: 'ACTION_REQUIRED', priority: 'NORMAL',
+        payload: { reason, conversationId: batch.conversationId, intent: memory.intent,
+          suppliedModel: memory.modelCandidate, storage: memory.storage, sourceMessageIds: messages.map(m => m.id) },
+      }),
+    })
+    if (!task.ok) throw new Error('CONVERSATION_HANDOFF_TASK_FAILED')
+  }
+  let sent = false
+  try { sent = await sendLineText(env, batch, reply, 'RULE_INFORMATION') }
+  catch (error) { console.warn('Conversation handoff reply unavailable', currentCase.id, String(error)) }
+  const metadata = { ...(currentCase.metadata || {}), conversationMemory: memory, pendingReply: null, conversationReviewReason: reason }
+  await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), {
+    state: 'HUMAN_REVIEW', control_mode: 'HUMAN_REQUIRED', metadata,
+  })
+  await patchRows(env, 'ai_buyer_conversations?id=eq.' + encodeURIComponent(batch.conversationId), { control_mode: 'HUMAN_REQUIRED' })
+  await markMessagesConsumed(env, messages.map(m => m.id))
+  return { ok: true, source: 'CONTEXT_HANDOFF', sent, humanReview: true, reason }
+}
+
 export async function runConversationIntake(
   env: ConversationEngineEnv,
   batch: IntakeBatch,
@@ -1448,7 +1489,38 @@ export async function runConversationIntake(
     return { ok: true, skipped: true, reason: 'HUMAN_CONTROL' }
   }
 
-  if (unconsumedMessages.length && !readyImages.length && unconsumedMessages.every(m => m.message_type === 'TEXT')) {
+  const offerFlowStates = ['PRICING','OFFERED','NEGOTIATING','ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED','COMPLETED']
+  const plan = contextualReplyPlan({
+    recent: recentMessages, incoming: unconsumedMessages, metadata: currentCase.metadata,
+    observations, category: currentCase.category, state: currentCase.state, readyImages: readyImages.length,
+  })
+  const memory = plan.memory
+  // Persist facts across the bounded history window, but commit lastInboundId only after a handled turn.
+  const factMemory = { ...memory, lastInboundId: (currentCase.metadata?.conversationMemory as ConversationMemory | undefined)?.lastInboundId || '' }
+  currentCase.metadata = { ...(currentCase.metadata || {}), conversationMemory: factMemory }
+  await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), { metadata: currentCase.metadata })
+  if (plan.route === 'HANDOFF') return handoffConversation(env, batch, currentCase, memory, unconsumedMessages, plan.reason, plan.reply)
+  if (plan.route === 'SUPPRESS' && unconsumedMessages.length
+    && !(plan.reason === 'ACKNOWLEDGEMENT' && offerFlowStates.includes(currentCase.state))) {
+    await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
+    currentCase.metadata.conversationMemory = memory
+    await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), { metadata: currentCase.metadata })
+    return { ok: true, skipped: true, reason: plan.reason }
+  }
+  if (plan.route === 'REPLY') {
+    try {
+      const sent = await sendLineText(env, batch, plan.reply, 'RULE_INFORMATION')
+      if (sent) {
+        currentCase.metadata.conversationMemory = { ...memory, lastRequestKey: plan.requestKey || memory.lastRequestKey, lastReply: plan.reply }
+        await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), { metadata: currentCase.metadata })
+        await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
+      }
+      return { ok: true, source: 'CONTEXTUAL_TEMPLATE', sent, reason: plan.reason }
+    } catch (error) { return { ok: false, error: String(error), source: 'CONTEXTUAL_TEMPLATE' } }
+  }
+
+  if (unconsumedMessages.length && !readyImages.length && unconsumedMessages.every(m => m.message_type === 'TEXT')
+    && ['SELL_ITEM', 'UNKNOWN'].includes(memory.intent)) {
     const newestAt = Math.max(...unconsumedMessages.map(m => Date.parse(m.created_at)))
     const evidenceAt = Date.parse(String(currentCase.metadata?.deterministicTextEvidenceAt || ''))
     const freshTextEvidence = Number.isFinite(evidenceAt) && evidenceAt >= newestAt
@@ -1478,21 +1550,9 @@ export async function runConversationIntake(
         return { ok: false, error: String(error), source: 'TABLE_ONLY' }
       }
     }
-    const text = unconsumedMessages.map(m => m.text_content || '').join(' ').trim()
-    const reply = informationTemplate(text, null) || (freshTextEvidence
-      && !/เสีย|พัง|แตก|บวม|เปลี่ยน|ซ่อม|ดับ|ล็อค|ล็อก|น้ำ|ตำหนิ|defect|broken|damage/i.test(text)
-      && ['NEW', 'IDENTIFYING_PRODUCT', 'NEED_MORE_INFO', 'COLLECTING_PHOTOS'].includes(currentCase.state)
-      ? missingInformationTemplate(currentCase.metadata?.lastRequestedInputs) : null)
-    if (reply) {
-      try {
-        const sent = await sendLineText(env, batch, reply, 'RULE_INFORMATION')
-        if (sent) await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
-        return { ok: true, source: 'OWNER_TEMPLATE', sent }
-      } catch (error) { return { ok: false, error: String(error), source: 'OWNER_TEMPLATE' } }
-    }
   }
 
-  const offerFlowStates = ['PRICING','OFFERED','NEGOTIATING','ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED','COMPLETED']
+
   if (unconsumedMessages.length && offerFlowStates.includes(currentCase.state)) {
     const messageIds = unconsumedMessages.map((message) => message.id)
     try {
@@ -1555,7 +1615,7 @@ export async function runConversationIntake(
   const circuitResponse = await runtimeControl(env).fetch('https://control/circuit/status')
   if (!circuitResponse.ok) return { ok: true, skipped: true, reason: 'AI_CIRCUIT_UNAVAILABLE' }
   if ((await circuitResponse.json() as { blocked?: boolean }).blocked) {
-    return { ok: true, skipped: true, reason: 'AI_CREDIT_CIRCUIT_OPEN' }
+    return handoffConversation(env, batch, currentCase, memory, unconsumedMessages, 'AI_CREDIT_CIRCUIT_OPEN')
   }
 
   const model = clean(env.OPENAI_VISION_MODEL, 100) || 'gpt-5.6-sol'
@@ -1568,9 +1628,29 @@ export async function runConversationIntake(
     const run = await createAnalysisRun(env, batch, model, messageIds, imageIds)
     runId = run.id
 
-    const vision = await callVision(env, recentMessages, observations, readyImages)
+    const vision = await callVision(env, recentMessages, observations, readyImages, memory)
     const result = applyStoredCaseRiskGuard(vision.result, currentCase)
+    if (memory.intent === 'IDENTIFY_MODEL' || memory.intent === 'BUY_ITEM' || memory.intent === 'GENERAL') {
+      result.intent = 'GENERAL'
+      if (result.action === 'READY_TO_PRICE') result.action = 'ASK_MORE_INFO'
+      result.pricing_readiness = 0
+      result.requested_inputs = result.requested_inputs.filter(k => k !== 'STORAGE_VARIANT' && k !== 'CORE_SPEC')
+    }
+    const askingKnownInText = Boolean((memory.modelCandidate || memory.knownModel) && /ขอรุ่น|รุ่นไหน|รุ่นอะไร/.test(result.customer_reply))
+      || Boolean(memory.storage && /ขอ.*ความจุ|ความจุเท่าไร/.test(result.customer_reply))
+    const askingKnown = result.requested_inputs.some(k => (k === 'MODEL' && (memory.modelCandidate || memory.knownModel))
+      || (k === 'STORAGE_VARIANT' && memory.storage))
+    const repeatsReply = result.customer_reply && result.customer_reply.replace(/\s+/g, '') === memory.lastReply.replace(/\s+/g, '')
+    if (askingKnown || askingKnownInText || repeatsReply || !result.customer_reply && result.intent === 'GENERAL') {
+      result.action = 'HUMAN_REVIEW'
+      result.handoff_requested = true
+      result.flags.push('CONTEXT_REQUIRES_HUMAN_REVIEW')
+    }
 
+    if (result.identity_confidence >= 0.9 && result.model_name && result.confirmed.some(f => /model|รุ่น/i.test(f.key))) {
+      memory.knownModel = result.model_name
+      memory.modelUnknown = false
+    }
     await storeObservation(env, batch.caseId, result, vision.includedImageIds.length > 0)
     if (vision.includedImageIds.length) await markImages(env, vision.includedImageIds, 'ANALYZED', run.id)
     if (vision.skippedImageIds.length) await markImages(env, vision.skippedImageIds, 'FAILED', run.id)
@@ -1587,6 +1667,10 @@ export async function runConversationIntake(
       return runConversationIntake(env, batch, drainDepth + 1)
     }
 
+    if (result.action === 'HUMAN_REVIEW' || result.handoff_requested) {
+      await completeAnalysisRun(env, run.id, 'SUCCEEDED', result, vision.usage)
+      return handoffConversation(env, batch, currentCase, memory, unconsumedMessages, 'AI_CONTEXT_REQUIRES_REVIEW')
+    }
     let reply = composeReply(result, currentCase)
     let replyAction: string = result.action
     let flowOfferId: string | null = null
@@ -1663,7 +1747,13 @@ export async function runConversationIntake(
             outboundActionId: flowOutboundActionId,
           })
         }
-        if (sent) await clearPendingReply(env, currentCase.id, pendingMetadata)
+        if (sent) {
+          await clearPendingReply(env, currentCase.id, pendingMetadata)
+          const deliveredMemory = { ...memory, lastReply: reply, lastRequestKey: result.requested_inputs.length ? 'MISSING:' + [...result.requested_inputs].sort().join(',') : memory.lastRequestKey }
+          await patchRows(env, 'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(currentCase.id), {
+            metadata: { ...pendingMetadata, pendingReply: null, conversationMemory: deliveredMemory },
+          })
+        }
       } catch (deliveryError) {
         await markOfferFlowFailure(env, flowOutboundActionId, deliveryError).catch(() => undefined)
         console.error('AI BUYER LINE delivery failed after successful analysis', batch.caseId, deliveryError)
@@ -1690,6 +1780,9 @@ export async function runConversationIntake(
     }
   } catch (error) {
     await failAnalysis(env, runId, imageIds, error)
+    if (isQuotaExhausted(error) || String(error).includes('AI_CREDIT_CIRCUIT_OPEN')) {
+      return handoffConversation(env, batch, currentCase, memory, unconsumedMessages, 'AI_CREDIT_EXHAUSTED')
+    }
     console.error('AI BUYER conversation intake failed', batch.caseId, error)
     return {
       ok: false,
