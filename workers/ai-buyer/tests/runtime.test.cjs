@@ -318,3 +318,10 @@ test('ambiguous general inquiry sends a bounded contextual AI reply through repl
     assert.match(sent[0].messages[0].text, /รายละเอียดอาการ/); assert.doesNotMatch(sent[0].messages[0].text, /ขอรุ่น/)
   } finally { global.fetch = original }
 })
+
+
+test('photo followed by acknowledgement still analyzes the new image', () => {
+  const f = policyFixture('TABLET'); turn(f, 'อยากทราบรุ่นไอแพดจำไม่ได้')
+  f.readyImages = 1; const p = turn(f, 'ครับ')
+  assert.equal(p.route, 'AI'); assert.equal(p.reason, 'ACKNOWLEDGEMENT_WITH_NEW_IMAGE')
+})

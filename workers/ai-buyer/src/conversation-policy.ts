@@ -86,7 +86,7 @@ export function contextualReplyPlan(input: {
   if (!latest) return plan('SUPPRESS', '', '', 'NO_NEW_MESSAGE')
   if (latest.id === memory.lastInboundId) return plan('SUPPRESS', '', '', 'ALREADY_HANDLED')
   if (/^(ครับ|ค่ะ|คะ|คับ|ขอบคุณ(?:ครับ|ค่ะ)?|โอเค(?:ครับ|ค่ะ)?|ok)[!.\s]*$/i.test(latestText)) {
-    return plan('SUPPRESS', '', '', 'ACKNOWLEDGEMENT')
+    return input.readyImages > 0 ? plan('AI', '', '', 'ACKNOWLEDGEMENT_WITH_NEW_IMAGE') : plan('SUPPRESS', '', '', 'ACKNOWLEDGEMENT')
   }
   if (/คุย.*(?:คน|แอดมิน|พนักงาน)|ขอ.*(?:แอดมิน|พนักงาน)|ให้คนตอบ|ติดต่อเจ้าหน้าที่/.test(latestText)) return handoff('CUSTOMER_REQUESTED_HUMAN')
   if (/เป็น.*(?:ai|เอไอ|บอท)|ตอบ.*(?:อัตโนมัติ|บอท)|ใช่.*(?:ai|เอไอ)/i.test(latestText)) {
@@ -119,7 +119,7 @@ export function contextualReplyPlan(input: {
   if (/^(สอบถาม|สอบถามได้(?:ไหม|มั้ย|มั้ยคะ)|สอบถามได้มั้ยคะ|สอบถามได้ไหมครับ)[?\s]*$/i.test(latestText)) {
     return plan('REPLY', 'สอบถามได้เลยครับ', '', 'GENERAL_INVITATION')
   }
-  const greeting = informationTemplate(latestText, null)
+  const greeting = input.readyImages ? null : informationTemplate(latestText, null)
   if (greeting) return plan('REPLY', greeting, '', 'GREETING')
   if (memory.modelUnknown) {
     return askOnce('ถ้าไม่ทราบรุ่น ส่งรูปตัวเครื่องและป้ายรุ่นใกล้ ๆ มาได้เลยครับ', 'HELP_MODEL_LABEL', 'MODEL_UNKNOWN')
