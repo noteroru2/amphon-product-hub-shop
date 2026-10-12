@@ -1,0 +1,28 @@
+name: SEO Rendered Evidence
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/seo-evidence-render.mjs','.github/workflows/seo-evidence-render.yml']
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: seo-rendered-evidence
+  cancel-in-progress: false
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Read allowlisted public pages and verify approved publications
+        run: node scripts/seo-evidence-render.mjs

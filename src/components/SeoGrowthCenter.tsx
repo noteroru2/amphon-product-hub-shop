@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { loadSeoGrowth, manageSeoGrowth, type GrowthOpportunity, type KeywordOwner, type LeadGuard } from '../lib/seoGrowth'
 import { activeOpportunity, growthKindLabels, guardLabels, guardNotes } from '../lib/seoGrowthSignals'
 import type { SeoNetworkSite } from '../lib/seoNetwork'
+import { manageSeoLab } from '../lib/seoLab'
 
 const num = (value: number | null, digits = 0) => value == null ? '—' : Number(value).toLocaleString('th-TH', { maximumFractionDigits: digits })
 const when = (value: string | null) => value ? new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' }) : '—'
@@ -63,7 +64,7 @@ export function SeoGrowthCenter({ sites }: { sites: SeoNetworkSite[] }) {
         <th>{label(row.site_id)}<small>{row.query}</small><a href={row.page} target="_blank" rel="noreferrer">{row.page}</a></th>
         <td>{growthKindLabels[row.kind]}<small>ลำดับงาน {row.priority}/100</small></td>
         <td>{num(row.clicks)} คลิก / {num(row.impressions)} แสดงผล<small>อันดับ {num(row.position, 2)} • CTR {row.ctr == null ? '—' : `${num(Number(row.ctr) * 100, 2)}%`}</small><small>นำเข้า {when(row.source_at)}</small></td>
-        <td><p>{row.recommendation}</p><button disabled={busy} onClick={() => void act('review', { id: row.id, status: 'REVIEWED' })}>ตรวจแล้ว / ยังไม่แก้เว็บ</button> <button disabled={busy} onClick={() => void act('review', { id: row.id, status: 'DISMISSED' })}>พักงาน</button></td>
+        <td><p>{row.recommendation}</p><button disabled={busy} onClick={() => { setBusy(true); void manageSeoLab('create', { opportunity_id: row.id }).then(() => setNotice('สร้างงานแล้ว • เปิดแท็บเนื้อหา / อนุมัติด้านล่าง ระบบโหลดรายการใหม่ภายใน 1 นาที')).catch(err => setError(err instanceof Error ? err.message : String(err))).finally(() => setBusy(false)) }}>สร้างงานเนื้อหา</button> <button disabled={busy} onClick={() => void act('review', { id: row.id, status: 'REVIEWED' })}>ตรวจแล้ว / ยังไม่แก้เว็บ</button> <button disabled={busy} onClick={() => void act('review', { id: row.id, status: 'DISMISSED' })}>พักงาน</button></td>
       </tr>)}</tbody></table></div>}
       {opportunities.some(row => matches(row) && ['REVIEWED', 'DISMISSED'].includes(row.status)) && <details><summary>งานตรวจแล้ว / พักงาน</summary>{opportunities.filter(row => matches(row) && ['REVIEWED', 'DISMISSED'].includes(row.status)).map(row => <p key={row.id}>{label(row.site_id)} • {row.query} • {growthKindLabels[row.kind]} <button disabled={busy} onClick={() => void act('review', { id: row.id, status: 'OPEN' })}>เปิดงานอีกครั้ง</button></p>)}</details>}
     </>}

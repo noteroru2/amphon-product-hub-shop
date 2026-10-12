@@ -131,6 +131,8 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     </footer>
     <script>
       import { CART_EVENT, readCartSkus } from '../lib/cart'
+      import { initSeoAttribution } from '../lib/seo-attribution'
+      initSeoAttribution()
       const updateCartCount = () => {
         const target = document.getElementById('cart-count')
         if (target) target.textContent = String(readCartSkus().length)

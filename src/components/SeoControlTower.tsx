@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SeoNetworkOverview } from './SeoNetworkOverview'
+import { SeoEvidenceCenter } from './SeoEvidenceCenter'
 import {
   Activity,
   AlertTriangle,
@@ -204,6 +205,7 @@ export function SeoControlTower({
         <button aria-pressed={tab === 'experiments'} onClick={() => setTab('experiments')}>ผลหลังปรับปรุง · Experiments</button>
       </nav>
       {tab === 'network' ? <SeoNetworkOverview refreshSignal={networkRefresh} /> : <>
+      <SeoEvidenceCenter experimentsOnly />
       {error && <p role="alert" className="seo-network-warning">โหลด Experiments ไม่ได้: {error}</p>}
       <div className={`seo-tower-health ${summary.criticalAlerts > 0 ? 'critical' : summary.openAlerts > 0 ? 'warning' : 'healthy'}`}>
         {summary.criticalAlerts > 0 ? <ShieldAlert size={21} /> : summary.openAlerts > 0 ? <AlertTriangle size={21} /> : <CheckCircle2 size={21} />}
