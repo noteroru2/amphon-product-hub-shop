@@ -17,8 +17,10 @@ do $$ declare n bigint:=current_setting('test.lab_job')::bigint; begin
  perform public.seo_lab_manage('approve',jsonb_build_object('id',n,'facts_confirmed',true));
  if not exists(select 1 from public.commerce_seo_content_jobs where id=n and status='APPROVED') then raise exception 'Owner approval failed'; end if;
  if exists(select 1 from public.commerce_seo_content_measurements where job_id=n) then raise exception 'Approval started experiment early'; end if;
+ perform public.seo_lab_manage('render_publish',jsonb_build_object('id',n,'proof_excerpt',repeat('Verified test fact. ',10),'publication_url','https://github.com/example/test/commit/'||repeat('a',40)));
  perform public.seo_lab_manage('save',jsonb_build_object('id',n,'body',repeat('Revised test fact. ',20)));
  if exists(select 1 from public.commerce_seo_content_jobs where id=n and approved_body is not null) then raise exception 'Draft edit preserved approval'; end if;
+ if exists(select 1 from public.commerce_seo_content_jobs where id=n and (render_requested_at is not null or proof_excerpt is not null or render_lease_id is not null)) then raise exception 'Revision preserved old publication request'; end if;
  perform public.seo_lab_manage('approve',jsonb_build_object('id',n,'facts_confirmed',true));
  perform public.seo_lab_manage('ai_sample',jsonb_build_object('prompt_id',(select min(id) from public.commerce_seo_ai_prompts),'provider','ChatGPT','observed_at',now(),'evidence_url','https://example.com/test-only','run_status','NO_DATA','mentioned',false));
  if exists(select 1 from public.commerce_seo_ai_samples where evidence_url='https://example.com/test-only' and mentioned is not null) then raise exception 'Missing AI sample became zero visibility'; end if;
