@@ -1,7 +1,9 @@
+import type { RuntimeControlEnv } from './runtime-control'
+import { preferredLineSend } from './line-transport'
 import { approvePreparedOffer, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 import { runPricingForCase } from './pricing-router'
 
-export interface HubAdminEnv {
+export interface HubAdminEnv extends RuntimeControlEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
@@ -1232,17 +1234,9 @@ export async function handleHubAdminManualReply(request: Request, env: HubAdminE
       })
     }
 
-    const line = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
-        'content-type': 'application/json',
-        'X-Line-Retry-Key': idempotencyKey,
-      },
-      body: JSON.stringify({
-        to: prep.line_user_id,
-        messages: [{ type: 'text', text: finalText }],
-      }),
+    const line = await preferredLineSend(env, {
+      lineUserId: prep.line_user_id, text: finalText,
+      humanPushReason: 'MANUAL_CUSTOMER_RESPONSE', retryKey: idempotencyKey,
     })
 
     const raw = await line.text()
@@ -1583,16 +1577,9 @@ export async function handleHubAdminApproveOffer(request: Request, env: HubAdmin
       )
     }
 
-    const sent = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: flow.lineUserId,
-        messages: [{ type: 'text', text: flow.reply }],
-      }),
+    const sent = await preferredLineSend(env, {
+      lineUserId: flow.lineUserId, text: flow.reply,
+      humanPushReason: 'OWNER_APPROVED_OFFER', retryKey: flow.offerId || offerId,
     })
 
     if (!sent.ok) {

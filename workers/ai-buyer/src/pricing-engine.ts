@@ -1,4 +1,6 @@
-export interface PricingEnv {
+import { guardedOpenAIFetch, type RuntimeControlEnv } from './runtime-control'
+export interface PricingEnv extends RuntimeControlEnv {
+  AI_BUYER_MARKET_ENABLED?: string
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
   OPENAI_API_KEY: string
@@ -1002,7 +1004,7 @@ async function marketSearch(
     '- Do not calculate a buyback offer. Return comparable evidence only.',
   ].join('\n')
 
-  const result = await fetch('https://api.openai.com/v1/responses', {
+  const result = await guardedOpenAIFetch(env, {
     method: 'POST',
     headers: {
       authorization: 'Bearer ' + env.OPENAI_API_KEY,
@@ -1220,7 +1222,7 @@ export async function runPricingForCase(env: PricingEnv, caseId: string) {
     }
   }
 
-  if (!rule || !rule.market_enabled) {
+  if (env.AI_BUYER_MARKET_ENABLED !== 'true' || !rule || !rule.market_enabled) {
     return escalatePricing(env, caseRow, 'MARKET_FALLBACK_DISABLED', {
       activePriceBook: version?.version_name || null,
     })
