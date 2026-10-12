@@ -29,6 +29,18 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Read runtime automation policy
+        id: runtime-policy
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const config = JSON.parse(fs.readFileSync('workers/ai-buyer/wrangler.jsonc', 'utf8'))
+          const paused = config.vars.AI_BUYER_PAUSED === 'true'
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'paused=' + paused + '\n')
+          console.log('AI Buyer paused:', paused)
+          NODE
+
       - name: Verify AI Buyer invariants
         run: npm run verify:ai-buyer
 
@@ -198,8 +210,9 @@ jobs:
           echo "::error::AI Buyer health endpoint did not become fully configured"
           exit 1
 
-      - name: Verify all categories remain APPROVAL
+      - name: Verify rollout matches runtime pause policy
         env:
+          EXPECTED_PAUSED: ${{ steps.runtime-policy.outputs.paused }}
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash
         run: |
@@ -213,16 +226,18 @@ jobs:
             console.error('Expected 7 rollout categories, got', modes.length)
             process.exit(1)
           }
-          const bad = modes.filter(x => x.mode !== 'APPROVAL' || x.active !== true)
+          const expectedActive = process.env.EXPECTED_PAUSED !== 'true'
+          const bad = modes.filter(x => x.mode !== 'APPROVAL' || x.active !== expectedActive)
           if (bad.length) {
             console.error('Non-APPROVAL rollout detected:', JSON.stringify(bad))
             process.exit(1)
           }
-          console.log('APPROVAL verification PASS:', modes.map(x => x.category).sort().join(', '))
+          console.log('APPROVAL pause verification PASS, active=' + expectedActive + ':', modes.map(x => x.category).sort().join(', '))
           NODE
 
 
       - name: Bootstrap approval queue from READY_TO_PRICE backlog
+        if: steps.runtime-policy.outputs.paused != 'true'
         env:
           AI_BUYER_ADMIN_TOKEN: ${{ secrets.AI_BUYER_ADMIN_TOKEN }}
         shell: bash

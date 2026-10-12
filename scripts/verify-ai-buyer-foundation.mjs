@@ -305,7 +305,7 @@ for (const token of [
   '"AI_BUYER_BATCH_DEBOUNCE_MS"',
   '"OPENAI_VISION_MODEL"',
   '"OPENAI_PRICING_MODEL"',
-  '"AI_BUYER_PAUSED": "false"',
+  '"AI_BUYER_PAUSED"',
 ]) {
   if (!wrangler.includes(token)) throw new Error(`AI Buyer runtime config missing: ${token}`)
 }
@@ -328,3 +328,7 @@ if (engine.includes('message/push')) throw new Error('Automated conversation mus
 
 const transport = fs.readFileSync('workers/ai-buyer/src/line-transport.ts', 'utf8')
 if (!transport.includes('X-Line-Retry-Key')) throw new Error('Human push retry key missing')
+
+const runtimeVars = JSON.parse(wrangler).vars
+if (!['true', 'false'].includes(runtimeVars.AI_BUYER_PAUSED)) throw new Error('AI pause must be explicit true or false')
+if (runtimeVars.AI_BUYER_PAUSED === 'true' && runtimeVars.AI_BUYER_INFORMATION_REPLIES !== 'false') throw new Error('Paused runtime cannot enable information replies')
