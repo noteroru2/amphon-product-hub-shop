@@ -1,7 +1,10 @@
+import { preferredLineSend } from './line-transport'
+import { informationTemplate, missingInformationTemplate } from './reply-templates'
+import { guardedOpenAIFetch, runtimeControl, type RuntimeControlEnv } from './runtime-control'
 import { runPricingForCase } from './pricing-router'
 import { handleOfferFlow, markOfferFlowDelivery, markOfferFlowFailure, startOfferAfterPricing } from './negotiation-engine'
 
-export interface ConversationEngineEnv {
+export interface ConversationEngineEnv extends RuntimeControlEnv {
   IMAGES: R2Bucket
   SUPABASE_URL: string
   SUPABASE_SECRET_KEY: string
@@ -10,6 +13,8 @@ export interface ConversationEngineEnv {
   OPENAI_VISION_MODEL?: string
   OPENAI_PRICING_MODEL?: string
   AI_BUYER_PAUSED?: string
+  AI_BUYER_INFORMATION_REPLIES?: string
+  AI_BUYER_MARKET_ENABLED?: string
 }
 
 export type IntakeBatch = {
@@ -173,7 +178,7 @@ type OpenAIResponse = {
   usage?: Record<string, unknown>
 }
 
-const MAX_CONTEXT_MESSAGES = 30
+const MAX_CONTEXT_MESSAGES = 12
 const MAX_NEW_IMAGES = 8
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 const MAX_TOTAL_IMAGE_BYTES = 24 * 1024 * 1024
@@ -865,7 +870,7 @@ async function callVision(
     ...prepared.output,
   ]
 
-  const apiResult = await fetch('https://api.openai.com/v1/responses', {
+  const apiResult = await guardedOpenAIFetch(env, {
     method: 'POST',
     headers: {
       authorization: 'Bearer ' + env.OPENAI_API_KEY,
@@ -873,6 +878,7 @@ async function callVision(
     },
     body: JSON.stringify({
       model,
+      max_output_tokens: 1600,
       input: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userContent },
@@ -1244,15 +1250,19 @@ type OutboundAutomationGate = {
 async function outboundAutomationGate(
   env: ConversationEngineEnv,
   batch: IntakeBatch,
+  informationOnly = false,
 ): Promise<OutboundAutomationGate> {
   // Fail closed: no automated LINE output is allowed unless the current
   // category rollout row explicitly says active AUTO.
   try {
-    const cases = await readRows<{ category: ProductCategory | null }>(await supabaseRequest(
+    const cases = await readRows<{ category: ProductCategory | null; control_mode: string }>(await supabaseRequest(
       env,
       'ai_buyer_valuation_cases?id=eq.' + encodeURIComponent(batch.caseId)
-        + '&select=category&limit=1',
+        + '&select=category,control_mode&limit=1',
     ))
+    if (!cases[0] || cases[0].control_mode !== 'AUTO') {
+      return { allowed: false, category: 'OTHER', mode: 'SHADOW', active: false, reason: 'HUMAN_CONTROL' }
+    }
     const rawCategory = cases[0]?.category
     const category = rawCategory && rawCategory !== 'UNKNOWN' ? rawCategory : 'OTHER'
     const rows = await readRows<{
@@ -1272,7 +1282,7 @@ async function outboundAutomationGate(
     if (rollout.active !== true) {
       return { allowed: false, category, mode: rollout.mode, active: false, reason: 'ROLLOUT_INACTIVE' }
     }
-    if (rollout.mode !== 'AUTO') {
+    if (rollout.mode !== 'AUTO' && !(informationOnly && env.AI_BUYER_INFORMATION_REPLIES === 'true' && rollout.mode === 'APPROVAL')) {
       return { allowed: false, category, mode: rollout.mode, active: true, reason: 'MODE_' + rollout.mode }
     }
     return { allowed: true, category, mode: rollout.mode, active: true, reason: 'AUTO_ALLOWED' }
@@ -1291,7 +1301,7 @@ async function sendLineText(
   const trimmed = clean(text, 4500)
   if (!trimmed) return false
 
-  const gate = await outboundAutomationGate(env, batch)
+  const gate = await outboundAutomationGate(env, batch, action === 'RULE_INFORMATION')
   if (!gate.allowed) {
     console.warn(
       'AI BUYER outbound suppressed by automation gate',
@@ -1304,32 +1314,10 @@ async function sendLineText(
     return false
   }
 
-  const requestBody = batch.replyToken
-    ? { replyToken: batch.replyToken, messages: [{ type: 'text', text: trimmed }] }
-    : { to: batch.lineUserId, messages: [{ type: 'text', text: trimmed }] }
-  const endpoint = batch.replyToken
-    ? 'https://api.line.me/v2/bot/message/reply'
-    : 'https://api.line.me/v2/bot/message/push'
-
-  let sent = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
+  const sent = await preferredLineSend(env, {
+    lineUserId: batch.lineUserId, text: trimmed,
+    replyToken: batch.replyToken, receivedAt: batch.touchedAt,
   })
-
-  if (!sent.ok && batch.replyToken) {
-    sent = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ to: batch.lineUserId, messages: [{ type: 'text', text: trimmed }] }),
-    })
-  }
 
   if (!sent.ok) {
     const detail = await sent.text().catch(() => '')
@@ -1460,6 +1448,50 @@ export async function runConversationIntake(
     return { ok: true, skipped: true, reason: 'HUMAN_CONTROL' }
   }
 
+  if (unconsumedMessages.length && !readyImages.length && unconsumedMessages.every(m => m.message_type === 'TEXT')) {
+    const newestAt = Math.max(...unconsumedMessages.map(m => Date.parse(m.created_at)))
+    const evidenceAt = Date.parse(String(currentCase.metadata?.deterministicTextEvidenceAt || ''))
+    const freshTextEvidence = Number.isFinite(evidenceAt) && evidenceAt >= newestAt
+    if (currentCase.state === 'READY_TO_PRICE' && freshTextEvidence) {
+      try {
+        // Table/spec pricing only: a table miss must escalate, never launch a paid market search.
+        const pricing = await runPricingForCase({ ...env, AI_BUYER_MARKET_ENABLED: 'false' }, batch.caseId)
+        if (pricing && typeof pricing === 'object' && (pricing as { ok?: boolean }).ok) {
+          const flow = await startOfferAfterPricing(env, batch.caseId)
+          if (flow.reply) {
+            const metadata = await setPendingReply(env, currentCase.id, currentCase.metadata, {
+              text: flow.reply, action: flow.action || 'OFFER', offerId: flow.offerId,
+              outboundActionId: flow.outboundActionId,
+            })
+            const sent = await sendLineText(env, batch, flow.reply, flow.action || 'OFFER')
+            if (sent) {
+              await markOfferFlowDelivery(env, { offerId: flow.offerId, outboundActionId: flow.outboundActionId })
+              await clearPendingReply(env, currentCase.id, metadata)
+            }
+            await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
+            return { ok: true, source: 'TABLE_ONLY', sent }
+          }
+        }
+        await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
+        return { ok: true, source: 'TABLE_ONLY', pricing }
+      } catch (error) {
+        return { ok: false, error: String(error), source: 'TABLE_ONLY' }
+      }
+    }
+    const text = unconsumedMessages.map(m => m.text_content || '').join(' ').trim()
+    const reply = informationTemplate(text, null) || (freshTextEvidence
+      && !/เสีย|พัง|แตก|บวม|เปลี่ยน|ซ่อม|ดับ|ล็อค|ล็อก|น้ำ|ตำหนิ|defect|broken|damage/i.test(text)
+      && ['NEW', 'IDENTIFYING_PRODUCT', 'NEED_MORE_INFO', 'COLLECTING_PHOTOS'].includes(currentCase.state)
+      ? missingInformationTemplate(currentCase.metadata?.lastRequestedInputs) : null)
+    if (reply) {
+      try {
+        const sent = await sendLineText(env, batch, reply, 'RULE_INFORMATION')
+        if (sent) await markMessagesConsumed(env, unconsumedMessages.map(m => m.id))
+        return { ok: true, source: 'OWNER_TEMPLATE', sent }
+      } catch (error) { return { ok: false, error: String(error), source: 'OWNER_TEMPLATE' } }
+    }
+  }
+
   const offerFlowStates = ['PRICING','OFFERED','NEGOTIATING','ACCEPTED','COLLECTING_FULFILLMENT','ACTION_REQUIRED','ADMIN_ASSIGNED','COMPLETED']
   if (unconsumedMessages.length && offerFlowStates.includes(currentCase.state)) {
     const messageIds = unconsumedMessages.map((message) => message.id)
@@ -1518,6 +1550,12 @@ export async function runConversationIntake(
 
   if (!unconsumedMessages.length && !readyImages.length) {
     return { ok: true, skipped: true, reason: 'NOTHING_NEW' }
+  }
+
+  const circuitResponse = await runtimeControl(env).fetch('https://control/circuit/status')
+  if (!circuitResponse.ok) return { ok: true, skipped: true, reason: 'AI_CIRCUIT_UNAVAILABLE' }
+  if ((await circuitResponse.json() as { blocked?: boolean }).blocked) {
+    return { ok: true, skipped: true, reason: 'AI_CREDIT_CIRCUIT_OPEN' }
   }
 
   const model = clean(env.OPENAI_VISION_MODEL, 100) || 'gpt-5.6-sol'

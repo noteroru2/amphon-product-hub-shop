@@ -1,3 +1,5 @@
+import { runtimeControl } from './runtime-control'
+import { preferredLineSend } from './line-transport'
 export { ConversationBatcher } from './batcher'
 import { importPriceBook, guardOffer, type PriceBookImportPayload } from './pricing-engine'
 import { runPricingForCase } from './pricing-router'
@@ -1392,17 +1394,11 @@ async function handleApproveOffer(request: Request, env: Env) {
       return response({ ok: false, error: flow.reason || 'OFFER_NOT_APPROVABLE' }, 400)
     }
 
-    const sent = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: flow.lineUserId,
-        messages: [{ type: 'text', text: flow.reply }],
-      }),
+    const sent = await preferredLineSend(env, {
+      lineUserId: flow.lineUserId, text: flow.reply,
+      humanPushReason: 'OWNER_APPROVED_OFFER', retryKey: flow.offerId || offerId,
     })
+
     if (!sent.ok) {
       const detail = await sent.text().catch(() => '')
       await markOfferFlowFailure(env, flow.outboundActionId, 'LINE_PUSH_' + sent.status + ':' + detail)
@@ -1468,6 +1464,14 @@ async function handleWebhook(request: Request, env: Env, ctx: ExecutionContext) 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
+
+    if (url.pathname === '/v1/admin/ai-circuit' && ['GET', 'POST'].includes(request.method)) {
+      if (!(await requireAdmin(request, env))) return response({ ok: false, error: 'ADMIN_UNAUTHORIZED' }, 401)
+      // POST is an explicit operator resume after replenishing credits; no periodic probe spends tokens.
+      return runtimeControl(env).fetch('https://control/circuit/' + (request.method === 'POST' ? 'reset' : 'status'), {
+        method: request.method,
+      })
+    }
 
     if (url.pathname === '/v1/health' && request.method === 'GET') {
       return response({

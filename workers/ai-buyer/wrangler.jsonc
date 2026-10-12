@@ -29,6 +29,8 @@
     "AI_BUYER_ENV": "production",
     "AI_BUYER_PAUSED": "false",
     "AI_BUYER_BATCH_DEBOUNCE_MS": "2500",
+    "AI_BUYER_INFORMATION_REPLIES": "true",
+    "AI_BUYER_MARKET_ENABLED": "false",
     "OPENAI_VISION_MODEL": "gpt-5.6-sol",
     "OPENAI_PRICING_MODEL": "gpt-5.6-sol"
   }

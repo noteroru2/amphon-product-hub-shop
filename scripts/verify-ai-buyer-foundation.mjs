@@ -81,7 +81,7 @@ for (const token of [
   'READY_TO_PRICE',
   'HUMAN_REVIEW',
   'OPENAI_API_KEY',
-  'https://api.openai.com/v1/responses',
+  'guardedOpenAIFetch',
   "type: 'input_image'",
   "type: 'json_schema'",
   'requested_inputs',
@@ -265,7 +265,7 @@ for (const token of [
   'ai_buyer_case_outcomes',
   'ai_buyer_deal_ledger',
   'needsFinalLabel',
-  'X-Line-Retry-Key',
+  'preferredLineSend',
 ]) {
   if (!hubAdmin.includes(token)) throw new Error(`AI Buyer P0 Hub learning invariant missing: ${token}`)
 }
@@ -321,3 +321,10 @@ for (const forbidden of [
 }
 
 console.log('AI BUYER V1 CHECKPOINT 1+2+3+3.5: PASS')
+
+const control = fs.readFileSync('workers/ai-buyer/src/runtime-control.ts', 'utf8')
+if (!control.includes('https://api.openai.com/v1/responses')) throw new Error('Guarded OpenAI endpoint missing')
+if (engine.includes('message/push')) throw new Error('Automated conversation must never push')
+
+const transport = fs.readFileSync('workers/ai-buyer/src/line-transport.ts', 'utf8')
+if (!transport.includes('X-Line-Retry-Key')) throw new Error('Human push retry key missing')

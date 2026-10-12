@@ -41,3 +41,7 @@ jobs:
       - name: Typecheck AI Buyer worker
         working-directory: workers/ai-buyer
         run: npm run typecheck
+
+      - name: Test reply transport and credit circuit
+        working-directory: workers/ai-buyer
+        run: npm test
