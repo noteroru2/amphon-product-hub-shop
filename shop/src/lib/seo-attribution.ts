@@ -13,7 +13,7 @@ export function initSeoAttribution() {
   } catch { return } // Contact links remain usable if browser storage is disabled.
   document.addEventListener('click',event=>{
     const target=event.target instanceof Element?event.target.closest<HTMLAnchorElement>('a'):null
-    if(!target || !/^https:\/\/line\.me\/R\/(ti\/p|oaMessage)\/(%40|@)webuy/i.test(target.href)) return
+    if(!target || !/^https:\/\/line\.me\/(R\/)?(ti\/p|oaMessage)\/(~|%7e)?(%40|@)webuy([/?#]|$)/i.test(target.href)) return
     const url=new URL(endpoint)
     url.search=new URLSearchParams({site:'shop',page:location.origin+location.pathname,session:source.session,referrer:source.referrer,sku:document.getElementById('add-to-cart')?.dataset.sku || ''}).toString()
     target.href=url.href
