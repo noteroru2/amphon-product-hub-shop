@@ -1,8 +1,14 @@
 import { supabase } from './supabase'
-export interface ContentJob { id:number; site_id:string; page:string; focus_query:string; status:string; draft_body:string; approved_body:string|null; evidence_id:number|null; approved_at:string|null; published_at:string|null; publication_url:string|null; render_error?:string|null; render_requested_at?:string|null }
+export interface ContentJob { id:number; site_id:string; page:string; focus_query:string; status:string; draft_body:string; approved_body:string|null; evidence_id:number|null; approved_at:string|null; published_at:string|null; publication_url:string|null; render_error?:string|null; render_requested_at?:string|null; analysis_note?:string|null; analysis_receipt_id?:string|null }
 export interface ContentEvidence {id:number;job_id:number;source_url:string;source_at:string;page_title:string|null;excerpt:string;source_hash:string}
 export interface ContentMeasurement {job_id:number;checkpoint_days:number;verdict:string;next_at:string;last_error:string|null;before_data:{clicks:number;impressions:number;position:number|null}|null;after_data:{clicks:number;impressions:number;position:number|null}|null;windows:unknown}
 export interface AiPrompt {id:number;prompt:string;provider_setup:string}
+export interface GscReceipt {id:string;created_at:string;query_request:Record<string,unknown>;result:Record<string,unknown>}
+export async function loadSeoReceipt(id:string):Promise<GscReceipt> {
+ if(!supabase)throw new Error('ยังไม่ได้เชื่อมฐานข้อมูล')
+ const {data,error}=await supabase.from('seo_connector_receipts').select('id,created_at,query_request,result').eq('id',id).single()
+ if(error)throw new Error(error.message);return data as GscReceipt
+}
 export interface AiSample {id:number;prompt_id:number;provider:string;observed_at:string;evidence_url:string;mentioned:boolean|null;run_status:string;citations:string[];cited_sites:string[];source_kind:string}
 export interface ContactEvent {id:string;token:string;site_id:string;page:string;source_channel:string;created_at:string;confirmed_lead:boolean;lead_reference:string|null;sale_id:string|null;sku:string|null;actual_profit:number|null;actual_unit_price:number|null;quantity:number|null;attribution_status:string}
 export interface SaleChoice {id:string;sku:string;sold_at:string;actual_profit:number|null}
