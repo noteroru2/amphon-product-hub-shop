@@ -55,6 +55,9 @@ jobs:
       - name: SEO monitoring state regressions
         run: node --test tests/seo-network.test.mjs tests/seo-gsc.test.mjs tests/seo-growth.test.mjs tests/seo-lab.test.mjs
 
+      - name: Save, navigation and inventory regressions
+        run: node --test tests/save-navigation.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
+
       - name: Hub TypeScript
         run: npm run typecheck
 
@@ -71,8 +74,8 @@ jobs:
           node scripts/verify-seo-ops-phase3.mjs
           node scripts/verify-seo-action-executor.mjs
 
-      - name: Hub Vite build
-        run: npx vite build
+      - name: Hub complete production build
+        run: npm run build
 
       - name: Install Worker dependencies
         run: npm --prefix workers/r2-upload ci
