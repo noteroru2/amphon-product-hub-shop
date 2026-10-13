@@ -78,6 +78,10 @@ function mapProduct(row: any, financial?: any): ProductSummary {
     price: numberOrUndefined(row.price) ?? 0,
     cost: numberOrUndefined(financial?.cost),
     oneManaged: Boolean(row.one_managed),
+    intakeGroupId: row.one_intake_group_id ?? undefined,
+    quantityRemaining: numberOrUndefined(row.quantity_remaining),
+    quantityTotal: numberOrUndefined(row.quantity_total),
+    quantityReserved: numberOrUndefined(row.quantity_reserved),
     retailPrice: numberOrUndefined(row.one_retail_price),
     quickSalePrice: numberOrUndefined(row.one_quick_sale_price),
     dealerPrice: numberOrUndefined(row.one_dealer_price),
@@ -121,17 +125,15 @@ export async function loadProfile(userId: string): Promise<Profile> {
 
 export async function listProducts(role: UserRole): Promise<ProductSummary[]> {
   const db = client()
-  const { data, error } = await db
-    .from('products')
-    .select('id,sku,category,subtype,brand,model,title,serial_number,status,condition_percent,price,warranty_until,defects,notes,specs,created_at,updated_at,sold_at,one_managed,one_retail_price,one_quick_sale_price,one_dealer_price,one_absolute_floor_price,one_stock_age_days,one_aging_bucket,one_dealer_eligibility,one_price_strategy,one_turnover_rule_version,one_turnover_rule_cohort,one_pricing_updated_at,product_images(id,object_key,public_url,sort_order,is_cover,image_role)')
-    // AMPHON System owns inventory availability. Once System projects SOLD,
-    // the item must disappear from normal Hub inventory instead of lingering
-    // as a historical product card. NULL keeps legacy/non-ONE records visible.
-    .neq('status', 'sold')
-    .or('one_availability.is.null,one_availability.neq.SOLD')
-    .order('updated_at', { ascending: false })
-    .limit(500)
-  if (error) throw error
+  const rows: any[] = []
+  // The database groups before pagination; counts include every physical unit.
+  for (let offset = 0; ; offset += 500) {
+    const { data: page, error } = await db.rpc('hub_list_inventory', { p_limit: 500, p_offset: offset })
+    if (error) throw error
+    rows.push(...(page ?? []))
+    if (!page || page.length < 500) break
+  }
+  const data = rows
 
   let financialById = new Map<string, any>()
   if (canSeeFinancials(role) && data?.length) {
@@ -354,6 +356,11 @@ async function uploadObject(productId: string, image: ProductImageDraft) {
 
 async function deleteObject(productId: string, objectKey: string) {
   if (!r2Api) return
+  // A grouped listing shares R2 objects across unit metadata.
+  const { count, error } = await client().from('product_images')
+    .select('id', { count: 'exact', head: true }).eq('object_key', objectKey).neq('product_id', productId)
+  if (error) throw error
+  if (count && count > 0) return
   const session = await currentSession()
   const response = await fetch(`${r2Api}/object`, {
     method: 'DELETE',
@@ -573,6 +580,12 @@ async function saveProductCore(draft: ProductDraft, profile: Profile, hooks: Sav
     throw new Error('บันทึกข้อมูลแล้ว แต่มีบางรูปอัปโหลดไม่สำเร็จ รูปที่สำเร็จถูกจำไว้แล้ว กด “ลองอัปโหลดอีกครั้ง” เพื่อส่งเฉพาะรูปที่ค้าง')
   }
 
+  if (existingOneManaged) {
+    hooks.onStage?.('share_intake_listing')
+    const { error: shareError } = await db.rpc('hub_sync_intake_listing', { p_source_id: savedProductId })
+    if (shareError) throw shareError
+  }
+
   if (statusRequested) {
     hooks.onStage?.('finalize_status')
     let finalize = db.from('products').update({ status: desiredStatus, updated_by: profile.id }).eq('id', savedProductId)
@@ -636,3 +649,4 @@ export async function removeRealtimeChannel(channel: RealtimeChannel) {
   if (!supabase) return
   await supabase.removeChannel(channel)
 }
+

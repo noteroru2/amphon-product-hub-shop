@@ -62,27 +62,23 @@ test('sold products contribute historical evidence without increasing live stock
   assert.deepEqual(state, { currentStockCount: 1, historicalStockCount: 2 })
 })
 
-test('Hub inventory excludes both local sold status and System SOLD before the result limit', async () => {
-  const rows = [
-    { id: 'live', sku: 'LIVE', status: 'published', one_availability: null },
-    { id: 'local-sold', sku: 'LOCAL-SOLD', status: 'sold', one_availability: null },
-    { id: 'system-sold', sku: 'SYSTEM-SOLD', status: 'published', one_availability: 'SOLD' },
-    { id: 'returned-for-resale', sku: 'RESALE', status: 'published', one_availability: 'IN_STOCK' },
-  ]
-  let result = rows
-  const query = {
-    select() { return this },
-    neq(column, value) { result = result.filter(row => row[column] !== value); return this },
-    or(expression) { assert.equal(expression, 'one_availability.is.null,one_availability.neq.SOLD'); result = result.filter(row => row.one_availability === null || row.one_availability !== 'SOLD'); return this },
-    order() { return this },
-    limit(n) { return { data: result.slice(0, n), error: null } },
-  }
-  const db = { from(table) { assert.equal(table, 'products'); return query } }
+test('Hub reads grouped inventory with quantities and paginates after grouping', async () => {
+  const calls = []
+  const first = Array.from({length: 500}, (_, i) => ({id: `live-${i}`,sku: `LIVE-${i}`,status: 'draft',one_managed: true,one_intake_group_id: `lot-${i}`,quantity_remaining: 3,quantity_total: 5,product_images: []}))
+  const db = { async rpc(name, args) {
+    assert.equal(name, 'hub_list_inventory')
+    calls.push(args)
+    return {data: args.p_offset === 0 ? first : [{id: 'last',sku: 'LAST',status: 'published',product_images: []}],error: null}
+  }}
   let js = ts.transpileModule(await readFile(new URL('../src/lib/backend.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
     .replace(/^import .*$/gm, '').replace(/^export /gm, '').replaceAll('import.meta.env', '{}')
   const listProducts = new Function('supabase', 'validateReadyToList', 'errorMessage', `${js}\nreturn listProducts`)(db, () => [], String)
-  const products = await listProducts('staff')
-  assert.deepEqual(products.map(p => p.sku), ['LIVE', 'RESALE'])
+  const products = await listProducts('sales')
+  assert.equal(products.length, 501)
+  assert.equal(products[0].quantityRemaining, 3)
+  assert.equal(products[0].quantityTotal, 5)
+  assert.equal(products[500].sku, 'LAST')
+  assert.deepEqual(calls.map(x => x.p_offset), [0, 500])
 })
 
 test('Shop all-stock requests preserve availability=all for sold URLs and category history, including pagination', async () => {
@@ -115,3 +111,4 @@ test('general PC collection includes gaming PCs so คอมมือสอง r
   const category = catalogCategories.find(c => c.slug === 'desktop-pcs')
   assert.equal(effectiveCategoryIndexPolicy(category, state), 'INDEX')
 })
+

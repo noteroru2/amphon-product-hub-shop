@@ -20,6 +20,7 @@ const [migration, initMigration, worker, wrangler, deploy, contractRaw, hubBacke
   readFile(new URL(`../${hubAppPath}`, import.meta.url), 'utf8'),
 ])
 
+const groupListing = await readFile(new URL('../supabase/intake_group_listing.sql', import.meta.url), 'utf8')
 const contract = JSON.parse(contractRaw)
 const failures = []
 const requireText = (text, needle, label) => {
@@ -98,8 +99,8 @@ requireText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "false"', 'fail-closed sou
 forbidText(wrangler, '"ONE3_STOCK_CONSUMER_ENABLED": "true"', 'fail-closed source flag')
 
 requireText(
-  hubBackend,
-  ".or('one_availability.is.null,one_availability.neq.SOLD')",
+  groupListing,
+  "coalesce(p.one_availability,'IN_STOCK')<>'SOLD'",
   'Hub inventory must hide System SOLD products',
 )
 forbidText(hubApp, 'active={filter === "sold"}', 'Hub sold inventory filter must stay removed')
@@ -136,3 +137,4 @@ if (failures.length) {
 }
 
 console.log('AMPHON ONE-3C: PASS — versioned Hub projection, new-shell IN_STOCK v0 initialization, exact mapping, stale/gap guards, server-only RPC, browser mutation guard and Wrangler-v4-safe fail-closed production activation are locked')
+
