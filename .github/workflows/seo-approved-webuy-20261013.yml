@@ -42,7 +42,7 @@ jobs:
                   response=urllib.request.urlopen(url,timeout=20)
                   body=response.read().decode()
                   text=' '.join(html.unescape(re.sub('<[^>]+>',' ',body)).split())
-                  if response.status==200 and proof in text and len(re.findall(r'<h1(?:\\s|>)',body))==1:
+                  if response.status==200 and proof in text and body.count('<h1')==1:
                       print("Approved WEBUY content verified on production")
                       break
               except Exception: pass
