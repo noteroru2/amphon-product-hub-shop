@@ -29,7 +29,17 @@ export async function loadSeoLab() {
 export async function manageSeoLab(action:string,data:Record<string,unknown>) {
  if(!supabase) throw new Error('ยังไม่ได้เชื่อมฐานข้อมูล')
  const result=await supabase.rpc('seo_lab_manage',{p_action:action,p_data:data})
- if(result.error) throw new Error(result.error.message); return result.data
+ if(result.error) {
+ const messages:Record<string,string>={
+ 'Owner approval required':'บัญชีนี้ไม่ใช่เจ้าของร้าน กรุณาใช้บัญชีเจ้าของร้านเพื่ออนุมัติ',
+ 'Owner/admin required':'บัญชีนี้ไม่มีสิทธิ์จัดการงาน SEO กรุณาใช้บัญชีเจ้าของร้านหรือแอดมิน',
+ 'Draft changed; reload and review the current version':'ร่างเปลี่ยนไปแล้ว กรุณาเปิดร่างใหม่ ตรวจข้อความล่าสุด และติ๊กยืนยันอีกครั้ง',
+ 'Evidence, draft and fact confirmation required':'ต้องมีหลักฐาน ร่างอย่างน้อย 100 ตัวอักษร และติ๊กยืนยันข้อเท็จจริงก่อนอนุมัติ',
+ 'Fresh evidence required':'หลักฐานหน้าเว็บเกิน 7 วันหรือยังไม่มี กรุณากด “อ่านหน้าเป็นหลักฐาน” และรอผลใหม่ก่อนอนุมัติ',
+ 'Resolve technical warning before approval':'หน้านี้มีคำเตือนทางเทคนิคระดับวิกฤต ต้องแก้คำเตือนก่อนอนุมัติ',
+ }
+ throw new Error(messages[result.error.message] || result.error.message)
+ }; return result.data
 }
 export async function runSeoWorkbench(action:string,data:Record<string,unknown>) {
  if(!supabase) throw new Error('ยังไม่ได้เชื่อมฐานข้อมูล')
