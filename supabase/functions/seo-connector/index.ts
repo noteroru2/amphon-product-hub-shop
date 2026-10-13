@@ -1,5 +1,5 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0'
-import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,validateGsc,TOOLS} from './core.ts'
+import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,validateGsc,scopeGsc,TOOLS} from './core.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -32,9 +32,12 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
  if(name==='seo_prepare_draft')return internal('prepare',{...a,actor})
  if(name==='seo_save_draft')return internal('draft',{...a,actor})
  if(name==='seo_gsc_query') {
-  const request=validateGsc(a)
+  const validated=validateGsc(a)
   const context=await checked(db.rpc('seo_connector_gsc_context',{p_site:a.site_id}));if(!context)throw new Error('GSC site is not connected')
   if(a.page&&!pageAllowed(a.page,context.origin))throw new Error('Page must belong to this registered site')
+  const site=await checked(db.from('commerce_seo_sites').select('label').eq('id',a.site_id).eq('enabled',true).single())
+  if(!site)throw new Error('Site disabled')
+  const request=scopeGsc(validated,context.origin,site.label)
   const config=await checked(db.rpc('commerce_gsc_internal',{p_action:'config'}))
   const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:config.client_id,client_secret:config.client_secret,refresh_token:context.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(15000)})
   if(!tokenResponse.ok)throw new Error('Google authorization failed; reconnect GSC in Hub')
@@ -42,7 +45,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
   const response=await fetch('https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(context.property)+'/searchAnalytics/query',{method:'POST',headers:{Authorization:'Bearer '+token.access_token,'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(20000)})
   if(!response.ok)throw new Error('Google GSC query failed ('+response.status+')')
   const data=await response.json();const rows=data.rows||[]
-  const result={site_id:a.site_id,request,rows,response_aggregation_type:data.responseAggregationType,observed_at:new Date().toISOString(),next_offset:rows.length===request.rowLimit?request.startRow+rows.length:null,may_have_more:rows.length===request.rowLimit,notice:'Final GSC data, Pacific dates. Empty results and omitted/anonymized queries are not proof of no ranking. Pagination cannot recover all data Google withholds.'}
+  const result={site_id:a.site_id,scope:'SITE_HOST',request,rows,response_aggregation_type:data.responseAggregationType,observed_at:new Date().toISOString(),next_offset:rows.length===request.rowLimit?request.startRow+rows.length:null,may_have_more:rows.length===request.rowLimit,notice:'Final GSC data, scoped to the registered site hostname, Pacific dates. Empty results and omitted/anonymized queries are not proof of no ranking. Pagination cannot recover all data Google withholds.'}
   const receipt=await checked(db.from('seo_connector_receipts').insert({actor,site_id:a.site_id,query_request:a,result}).select('id').single())
   return {...result,receipt_id:receipt.id}
  }

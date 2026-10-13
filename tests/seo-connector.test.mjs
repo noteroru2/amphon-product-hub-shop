@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from 'typescript'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText
+const compile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const data=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 const coreCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/core.ts',import.meta.url),'utf8'))
 const core=await import(data(coreCode))
@@ -25,6 +25,17 @@ test('GSC date filters preserve final Pacific windows, dimensions and exact matc
 test('page filters cannot request another site or leak query strings',()=>{
  assert.equal(core.pageAllowed('https://amphon.co.th/a','https://amphon.co.th'),true)
  for(const u of ['https://evil.test/a','https://amphon.co.th/a?phone=1','https://user@amphon.co.th/a','http://amphon.co.th/a'])assert.equal(core.pageAllowed(u,'https://amphon.co.th'),false)
+})
+test('all direct GSC requests isolate the registered hostname even for a shared domain property',()=>{
+ const a=core.validateGsc({start_date:'2026-09-01',end_date:'2026-10-01',dimensions:[],query:'รับซื้อคอม'})
+ const main=core.scopeGsc(a,'https://amphon.co.th','amphon.co.th'),shop=core.scopeGsc(a,'https://shop.amphon.co.th','shop.amphon.co.th')
+ const mainFilter=new RegExp(main.dimensionFilterGroups[0].filters.at(-1).expression),shopFilter=new RegExp(shop.dimensionFilterGroups[0].filters.at(-1).expression)
+ assert.equal(mainFilter.test('https://amphon.co.th/a'),true);assert.equal(mainFilter.test('https://www.amphon.co.th/a'),true)
+ assert.equal(mainFilter.test('https://shop.amphon.co.th/a'),false);assert.equal(shopFilter.test('https://amphon.co.th/a'),false)
+ assert.equal(shopFilter.test('https://shop.amphon.co.th/a'),true);assert.equal(mainFilter.test('https://amphonXcoXth/a'),false)
+ assert.equal(main.dimensionFilterGroups[0].filters[0].expression,'รับซื้อคอม')
+ const thai=core.scopeGsc(a,'https://xn--c3c3ab7an0ca2a0dm8p.com','รับซื้ออุบล.com');const filter=new RegExp(thai.dimensionFilterGroups[0].filters.at(-1).expression)
+ assert.equal(filter.test('https://รับซื้ออุบล.com/a'),true);assert.equal(filter.test('https://xn--c3c3ab7an0ca2a0dm8p.com/a'),true)
 })
 test('connector exposes reads and draft preparation only, no approval/publication tool',()=>{
  assert.deepEqual(core.TOOLS.filter(t=>!t.annotations.readOnlyHint).map(t=>t.name),['seo_prepare_draft','seo_save_draft'])
