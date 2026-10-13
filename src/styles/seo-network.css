@@ -28,4 +28,10 @@
 .seo-growth-form input, .seo-growth-form select { width: 100%; box-sizing: border-box; }
 .seo-growth-form textarea { width:100%;box-sizing:border-box;padding:12px;border:1px solid #dbe4ee;border-radius:8px;font:inherit; }
 .seo-growth-form input[type=checkbox] { width:auto; }
+.seo-approval-panel { display:grid;gap:12px;padding:16px;border:1px solid #fed7aa;border-radius:12px;background:#fff7ed; }
+.seo-approval-panel h4,.seo-approval-panel p { margin:0; }
+.seo-growth-form .seo-approval-confirm { display:flex;align-items:flex-start;gap:12px;min-height:44px;cursor:pointer;line-height:1.6; }
+.seo-growth-form .seo-approval-confirm input { width:22px;height:22px;flex:0 0 22px;margin:2px 0;accent-color:#ea580c; }
+.seo-approval-button { padding:12px;border:0;border-radius:10px;background:#ea580c;color:#fff;font-weight:700; }
+.seo-approval-button:disabled { background:#e2e8f0;color:#475569;cursor:not-allowed; }
 .seo-evidence-excerpt { max-height:300px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7; }
