@@ -65,6 +65,7 @@ import { AiBuyerApprovalQueue } from "./components/AiBuyerApprovalQueue";
 import { LineOAChat } from "./components/LineOAChat";
 import { SeoOpportunityCenter } from "./components/SeoOpportunityCenter";
 import { SeoControlTower } from "./components/SeoControlTower";
+import { SeoChatgptConsent } from "./components/SeoChatgptConnection";
 import { MerchantDiagnosticsCenter } from "./components/MerchantDiagnosticsCenter";
 import { TrustReviewCenter } from "./components/TrustReviewCenter";
 import { ChannelSettings } from "./components/ChannelSettings";
@@ -889,6 +890,9 @@ function App() {
     return <ForcePasswordChangeScreen session={session} />;
   if (!profile && !backendError)
     return <LoadingScreen label="กำลังโหลดสิทธิ์พนักงาน" />;
+
+  const seoMcpRequest = new URLSearchParams(window.location.search).get('seo_mcp_request');
+  if (seoMcpRequest) return <SeoChatgptConsent requestId={seoMcpRequest} isOwner={profile?.active === true && profile.role === 'owner'} />;
 
   return (
     <div className="app-shell">
