@@ -31,21 +31,23 @@ jobs:
           test "$(git rev-parse HEAD)" = "27ce9777aed030959e229a15b56413b975a32ffb"
           node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("wrangler.jsonc","utf8"));if(c.name!=="webuy")process.exit(1)'
           npx wrangler deploy --config wrangler.jsonc
+      - name: Install rendered-page verification
+        run: |
+          npm install --no-save --package-lock=false playwright@1.61.0
+          npx playwright install --with-deps chromium
       - name: Verify approved text on production
         run: |
-          python - <<'PY'
-          import urllib.request,re,html,time
-          proof="ผู้ที่ต้องการขายอุปกรณ์ Apple ในอุบลราชธานีสามารถส่งรูป รุ่น ความจุ สภาพ และอุปกรณ์ที่มีทาง LINE @webuy เพื่อให้ทีมงานพิจารณาราคาเบื้องต้นก่อนนัดตรวจ ราคาที่ตกลงหลังตรวจสินค้าจริงอาจต่างจากราคาจากรูป หากรุ่น สภาพ อุปกรณ์ หรืออาการไม่ตรงกับข้อมูลที่แจ้ง"
-          url="https://webuy.in.th/services/buy-apple-ubon/"
-          for attempt in range(12):
-              try:
-                  response=urllib.request.urlopen(url,timeout=20)
-                  body=response.read().decode()
-                  text=' '.join(html.unescape(re.sub('<[^>]+>',' ',body)).split())
-                  if response.status==200 and proof in text and body.count('<h1')==1:
-                      print("Approved WEBUY content verified on production")
-                      break
-              except Exception: pass
-              time.sleep(5)
-          else: raise SystemExit("Approved excerpt is not live; do not start Experiments")
-          PY
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try {
+            const page=await browser.newPage();
+            const response=await page.goto('https://webuy.in.th/services/buy-apple-ubon/',{waitUntil:'domcontentloaded'});
+            if(!response || response.status()>=400)throw new Error('Production page is unavailable');
+            const proof="ผู้ที่ต้องการขายอุปกรณ์ Apple ในอุบลราชธานีสามารถส่งรูป รุ่น ความจุ สภาพ และอุปกรณ์ที่มีทาง LINE @webuy เพื่อให้ทีมงานพิจารณาราคาเบื้องต้นก่อนนัดตรวจ ราคาที่ตกลงหลังตรวจสินค้าจริงอาจต่างจากราคาจากรูป หากรุ่น สภาพ อุปกรณ์ หรืออาการไม่ตรงกับข้อมูลที่แจ้ง";
+            await page.waitForFunction(proof => (document.querySelector('main')||document.body).innerText.replace(/\s+/g,' ').includes(proof),proof,{timeout:20000});
+            if(await page.locator('h1').count()!==1)throw new Error('Expected one visible H1');
+            if(await page.locator('meta[name="robots"]').evaluateAll(nodes=>nodes.some(n=>/noindex/i.test(n.content))))throw new Error('Production page is noindex');
+            console.log('Approved WEBUY content verified on rendered production page');
+          } finally { await browser.close(); }
+          JS
