@@ -5,6 +5,7 @@ import { AppCrashBoundary } from './components/AppCrashBoundary'
 import { EnrichmentQueueDock } from './components/EnrichmentQueueDock'
 import { PwaInstallPrompt } from './components/PwaInstallPrompt'
 import { installRuntimeRecovery } from './lib/runtimeRecovery'
+import { seoAuthorizationRecovery } from './lib/seoAuthorizationRecovery'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
 import './styles/hubEase.css'
@@ -57,7 +58,11 @@ enableMobileImageLibraryPicker()
 const root = document.getElementById('root')
 if (!root) throw new Error('AMPHON Hub root element is missing')
 
-createRoot(root).render(
+const oauthRecoveryUrl = seoAuthorizationRecovery(window.location)
+if (oauthRecoveryUrl) {
+  root.textContent = 'กำลังเปิดหน้าการเชื่อมต่อ ChatGPT…'
+  window.location.replace(oauthRecoveryUrl)
+} else createRoot(root).render(
   <StrictMode>
     <AppCrashBoundary>
       <App />

@@ -42,6 +42,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // OAuth and MCP discovery are server routes, never the offline Hub shell.
+        navigateFallbackDenylist: [/^\/seo-connector(?:\/|$)/, /^\/\.well-known\/oauth-/],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
