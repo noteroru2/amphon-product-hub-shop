@@ -1,0 +1,34 @@
+{
+  "requestedAt": "2026-10-13",
+  "purpose": "Verify live owner-approved content before starting Experiments",
+  "jobs": [
+    {
+      "id": 1,
+      "publication_url": "https://github.com/noteroru2/amphon.co.th/commit/ca25681eed3a896022314565ea25664322fc70ba"
+    },
+    {
+      "id": 3,
+      "publication_url": "https://github.com/noteroru2/webuy/commit/27ce9777aed030959e229a15b56413b975a32ffb"
+    },
+    {
+      "id": 4,
+      "publication_url": "https://github.com/noteroru2/rubsuekongmuesong/commit/cace48081ea84827d166ab4929fd6d46daaa68f0"
+    },
+    {
+      "id": 5,
+      "publication_url": "https://github.com/noteroru2/rubsueubon/commit/fa87352514d5ac75004d7a11a31484c3cb793dae"
+    },
+    {
+      "id": 13,
+      "publication_url": "https://github.com/noteroru2/amphon.co.th/commit/ca25681eed3a896022314565ea25664322fc70ba"
+    },
+    {
+      "id": 14,
+      "publication_url": "https://github.com/noteroru2/amphon.co.th/commit/ca25681eed3a896022314565ea25664322fc70ba"
+    },
+    {
+      "id": 15,
+      "publication_url": "https://github.com/noteroru2/rubsuekongmuesong/commit/cace48081ea84827d166ab4929fd6d46daaa68f0"
+    }
+  ]
+}
