@@ -99,6 +99,10 @@ export interface ProductSummary {
   price: number;
   cost?: number;
   oneManaged?: boolean;
+  intakeGroupId?: string;
+  quantityRemaining?: number;
+  quantityTotal?: number;
+  quantityReserved?: number;
   retailPrice?: number;
   quickSalePrice?: number;
   dealerPrice?: number;
@@ -477,3 +481,4 @@ export interface CommerceOrder {
   updatedAt?: string;
   items: CommerceOrderItem[];
 }
+

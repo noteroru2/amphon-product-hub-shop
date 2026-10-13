@@ -3491,6 +3491,9 @@ function ProductCard({
           <strong>{baht(product.retailPrice ?? product.price)}</strong>
           <span>{product.sku}</span>
         </div>
+        {product.intakeGroupId && (
+          <p>คงเหลือ {product.quantityRemaining ?? 1} ชิ้น จาก {product.quantityTotal ?? 1} ชิ้น{product.quantityReserved ? ` · จอง ${product.quantityReserved} ชิ้น` : ""}</p>
+        )}
         {product.oneManaged && product.dealerPrice != null && (
           <div className="turnover-price-strip">
             <span><small>Quick</small><b>{baht(product.quickSalePrice ?? 0)}</b></span>
@@ -4264,3 +4267,4 @@ function BottomNav({
 }
 
 export default App;
+
