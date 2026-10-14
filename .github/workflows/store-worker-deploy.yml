@@ -31,6 +31,10 @@ jobs:
         working-directory: workers/r2-upload
         run: npm ci
 
+      - name: Verify existing Facebook post text correction
+        working-directory: workers/r2-upload
+        run: node --test tests/facebook-warranty-repair.test.mjs
+
       - name: Typecheck Store Worker
         working-directory: workers/r2-upload
         run: npm run typecheck
