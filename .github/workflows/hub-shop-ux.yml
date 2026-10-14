@@ -80,6 +80,10 @@ jobs:
       - name: Install Worker dependencies
         run: npm --prefix workers/r2-upload ci
 
+      - name: Existing Facebook post correction tests
+        working-directory: workers/r2-upload
+        run: node --test tests/facebook-warranty-repair.test.mjs
+
       - name: Worker TypeScript
         run: npm --prefix workers/r2-upload run typecheck
 
