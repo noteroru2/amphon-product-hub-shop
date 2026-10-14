@@ -1,3 +1,4 @@
+import { canonicalWarrantyDate } from './warrantyDate'
 import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { DuplicateIdentifierMatch, EmployeeActivity, EmployeeSummary, ProductActivity, ProductDraft, ProductImageDraft, ProductStatus, ProductSummary, Profile, UserRole } from '../types/product'
@@ -481,7 +482,7 @@ async function saveProductCore(draft: ProductDraft, profile: Profile, hooks: Sav
     ...(!productId ? { status: statusDuringUpload } : {}),
     condition_percent: draft.conditionPercent ?? null,
     ...(existingOneManaged ? {} : { price: draft.price ?? null }),
-    warranty_until: draft.warrantyUntil || null,
+    warranty_until: canonicalWarrantyDate(draft.warrantyUntil),
     defects: draft.defects || null,
     notes: draft.notes || null,
     specs: draft.specs ?? {},
