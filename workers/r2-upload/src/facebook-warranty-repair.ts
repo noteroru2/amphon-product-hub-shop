@@ -27,3 +27,19 @@ export function correctFacebookWarrantyText(original: string, fromYear: string, 
   if (alreadyCorrect) return { message: original, changed: false }
   throw new Error('FACEBOOK_WARRANTY_YEAR_NOT_PRESENT')
 }
+
+/** Append the canonical expiry to an existing sales caption that omitted warranty entirely. */
+export function addMissingFacebookWarrantyText(original: string, expiryDisplay: string): { message: string; changed: boolean } {
+  if (!original.trim()) throw new Error('FACEBOOK_WARRANTY_MESSAGE_EMPTY')
+  if (!/^\d{1,2}\s+[^\n]+\s+\d{4}$/.test(expiryDisplay)) throw new Error('FACEBOOK_WARRANTY_DATE_INVALID')
+  const lines=original.split('\n')
+  if (lines.some(line=>/ประกัน(?:ศูนย์|ร้าน)?\s*ถึง|warranty\s*(?:until|to|ends)/i.test(line))) {
+    if (lines.some(line=>line.includes(expiryDisplay)&&/ประกัน/i.test(line))) return {message:original,changed:false}
+    throw new Error('FACEBOOK_WARRANTY_EXISTING_CLAIM_REVIEW_REQUIRED')
+  }
+  if (lines.some(line=>/หมดประกัน|ไม่มีประกัน/i.test(line))) throw new Error('FACEBOOK_WARRANTY_NEGATIVE_CLAIM_REVIEW_REQUIRED')
+  const priceIndex=lines.findIndex(line=>/^\s*(?:💰\s*)?ราคา\s*[\d,]+\s*บาท/i.test(line))
+  if(priceIndex<0)throw new Error('FACEBOOK_WARRANTY_PRICE_ANCHOR_MISSING')
+  lines.splice(priceIndex,0,'🛡️ มีประกันถึง '+expiryDisplay)
+  return { message:lines.join('\n'), changed:true }
+}
