@@ -1,4 +1,5 @@
 import { facebookSoldMessage } from './facebook-content'
+import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText } from './facebook-warranty-repair'
 type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
 type Ctx={user:{id:string};profile:{role:string}}
 const enc=(s:string)=>new TextEncoder().encode(s)
@@ -179,6 +180,67 @@ async function updateFacebookSoldPost(env:Env,x:any,p:any){
  if(!r.ok||j.error||j.success!==true)throw new Error('FACEBOOK_SOLD_SYNC_FAILED:'+(j.error?.message||r.status))
  await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'SOLD',content_hash:soldContentVersion,sold_at:x.sold_at||new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
 }
+
+/**
+ * Bounded repair of four previously published posts. The list is intentionally
+ * fixed: this does not touch unrelated messages or call the Page /feed endpoint.
+ * The ledger records a completion marker, so cron retries are idempotent.
+ */
+export async function runFacebookWarrantyRepairSweep(env:Env){
+  // Retire this one-time corrective task automatically after 16 Oct (Bangkok).
+  if(Date.now()>=Date.parse('2026-10-16T17:00:00Z'))return []
+  const outcomes:Array<{postId:string;outcome:string}>=[]
+  for(const target of WARRANTY_POST_REPAIRS){
+    let ledger:any
+    try {
+      const entries=await rest(env,'facebook_post_ledger?post_id=eq.'+encodeURIComponent(target.postId)+'&select=id,post_id,product_id,page_id,connection_key,status,content_hash&limit=1')
+      ledger=entries?.[0]
+      if(!ledger||ledger.status!=='LIVE'||ledger.content_hash===WARRANTY_POST_REPAIR_TAG)continue
+      if(String(ledger.page_id)!==target.postId.split('_')[0])throw new Error('FACEBOOK_WARRANTY_LEDGER_PAGE_MISMATCH')
+      const products=await rest(env,'products?sku=eq.'+encodeURIComponent(target.sku)+'&select=id,sku,warranty_until&limit=1')
+      const product=products?.[0]
+      if(!product||String(product.id)!==String(ledger.product_id)||String(product.warranty_until)!==target.canonicalDate)
+        throw new Error('FACEBOOK_WARRANTY_PRODUCT_MISMATCH')
+      const connection=await creds(env,'facebook_page',String(ledger.connection_key))
+      if(!connection.pageAccessToken||String(connection.pageId)!==String(ledger.page_id))
+        throw new Error('FACEBOOK_WARRANTY_PAGE_TOKEN_MISMATCH')
+      const url='https://graph.facebook.com/v26.0/'+encodeURIComponent(target.postId)
+      const graphRead=async()=>{
+        const response=await fetch(url+'?fields=id,message&access_token='+encodeURIComponent(connection.pageAccessToken))
+        const data:any=await response.json()
+        if(!response.ok||data.error||String(data.id)!==target.postId)throw new Error('FACEBOOK_WARRANTY_READ_FAILED:'+(data.error?.message||response.status))
+        return String(data.message||'')
+      }
+      const original=await graphRead()
+      const correction=correctFacebookWarrantyText(original,target.fromYear,target.toYear)
+      if(correction.changed){
+        const response=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
+          body:new URLSearchParams({message:correction.message,access_token:connection.pageAccessToken})})
+        const data:any=await response.json()
+        if(!response.ok||data.error||data.success!==true)throw new Error('FACEBOOK_WARRANTY_EDIT_FAILED:'+(data.error?.message||response.status))
+      }
+      const verified=await graphRead()
+      if(verified!==correction.message)throw new Error('FACEBOOK_WARRANTY_VERIFY_MISMATCH')
+      await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(ledger.id)),{
+        method:'PATCH',headers:{prefer:'return=minimal'},
+        body:JSON.stringify({content_hash:WARRANTY_POST_REPAIR_TAG,last_error:null,updated_at:new Date().toISOString()})
+      })
+      outcomes.push({postId:target.postId,outcome:correction.changed?'EDITED_VERIFIED':'ALREADY_CORRECT'})
+    }catch(error){
+      const message=(error instanceof Error?error.message:String(error)).slice(0,550)
+      console.error('FACEBOOK warranty post correction failed', {postId:target.postId,error:message})
+      if(ledger?.id)try{
+        await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(ledger.id)),{
+          method:'PATCH',headers:{prefer:'return=minimal'},
+          body:JSON.stringify({last_error:'WARRANTY_REPAIR: '+message,updated_at:new Date().toISOString()})
+        })
+      }catch(logError){console.error('FACEBOOK warranty correction ledger update failed',String(logError))}
+      outcomes.push({postId:target.postId,outcome:'ERROR'})
+    }
+  }
+  return outcomes
+}
+
 export async function recoverFacebookHistory(env:Env){
  const states=await rest(env,'facebook_history_recovery?completed_at=is.null&last_error=is.null&select=*&order=updated_at.asc&limit=1'),state=states?.[0]
  if(!state)return
