@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const source=readFileSync(new URL('../src/facebook-warranty-repair.ts',import.meta.url),'utf8')
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
-const { correctFacebookWarrantyText, WARRANTY_POST_REPAIRS }=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
+const { correctFacebookWarrantyText, addMissingFacebookWarrantyText, WARRANTY_POST_REPAIRS }=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
 
 test('exactly four targeted existing page post IDs; never adds a new post',()=>{
   assert.equal(WARRANTY_POST_REPAIRS.length,4)
@@ -36,4 +36,17 @@ test('refuse edits when original lacks a warranty/year match',()=>{
   assert.throws(()=>correctFacebookWarrantyText('🔥 พร้อมขาย 3114 บาท','3114','2571'),/YEAR_NOT_PRESENT/)
   assert.throws(()=>correctFacebookWarrantyText('','3114','2571'),/MESSAGE_EMPTY/)
   assert.throws(()=>correctFacebookWarrantyText('ประกันถึง 31141','3114','2571'),/YEAR_NOT_PRESENT/)
+})
+
+test('adds the known expiry to iPhone Air post that omitted all warranty text',()=>{
+  const original='🔥 พร้อมส่ง iPhone Air 256GB สีขาว ครบกล่อง\n\nแบตเตอรี่: เก็บไฟได้ดี\n✅ สภาพประมาณ 95%\n🔎 ตำหนิ/สภาพ: รอยขนแมวตามการใช้งาน\n\n💰 ราคา 24,500 บาท\n📸 ภาพสินค้าจริงจากทางร้าน'
+  const updated=addMissingFacebookWarrantyText(original,'5 เมษายน 2570')
+  assert.equal(updated.changed,true)
+  assert.equal(updated.message,original.replace('💰 ราคา 24,500 บาท','🛡️ มีประกันถึง 5 เมษายน 2570\n💰 ราคา 24,500 บาท'))
+  assert.deepEqual(addMissingFacebookWarrantyText(updated.message,'5 เมษายน 2570'),{message:updated.message,changed:false})
+})
+test('never overwrites conflicting warranty claims or unrelated price lines',()=>{
+  assert.throws(()=>addMissingFacebookWarrantyText('ประกันถึง 10 พ.ค. 2570\nราคา 24,500 บาท','5 เมษายน 2570'),/EXISTING_CLAIM/)
+  assert.throws(()=>addMissingFacebookWarrantyText('หมดประกันแล้ว\nราคา 24,500 บาท','5 เมษายน 2570'),/NEGATIVE_CLAIM/)
+  assert.throws(()=>addMissingFacebookWarrantyText('สินค้าไม่ระบุราคา','5 เมษายน 2570'),/PRICE_ANCHOR/)
 })
