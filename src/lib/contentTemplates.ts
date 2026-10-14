@@ -1,3 +1,4 @@
+import { formatWarrantyThaiDate } from './warrantyDate'
 import type { ProductDraft } from '../types/product'
 import { getSpecRows, getSubtypeLabel } from './productSchemas'
 import { shopeeManualPrice } from './shopeePricing'
@@ -35,9 +36,7 @@ function formatPrice(value?: number) {
 
 function formatWarranty(value?: string) {
   if (!value) return ''
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+  return formatWarrantyThaiDate(value) || 'วันหมดประกันรอการตรวจสอบ'
 }
 
 function specRows(draft: ProductDraft) {

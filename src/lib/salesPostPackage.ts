@@ -1,3 +1,4 @@
+import { formatWarrantyThaiDate } from './warrantyDate'
 import type { SmartFieldDefinition } from './productSchemas'
 import type { ProductDraft } from '../types/product'
 
@@ -49,8 +50,7 @@ function baht(value: number) {
 }
 
 function thaiDate(value: string) {
-  const date = new Date(`${value}T00:00:00`)
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)
+  return formatWarrantyThaiDate(value) || 'วันหมดประกันรอการตรวจสอบ'
 }
 
 function rowsFor(fields: SmartFieldDefinition[], specs: Record<string, string>, section: 'spec' | 'condition' | 'accessory') {
@@ -65,7 +65,10 @@ function rowsFor(fields: SmartFieldDefinition[], specs: Record<string, string>, 
 }
 
 function warrantyText(draft: Pick<ProductDraft, 'warrantyUntil'>, context: SalesPostContext) {
-  if (clean(draft.warrantyUntil)) return `ประกันถึง ${thaiDate(draft.warrantyUntil!)}`
+  if (clean(draft.warrantyUntil)) {
+    const date = thaiDate(draft.warrantyUntil!)
+    return date === 'วันหมดประกันรอการตรวจสอบ' ? date : `ประกันถึง ${date}`
+  }
   if (context.listingWarrantyDays !== undefined) {
     if (context.listingWarrantyDays > 0) return `ประกันร้าน ${context.listingWarrantyDays} วัน${clean(context.listingWarrantyTerms) ? ` — ${clean(context.listingWarrantyTerms)}` : ''}`
     return 'ไม่มีประกันร้าน'
@@ -156,6 +159,7 @@ export function buildSalesPostPackage(draft: ProductDraft, fields: SmartFieldDef
   if (!defects) warnings.push('ยังไม่มีข้อมูลตำหนิ')
   if (!accessories.length) warnings.push('ยังไม่มีอุปกรณ์ที่ระบุ')
   if (warranty === 'ไม่ระบุประกัน') warnings.push('ยังไม่ระบุประกัน')
+  if (warranty === 'วันหมดประกันรอการตรวจสอบ') warnings.push('วันหมดประกันไม่ถูกต้อง กรุณาแก้ไขก่อนลงขาย')
 
   const essentialReady = [Boolean(sku), Boolean(title), price > 0, images.length > 0].filter(Boolean).length
   const optionalReady = [specifications.length > 0, condition.length > 0, Boolean(defects), accessories.length > 0, warranty !== 'ไม่ระบุประกัน', context.publishedToShop].filter(Boolean).length
@@ -178,5 +182,6 @@ export function validateSalesPostPackage(pkg: SalesPostPackage) {
   if (!pkg.title) missing.push('ชื่อสินค้า')
   if (!(pkg.price > 0)) missing.push('ราคาขาย')
   if (!pkg.imageCount) missing.push('รูปสินค้า')
+  if (pkg.warranty === 'วันหมดประกันรอการตรวจสอบ') missing.push('วันหมดประกันไม่ถูกต้อง')
   return { ready: missing.length === 0, missing }
 }
