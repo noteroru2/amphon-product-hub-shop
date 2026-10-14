@@ -56,7 +56,7 @@ jobs:
         run: node --test tests/seo-network.test.mjs tests/seo-gsc.test.mjs tests/seo-growth.test.mjs tests/seo-lab.test.mjs
 
       - name: Save, navigation and inventory regressions
-        run: node --test tests/save-navigation.test.mjs tests/warranty-date.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
+        run: node --test tests/save-navigation.test.mjs tests/inventory-work-queue.test.mjs tests/warranty-date.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck
