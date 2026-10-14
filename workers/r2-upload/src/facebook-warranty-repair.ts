@@ -16,7 +16,7 @@ export function correctFacebookWarrantyText(original: string, fromYear: string, 
   let replacements = 0
   let alreadyCorrect = false
   const message = original.split('\n').map(line => {
-    if (!/ประกัน|warranty/i.test(line)) return line
+    if (!/ประกัน(?:ศูนย์|ร้าน)?\s*ถึง|warranty\s*(?:until|to|ends)/i.test(line)) return line
     if (newYear.test(line)) alreadyCorrect = true
     return line.replace(oldYear, () => {
       replacements += 1
