@@ -15,6 +15,7 @@ function compile(file, imports = {}) {
 }
 const schemas = compile('productSchemas');
 const errors = compile('errors');
+const warrantyDate = compile('warrantyDate');
 const { createHubNavigation } = compile('hubNavigation');
 const profile = { id: 'employee', active: true, role: 'sales' };
 const oldImage = { id: 'image-1', object_key: 'old.jpg', public_url: 'https://img.test/old.jpg', sort_order: 0, is_cover: true, image_role: 'cover' };
@@ -57,7 +58,7 @@ function fixture(overrides = {}) {
       return chain;
     },
   };
-  const api = compile('backend', { './supabase': { supabase: db }, './productSchemas': schemas, './errors': errors });
+  const api = compile('backend', { './supabase': { supabase: db }, './productSchemas': schemas, './errors': errors, './warrantyDate': warrantyDate });
   const draft = api.draftFromProduct({ ...row, images: row.product_images.map(i => ({id:i.id,objectKey:i.object_key,publicUrl:i.public_url,sortOrder:i.sort_order,isCover:i.is_cover,imageRole:i.image_role})) }, profile.id);
   return { api, row, calls, draft, rejectUpdate: () => rejectProductUpdate = true, failAudit: () => auditFailure = true };
 }
