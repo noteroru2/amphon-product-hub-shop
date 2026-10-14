@@ -1,5 +1,5 @@
 import { facebookSoldMessage } from './facebook-content'
-import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText } from './facebook-warranty-repair'
+import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'
 type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
 type Ctx={user:{id:string};profile:{role:string}}
 const enc=(s:string)=>new TextEncoder().encode(s)
@@ -212,7 +212,15 @@ export async function runFacebookWarrantyRepairSweep(env:Env){
         return String(data.message||'')
       }
       const original=await graphRead()
-      const correction=correctFacebookWarrantyText(original,target.fromYear,target.toYear)
+      let correction: { message:string; changed:boolean }
+      try {
+        correction=correctFacebookWarrantyText(original,target.fromYear,target.toYear)
+      } catch (err) {
+        // The two iPhone Air posts were published without any warranty line;
+        // add the verified canonical date, not a fabricated new post.
+        if (target.sku!=='AT-IT-2610-500005'||(err instanceof Error?err.message:String(err))!=='FACEBOOK_WARRANTY_YEAR_NOT_PRESENT')throw err
+        correction=addMissingFacebookWarrantyText(original,'5 เมษายน 2570')
+      }
       if(correction.changed){
         const response=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
           body:new URLSearchParams({message:correction.message,access_token:connection.pageAccessToken})})
