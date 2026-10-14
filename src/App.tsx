@@ -1,4 +1,5 @@
 import { normalizeWarrantyDateInput } from './lib/warrantyDate';
+import { needsListingWork, sortPendingListingWork } from './lib/inventoryWorkQueue';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage } from "./lib/errors";
 import { createHubNavigation, type HubRoute } from "./lib/hubNavigation";
@@ -141,7 +142,7 @@ type Tab =
   | "merchant-diagnostics"
   | "trust-reviews"
   | "channel-settings";
-type StatusFilter = "all" | "ready_to_list" | "reserved";
+type StatusFilter = "all" | "needs_details" | "ready_to_list" | "reserved";
 
 const categories = productSchemas.map(({ key, label, icon }) => ({
   key,
@@ -514,10 +515,11 @@ function App() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return products.filter((product) => {
+    const matched = products.filter((product) => {
       if (product.status === "sold") return false;
       const matchStatus =
-        statusFilter === "all" || product.status === statusFilter;
+        statusFilter === "all" ||
+        (statusFilter === "needs_details" ? needsListingWork(product) : product.status === statusFilter);
       if (!matchStatus) return false;
       if (!q) return true;
       return [
@@ -529,6 +531,7 @@ function App() {
         productSubtitle(product),
       ].some((value) => value.toLowerCase().includes(q));
     });
+    return statusFilter === "needs_details" ? sortPendingListingWork(matched) : matched;
   }, [products, query, statusFilter]);
 
   const openAdd = () => {
@@ -919,6 +922,7 @@ function App() {
             onAdd={openAdd}
             onResume={resumeDraft}
             onProducts={() => setTab("products")}
+            onNeedsDetails={() => { setStatusFilter("needs_details"); setQuery(""); setTab("products"); }}
             onPublish={() => setTab("publish")}
             onOrders={() => setTab("orders")}
             onAiBuyer={() => setTab("ai-buyer")}
@@ -1311,6 +1315,7 @@ function HomeScreen({
   onAdd,
   onResume,
   onProducts,
+  onNeedsDetails,
   onPublish,
   onOrders,
   onAiBuyer,
@@ -1330,6 +1335,7 @@ function HomeScreen({
   onAdd: () => void;
   onResume: (draft: ProductDraft) => void;
   onProducts: () => void;
+  onNeedsDetails: () => void;
   onPublish: () => void;
   onOrders: () => void;
   onAiBuyer: () => void;
@@ -1345,6 +1351,7 @@ function HomeScreen({
   const publishedCount = products.filter(
     (product) => product.status === "published",
   ).length;
+  const pendingListingCount = products.filter(needsListingWork).length;
   return (
     <section className="screen page-pad">
       <header className="topbar">
@@ -1366,6 +1373,15 @@ function HomeScreen({
           count={drafts.length}
           onResume={() => onResume(drafts[0])}
         />
+      )}
+      {pendingListingCount > 0 && (
+        <button className="publish-center-launch" onClick={onNeedsDetails}>
+          <div><Package size={21}/><span>
+            <strong>งานรอลงขาย {pendingListingCount} รายการ</strong>
+            <small>รวมสินค้าเข้าพร้อมกันเป็นหนึ่งรายการ · เปิดรายการค้างเก่าสุดก่อน</small>
+          </span></div>
+          <ChevronRight />
+        </button>
       )}
       <button className="primary-add" onClick={onAdd}>
         <CirclePlus size={24} /> เพิ่มสินค้าใหม่
@@ -1658,6 +1674,11 @@ function ProductsScreen({
           onClick={() => setFilter("all")}
         />
         <FilterChip
+          label="รอลงขาย"
+          active={filter === "needs_details"}
+          onClick={() => setFilter("needs_details")}
+        />
+        <FilterChip
           label="พร้อมขาย"
           active={filter === "ready_to_list"}
           onClick={() => setFilter("ready_to_list")}
@@ -1668,7 +1689,10 @@ function ProductsScreen({
           onClick={() => setFilter("reserved")}
         />
       </div>
-      <div className="inventory-count">พบ {products.length} รายการ</div>
+      <div className="inventory-count">
+        พบ {products.length} รายการ
+        {filter === "needs_details" && " · เรียงจากรายการค้างเก่าสุด"}
+      </div>
       <div className="product-list">
         {products.map((product) => (
           <ProductCard
