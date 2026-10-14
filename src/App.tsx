@@ -1,3 +1,4 @@
+import { normalizeWarrantyDateInput } from './lib/warrantyDate';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage } from "./lib/errors";
 import { createHubNavigation, type HubRoute } from "./lib/hubNavigation";
@@ -2777,12 +2778,13 @@ function ReviewStep({
         inputMode="numeric"
       />
       <label className="field">
-        <span>ประกันถึง</span>
+        <span>ประกันถึง (พ.ศ./ค.ศ.)</span>
+        <small>รองรับปี พ.ศ. และ ค.ศ. ระบบบันทึกเป็น ค.ศ. อัตโนมัติ</small>
         <input
           type="date"
-          value={draft.warrantyUntil ?? ""}
+          value={normalizeWarrantyDateInput(draft.warrantyUntil)}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-            update({ warrantyUntil: event.target.value })
+            update({ warrantyUntil: normalizeWarrantyDateInput(event.target.value) })
           }
         />
       </label>
