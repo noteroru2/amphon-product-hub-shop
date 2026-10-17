@@ -1,0 +1,63 @@
+name: Complete stock-lot SEO page
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/seo-stock-lot-20261017.yml']
+permissions:
+  contents: read
+concurrency:
+  group: amphontd-stock-lot-release
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: noteroru2/amphontd
+          ref: ff91e16fc5a11a222eafcdffb99118222d1b8aeb
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run qa:p7
+      - run: node scripts/qa-stock-lot.mjs
+      - name: Deploy the exact stock-lot revision
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test "$(git rev-parse HEAD)" = "ff91e16fc5a11a222eafcdffb99118222d1b8aeb"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          node --input-type=module -e "import fs from 'node:fs';const c=fs.readFileSync('wrangler.toml','utf8');if(!/^name = \"amphontd\"$/m.test(c))process.exit(1)"
+          npx --yes wrangler@4.147.0 deploy --config wrangler.toml
+      - name: Verify production page and permanent redirects
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          const base='https://amphontd.com/';
+          const slug='รับซื้อสินค้าค้างสต๊อก';
+          function get(url) {
+            const result=execFileSync('curl',['-sS','--max-time','30','-D','-',
+              '-w','\nHTTP_CODE:%{http_code}',url],{encoding:'utf8'});
+            const split=result.indexOf('<!DOCTYPE')>=0?result.indexOf('<!DOCTYPE'):result.indexOf('<!doctype');
+            return {result,status:result.match(/HTTP_CODE:(\d+)/)?.[1],html:split>=0?result.slice(split):result};
+          }
+          const canonical=base+encodeURIComponent(slug)+'/';
+          const page=get(canonical);
+          assert.equal(page.status,'200');
+          assert.ok(page.html.includes('ส่งรายการสินค้า ยี่ห้อหรือรุ่น จำนวน สภาพ รูปตัวอย่าง'));
+          assert.ok(page.html.includes('ตกลงราคาและเงื่อนไขก่อนส่งมอบ'));
+          assert.equal((page.html.match(/<h1\b/g)||[]).length,1);
+          assert.ok(!/<meta[^>]*name="robots"[^>]*content="[^"]*noindex/i.test(page.html));
+          for(const suffix of ['-2','-3']){
+            const legacy=get(base+encodeURIComponent(slug+suffix)+'/');
+            assert.equal(legacy.status,'301');
+            const destination=legacy.result.match(/^location:\s*(.+)$/im)?.[1].trim();
+            assert.equal(decodeURI(new URL(destination,base).pathname),'/'+slug+'/');
+          }
+          console.log('STOCK_LOT_PRODUCTION_CONTENT_AND_301_PASS');
+          JS
