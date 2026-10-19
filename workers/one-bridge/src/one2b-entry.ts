@@ -316,11 +316,12 @@ async function consumePricing(env: Env, envelope: BridgeEnvelope) {
     }, 202)
   }
 
-  if (outcome === 'DUPLICATE') {
+  if (outcome === 'DUPLICATE' || outcome === 'STALE') {
     return response({
       ok: true,
       accepted: false,
-      duplicate: true,
+      stale: outcome === 'STALE',
+      duplicate: outcome === 'DUPLICATE',
       eventId: envelope.eventId,
       status: 'PROCESSED',
     }, 200)
