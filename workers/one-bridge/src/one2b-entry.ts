@@ -297,6 +297,31 @@ async function consumeAvailability(env: Env, envelope: BridgeEnvelope) {
   return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
 }
 
+async function consumeCatalog(env: Env, envelope: BridgeEnvelope) {
+  const consumed = await callRpc(env, 'one_catalog_consume_event', envelope.eventId)
+  const outcome = String(consumed.outcome || '').toUpperCase()
+  if (outcome === 'APPLIED') {
+    return response({
+      ok: true, accepted: true, eventId: envelope.eventId, status: 'PROCESSED',
+      catalog: {sku: consumed.sku || null,hubProductId: consumed.hubProductId || null,
+                sourceImagesRequireReview: Boolean((consumed as any).sourceImagesRequireReview)},
+    }, 202)
+  }
+  if (outcome === 'DUPLICATE' || outcome === 'STALE') {
+    return response({ok: true,accepted: false,duplicate: outcome === 'DUPLICATE',
+      stale: outcome === 'STALE',eventId: envelope.eventId,status:'PROCESSED'},200)
+  }
+  if (outcome === 'RETRY') {
+    return response({ok: false,error:consumed.error||'CATALOG_MAPPING_NOT_READY',
+      eventId:envelope.eventId},503)
+  }
+  if (outcome === 'CONFLICT' || outcome === 'DEAD') {
+    return response({ok:false,error:consumed.error||'CATALOG_MAPPING_CONFLICT',
+      eventId:envelope.eventId},409)
+  }
+  return response({ok:false,error:'CATALOG_CONSUMER_UNAVAILABLE'},503)
+}
+
 async function consumePricing(env: Env, envelope: BridgeEnvelope) {
   const consumed = await callRpc(env, 'one_pricing_consume_event', envelope.eventId)
   const outcome = String(consumed.outcome || '').toUpperCase()
@@ -436,6 +461,16 @@ async function maybeConsume(requestCopy: Request, baseResponse: Response, env: E
         console.error('ONE-3C failed to mark inbox retryable', { eventId: envelope.eventId, markError })
       })
       return response({ ok: false, error: 'BRIDGE_AVAILABILITY_CONSUMER_UNAVAILABLE' }, 503)
+    }
+  }
+
+  if (envelope.eventType === 'product.catalog_changed') {
+    try {
+      return await consumeCatalog(env, envelope)
+    } catch (error) {
+      console.error('Catalog projection consumer error',{eventId:envelope.eventId,error})
+      await markInboxFailed(env,envelope.eventId,'CATALOG_CONSUMER',error).catch(()=>undefined)
+      return response({ok:false,error:'CATALOG_PROJECTION_UNAVAILABLE'},503)
     }
   }
 

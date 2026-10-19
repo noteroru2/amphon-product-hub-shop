@@ -1,5 +1,6 @@
 import baseWorker from './index'
 import {runFacebookPriceSyncSweep} from './facebook-price-sync'
+import {runFacebookCatalogSyncSweep} from './facebook-catalog-sync'
 import {
   confirmOne4SystemSale,
   one4SystemStockEnabled,
@@ -145,6 +146,12 @@ export default {
         if (results.length) console.log('FACEBOOK price sync', results)
       } catch (error) {
         console.error('FACEBOOK price sync sweep failed', error)
+      }
+      try {
+        const catalog = await runFacebookCatalogSyncSweep(env)
+        if (catalog.length) console.log('FACEBOOK catalog sync', catalog)
+      } catch (error) {
+        console.error('FACEBOOK catalog sync sweep failed', error)
       }
     }
     if (!cron || cron === '*/5 * * * *') {
