@@ -16,7 +16,7 @@ export function facebookPriceMessage(original: string, retailPrice: number): {me
   const input = String(original || '')
   if (/^\s*#ขายแล้ว/u.test(input)) throw new Error('FACEBOOK_PRICE_SOLD_POST')
   if (!input.trim()) throw new Error('FACEBOOK_PRICE_EMPTY_POST')
-  const priceLine = /^(\s*(?:(?:💰|💵|🔥)\s*)?(?:ราคา(?:ขาย|พิเศษ|เพียง)?|ขายเพียง)\s*[:：]?\s*(?:฿\s*)?)(\d[\d,]*(?:\.\d{1,2})?)(\s*(?:(?:บาท|฿|\.\-))?(?:\s*\([^)]*\))?\s*)$/u
+  const priceLine = /^(\s*(?:(?:💰|💵|🔥)\s*)?(?:ราคา(?:ขาย|พิเศษ|เพียง)?|ขายเพียง)\s*[:：]?\s*(?:฿\s*)?)(\d[\d,]*(?:\.\d{1,2})?)(\s*(?:(?:บาท|฿|\.-))?(?:\s*\([^)]*\))?\s*)$/u
   const lines = input.split(/\r?\n/)
   const matches = lines.flatMap((line, i) => priceLine.test(line) ? [i] : [])
   if (matches.length !== 1) throw new Error(matches.length ? 'FACEBOOK_PRICE_AMBIGUOUS' : 'FACEBOOK_PRICE_LINE_NOT_FOUND')
