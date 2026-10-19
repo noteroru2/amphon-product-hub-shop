@@ -157,12 +157,24 @@ comment on function public.one_pricing_consume_event(uuid) is
 -- Historical posts are never recreated and SOLD/DELETED rows are never priced.
 alter table public.facebook_post_ledger
   add column if not exists price_synced_at timestamptz,
+  add column if not exists price_sync_baseline_at timestamptz,
   add column if not exists price_sync_attempts integer not null default 0,
   add column if not exists price_sync_retry_at timestamptz,
   add column if not exists price_sync_error text;
 create index if not exists facebook_post_ledger_price_sync_pending_idx
   on public.facebook_post_ledger(status, price_sync_retry_at, price_synced_at)
   where status = 'LIVE';
+
+-- Snapshot the existing published revision without claiming those historical posts
+-- were actually checked against Facebook. Only later price revisions are edited.
+-- This avoids mass rewriting old posts when the feature is first enabled.
+update public.facebook_post_ledger l
+   set price_sync_baseline_at = p.one_pricing_updated_at
+  from public.products p
+ where p.id = l.product_id
+   and l.status = 'LIVE'
+   and p.one_pricing_updated_at is not null
+   and l.price_sync_baseline_at is null;
 
 create or replace function public.facebook_price_sync_candidates(max_posts integer default 5)
 returns table(
@@ -200,6 +212,7 @@ language sql security invoker set search_path='' as $$
     and p.one_availability in ('IN_STOCK','RESERVED')
     and coalesce(p.price,0)>0
     and p.one_pricing_updated_at is not null
+    and (l.price_sync_baseline_at is null or l.price_sync_baseline_at < p.one_pricing_updated_at)
     and (l.price_synced_at is null or l.price_synced_at < p.one_pricing_updated_at)
     and (l.price_sync_retry_at is null or l.price_sync_retry_at <= now())
   order by l.price_synced_at nulls first, p.one_pricing_updated_at, l.id
