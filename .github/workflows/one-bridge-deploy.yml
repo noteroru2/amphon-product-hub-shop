@@ -1,0 +1,86 @@
+name: ONE Bridge Worker Production Deploy
+
+on:
+  pull_request:
+    paths:
+      - 'workers/one-bridge/**'
+      - '.github/workflows/one-bridge-deploy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/one-bridge/**'
+      - '.github/workflows/one-bridge-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: one-bridge-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workers/r2-upload/package-lock.json
+      - name: Install locked Worker dependencies
+        run: npm ci --prefix workers/r2-upload
+      - name: Typecheck ONE Bridge
+        working-directory: workers/r2-upload
+        run: ./node_modules/.bin/tsc --noEmit --project ../one-bridge/tsconfig.json
+      - name: Verify Wrangler config and enabled consumers
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const c=JSON.parse(readFileSync("workers/one-bridge/wrangler.jsonc","utf8"));
+            if(c.main!=="src/one2b-entry.ts" || c.vars.ONE2B_SHELL_CONSUMER_ENABLED!=="true" ||
+               c.vars.ONE3_STOCK_CONSUMER_ENABLED!=="true" ||
+               c.vars.ONE2D_RECONCILIATION_ENABLED!=="false")
+               process.exit(1);
+          '
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workers/r2-upload/package-lock.json
+      - name: Install locked Wrangler dependencies
+        run: npm ci --prefix workers/r2-upload
+      - name: Require Cloudflare credential
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Missing Cloudflare token"
+            exit 1
+          fi
+      - name: Deploy amphon-one-bridge
+        working-directory: workers/r2-upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler deploy --config ../one-bridge/wrangler.jsonc
+      - name: Smoke test Bridge auth boundary
+        shell: bash
+        run: |
+          response="$(curl -sS -w '\n%{http_code}' 'https://amphon-one-bridge.noteroru2.workers.dev/v1/health')"
+          code="${response##*$'\n'}"
+          if [ "$code" != 401 ]; then
+            echo "::error::Expected signed-only Bridge health (401 without auth), got $code"
+            exit 1
+          fi
+          echo "Bridge signed-only health smoke PASS"
