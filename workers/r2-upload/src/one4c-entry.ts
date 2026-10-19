@@ -1,4 +1,5 @@
 import baseWorker from './index'
+import {runFacebookPriceSyncSweep} from './facebook-price-sync'
 import {
   confirmOne4SystemSale,
   one4SystemStockEnabled,
@@ -138,6 +139,14 @@ export default {
     }
 
     const cron = controller.cron || ''
+    if (!cron || cron === '* * * * *') {
+      try {
+        const results = await runFacebookPriceSyncSweep(env)
+        if (results.length) console.log('FACEBOOK price sync', results)
+      } catch (error) {
+        console.error('FACEBOOK price sync sweep failed', error)
+      }
+    }
     if (!cron || cron === '*/5 * * * *') {
       try {
         await drainOne4ShopCommands(env)
