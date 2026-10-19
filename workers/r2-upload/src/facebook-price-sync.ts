@@ -92,17 +92,24 @@ async function markError(env: Env, candidate: PriceCandidate, error: unknown) {
 async function currentAuthority(env: Env, candidate: PriceCandidate) {
   const rows = await db<Array<{
     price: number | string
+    one_quick_sale_price: number | string | null
+    one_stock_age_days: number | null
+    one_dealer_eligibility: string | null
     one_pricing_updated_at: string | null
     one_availability: string
     status: string
   }>>(env, 'products?id=eq.' + encodeURIComponent(candidate.product_id) +
-    '&select=price,one_pricing_updated_at,one_availability,status&limit=1')
+    '&select=price,one_quick_sale_price,one_stock_age_days,one_dealer_eligibility,one_pricing_updated_at,one_availability,status&limit=1')
   const current = rows?.[0]
   if (!current || !['IN_STOCK','RESERVED'].includes(current.one_availability)
      || !['ready_to_list','published','reserved'].includes(current.status)) return false
   // Product may have changed again since the candidate query. The next sweep
   // must use its newer revision, never overwrite it with the old price.
-  return Number(current.price) === Number(candidate.price)
+  const age = Number(current.one_stock_age_days || 0)
+  const quick = Number(current.one_quick_sale_price || 0)
+  const promotional = current.one_dealer_eligibility === 'CLEARANCE' || age > 60 || (age > 30 && age <= 45)
+  const advertised = promotional && quick > 0 ? quick : Number(current.price)
+  return advertised === Number(candidate.price)
     && current.one_pricing_updated_at === candidate.one_pricing_updated_at
 }
 
