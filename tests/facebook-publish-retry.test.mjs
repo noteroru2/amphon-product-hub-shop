@@ -3,7 +3,11 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from '../workers/r2-upload/node_modules/typescript/lib/typescript.js'
 const source=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8').replace("import { facebookSoldMessage } from './facebook-content'",'const facebookSoldMessage=()=>"sold"')
-const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
+const selfContainedSource = source.replace(
+ "import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'",
+ 'const WARRANTY_POST_REPAIR_TAG="", WARRANTY_POST_REPAIRS=[], correctFacebookWarrantyText=()=>({message:"",changed:false}), addMissingFacebookWarrantyText=()=>({message:"",changed:false})'
+)
+const code=ts.transpileModule(selfContainedSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const {runFacebookRotationSweep}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))
 test('ledger write failure resumes external post; learning failure preserves POSTED',async()=>{
  const original=globalThis.fetch,originalError=console.error,job={id:'job',product_id:'product',connection_key:'page_1',template_id:'ROT-1'},env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
