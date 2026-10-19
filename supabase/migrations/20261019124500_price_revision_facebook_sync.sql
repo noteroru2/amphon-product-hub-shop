@@ -182,7 +182,14 @@ language sql security invoker set search_path='' as $$
     l.connection_key,
     l.post_id,
     p.sku,
-    p.price::numeric,
+    -- Match facebookSalesContent: promotional Quick Sale is public only
+    -- for QUICK_SALE or CLEARANCE; PUSH_DEALER still advertises retail.
+    (case when (
+       coalesce(p.one_dealer_eligibility,'')='CLEARANCE'
+       or coalesce(p.one_stock_age_days,0)>60
+       or coalesce(p.one_stock_age_days,0) between 31 and 45
+    ) and coalesce(p.one_quick_sale_price,0)>0
+      then p.one_quick_sale_price else p.price end)::numeric,
     p.one_pricing_updated_at,
     coalesce(l.price_sync_attempts,0)
   from public.facebook_post_ledger l
