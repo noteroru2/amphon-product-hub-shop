@@ -28,3 +28,13 @@ test('Hub homepage and inventory have staff-facing listing backlog filter',()=>{
   assert.match(app,/filter === "needs_details"/)
   assert.match(app,/sortPendingListingWork\(matched\)/)
 })
+
+test('inventory draft tab checks actual completeness, not only draft status', () => {
+  const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8')
+  assert.match(app,/function isIncompleteProductDraft\(product: ProductSummary\)/)
+  assert.match(app,/if \(!needsListingWork\(product\)\) return false/)
+  assert.match(app,/!getCompleteness\(draftFromProduct\(product\)\)\.ready/)
+  assert.match(app,/statusFilter === "needs_details" \? isIncompleteProductDraft\(product\)/)
+  assert.match(app,/label="แบบร่าง"/)
+  assert.match(app,/products\.filter\(isIncompleteProductDraft\)\.length/)
+})
