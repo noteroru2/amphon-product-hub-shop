@@ -144,6 +144,12 @@ type Tab =
   | "channel-settings";
 type StatusFilter = "all" | "needs_details" | "ready_to_list" | "reserved";
 
+// Only incomplete, non-published draft products appear in the draft tab.
+function isIncompleteProductDraft(product: ProductSummary): boolean {
+  if (!needsListingWork(product)) return false;
+  return !getCompleteness(draftFromProduct(product)).ready;
+}
+
 const categories = productSchemas.map(({ key, label, icon }) => ({
   key,
   label,
@@ -519,7 +525,7 @@ function App() {
       if (product.status === "sold") return false;
       const matchStatus =
         statusFilter === "all" ||
-        (statusFilter === "needs_details" ? needsListingWork(product) : product.status === statusFilter);
+        (statusFilter === "needs_details" ? isIncompleteProductDraft(product) : product.status === statusFilter);
       if (!matchStatus) return false;
       if (!q) return true;
       return [
@@ -1351,7 +1357,7 @@ function HomeScreen({
   const publishedCount = products.filter(
     (product) => product.status === "published",
   ).length;
-  const pendingListingCount = products.filter(needsListingWork).length;
+  const pendingListingCount = products.filter(isIncompleteProductDraft).length;
   return (
     <section className="screen page-pad">
       <header className="topbar">
@@ -1674,7 +1680,7 @@ function ProductsScreen({
           onClick={() => setFilter("all")}
         />
         <FilterChip
-          label="รอลงขาย"
+          label="แบบร่าง"
           active={filter === "needs_details"}
           onClick={() => setFilter("needs_details")}
         />
@@ -1691,7 +1697,7 @@ function ProductsScreen({
       </div>
       <div className="inventory-count">
         พบ {products.length} รายการ
-        {filter === "needs_details" && " · เรียงจากรายการค้างเก่าสุด"}
+        {filter === "needs_details" && " · ข้อมูลยังไม่ครบ · เรียงจากรายการค้างเก่าสุด"}
       </div>
       <div className="product-list">
         {products.map((product) => (
