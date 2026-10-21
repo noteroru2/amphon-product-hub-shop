@@ -56,9 +56,9 @@ const categories: CatalogCategory[] = [
   },
   {
     key: 'iphones', slug: 'iphones', name: 'iPhone มือสอง', navName: 'iPhone',
-    h1: 'iPhone มือสอง ดูเครื่องจริงและราคา',
-    title: 'iPhone มือสอง ดูเครื่องจริงและราคา | AMPHON TRADING',
-    description: 'เลือกซื้อ iPhone มือสอง ดูรุ่น ความจุ สภาพ ราคา รูปสินค้าจริงและรายละเอียดก่อนซื้อ',
+    h1: 'เลือกซื้อ iPhone มือสอง พร้อมดูสภาพและราคาเครื่องจริง',
+    title: 'เลือกซื้อ iPhone มือสอง พร้อมราคาและรูปจริง | AMPHON TRADING',
+    description: 'เลือกซื้อ iPhone มือสองจากสินค้าพร้อมขายของ AMPHON TRADING เทียบรุ่น ความจุ ราคา รูปเครื่องจริง สภาพ แบตเตอรี่และรายละเอียดก่อนสั่งซื้อ',
     sourceCategory: 'iphone', indexPolicy: 'INDEX', order: 50,
   },
   {
