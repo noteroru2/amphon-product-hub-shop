@@ -7,6 +7,8 @@ on:
       - 'shop/**'
       - 'workers/r2-upload/**'
       - 'supabase/migrations/**'
+      - 'supabase/functions/seo-connector/**'
+      - 'tests/seo-connector.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
       - 'scripts/verify-merchant-shopee-foundation.mjs'
       - 'scripts/verify-shopee-auto-publish.mjs'
@@ -29,6 +31,8 @@ on:
       - 'shop/**'
       - 'workers/r2-upload/**'
       - 'supabase/migrations/**'
+      - 'supabase/functions/seo-connector/**'
+      - 'tests/seo-connector.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
       - 'scripts/verify-merchant-shopee-foundation.mjs'
       - 'scripts/verify-shopee-auto-publish.mjs'
@@ -53,7 +57,7 @@ jobs:
         run: npm ci
 
       - name: SEO monitoring state regressions
-        run: node --test tests/seo-network.test.mjs tests/seo-gsc.test.mjs tests/seo-growth.test.mjs tests/seo-lab.test.mjs
+        run: node --test tests/seo-connector.test.mjs tests/seo-network.test.mjs tests/seo-gsc.test.mjs tests/seo-growth.test.mjs tests/seo-lab.test.mjs
 
       - name: Save, navigation and inventory regressions
         run: node --test tests/save-navigation.test.mjs tests/inventory-work-queue.test.mjs tests/hub-operations-guardrails.test.mjs tests/warranty-date.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
