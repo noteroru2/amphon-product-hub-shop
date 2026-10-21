@@ -88,3 +88,31 @@ export function availabilitySchema(product: StoreProduct) {
 export function conditionSchema(_product: StoreProduct) {
   return 'https://schema.org/UsedCondition'
 }
+
+
+// Inspection dates describe work already completed; never display a future
+// date as if the technician inspected a device before today. This is separate
+// from warranty expiration, which legitimately may be in the future.
+export function formatCompletedInspectionDate(
+  value: string | null | undefined,
+  now: Date = new Date(),
+) {
+  if (!value || !formatThaiDate(value)) return null
+  const normalized = value.replace(/^(\d{4})(?=-)/, (year) => {
+    const number = Number(year)
+    return number >= 2400 && number <= 3000 ? String(number - 543) : year
+  })
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/)
+  if (!match) return null
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || ''
+  const today = `${get('year')}-${get('month')}-${get('day')}`
+  const recorded = `${match[1]}-${match[2]}-${match[3]}`
+  return recorded > today ? null : formatThaiDate(value)
+}
