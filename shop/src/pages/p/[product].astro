@@ -8,6 +8,7 @@ import {
   extractSkuFromProductSegment,
   formatPrice,
   formatThaiDate,
+  formatCompletedInspectionDate,
   productDescription,
   productPath,
   productSegment,
@@ -146,12 +147,12 @@ const publishedDate = product ? formatThaiDate(product.publishedAt) : null
 const updatedDate = product ? formatThaiDate(product.updatedAt) : null
 const warrantyDate = product ? formatThaiDate(product.warrantyUntil) : null
 const evidence = product ? productEvidence(product) : null
-const inspectionDate = evidence?.inspectionDate ? formatThaiDate(evidence.inspectionDate) : null
+const inspectionDate = formatCompletedInspectionDate(evidence?.inspectionDate)
 const evidenceRows = evidence?.evidenceRows || []
 const evidenceImages = evidence?.evidenceImages || []
 const structuredSpecEntries = (() => {
   const evidenceMetaRows: Array<[string, string]> = [
-    ...(evidence?.inspectionDate ? [['วันที่ตรวจเครื่อง', evidence.inspectionDate] as [string, string]] : []),
+    ...(inspectionDate && evidence?.inspectionDate ? [['วันที่ตรวจเครื่อง', evidence.inspectionDate] as [string, string]] : []),
     ...(evidence?.inspectionResult ? [['ผลตรวจโดยรวม', evidence.inspectionResult] as [string, string]] : []),
   ]
   const rows = [...evidenceMetaRows, ...evidenceRows, ...allSpecEntries]
