@@ -53,6 +53,11 @@ try {
 } catch (error) {
   apiError = true
   console.error('SHOP_CATEGORY_STORE_API', category.key, error)
+  // A temporary Store API outage must not be returned as a successful 200
+  // category page with noindex (which could lead to deindexation).
+  Astro.response.status = 503
+  Astro.response.headers.set('Retry-After', '300')
+  Astro.response.headers.set('Cache-Control', 'no-store')
 }
 
 const effectiveIndexPolicy = effectiveCategoryIndexPolicy(category, { currentStockCount, historicalStockCount })
