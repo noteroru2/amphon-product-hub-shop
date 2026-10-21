@@ -37,6 +37,14 @@ test('all direct GSC requests isolate the registered hostname even for a shared 
  const thai=core.scopeGsc(a,'https://xn--c3c3ab7an0ca2a0dm8p.com','รับซื้ออุบล.com');const filter=new RegExp(thai.dimensionFilterGroups[0].filters.at(-1).expression)
  assert.equal(filter.test('https://รับซื้ออุบล.com/a'),true);assert.equal(filter.test('https://xn--c3c3ab7an0ca2a0dm8p.com/a'),true)
 })
+test('Google URL Inspection is a read-only, site-scoped tool and never requests indexing',()=>{
+ const t=core.TOOLS.find(x=>x.name==='seo_url_inspection')
+ assert.ok(t);assert.equal(t.annotations.readOnlyHint,true)
+ assert.deepEqual(t.inputSchema.required,['site_id','page'])
+ assert.ok(t.securitySchemes[0].scopes.includes('seo:read'))
+ assert.equal(t.inputSchema.properties.page.type,'string')
+ for(const u of ['https://evil.test/article','http://amphon.co.th/','https://amphon.co.th/a?secret=1','https://amphon.co.th/a#fragment'])assert.equal(core.pageAllowed(u,'https://amphon.co.th'),false)
+})
 test('connector exposes reads and draft preparation only, no approval/publication tool',()=>{
  assert.deepEqual(core.TOOLS.filter(t=>!t.annotations.readOnlyHint).map(t=>t.name),['seo_prepare_draft','seo_save_draft'])
  assert.equal(core.TOOLS.some(t=>/approve|publish|delete/.test(t.name)),false)
@@ -53,7 +61,7 @@ test('MCP transport enforces auth and scopes and refuses undeclared write argume
  const anon=await call({jsonrpc:'2.0',id:1,method:'tools/list'});assert.equal(anon.status,401);assert.match(anon.headers.get('www-authenticate'),/oauth-protected-resource/)
  const token='a'.repeat(43),init=await call({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}},token);assert.equal((await init.json()).result.serverInfo.name,'AMPHON SEO Connector')
  const denied=await call({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'seo_prepare_draft',arguments:{opportunity_id:1}}},token);assert.equal((await denied.json()).result.isError,true);assert.equal(calls.some(x=>x.args.p_action==='prepare'),false)
- const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token);assert.equal((await list.json()).result.tools.length,7)
+ const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token);assert.equal((await list.json()).result.tools.length,8)
  const extra=await call({jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'seo_sites',arguments:{table:'profiles'}}},token);assert.equal((await extra.json()).result.isError,true)
  const origin=await handler(new Request('https://example/seo-connector/resource-metadata',{headers:{origin:'https://evil.test'}}));assert.equal(origin.status,403)
  delete globalThis.Deno;delete globalThis.__seoConnectorMock
