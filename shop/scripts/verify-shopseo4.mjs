@@ -57,6 +57,7 @@ const checks = [
   ['category has ItemList schema for current products', categoryPage.includes("'@type': 'ItemList'") && categoryPage.includes('productPath(product)')],
   ['category keeps BreadcrumbList schema', categoryPage.includes("'@type': 'BreadcrumbList'")],
   ['category page uses effective stock-aware index policy', categoryPage.includes('effectiveCategoryIndexPolicy') && categoryPage.includes('historicalStockCount') && categoryPage.includes("'noindex,follow'")],
+  ['category Store API outage is 503, not successful noindex', categoryPage.includes('Astro.response.status = 503') && categoryPage.includes("Astro.response.headers.set('Retry-After', '300')")],
   ['category sitemap uses stock-aware governance', sitemapCategories.includes('categoryIsEffectivelyIndexable') && sitemapCategories.includes('getAllStoreProducts')],
   ['product sitemap excludes non-index policies', sitemapProducts.includes("['NOINDEX', 'HOLD', 'RETIRED']")],
   [
