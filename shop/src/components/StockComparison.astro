@@ -1,6 +1,6 @@
 ---
 import type { StoreProduct } from '../lib/store-api'
-import { formatPrice, formatThaiDate, productPath } from '../lib/seo'
+import { formatCompletedInspectionDate, formatPrice, formatThaiDate, productPath } from '../lib/seo'
 import { productEvidence, specValue } from '../lib/product-trust'
 interface Props { products: StoreProduct[]; title?: string }
 const { products, title = 'เปรียบเทียบข้อมูลของแต่ละชิ้น' } = Astro.props
@@ -21,7 +21,7 @@ const prices = priced.map((p) => p.price)
         <th scope="row"><a href={productPath(product)}>{product.title}</a><br /><small>{product.availability === 'out_of_stock' ? 'สินค้าหมด' : product.availability === 'reserved' ? 'จองแล้ว' : 'พร้อมขาย'} · {product.sku}</small></th>
         <td>{product.price > 0 ? formatPrice(product.price) : 'ยังไม่ระบุราคา'}<br /><small>{formatThaiDate(product.updatedAt) || 'ยังไม่ระบุวันที่'}</small></td>
         <td>{specs.length ? specs.map(([label, value]) => <div>{label}: {value}</div>) : 'ยังไม่ระบุสเปก'}</td>
-        <td><div>ตำหนิ: {product.defects || 'ยังไม่ระบุ โปรดยืนยันกับร้าน'}</div><div>วันที่ตรวจ: {formatThaiDate(evidence.inspectionDate) || 'ยังไม่ระบุ'}</div><div>ผลตรวจ: {evidence.inspectionResult || 'ยังไม่ระบุ'}</div><div>{evidence.evidenceFieldCount} ช่องข้อมูลตรวจ · {evidence.evidenceImageCount} รูปประกอบการตรวจ</div><a href={`${productPath(product)}#condition`}>ดูรายละเอียดและประกันของชิ้นนี้ →</a></td>
+        <td><div>ตำหนิ: {product.defects || 'ยังไม่ระบุ โปรดยืนยันกับร้าน'}</div><div>วันที่ตรวจ: {formatCompletedInspectionDate(evidence.inspectionDate) || 'ยังไม่ระบุ'}</div><div>ผลตรวจ: {evidence.inspectionResult || 'ยังไม่ระบุ'}</div><div>{evidence.evidenceFieldCount} ช่องข้อมูลตรวจ · {evidence.evidenceImageCount} รูปประกอบการตรวจ</div><a href={`${productPath(product)}#condition`}>ดูรายละเอียดและประกันของชิ้นนี้ →</a></td>
       </tr>
     })}
     </tbody></table>
