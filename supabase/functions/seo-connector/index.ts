@@ -31,6 +31,35 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
  }
  if(name==='seo_prepare_draft')return internal('prepare',{...a,actor})
  if(name==='seo_save_draft')return internal('draft',{...a,actor})
+ if(name==='seo_url_inspection') {
+  if(typeof a.site_id!=='string'||!a.site_id||typeof a.page!=='string'||a.page.length>2000)throw new Error('Site and HTTPS page required')
+  const context=await checked(db.rpc('seo_connector_gsc_context',{p_site:a.site_id}))
+  if(!context)throw new Error('GSC site is not connected')
+  if(!pageAllowed(a.page,context.origin))throw new Error('Inspection URL must belong to this registered site, without query or fragment')
+  const site=await checked(db.from('commerce_seo_sites').select('id').eq('id',a.site_id).eq('enabled',true).single())
+  if(!site)throw new Error('Site disabled')
+  const config=await checked(db.rpc('commerce_gsc_internal',{p_action:'config'}))
+  const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:config.client_id,client_secret:config.client_secret,refresh_token:context.refresh_token,grant_type:'refresh_token'}),signal:AbortSignal.timeout(15000)})
+  if(!tokenResponse.ok)throw new Error('Google authorization failed; reconnect GSC in Hub')
+  const token=await tokenResponse.json()
+  if(!token.access_token)throw new Error('Google authorization failed')
+  const request={inspectionUrl:a.page,siteUrl:context.property,languageCode:'th-TH'}
+  const response=await fetch('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',{method:'POST',headers:{Authorization:'Bearer '+token.access_token,'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(20000)})
+  if(!response.ok)throw new Error('Google URL Inspection failed ('+response.status+')')
+  const inspection=await response.json()
+  const state=inspection.inspectionResult?.indexStatusResult
+  if(!state)throw new Error('Google did not return index status')
+  const result={site_id:a.site_id,page:a.page,observed_at:new Date().toISOString(),inspection:{
+   verdict:state.verdict??null,coverage_state:state.coverageState??null,
+   google_selected_canonical:state.googleCanonical??null,user_declared_canonical:state.userCanonical??null,
+   last_crawl_time:state.lastCrawlTime??null,robots_txt_state:state.robotsTxtState??null,
+   indexing_state:state.indexingState??null,page_fetch_state:state.pageFetchState??null,
+   referring_sitemaps:state.sitemap??[],crawled_as:state.crawledAs??null,
+   inspection_result_link:inspection.inspectionResult?.inspectionResultLink??null
+  },notice:'Google index snapshot, NOT a live test and NOT an indexing request. Google may choose a different canonical than the site declares.'}
+  const receipt=await checked(db.from('seo_connector_receipts').insert({actor,site_id:a.site_id,query_request:{kind:'URL_INSPECTION',site_id:a.site_id,page:a.page},result}).select('id').single())
+  return {...result,receipt_id:receipt.id}
+ }
  if(name==='seo_gsc_query') {
   const validated=validateGsc(a)
   const context=await checked(db.rpc('seo_connector_gsc_context',{p_site:a.site_id}));if(!context)throw new Error('GSC site is not connected')
