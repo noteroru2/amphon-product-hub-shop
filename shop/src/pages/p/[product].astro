@@ -186,7 +186,7 @@ const breadcrumbItems = product ? [
 
 const schema = product ? [
   buildMerchantOrganizationSchema(settings),
-  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: structuredSpecEntries }),
+  buildProductMerchantSchema({ product, settings, canonicalPath, description, specs: structuredSpecEntries, verifiedReviews }),
   {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
