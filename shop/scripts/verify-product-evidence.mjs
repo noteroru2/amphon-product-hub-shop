@@ -23,6 +23,9 @@ const checks = [
   ['Product page exposes a visible Product Evidence section', productPage.includes('id="product-evidence"') && productPage.includes('ผลตรวจเครื่องจริงของ') && productPage.includes('ช่องที่ไม่ได้ตรวจจะไม่ถูกสรุปว่า “ปกติ”')],
   ['Product page adds an evidence-driven FAQ only when evidence exists', productPage.includes('evidence?.hasProductEvidence') && productPage.includes('ร้านตรวจ ${product.title} เครื่องนี้อะไรแล้วบ้าง?')],
   ['Product structured data prioritizes evidence', productPage.includes('structuredSpecEntries') && productPage.includes('evidenceMetaRows') && merchantSchema.includes('additionalProperty')],
+  ['Return policy is supplied on each eligible Offer using real store settings', merchantSchema.includes('hasMerchantReturnPolicy: returnPolicy') && merchantSchema.includes('const returnPolicy = buildReturnPolicy(settings)')],
+  ['Verified buyer reviews are passed to the schema generator', productPage.includes('specs: structuredSpecEntries, verifiedReviews') && merchantSchema.includes('review.verified_purchase === true')],
+  ['Missing reviews never produce a fake rating', merchantSchema.includes('...(reviewMarkup.length ? {') && merchantSchema.includes('aggregateRating:')],
   ['Merchant feed exports inspection evidence as product details', merchantFeed.includes("section: 'Product evidence'") && merchantFeed.includes("key: 'inspection_date'") && merchantFeed.includes("key: 'stress_test'")],
 ]
 

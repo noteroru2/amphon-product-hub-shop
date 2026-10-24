@@ -1,4 +1,4 @@
-import type { StoreProduct, StoreSettings } from './store-api'
+import type { StoreProduct, StoreSettings, StoreVerifiedReview } from './store-api'
 import { MAIN_ORGANIZATION_ID } from '../config/ecosystem'
 import { absoluteUrl } from './seo'
 
@@ -104,9 +104,27 @@ export function buildProductMerchantSchema(input: {
   canonicalPath: string
   description: string
   specs: Array<[string, string]>
+  verifiedReviews?: StoreVerifiedReview[]
 }) {
   const { product, settings, canonicalPath, description, specs } = input
   const shippingDetails = buildShippingDetails(settings)
+  const returnPolicy = buildReturnPolicy(settings)
+  // The organization-level policy does not always satisfy per-Offer diagnostics
+  // in Search Console. Reuse the verified, publicly displayed shop policy.
+  const approvedReviews = (input.verifiedReviews || []).filter((review) =>
+    review.verified_purchase === true &&
+    Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5 &&
+    typeof review.body === 'string' && review.body.trim().length > 0 &&
+    typeof review.display_name === 'string' && review.display_name.trim().length > 0
+  )
+  const reviewMarkup = approvedReviews.map((review) => ({
+    '@type': 'Review',
+    author: { '@type': 'Person', name: review.display_name.trim() },
+    reviewRating: { '@type': 'Rating', ratingValue: review.rating, bestRating: 5 },
+    reviewBody: review.body.trim(),
+    ...(review.title?.trim() ? { name: review.title.trim() } : {}),
+    ...(Number.isFinite(Date.parse(review.submitted_at)) ? { datePublished: review.submitted_at } : {}),
+  }))
   const offer = {
     '@type': 'Offer',
     url: absoluteUrl(canonicalPath),
@@ -116,6 +134,7 @@ export function buildProductMerchantSchema(input: {
     itemCondition: merchantItemConditionSchema(product),
     seller: { '@id': `${absoluteUrl('/')}#store` },
     ...(shippingDetails ? { shippingDetails } : {}),
+    ...(returnPolicy ? { hasMerchantReturnPolicy: returnPolicy } : {}),
   }
 
   return {
@@ -130,6 +149,17 @@ export function buildProductMerchantSchema(input: {
     ...(product.mpn ? { mpn: product.mpn } : {}),
     ...(product.gtin ? { gtin: product.gtin } : {}),
     itemCondition: merchantItemConditionSchema(product),
+    // Ratings are emitted only from real, approved purchases also shown on the page.
+    ...(reviewMarkup.length ? {
+      review: reviewMarkup,
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: Number((approvedReviews.reduce((sum, review) => sum + review.rating, 0) / approvedReviews.length).toFixed(2)),
+        ratingCount: approvedReviews.length,
+        reviewCount: approvedReviews.length,
+        bestRating: 5,
+      },
+    } : {}),
     ...(specs.length ? {
       additionalProperty: specs.slice(0, 24).map(([name, value]) => ({ '@type': 'PropertyValue', name, value })),
     } : {}),
