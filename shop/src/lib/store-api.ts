@@ -237,6 +237,7 @@ function storeApiBase() {
 
 async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
+    cache: 'no-store',
     ...init,
     headers: { accept: 'application/json', ...(init.headers || {}) },
   })
@@ -274,6 +275,7 @@ export async function listStoreProducts(params: ListStoreProductsParams = {}): P
 
 export async function getStoreProduct(sku: string): Promise<StoreProduct | null> {
   const response = await fetch(`${storeApiBase()}/products/${encodeURIComponent(sku)}`, {
+    cache: 'no-store',
     headers: { accept: 'application/json' },
   })
   if (response.status === 404) return null

@@ -4,7 +4,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 import { listStoreProducts, type StoreProduct } from '../../lib/store-api'
 import { absoluteUrl, productPath } from '../../lib/seo'
 
-Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=15, must-revalidate')
 
 let products: StoreProduct[] = []
 let apiError = false
