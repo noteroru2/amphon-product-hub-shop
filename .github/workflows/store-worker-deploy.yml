@@ -33,7 +33,7 @@ jobs:
 
       - name: Verify existing Facebook post text correction
         working-directory: workers/r2-upload
-        run: node --test tests/facebook-warranty-repair.test.mjs
+        run: node --test tests/facebook-warranty-repair.test.mjs tests/facebook-write-guard.test.mjs
 
       - name: Typecheck Store Worker
         working-directory: workers/r2-upload

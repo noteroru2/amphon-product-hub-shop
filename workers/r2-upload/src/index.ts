@@ -1474,8 +1474,8 @@ async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<
   if (detailMatch) {
     const requestedSku = decodeURIComponent(detailMatch[1]).trim().toUpperCase()
     const found = await loadWebsiteProductBySku(env, requestedSku)
-    if (!found) return storeJson({ error: 'Product not found' }, 404, 'public, max-age=15, stale-while-revalidate=60')
-    return storeJson({ product: mapStoreProduct(found) }, 200, 'public, max-age=15, stale-while-revalidate=60')
+    if (!found) return storeJson({ error: 'Product not found' }, 404, 'no-store')
+    return storeJson({ product: mapStoreProduct(found) }, 200, 'no-store')
   }
 
   if (url.pathname === '/store/products') {
@@ -1495,7 +1495,7 @@ async function handleStoreRoutes(request: Request, env: Env, url: URL): Promise<
     return storeJson({
       products,
       pagination: { total: page.total, limit, offset, hasMore: offset + products.length < page.total },
-    })
+    }, 200, 'no-store')
   }
 
   return storeJson({ error: 'Not found' }, 404, 'no-store')

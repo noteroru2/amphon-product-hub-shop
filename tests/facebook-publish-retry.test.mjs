@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from '../workers/r2-upload/node_modules/typescript/lib/typescript.js'
 const source=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8').replace("import { facebookSoldMessage } from './facebook-content'",'const facebookSoldMessage=()=>"sold"')
-const selfContainedSource = source.replace(
+const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()')
+const selfContainedSource = guardedSource.replace(
  "import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'",
  'const WARRANTY_POST_REPAIR_TAG="", WARRANTY_POST_REPAIRS=[], correctFacebookWarrantyText=()=>({message:"",changed:false}), addMissingFacebookWarrantyText=()=>({message:"",changed:false})'
 )

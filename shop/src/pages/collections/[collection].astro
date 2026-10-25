@@ -14,7 +14,7 @@ if (collection) {
   try { stock = collectionStock(await getAllStoreProducts(), collection) }
   catch (error) { apiError = true; Astro.response.status = 503; console.error('SHOP_BUYING_COLLECTION', collection.slug, error) }
 }
-Astro.response.headers.set('Cache-Control', apiError ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300')
+Astro.response.headers.set('Cache-Control', apiError ? 'no-store' : 'public, max-age=0, s-maxage=15, must-revalidate')
 const path = collection ? `/collections/${collection.slug}/` : Astro.url.pathname
 const title = collection ? `${collection.title} | AMPHON SHOP` : 'ไม่พบหน้าสินค้า | AMPHON SHOP'
 const schema = collection ? [

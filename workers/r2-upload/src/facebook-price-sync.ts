@@ -1,3 +1,4 @@
+import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
 import { facebookPriceMessage } from './facebook-content'
 
 type Env = { SUPABASE_URL: string; SUPABASE_SECRET_KEY: string }
@@ -120,9 +121,10 @@ export async function runFacebookPriceSyncSweep(env: Env) {
   const results: Array<{sku: string; postId: string; status: string; error?: string}> = []
   for (const candidate of Array.isArray(rows) ? rows : []) {
     try {
+      await withFacebookPageWrite(env,candidate.connection_key,async()=>{
       if (!await currentAuthority(env, candidate)) {
         results.push({sku:candidate.sku,postId:candidate.post_id,status:'STALE_OR_SOLD'})
-        continue
+        return
       }
       const token = await pageToken(env, candidate.connection_key)
       const original = await graphGetMessage(candidate.post_id, token)
@@ -131,7 +133,7 @@ export async function runFacebookPriceSyncSweep(env: Env) {
         // Recheck stock/price right before externally mutating the post.
         if (!await currentAuthority(env, candidate)) {
           results.push({sku:candidate.sku,postId:candidate.post_id,status:'STALE_OR_SOLD'})
-          continue
+          return
         }
         await graphUpdateMessage(candidate.post_id, token, next.message)
         const verified = await graphGetMessage(candidate.post_id, token)
@@ -139,7 +141,9 @@ export async function runFacebookPriceSyncSweep(env: Env) {
       }
       await markSynced(env, candidate)
       results.push({sku:candidate.sku,postId:candidate.post_id,status:next.changed?'UPDATED':'UNCHANGED'})
+    })
     } catch (error) {
+      if(error instanceof FacebookWriteDeferred){results.push({sku:candidate.sku,postId:candidate.post_id,status:'DEFERRED'});continue}
       const message = error instanceof Error ? error.message : String(error)
       console.error('FACEBOOK PRICE SYNC failed', {sku:candidate.sku,postId:candidate.post_id,error:message.slice(0,500)})
       try {

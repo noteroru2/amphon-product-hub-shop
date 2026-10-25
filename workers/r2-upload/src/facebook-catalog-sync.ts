@@ -1,3 +1,4 @@
+import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
 import { facebookCatalogMessage, type PublicFacebookProduct } from './facebook-catalog-message'
 
 type Env = { SUPABASE_URL: string; SUPABASE_SECRET_KEY: string }
@@ -52,7 +53,7 @@ async function graph<T>(path:string,token:string,params:Record<string,string>|nu
   const res=await fetch(target,init)
   const json=await res.json() as T & {error?:{message?:string}}
   if(!res.ok || json.error)
-    throw new Error('CATALOG_GRAPH_'+res.status+':'+String(json.error?.message||'Unknown').slice(0,320))
+    throw new Error('CATALOG_GRAPH_'+res.status+':'+String((json.error as any)?.code||'')+':'+String(json.error?.message||'Unknown').slice(0,320))
   return json
 }
 
@@ -129,13 +130,14 @@ export async function runFacebookCatalogSyncSweep(env:Env){
   const results:Array<{sku:string;postId:string;status:string;error?:string}>=[]
   for(const c of Array.isArray(rows)?rows:[]){
     try{
+      await withFacebookPageWrite(env,c.connection_key,async()=>{
       const p=await authority(env,c)
-      if(!p){results.push({sku:c.sku,postId:c.post_id,status:'STALE_OR_SOLD'});continue}
+      if(!p){results.push({sku:c.sku,postId:c.post_id,status:'STALE_OR_SOLD'});return}
       const {token,pageId}=await tokenFor(env,c.connection_key,c.post_id)
       const before=await readMessage(c.post_id,token)
       const next=facebookCatalogMessage(before,p)
       if(next.changed){
-        if(!await authority(env,c)){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});continue}
+        if(!await authority(env,c)){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});return}
         const updated=await graph<{success?:boolean;id?:string}>(encodeURIComponent(c.post_id),token,{message:next.message})
         if(updated.success!==true&&updated.id!==c.post_id)throw new Error('CATALOG_MESSAGE_EDIT_UNCONFIRMED')
         if(await readMessage(c.post_id,token)!==next.message)
@@ -147,9 +149,9 @@ export async function runFacebookCatalogSyncSweep(env:Env){
         || Date.parse(c.image_synced_revision)<Date.parse(c.image_revision)
       if(imagesChanged){
         const edited=await tryUpdatePhotos(env,c,pageId,token)
-        if(!edited){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});continue}
+        if(!edited){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});return}
       }
-      if(!await authority(env,c)){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});continue}
+      if(!await authority(env,c)){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});return}
       await patchLedger(env,c,{
         catalog_synced_revision_at:c.content_revision,
         ...(imagesChanged?{image_synced_revision_at:c.image_revision,image_sync_status:'VERIFIED',
@@ -157,7 +159,9 @@ export async function runFacebookCatalogSyncSweep(env:Env){
         catalog_sync_attempts:0,catalog_sync_retry_at:null,catalog_sync_error:null,
       })
       results.push({sku:c.sku,postId:c.post_id,status:imagesChanged?'TEXT_AND_IMAGES_VERIFIED':next.changed?'TEXT_VERIFIED':'UNCHANGED_VERIFIED'})
+    })
     }catch(error){
+      if(error instanceof FacebookWriteDeferred){results.push({sku:c.sku,postId:c.post_id,status:'DEFERRED'});continue}
       const message=String(error instanceof Error?error.message:error).slice(0,700)
       const attempts=Math.max(0,Number(c.catalog_attempts)||0)+1
       const review=/REVIEW_REQUIRED|UNAVAILABLE|READBACK_MISMATCH|PAGE_IDENTITY/.test(message)

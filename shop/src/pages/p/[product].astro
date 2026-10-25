@@ -120,7 +120,7 @@ if (product) {
   }
 }
 
-if (product) Astro.response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=180')
+if (product) Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=15, must-revalidate')
 else Astro.response.headers.set('Cache-Control', 'no-store')
 
 const canonicalPath = product ? productPath(product) : Astro.url.pathname
