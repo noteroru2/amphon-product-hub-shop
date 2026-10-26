@@ -1,4 +1,16 @@
 -- P0: one combined six-post budget per Facebook Page / Bangkok day.
+-- Extend the exact existing Control Tower enum before emitting new alerts.
+-- Preserve all seven previously allowed types and their existing rows.
+ALTER TABLE public.distribution_alerts
+  DROP CONSTRAINT distribution_alerts_alert_type_check;
+ALTER TABLE public.distribution_alerts
+  ADD CONSTRAINT distribution_alerts_alert_type_check
+  CHECK (alert_type IN (
+    'DISTRIBUTION_GAP','FACEBOOK_QUEUE_STUCK','FACEBOOK_FAILED',
+    'FACEBOOK_STALLED','FACEBOOK_PAGE_ERROR','SOLD_ORPHAN_FACEBOOK',
+    'SOLD_ORPHAN_MARKETPLACE','FACEBOOK_RATE_LIMITED'
+  ));
+
 -- Preserve today's Meta 368 cooldown and keep postponed jobs queued (no forced retries).
 -- Includes NEW_ARRIVAL, ROTATION and previously recorded external posts.
 CREATE OR REPLACE FUNCTION public.facebook_rotation_claim_due(max_jobs integer DEFAULT 3)
