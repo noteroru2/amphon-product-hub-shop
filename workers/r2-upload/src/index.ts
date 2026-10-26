@@ -2797,6 +2797,15 @@ export default {
       } catch (error) {
         console.error('FACEBOOK history recovery failed', error)
       }
+      // After a Meta restriction expires, probe a new post first. Publish checks
+      // its Graph read-back before normal sold/catalogue editing resumes.
+      // The shared page-write lease and combined daily cap prevent bursts.
+      try {
+        const rotation = await runFacebookRotationSweep(env)
+        if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
+      } catch (error) {
+        console.error('FACEBOOK ROTATION sweep failed', error)
+      }
       try {
         const repairs = await runFacebookWarrantyRepairSweep(env)
         if (repairs.length) console.log('FACEBOOK warranty correction results', repairs)
@@ -2808,12 +2817,6 @@ export default {
         if (soldSync.length) console.log('DISTRIBUTION sold sync', soldSync)
       } catch (error) {
         console.error('DISTRIBUTION sold sync failed', error)
-      }
-      try {
-        const rotation = await runFacebookRotationSweep(env)
-        if (rotation.length) console.log('FACEBOOK ROTATION sweep', rotation)
-      } catch (error) {
-        console.error('FACEBOOK ROTATION sweep failed', error)
       }
 
       try {
