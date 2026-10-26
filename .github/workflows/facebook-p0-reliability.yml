@@ -21,4 +21,4 @@ jobs:
       - name: Worker typecheck
         run: npm --prefix workers/r2-upload run typecheck
       - name: Facebook idempotency and sold-copy tests
-        run: node --test tests/facebook-publish-retry.test.mjs tests/facebook-sold-content.test.mjs tests/facebook-price-content.test.mjs tests/facebook-catalog-content.test.mjs
+        run: node --test tests/facebook-publish-retry.test.mjs tests/facebook-sold-content.test.mjs tests/facebook-price-content.test.mjs tests/facebook-catalog-content.test.mjs tests/facebook-safe-resume.test.mjs
