@@ -100,7 +100,7 @@ function facebookSalesContent(p:any,templateId='ROT-1'){
 async function createFacebookFeed(url:string,params:URLSearchParams){
  let r:Response,j:any
  try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json()}catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
- if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
+ if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status))
  return j
 }
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
@@ -113,7 +113,7 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
  const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
- if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
+ if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
  const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
  else {j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
