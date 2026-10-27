@@ -55,6 +55,7 @@ export type DistributionControlTower={
   alerts:DistributionAlert[];
   facebookHealth:{failed_jobs:number;stuck_jobs:number;metric_errors:number;metric_pending:number;last_posted_at:string|null}|null;
   facebookConnections:Array<{connection_key:string;label:string;status:string;activation_status:string;last_error?:string|null;last_synced_at?:string|null}>;
+  facebookAutomation?:{rotationEnabled:boolean;activeConnectionKeys:string[];pausedConnectionKeys:string[];soldSyncPaused:boolean};
   contentSales:Array<{connection_key:string;template_id:string;posts:number;measured_posts:number;avg_reach:number|null;avg_impressions:number|null;avg_engaged:number|null;direct_sales:number;direct_profit:number;direct_sales_per_100_posts:number}>;
   saleOutcomes:Array<{id:string;product_id:string;sku:string;sale_channel:string;buyer_type?:string|null;actual_unit_price?:number|null;actual_profit?:number|null;sold_at:string;attribution_mode:string}>;
 }
