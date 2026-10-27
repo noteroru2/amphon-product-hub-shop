@@ -41,3 +41,24 @@ test('recovery probes a new post before bulk sold edits and preserves Graph erro
   assert.match(publisher,/FACEBOOK_PUBLISH_FAILED:'\+\(j\.error\?\.code/)
   assert.match(publisher,/PHOTO_UPLOAD_FAILED:'\+\(uj\.error\?\.code/)
 })
+
+test('a Meta sold-edit restriction pauses only automatic sold editing, never disables posting or clears cooldown',()=>{
+  const editPause=readFileSync(new URL('../supabase/migrations/20261027195500_facebook_sold_edit_circuit_breaker.sql', import.meta.url),'utf8')
+  assert.match(editPause,/ADD COLUMN IF NOT EXISTS sold_sync_paused boolean NOT NULL DEFAULT false/)
+  assert.match(editPause,/SET sold_sync_paused=true/)
+  assert.match(editPause,/s\.sold_sync_paused=false/)
+  assert.match(editPause,/CREATE OR REPLACE FUNCTION public\.facebook_sold_sync_candidates/)
+  assert.doesNotMatch(editPause,/UPDATE public\.facebook_page_write_state/)
+  assert.doesNotMatch(editPause,/UPDATE public\.facebook_rotation_queue/)
+  assert.doesNotMatch(editPause,/SET enabled=false/)
+  assert.doesNotMatch(editPause,/SET dry_run=true/)
+})
+
+test('Control Tower tells staff that scheduled publishing stays active while sold edits are paused',()=>{
+  const dashboard=readFileSync(new URL('../src/components/DistributionControlTower.tsx', import.meta.url),'utf8')
+  const worker=readFileSync(new URL('../workers/r2-upload/src/index.ts', import.meta.url),'utf8')
+  assert.match(worker,/facebookAutomation: \{/)
+  assert.match(worker,/soldSyncPaused: Boolean\(facebookSettings\[0\]\?\.sold_sync_paused\)/)
+  assert.match(dashboard,/facebookAutomation\?\.soldSyncPaused/)
+  assert.match(dashboard,/Error 368/)
+})
