@@ -22,8 +22,8 @@ const categories: CatalogCategory[] = [
   {
     key: 'notebooks', slug: 'notebooks', name: 'โน้ตบุ๊กมือสอง', navName: 'โน้ตบุ๊ก',
     h1: 'โน้ตบุ๊กมือสอง สภาพจริง พร้อมราคา',
-    title: 'โน้ตบุ๊กมือสอง สภาพจริง พร้อมราคา | AMPHON TRADING',
-    description: 'เลือกซื้อโน้ตบุ๊กมือสองจาก AMPHON TRADING ดูรูป สเปก ราคา สภาพและประกันของสินค้าจริงก่อนสั่งซื้อ',
+    title: 'โน้ตบุ๊กมือสอง ดูสเปก ราคาและรูปเครื่องจริง | AMPHON SHOP',
+    description: 'เลือกซื้อโน้ตบุ๊กมือสองจาก AMPHON SHOP ดูรุ่น CPU RAM SSD ราคา รูปสภาพจริง แบตเตอรี่และประกันของแต่ละเครื่องก่อนสั่งซื้อ',
     sourceCategory: 'notebook', indexPolicy: 'INDEX', order: 10,
   },
   {
@@ -57,8 +57,8 @@ const categories: CatalogCategory[] = [
   {
     key: 'iphones', slug: 'iphones', name: 'iPhone มือสอง', navName: 'iPhone',
     h1: 'เลือกซื้อ iPhone มือสอง พร้อมดูสภาพและราคาเครื่องจริง',
-    title: 'เลือกซื้อ iPhone มือสอง พร้อมราคาและรูปจริง | AMPHON TRADING',
-    description: 'เลือกซื้อ iPhone มือสองจากสินค้าพร้อมขายของ AMPHON TRADING เทียบรุ่น ความจุ ราคา รูปเครื่องจริง สภาพ แบตเตอรี่และรายละเอียดก่อนสั่งซื้อ',
+    title: 'iPhone มือสอง ราคาและรูปเครื่องจริง เช็กแบตได้ | AMPHON SHOP',
+    description: 'เลือกซื้อ iPhone มือสองจาก AMPHON SHOP เทียบรุ่น ความจุ ราคา รูปจริง สภาพจอและสุขภาพแบตของแต่ละเครื่อง ตรวจสถานะสินค้าก่อนสั่งซื้อ',
     sourceCategory: 'iphone', indexPolicy: 'INDEX', order: 50,
   },
   {
