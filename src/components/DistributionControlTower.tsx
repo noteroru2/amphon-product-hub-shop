@@ -54,7 +54,7 @@ export default function DistributionControlTower({
     </header>
 
     {error&&<div className="distribution-error">{error}</div>}
-    {data?.facebookAutomation?.soldSyncPaused&&<div className="distribution-error" role="status">Facebook: ระบบโพสต์สินค้าใหม่และ Rotation ยังเปิดตามปกติ แต่พักการแก้ไขโพสต์ขายแล้วอัตโนมัติชั่วคราว เนื่องจาก Meta Error 368 เพื่อไม่ให้ระบบแก้โพสต์เก่ามาทำให้คิวโพสต์สินค้าใหม่หยุดอีกครั้ง (รอ Meta อนุญาตก่อนกลับมาแก้โพสต์เก่า)</div>}
+    {data?.facebookAutomation&&(data.facebookAutomation.soldSyncPaused||data.facebookAutomation.priceSyncPaused||data.facebookAutomation.catalogSyncPaused)&&<div className="distribution-error" role="status">Facebook โหมดโพสต์สินค้าอย่างเดียว: เปิดโพสต์สินค้าใหม่และ Rotation อัตโนมัติทั้งสองเพจ (ตามช่วงพัก Error 368 และเพดานโพสต์ที่ตั้งไว้) แต่พักการแก้โพสต์เดิมอัตโนมัติทั้งสามประเภท ได้แก่ สินค้าขายแล้ว ราคา และข้อมูล/รูปภาพ โดยเก็บคิวแก้ไขไว้ ไม่ลบโพสต์เก่า</div>}
     {data&&<>
       <div className="distribution-kpis">
         <div><span>Coverage</span><b>{pct(data.summary.coveragePct)}%</b><small>{data.summary.fullyDistributed}/{data.summary.totalEligible} SKU</small></div>
