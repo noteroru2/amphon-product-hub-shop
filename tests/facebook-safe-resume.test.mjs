@@ -59,7 +59,7 @@ test('Control Tower tells staff that scheduled publishing stays active while sol
   const worker=readFileSync(new URL('../workers/r2-upload/src/index.ts', import.meta.url),'utf8')
   assert.match(worker,/facebookAutomation: \{/)
   assert.match(worker,/soldSyncPaused: Boolean\(facebookSettings\[0\]\?\.sold_sync_paused\)/)
-  assert.match(dashboard,/facebookAutomation\?\.soldSyncPaused/)
+  assert.match(dashboard,/facebookAutomation(?:\?\.|\.)soldSyncPaused/)
   assert.match(dashboard,/Error 368/)
 })
 
