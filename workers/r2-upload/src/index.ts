@@ -1925,7 +1925,7 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
       serviceRest<any[]>(env, 'facebook_content_sale_performance_v?select=*&order=direct_sales.desc,posts.desc&limit=100'),
       serviceRest<any[]>(env, 'distribution_sale_outcomes?select=id,product_id,sku,sale_channel,buyer_type,actual_unit_price,actual_profit,sold_at,attribution_mode&order=sold_at.desc&limit=100'),
       serviceRest<any[]>(env, 'sales_channel_connections?channel_key=eq.facebook_page&environment=eq.PRODUCTION&select=connection_key,label,status,activation_status,last_error,last_synced_at&order=connection_key'),
-      serviceRest<any[]>(env, 'facebook_rotation_settings?select=enabled,dry_run,active_connection_keys,paused_connection_keys,sold_sync_paused&id=eq.true&limit=1'),
+      serviceRest<any[]>(env, 'facebook_rotation_settings?select=enabled,dry_run,active_connection_keys,paused_connection_keys,sold_sync_paused,price_sync_paused,catalog_sync_paused&id=eq.true&limit=1'),
     ])
     const total=coverage.length
     const full=coverage.filter((x:any)=>Number(x.coverage_pct||0)>=100).length
@@ -1952,6 +1952,8 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
         activeConnectionKeys: facebookSettings[0]?.active_connection_keys || [],
         pausedConnectionKeys: facebookSettings[0]?.paused_connection_keys || [],
         soldSyncPaused: Boolean(facebookSettings[0]?.sold_sync_paused),
+        priceSyncPaused: Boolean(facebookSettings[0]?.price_sync_paused),
+        catalogSyncPaused: Boolean(facebookSettings[0]?.catalog_sync_paused),
       },
       contentSales,
       saleOutcomes:outcomes,
