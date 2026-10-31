@@ -23,7 +23,7 @@ export async function facebookSyncProduct(productId:string){return call<{ok:bool
 
 export async function listActiveFacebookPages(){return call<{pages:Array<{connectionKey:string;label:string;pageId:string|null}>}>('/commerce/facebook/active-pages')}
 
-export type FacebookRotationStatus={settings:{enabled:boolean;dry_run:boolean;posts_per_product_per_week:number;min_page_gap_minutes:number;min_product_gap_hours:number;page_daily_budget:number;active_connection_keys?:string[];paused_connection_keys?:string[];last_generated_week?:string|null;last_generated_at?:string|null}|null;queue:Array<{id:string;product_id:string;connection_key:string;scheduled_at:string;rotation_no:number;template_id:string;status:string;post_id?:string|null;last_error?:string|null;product?:{id:string;sku:string;title:string;status:string;price:number}|null}>}
+export type FacebookRotationStatus={settings:{enabled:boolean;dry_run:boolean;posts_per_product_per_week:number;min_page_gap_minutes:number;min_product_gap_hours:number;page_daily_budget:number;active_connection_keys?:string[];paused_connection_keys?:string[];sold_sync_paused?:boolean;price_sync_paused?:boolean;catalog_sync_paused?:boolean;last_generated_week?:string|null;last_generated_at?:string|null}|null;queue:Array<{id:string;product_id:string;connection_key:string;scheduled_at:string;rotation_no:number;template_id:string;status:string;post_id?:string|null;last_error?:string|null;product?:{id:string;sku:string;title:string;status:string;price:number}|null}>}
 export async function getFacebookRotationStatus(){return call<FacebookRotationStatus>('/commerce/facebook/rotation-status')}
 export async function updateFacebookRotationSettings(patch:{enabled?:boolean;dryRun?:boolean;activeConnectionKeys?:string[];pausedConnectionKeys?:string[]}){return call<{ok:boolean}>('/commerce/facebook/rotation-settings',{method:'PATCH',body:JSON.stringify(patch)})}
 
@@ -55,7 +55,7 @@ export type DistributionControlTower={
   alerts:DistributionAlert[];
   facebookHealth:{failed_jobs:number;stuck_jobs:number;metric_errors:number;metric_pending:number;last_posted_at:string|null}|null;
   facebookConnections:Array<{connection_key:string;label:string;status:string;activation_status:string;last_error?:string|null;last_synced_at?:string|null}>;
-  facebookAutomation?:{rotationEnabled:boolean;activeConnectionKeys:string[];pausedConnectionKeys:string[];soldSyncPaused:boolean};
+  facebookAutomation?:{rotationEnabled:boolean;activeConnectionKeys:string[];pausedConnectionKeys:string[];soldSyncPaused:boolean;priceSyncPaused:boolean;catalogSyncPaused:boolean};
   contentSales:Array<{connection_key:string;template_id:string;posts:number;measured_posts:number;avg_reach:number|null;avg_impressions:number|null;avg_engaged:number|null;direct_sales:number;direct_profit:number;direct_sales_per_100_posts:number}>;
   saleOutcomes:Array<{id:string;product_id:string;sku:string;sale_channel:string;buyer_type?:string|null;actual_unit_price?:number|null;actual_profit?:number|null;sold_at:string;attribution_mode:string}>;
 }
