@@ -34,7 +34,9 @@ Deno.serve(async(req:Request)=>{
     if(!r.data) return new Response('/* unknown site */',{status:404,headers:{'Content-Type':'application/javascript'}})
     const config=JSON.stringify({site:r.data.id,host:new URL(r.data.origin).hostname,endpoint:`${url}/functions/v1/seo-workbench/contact`})
     const script=`(()=>{const c=${config};if(![c.host,'www.'+c.host].includes(location.hostname))return;let s;try{const k='amphon-source-v1';s=JSON.parse(sessionStorage.getItem(k)||'null');if(!s||s.expires<Date.now()||!/^([a-f0-9]{32})$/.test(s.session)){let referrer='';try{referrer=new URL(document.referrer).hostname;if(referrer===location.hostname)referrer=''}catch{}s={session:Array.from(crypto.getRandomValues(new Uint8Array(16))).map(n=>n.toString(16).padStart(2,'0')).join(''),referrer,expires:Date.now()+86400000};sessionStorage.setItem(k,JSON.stringify(s))}}catch{return}document.addEventListener('click',e=>{const a=e.target instanceof Element?e.target.closest('a'):null;if(!a||!/^https:\\/\\/line\\.me\\/(R\\/)?(ti\\/p|oaMessage)\\/(~|%7e)?(%40|@)webuy([/?#]|$)/i.test(a.href))return;const u=new URL(c.endpoint);u.search=new URLSearchParams({site:c.site,page:location.origin+location.pathname,session:s.session,referrer:s.referrer,sku:''}).toString();a.href=u.href},true)})();`
-    return new Response(script,{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'public,max-age=300','X-Content-Type-Options':'nosniff'}})
+    const phoneConfig=JSON.stringify({site:r.data.id,host:new URL(r.data.origin).hostname,endpoint:`${url}/functions/v1/seo-workbench/phone-click`})
+    const phoneScript=`(()=>{const c=${phoneConfig};if(![c.host,'www.'+c.host].includes(location.hostname))return;document.addEventListener('click',e=>{const a=e.target instanceof Element?e.target.closest('a'):null;if(!a||!/^tel:/i.test(typeof a.getAttribute==='function'?(a.getAttribute('href')||''):(a.href||'')))return;let referrer='';try{referrer=new URL(document.referrer).hostname;if(referrer===location.hostname)referrer=''}catch{}const u=new URL(c.endpoint);u.search=new URLSearchParams({site:c.site,page:location.origin+location.pathname,referrer}).toString();navigator.sendBeacon?.(u.toString());},{capture:true,passive:true})})();`
+    return new Response(`${script}\n${phoneScript}`,{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'public,max-age=300','X-Content-Type-Options':'nosniff'}})
   }
   if(req.method==='GET' && requestUrl.pathname.endsWith('/contact')) {
     try {
@@ -46,6 +48,30 @@ Deno.serve(async(req:Request)=>{
       return redirect(`https://line.me/R/oaMessage/%40webuy/?${encodeURIComponent(`สอบถาม${sku?`สินค้า ${sku}`:'สินค้า/บริการ'}ครับ [AMPHON:${result.token}]`)}`)
     } catch { return redirect(line) }
   }
+
+  // Non-blocking first-party phone CTA telemetry. No visitor ID, tel: value or raw message is sent.
+  if(req.method==='POST' && requestUrl.pathname.endsWith('/phone-click')) {
+    try {
+      if(Number(req.headers.get('content-length') || 0)>1024) return new Response(null,{status:413})
+      const site=String(requestUrl.searchParams.get('site')||'')
+      if(!['amphon','shop'].includes(site)) return new Response(null,{status:404})
+      const row=await db.from('commerce_seo_sites').select('origin').eq('id',site).eq('enabled',true).single()
+      if(!row.data) return new Response(null,{status:404})
+      const siteOrigin=new URL(row.data.origin).origin
+      if(req.headers.get('origin')!==siteOrigin) return new Response(null,{status:403})
+      const rawPage=String(requestUrl.searchParams.get('page')||'')
+      if(rawPage.length>1024) return new Response(null,{status:400})
+      const page=new URL(rawPage)
+      if(page.origin!==siteOrigin || page.search || page.hash) return new Response(null,{status:400})
+      const referrer=String(requestUrl.searchParams.get('referrer')||'')
+      if(referrer.length>200 || (referrer && !/^[a-z0-9.-]+$/i.test(referrer))) return new Response(null,{status:400})
+      const channel=referral(referrer)
+      const event=await db.rpc('seo_phone_click_increment',{p_site_id:site,p_page:page.origin+page.pathname,p_source_channel:channel})
+      if(event.error) { console.error('SEO_PHONE_CLICK_AGGREGATE',event.error.code); return new Response(null,{status:500}) }
+      return new Response(null,{status:204,headers:{'Cache-Control':'no-store','Access-Control-Allow-Origin':siteOrigin}})
+    } catch { return new Response(null,{status:400}) }
+  }
+
   if(req.method!=='POST') return json({error:'Method not allowed'},405)
   try {
     if(Number(req.headers.get('content-length') || 0)>100000) return json({error:'Request too large'},413)

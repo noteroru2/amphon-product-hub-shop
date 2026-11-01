@@ -52,10 +52,19 @@ test('anonymous management and fake scheduler keys cannot claim experiments; con
  assert.equal(contact.status,302);assert.ok(contact.headers.get('location').includes('oaMessage/%40webuy'));assert.ok(decodeURIComponent(contact.headers.get('location')).includes('[AMPHON:1234567890abcdef]'))
  const tracker=await handler(new Request('https://example/seo-workbench/tracker.js?site=amphon'));const script=await tracker.text()
  for(const href of ['https://line.me/R/ti/p/@webuy','https://line.me/ti/p/~@webuy','https://line.me/R/ti/p/%40WEBUY','https://line.me/R/ti/p/@webuy_fake']){
-  let listener;class Element{closest(){return this}};const anchor=new Element();anchor.href=href
-  const context={location:{hostname:'amphon.co.th',origin:'https://amphon.co.th',pathname:'/'},document:{referrer:'https://www.google.co.th/search?q=private',addEventListener:(event,fn)=>listener=fn},sessionStorage:{getItem:()=>null,setItem:()=>{}},crypto:globalThis.crypto,URL,URLSearchParams,Date,Element}
-  vm.runInNewContext(script,context);listener({target:anchor})
+  let listeners=[];class Element{closest(){return this}};const anchor=new Element();anchor.href=href
+  const context={location:{hostname:'amphon.co.th',origin:'https://amphon.co.th',pathname:'/'},document:{referrer:'https://www.google.co.th/search?q=private',addEventListener:(event,fn)=>listeners.push(fn)},sessionStorage:{getItem:()=>null,setItem:()=>{}},crypto:globalThis.crypto,URL,URLSearchParams,Date,Element,navigator:{sendBeacon:()=>true}}
+  vm.runInNewContext(script,context);listeners.forEach(listener=>listener({target:anchor}))
   if(href.includes('webuy_fake'))assert.equal(anchor.href,href);else{const u=new URL(anchor.href);assert.equal(u.searchParams.get('site'),'amphon');assert.equal(u.searchParams.get('referrer'),'www.google.co.th');assert.ok(!anchor.href.includes('q=private'))}
  }
+ const rejected=await handler(new Request('https://example/seo-workbench/phone-click?site=amphon&page=https%3A%2F%2Famphon.co.th%2F',{method:'POST',headers:{origin:'https://evil.test'}}))
+ assert.equal(rejected.status,403)
+ let handlers=[];const sent=[];class PhoneElement{closest(){return this}};const phoneAnchor=new PhoneElement();phoneAnchor.href='tel:+66642579353'
+ const phoneContext={location:{hostname:'amphon.co.th',origin:'https://amphon.co.th',pathname:'/บริการ/รับซื้อโน๊ตบุ๊ค'},document:{referrer:'https://www.google.co.th/?q=private',addEventListener:(event,fn)=>handlers.push(fn)},sessionStorage:{getItem:()=>null,setItem:()=>{}},crypto:globalThis.crypto,URL,URLSearchParams,Date,Element:PhoneElement,navigator:{sendBeacon:(url)=>{sent.push(url);return true}}}
+ vm.runInNewContext(script,phoneContext);handlers.forEach(fn=>fn({target:phoneAnchor}))
+ assert.equal(sent.length,1)
+ const phoneUrl=new URL(sent[0]);assert.equal(phoneUrl.pathname,'/functions/v1/seo-workbench/phone-click');assert.equal(phoneUrl.searchParams.get('page'),'https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค')
+ assert.equal(phoneUrl.searchParams.get('referrer'),'www.google.co.th');assert.ok(!sent[0].includes('tel:')&&!sent[0].includes('642579353')&&!sent[0].includes('q=private'))
+ assert.equal(phoneAnchor.href,'tel:+66642579353')
  delete globalThis.Deno;delete globalThis.__seoLabMock
 })
