@@ -8,7 +8,7 @@ import { SeoGrowthCenter } from './SeoGrowthCenter'
 import { SeoEvidenceCenter } from './SeoEvidenceCenter'
 
 const healthLabels: Record<string, string> = { OK: 'ตรวจผ่าน', ATTENTION: 'ควรตรวจสอบ', RUNNING: 'กำลังตรวจ', WAITING: 'รอรอบตรวจ', STALE: 'ผลตรวจเก่า', REDIRECT: 'เปลี่ยนเส้นทาง' }
-const sourceLabels: Record<string, string> = { FRESH: 'ข้อมูลล่าสุด', STALE: 'ข้อมูลเก่า', MISSING: 'ยังไม่มีข้อมูล', BLOCKED: 'ดึงข้อมูลถูกระงับ' }
+const sourceLabels: Record<string, string> = { FRESH: 'ข้อมูลล่าสุด', STALE: 'ข้อมูลเก่า', MISSING: 'ยังไม่มีข้อมูล', BLOCKED: 'ข้อมูลนำเข้ายังไม่พร้อม' }
 const format = (value: number | null | undefined, digits = 0) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('th-TH', { maximumFractionDigits: digits })
 const percent = (value: number | null) => value == null ? '—' : `${format(value * 100, 2)}%`
 const time = (value: string | null) => value ? new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -76,7 +76,7 @@ export function SeoNetworkOverview({ refreshSignal = 0 }: { refreshSignal?: numb
         <div><span>มีข้อมูล GSC ที่นำเข้า</span><strong>{sites.filter(row => row.source_at).length}/{sites.length}</strong></div>
         <div><span>GSC ข้อมูลล่าสุดพร้อมใช้</span><strong>{sites.filter(row => sourceState(row) === 'FRESH').length}/{sites.length}</strong></div>
       </div>
-      {sites.some(row => row.gsc_state !== 'READY') && <div className="seo-network-warning"><AlertTriangle size={18}/><div><strong>การดึงข้อมูล GSC ใหม่ยังติดข้อจำกัดการเชื่อมต่อ</strong><p>{sites.find(row => row.gsc_state !== 'READY')?.gsc_note}</p><small>ผลเก่าจะแสดงวันที่ต้นทาง • “—” หมายถึงยังไม่มีข้อมูล ไม่ใช่อันดับหายหรือยอดเป็นศูนย์</small></div></div>}
+      {sites.some(row => row.gsc_state !== 'READY') && <div className="seo-network-warning"><AlertTriangle size={18}/><div><strong>สถานะนำเข้าข้อมูล GSC ยังไม่พร้อมครบทุกเว็บ ({sites.filter(row => row.gsc_state === 'READY').length}/{sites.length} พร้อมใช้)</strong><p>{sites.find(row => row.gsc_state !== 'READY')?.gsc_note}</p><small>สถานะนี้เป็นสถานะข้อมูลที่นำเข้ามาใน Hub ไม่ใช่ผลตรวจสิทธิ์ Google แบบสด • ผลเก่าจะแสดงวันที่ต้นทาง • “—” หมายถึงยังไม่มีข้อมูล ไม่ใช่อันดับหายหรือยอดเป็นศูนย์</small></div></div>}
       <p className="seo-network-note">ช่วง 28 วัน • “ยอดรวมเว็บ” มาจาก GSC แยกตาม hostname ของเว็บนั้น • “ตัวอย่างคำค้น” เป็นข้อมูลเก่าที่รวมเฉพาะคำค้นที่นำเข้า • อันดับเฉลี่ย GSC แยกจากการตรวจอันดับหน้าค้นหา</p>
       <div className="seo-network-table-wrap"><table className="seo-network-table">
         <caption>ภาพรวมเว็บทั้งหมด • กดชื่อเว็บเพื่อดูรายละเอียด</caption>
