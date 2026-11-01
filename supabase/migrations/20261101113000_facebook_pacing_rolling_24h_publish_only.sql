@@ -104,7 +104,7 @@ BEGIN
  UPDATE public.facebook_page_write_state SET token=lease,
  retry_at=now()+interval '5 minutes',updated_at=now() WHERE connection_key=p_connection_key;
  RETURN jsonb_build_object('token',lease);
-END $function$
+END $function$;
 
 CREATE OR REPLACE FUNCTION public.facebook_rotation_claim_due(max_jobs integer DEFAULT 3)
  RETURNS SETOF facebook_rotation_queue
@@ -199,5 +199,5 @@ BEGIN
     picked:=picked+1;
     EXIT WHEN picked>=greatest(1,least(max_jobs,10));
   END LOOP;
-END $function$
+END $function$;
 
