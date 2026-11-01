@@ -139,3 +139,13 @@ test('Meta Graph usage samples and publishing gates are service-role scoped',()=
  assert.match(sql,/:80001:/)
  assert.doesNotMatch(sql,/access_token/i)
 })
+
+test('permission-denied Meta engagement reads never loop automatically while paused',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261101123500_facebook_learning_metrics_permission_guard.sql',import.meta.url),'utf8')
+ const src=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8')
+ assert.match(sql,/learning_metrics_paused=true/)
+ assert.match(src,/facebook_rotation_settings\?select=learning_metrics_paused/)
+ assert.match(src,/learning_metrics_paused!==false\)return/)
+ assert.match(src,/facebook_learning_ledger\?metric_status=eq.PENDING/)
+ assert.doesNotMatch(src,/facebook_learning_ledger\?metric_status=in\.\(PENDING,ERROR,UNAVAILABLE\)/)
+})
