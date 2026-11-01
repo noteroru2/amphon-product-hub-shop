@@ -86,14 +86,18 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.facebook_graph_usage_samples u
     WHERE u.connection_key=p_connection_key
-      AND u.recorded_at>now()-interval '60 minutes'
+      AND u.recorded_at>now()-interval '24 hours'
+      AND greatest(u.recorded_at+interval '60 minutes',
+        u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440)))>now()
       AND (greatest(coalesce(u.app_call_percent,0),coalesce(u.business_call_percent,0))>=80
            OR coalesce(u.business_recovery_minutes,0)>0)
   ) THEN
     SELECT max(greatest(u.recorded_at+interval '60 minutes',
       u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440))))
     INTO v_retry FROM public.facebook_graph_usage_samples u
-    WHERE u.connection_key=p_connection_key AND u.recorded_at>now()-interval '60 minutes'
+    WHERE u.connection_key=p_connection_key AND u.recorded_at>now()-interval '24 hours'
+      AND greatest(u.recorded_at+interval '60 minutes',
+        u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440)))>now()
       AND (greatest(coalesce(u.app_call_percent,0),coalesce(u.business_call_percent,0))>=80
            OR coalesce(u.business_recovery_minutes,0)>0);
     IF v_retry>now() THEN
