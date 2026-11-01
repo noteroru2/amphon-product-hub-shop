@@ -141,7 +141,7 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
 async function verifyFacebookPost(env:Env,connectionKey:string,postId:string){
  const cr=await creds(env,'facebook_page',connectionKey)
  if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
- const r=await facebookObservedFetch(env,connectionKey,'post-verify','https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token=+encodeURIComponent(cr.pageAccessToken))
+ const r=await facebookObservedFetch(env,connectionKey,'post-verify','https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token='+encodeURIComponent(cr.pageAccessToken))
  const j:any=await r.json()
  if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_VERIFY_FAILED:'+(j.error?.message||r.status))
  return {postId:String(j.id),permalinkUrl:String(j.permalink_url||('https://www.facebook.com/'+j.id))}
@@ -205,7 +205,7 @@ async function updateFacebookSoldPostUnchecked(env:Env,x:any,p:any){
  const cr=await creds(env,'facebook_page',String(x.connection_key))
  if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
  const url='https://graph.facebook.com/v23.0/'+encodeURIComponent(String(x.post_id))
- const read=await facebookObservedFetch(env,String(x.connection_key),'sold-read',url+'?fields=message&access_token=+encodeURIComponent(cr.pageAccessToken)),original:any=await read.json()
+ const read=await facebookObservedFetch(env,String(x.connection_key),'sold-read',url+'?fields=message&access_token='+encodeURIComponent(cr.pageAccessToken)),original:any=await read.json()
  if(!read.ok||original.error)throw new Error('FACEBOOK_SOLD_READ_FAILED:'+(original.error?.message||read.status))
  if(String(cr.pageId)!==String(x.post_id).split('_')[0])throw new Error('FACEBOOK_SOLD_PAGE_MISMATCH')
  const msg=facebookSoldMessage(String(original.message||''),p)
@@ -215,7 +215,7 @@ async function updateFacebookSoldPostUnchecked(env:Env,x:any,p:any){
  const r=await facebookObservedFetch(env,String(x.connection_key),'sold-write',url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message:msg,access_token:cr.pageAccessToken})}),j:any=await r.json()
  if(!r.ok||j.error||j.success!==true)throw new Error('FACEBOOK_SOLD_SYNC_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status))
  }
- const verify=await facebookObservedFetch(env,String(x.connection_key),'sold-verify',url+'?fields=message&access_token=+encodeURIComponent(cr.pageAccessToken)),verified:any=await verify.json()
+ const verify=await facebookObservedFetch(env,String(x.connection_key),'sold-verify',url+'?fields=message&access_token='+encodeURIComponent(cr.pageAccessToken)),verified:any=await verify.json()
  if(!verify.ok||verified.error||verified.message!==msg)throw new Error('FACEBOOK_SOLD_VERIFY_FAILED:'+(verified.error?.message||'READBACK_MISMATCH'))
  await rest(env,'facebook_post_ledger?id=eq.'+encodeURIComponent(String(x.id)),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({status:'SOLD',content_hash:soldContentVersion,sold_at:current[0].sold_at||x.sold_at||new Date().toISOString(),updated_at:new Date().toISOString(),last_error:null})})
 }
