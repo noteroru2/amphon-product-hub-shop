@@ -1,4 +1,5 @@
 import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
+import { facebookObservedFetch } from './facebook-graph-usage'
 import { facebookPriceMessage } from './facebook-content'
 
 type Env = { SUPABASE_URL: string; SUPABASE_SECRET_KEY: string }
@@ -37,8 +38,8 @@ async function pageToken(env: Env, key: string) {
   return credentials.pageAccessToken
 }
 
-async function graphGetMessage(postId: string, token: string) {
-  const response = await fetch('https://graph.facebook.com/v23.0/' + encodeURIComponent(postId) +
+async function graphGetMessage(env: Env, key: string, postId: string, token: string) {
+  const response = await facebookObservedFetch(env,key,'price-read','https://graph.facebook.com/v23.0/' + encodeURIComponent(postId) +
     '?' + new URLSearchParams({fields:'id,message',access_token:token}))
   const result = await response.json() as {id?:string;message?:string;error?:{message?:string}}
   if (!response.ok || result.error || String(result.id) !== postId) {
@@ -47,9 +48,9 @@ async function graphGetMessage(postId: string, token: string) {
   return String(result.message || '')
 }
 
-async function graphUpdateMessage(postId: string, token: string, message: string) {
+async function graphUpdateMessage(env: Env, key: string, postId: string, token: string, message: string) {
   // Graph API POST to the known post ID: NEVER POST to /feed.
-  const response = await fetch('https://graph.facebook.com/v23.0/' + encodeURIComponent(postId), {
+  const response = await facebookObservedFetch(env,key,'price-write','https://graph.facebook.com/v23.0/' + encodeURIComponent(postId), {
     method: 'POST',
     headers: {'content-type': 'application/x-www-form-urlencoded'},
     body: new URLSearchParams({message, access_token: token}),
@@ -127,7 +128,7 @@ export async function runFacebookPriceSyncSweep(env: Env) {
         return
       }
       const token = await pageToken(env, candidate.connection_key)
-      const original = await graphGetMessage(candidate.post_id, token)
+      const original = await graphGetMessage(env,candidate.connection_key,candidate.post_id, token)
       const next = facebookPriceMessage(original, Number(candidate.price))
       if (next.changed) {
         // Recheck stock/price right before externally mutating the post.
@@ -135,8 +136,8 @@ export async function runFacebookPriceSyncSweep(env: Env) {
           results.push({sku:candidate.sku,postId:candidate.post_id,status:'STALE_OR_SOLD'})
           return
         }
-        await graphUpdateMessage(candidate.post_id, token, next.message)
-        const verified = await graphGetMessage(candidate.post_id, token)
+        await graphUpdateMessage(env,candidate.connection_key,candidate.post_id, token, next.message)
+        const verified = await graphGetMessage(env,candidate.connection_key,candidate.post_id, token)
         if (verified !== next.message) throw new Error('FACEBOOK_PRICE_VERIFY_MISMATCH')
       }
       await markSynced(env, candidate)
