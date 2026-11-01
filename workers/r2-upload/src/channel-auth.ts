@@ -1,4 +1,5 @@
 import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
+import { facebookObservedFetch } from './facebook-graph-usage'
 import { facebookSoldMessage } from './facebook-content'
 import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'
 type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
@@ -115,9 +116,9 @@ function facebookGraphDiagnostics(response: Response, data: any): string {
  return parts.length?':'+parts.join(':'):''
 }
 
-async function createFacebookFeed(url:string,params:URLSearchParams){
+async function createFacebookFeed(env:Env,key:string,url:string,params:URLSearchParams){
  let r:Response,j:any
- try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json()}catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
+ try{r=await facebookObservedFetch(env,key,'feed-publish',url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json()}catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
  if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
  return j
 }
@@ -131,16 +132,16 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
  const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
- if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj));mediaIds.push(String(uj.id))}
- const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
- else {j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
+ if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await facebookObservedFetch(env,key,'photo-upload','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj));mediaIds.push(String(uj.id))}
+ const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
+ else {j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
 async function verifyFacebookPost(env:Env,connectionKey:string,postId:string){
  const cr=await creds(env,'facebook_page',connectionKey)
  if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
- const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token='+encodeURIComponent(cr.pageAccessToken))
+ const r=await facebookObservedFetch(env,connectionKey,'post-verify','https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+'?fields=id,permalink_url&access_token=+encodeURIComponent(cr.pageAccessToken))
  const j:any=await r.json()
  if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_VERIFY_FAILED:'+(j.error?.message||r.status))
  return {postId:String(j.id),permalinkUrl:String(j.permalink_url||('https://www.facebook.com/'+j.id))}
@@ -159,7 +160,7 @@ async function collectFacebookLearning(env:Env){
  const rows=await rest(env,'facebook_learning_ledger?metric_status=in.(PENDING,ERROR,UNAVAILABLE)&posted_at=lt.'+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+'&select=*&order=posted_at.asc&limit=5')
  for(const row of Array.isArray(rows)?rows:[]){try{const cr=await creds(env,'facebook_page',String(row.connection_key));if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
    const url='https://graph.facebook.com/v23.0/'+encodeURIComponent(String(row.post_id))+'?fields=shares,comments.limit(0).summary(true),reactions.limit(0).summary(true)&access_token='+encodeURIComponent(cr.pageAccessToken)
-   const rr=await fetch(url),j:any=await rr.json();if(!rr.ok||j.error)throw new Error(j.error?.message||('GRAPH_'+rr.status))
+   const rr=await facebookObservedFetch(env,String(row.connection_key),'learning-read',url),j:any=await rr.json();if(!rr.ok||j.error)throw new Error(j.error?.message||('GRAPH_'+rr.status))
    const comments=Number(j.comments?.summary?.total_count||0),reactions=Number(j.reactions?.summary?.total_count||0),shares=Number(j.shares?.count||0),engaged=comments+reactions+shares
    await rest(env,'facebook_learning_ledger?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({engaged_users:engaged,reactions,comments,shares,metric_status:'COLLECTED',metric_error:null,measured_at:new Date().toISOString(),updated_at:new Date().toISOString()})})
   }catch(e){const msg=e instanceof Error?e.message:String(e);await rest(env,'facebook_learning_ledger?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({metric_status:/permission|unsupported/i.test(msg)?'UNAVAILABLE':'ERROR',metric_error:msg.slice(0,800),measured_at:new Date().toISOString(),updated_at:new Date().toISOString()})})}}
@@ -370,15 +371,15 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
    if(images.length){
     const mediaIds:string[]=[]
     for(const url of images){
-     const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})})
+     const ur=await facebookObservedFetch(env,key,'photo-upload','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})})
      const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))
     }
     const params=new URLSearchParams({message,access_token:cr.pageAccessToken})
     mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})))
-    const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params})
+    const r=await facebookObservedFetch(env,key,'manual-feed-publish','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params})
     j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
    }else{
-    const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})})
+    const r=await facebookObservedFetch(env,key,'manual-feed-publish','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken})})
     j=await r.json();if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.message||r.status))
    }
    const verified=await verifyFacebookPost(env,key,String(j.id))
