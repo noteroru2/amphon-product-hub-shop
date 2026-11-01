@@ -12,6 +12,7 @@ export async function loadSeoReceipt(id:string):Promise<GscReceipt> {
 export interface AiSample {id:number;prompt_id:number;provider:string;observed_at:string;evidence_url:string;mentioned:boolean|null;run_status:string;citations:string[];cited_sites:string[];source_kind:string}
 export interface ContactEvent {id:string;token:string;site_id:string;page:string;source_channel:string;created_at:string;confirmed_lead:boolean;lead_reference:string|null;sale_id:string|null;sku:string|null;actual_profit:number|null;actual_unit_price:number|null;quantity:number|null;attribution_status:string}
 export interface SaleChoice {id:string;sku:string;sold_at:string;actual_profit:number|null}
+export interface PhoneClickDaily {site_id:string;page:string;event_day:string;source_channel:string;clicks:number}
 export async function loadSeoLab() {
  if(!supabase) throw new Error('ยังไม่ได้เชื่อมฐานข้อมูล')
  const results=await Promise.all([
@@ -22,9 +23,10 @@ export async function loadSeoLab() {
  supabase.from('commerce_seo_ai_samples').select('*').gte('observed_at',new Date(Date.now()-30*86400000).toISOString()).order('observed_at',{ascending:false}).limit(500),
  supabase.from('commerce_seo_attribution_v').select('*').gte('created_at',new Date(Date.now()-30*86400000).toISOString()).order('created_at',{ascending:false}).limit(300),
  supabase.from('distribution_sale_outcomes').select('id,sku,sold_at,actual_profit').not('source_event_id','is',null).order('sold_at',{ascending:false}).limit(100),
+ supabase.from('commerce_seo_phone_click_daily').select('site_id,page,event_day,source_channel,clicks').gte('event_day',new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order('event_day',{ascending:false}).limit(1000),
  ])
  for(const r of results) if(r.error) throw new Error(r.error.message)
- return {jobs:(results[0].data||[]) as ContentJob[],evidence:(results[1].data||[]) as ContentEvidence[],measurements:(results[2].data||[]) as ContentMeasurement[],prompts:(results[3].data||[]) as AiPrompt[],samples:(results[4].data||[]) as AiSample[],contacts:(results[5].data||[]) as ContactEvent[],sales:(results[6].data||[]) as SaleChoice[]}
+ return {jobs:(results[0].data||[]) as ContentJob[],evidence:(results[1].data||[]) as ContentEvidence[],measurements:(results[2].data||[]) as ContentMeasurement[],prompts:(results[3].data||[]) as AiPrompt[],samples:(results[4].data||[]) as AiSample[],contacts:(results[5].data||[]) as ContactEvent[],sales:(results[6].data||[]) as SaleChoice[],phoneClicks:(results[7].data||[]) as PhoneClickDaily[]}
 }
 export async function manageSeoLab(action:string,data:Record<string,unknown>) {
  if(!supabase) throw new Error('ยังไม่ได้เชื่อมฐานข้อมูล')
