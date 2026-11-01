@@ -157,7 +157,11 @@ async function recordFacebookLearning(env:Env,job:any,postId:string,postedAt:str
  await rest(env,'facebook_learning_ledger',{method:'POST',headers:{prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({queue_id:job.id,product_id:job.product_id,connection_key:job.connection_key,post_id:postId,template_id:job.template_id,posted_at:postedAt,local_hour:d.getUTCHours(),local_dow:d.getUTCDay(),metric_status:'PENDING',updated_at:new Date().toISOString()})})
 }
 async function collectFacebookLearning(env:Env){
- const rows=await rest(env,'facebook_learning_ledger?metric_status=in.(PENDING,ERROR,UNAVAILABLE)&posted_at=lt.'+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+'&select=*&order=posted_at.asc&limit=5')
+ // Error 10: Meta has not approved pages_read_user_content; never retry periodically.
+ // Treat missing settings as paused; publishing still runs independently.
+ const config=await rest(env,'facebook_rotation_settings?select=learning_metrics_paused&id=eq.true&limit=1')
+ if(config?.[0]?.learning_metrics_paused!==false)return
+ const rows=await rest(env,'facebook_learning_ledger?metric_status=eq.PENDING&posted_at=lt.'+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+'&select=*&order=posted_at.asc&limit=5')
  for(const row of Array.isArray(rows)?rows:[]){try{const cr=await creds(env,'facebook_page',String(row.connection_key));if(!cr.pageAccessToken)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
    const url='https://graph.facebook.com/v23.0/'+encodeURIComponent(String(row.post_id))+'?fields=shares,comments.limit(0).summary(true),reactions.limit(0).summary(true)&access_token='+encodeURIComponent(cr.pageAccessToken)
    const rr=await facebookObservedFetch(env,String(row.connection_key),'learning-read',url),j:any=await rr.json();if(!rr.ok||j.error)throw new Error(j.error?.message||('GRAPH_'+rr.status))
