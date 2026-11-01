@@ -117,3 +117,25 @@ test('Only publish-only actions continue: manual existing-post edits reject befo
  assert.match(src,/PHOTO_UPLOAD_FAILED:'\+\(uj\.error\?\.code/)
  assert.match(src,/\.filter\(Boolean\)\.slice\(0,6\)/)
 })
+
+test('stale rotation migration preserves 48h queue history and never touches arrivals or posted IDs',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261101115500_facebook_rotation_expire_stale.sql',import.meta.url),'utf8')
+ assert.match(sql,/facebook_rotation_expire_stale\(48\)/)
+ assert.match(sql,/q\.lane='ROTATION'/)
+ assert.match(sql,/status='CANCELLED'/)
+ assert.match(sql,/ROTATION_SLOT_EXPIRED_REPLAN_NEXT_WEEK/)
+ assert.match(sql,/q\.post_id IS NULL/)
+ assert.doesNotMatch(sql,/DELETE FROM public\.facebook_rotation_queue/)
+})
+
+test('Meta Graph usage samples and publishing gates are service-role scoped',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261101120000_facebook_graph_usage_tracking.sql',import.meta.url),'utf8')
+ assert.match(sql,/CREATE TABLE IF NOT EXISTS public\.facebook_graph_usage_samples/)
+ assert.match(sql,/ENABLE ROW LEVEL SECURITY/)
+ assert.match(sql,/facebook_graph_usage_record/)
+ assert.match(sql,/TO service_role/)
+ assert.match(sql,/META_USAGE_SAFETY_HOLD/)
+ assert.match(sql,/business_recovery_minutes/)
+ assert.match(sql,/:80001:/)
+ assert.doesNotMatch(sql,/access_token/i)
+})
