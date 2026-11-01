@@ -22,3 +22,5 @@ jobs:
         run: npm --prefix workers/r2-upload run typecheck
       - name: Facebook idempotency and sold-copy tests
         run: node --test tests/facebook-publish-retry.test.mjs tests/facebook-sold-content.test.mjs tests/facebook-price-content.test.mjs tests/facebook-catalog-content.test.mjs tests/facebook-safe-resume.test.mjs
+      - name: Meta Graph usage telemetry tests
+        run: cd workers/r2-upload && node --test tests/facebook-graph-usage.test.mjs
