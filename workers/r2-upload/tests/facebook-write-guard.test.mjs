@@ -6,7 +6,8 @@ const compile=path=>ts.transpileModule(readFileSync(new URL(path,import.meta.url
 const uri=code=>'data:text/javascript;base64,'+Buffer.from(code).toString('base64')
 const guardUri=uri(compile('../src/facebook-write-guard.ts'))
 const {withFacebookPageWrite,FacebookWriteDeferred}=await import(guardUri)
-const channel=compile('../src/channel-auth.ts').replace("'./facebook-write-guard'",JSON.stringify(guardUri)).replace("'./facebook-content'",JSON.stringify(uri(compile('../src/facebook-content.ts')))).replace("'./facebook-warranty-repair'",JSON.stringify(uri(compile('../src/facebook-warranty-repair.ts'))))
+const graphUri=uri('export async function facebookObservedFetch(env,key,operation,url,init){return fetch(url,init)}')
+const channel=compile('../src/channel-auth.ts').replace("'./facebook-write-guard'",JSON.stringify(guardUri)).replace("'./facebook-content'",JSON.stringify(uri(compile('../src/facebook-content.ts')))).replace("'./facebook-warranty-repair'",JSON.stringify(uri(compile('../src/facebook-warranty-repair.ts')))).replace("'./facebook-graph-usage'",JSON.stringify(graphUri))
 const {runFacebookSoldSyncSweep}=await import(uri(channel))
 const env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
 const ok=x=>new Response(JSON.stringify(x))
