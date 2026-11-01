@@ -29,8 +29,8 @@ const categories: CatalogCategory[] = [
   {
     key: 'macbooks', slug: 'macbooks', name: 'MacBook มือสอง', navName: 'MacBook',
     h1: 'MacBook มือสอง พร้อมดูสภาพและราคา',
-    title: 'MacBook มือสอง สภาพจริง พร้อมราคา | AMPHON TRADING',
-    description: 'เลือกซื้อ MacBook มือสอง ดูรูปจริง สเปก ราคา สภาพและประกันจาก AMPHON TRADING',
+    title: 'MacBook มือสอง MacBook Air Pro ดูราคาและสภาพจริง | AMPHON SHOP',
+    description: 'MacBook มือสอง เลือกดู MacBook Air และ MacBook Pro ตามชิป RAM SSD พร้อมราคา รูปเครื่องจริง สภาพแบต และประกันของแต่ละรายการก่อนสั่งซื้อ',
     sourceCategory: 'notebook', sourceSubtype: 'macbook', query: 'MacBook', indexPolicy: 'INDEX', order: 20,
   },
   {
@@ -71,8 +71,8 @@ const categories: CatalogCategory[] = [
   {
     key: 'tablets', slug: 'tablets', name: 'iPad และ Tablet มือสอง', navName: 'iPad / Tablet',
     h1: 'iPad และ Tablet มือสอง',
-    title: 'iPad และ Tablet มือสอง | AMPHON TRADING',
-    description: 'เลือกซื้อ iPad และ Tablet มือสอง ดูรุ่น ความจุ สภาพ ราคาและรูปสินค้าจริง',
+    title: 'iPad มือสอง Tablet มือสอง ดูราคาและสภาพจริง | AMPHON SHOP',
+    description: 'เลือกซื้อ iPad มือสองและ Tablet มือสอง ดูรุ่น ความจุ ราคา รูปเครื่องจริง สภาพจอ แบตเตอรี่ และการรองรับปากกาของแต่ละรุ่นก่อนตัดสินใจ',
     sourceCategory: 'tablet', indexPolicy: 'INDEX', order: 70,
   },
   {
