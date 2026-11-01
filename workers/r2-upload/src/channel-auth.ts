@@ -94,13 +94,31 @@ function facebookSalesContent(p:any,templateId='ROT-1'){
  const shop='https://shop.amphon.co.th/product/'+encodeURIComponent(sku)
  const strategyLine=strategy==='CLEARANCE'?'⚡ Clearance — ราคาพิเศษเพื่อหมุนสต๊อก':strategy==='PUSH_DEALER'?'🤝 ร้านค้า/Dealer สนใจรับไปขายต่อ ทักสอบถามราคาส่งได้':strategy==='QUICK_SALE'?'🔥 Quick Sale — ปรับราคาพิเศษสำหรับรอบนี้':null
  const message=[heads[(n-1)%heads.length]+title,'',strategyLine,...specsLines,p.condition_percent?('✅ สภาพประมาณ '+p.condition_percent+'%'):null,p.defects?('🔎 ตำหนิ/สภาพ: '+p.defects):null,'',warrantyText,warrantyText?['✨ มีประกันเหลือ เพิ่มความมั่นใจในการใช้งาน','✅ จุดเด่นคือยังมีประกันเหลือ','🛡️ ยังอยู่ในระยะประกัน ใช้งานต่ออุ่นใจขึ้น'][n%3]:null,price?('💰 ราคา '+price.toLocaleString('th-TH')+' บาท'):null,['📸 รูปสินค้าจริง รายละเอียดแจ้งตามสภาพจริง','📸 ภาพสินค้าจริงจากทางร้าน มีหลายมุมให้ตรวจสอบ','✅ ข้อมูลและตำหนิแจ้งตามสินค้าจริง'][n%3],ctas[n%ctas.length],'🔗 ดูรายละเอียด: '+shop,'',tags].filter(x=>x!==null).join('\n')
- return {message,shop,images:(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)}
+ return {message,shop,images:(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,6)}
+}
+
+
+/** Non-secret Meta diagnostics: do not retain Page tokens or response bodies. */
+function facebookGraphDiagnostics(response: Response, data: any): string {
+ const error=data?.error||{},parts:string[]=[]
+ if(error.error_subcode!=null)parts.push('subcode='+String(error.error_subcode).slice(0,30))
+ if(error.fbtrace_id)parts.push('fbtrace_id='+String(error.fbtrace_id).slice(0,100))
+ const bu=response.headers.get('x-business-use-case-usage')
+ if(bu)try{
+   const parsed=JSON.parse(bu)
+   const values=Object.values(parsed||{}).flatMap((v:any)=>Array.isArray(v)?v:[])
+   const page=values.find((v:any)=>v&&v.type==='pages') as any || values[0] as any
+   if(page?.call_count!=null)parts.push('buc_call_pct='+Number(page.call_count))
+   if(page?.estimated_time_to_regain_access!=null)
+     parts.push('buc_recovery_min='+Number(page.estimated_time_to_regain_access))
+ }catch{ /* response header was not JSON */ }
+ return parts.length?':'+parts.join(':'):''
 }
 
 async function createFacebookFeed(url:string,params:URLSearchParams){
  let r:Response,j:any
  try{r=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json()}catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
- if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status))
+ if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
  return j
 }
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
@@ -113,7 +131,7 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
  const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
- if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status));mediaIds.push(String(uj.id))}
+ if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj));mediaIds.push(String(uj.id))}
  const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
  else {j=await createFacebookFeed('https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
@@ -338,7 +356,7 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
   '',
   tags
  ].filter(x=>x!==null).join('\n')
- const images=(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,10)
+ const images=(Array.isArray(p.images)?p.images:[]).map((x:any)=>String(x?.url||'')).filter(Boolean).slice(0,6)
  const results:any[]=[]
  for(const key of keys){
   const rs=await rest(env,'sales_channel_connections?channel_key=eq.facebook_page&connection_key=eq.'+encodeURIComponent(key)+'&select=activation_status,external_account_id&limit=1')
@@ -372,7 +390,11 @@ export async function facebookPublishSelected(env:Env,ctx:Ctx,body:any){
  return {ok:results.some(x=>x.ok),results}
 }
 export async function facebookSyncProduct(env:Env,ctx:Ctx,body:any){
- if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');const productId=String(body.productId||'');const ps=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=id,sku,title,status,price,one_availability&limit=1');const p=ps?.[0];if(!p)throw new Error('PRODUCT_NOT_FOUND');const rows=await rest(env,'facebook_post_ledger?product_id=eq.'+encodeURIComponent(productId)+'&status=in.(LIVE,SOLD)&select=*');const results:any[]=[]
+ if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY');
+  const settings=await rest(env,'facebook_rotation_settings?select=sold_sync_paused,price_sync_paused,catalog_sync_paused&id=eq.true&limit=1')
+  if(!settings?.[0]||settings[0].sold_sync_paused||settings[0].price_sync_paused||settings[0].catalog_sync_paused)
+    throw new Error('FACEBOOK_EXISTING_POST_EDITS_PAUSED')
+  const productId=String(body.productId||'');const ps=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=id,sku,title,status,price,one_availability&limit=1');const p=ps?.[0];if(!p)throw new Error('PRODUCT_NOT_FOUND');const rows=await rest(env,'facebook_post_ledger?product_id=eq.'+encodeURIComponent(productId)+'&status=in.(LIVE,SOLD)&select=*');const results:any[]=[]
  for(const x of rows||[]){const cr=await creds(env,'facebook_page',String(x.connection_key));if(!cr.pageAccessToken)continue;if(p.status==='sold'||p.one_availability==='SOLD'){await updateFacebookSoldPost(env,x,p);results.push({connectionKey:x.connection_key,status:'SOLD'})}else{await withFacebookPageWrite(env,String(x.connection_key),async()=>{const price=Number(p.price??0),shop='https://shop.amphon.co.th/product/'+encodeURIComponent(String(p.sku)),msg=String(p.title||p.sku)+(price?'\nราคา '+price.toLocaleString('th-TH')+' บาท':'')+'\nดูสินค้า: '+shop;const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(x.post_id),{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({message:msg,access_token:cr.pageAccessToken})});const j:any=await r.json();if(!r.ok||j.error)throw new Error('FACEBOOK_UPDATE_FAILED:'+x.connection_key+':'+(j.error?.code||'')+':'+(j.error?.message||r.status));await rest(env,'facebook_post_ledger?id=eq.'+x.id,{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({updated_at:new Date().toISOString(),last_error:null})});results.push({connectionKey:x.connection_key,status:'UPDATED'})})}}
  return {ok:true,results}
 }
