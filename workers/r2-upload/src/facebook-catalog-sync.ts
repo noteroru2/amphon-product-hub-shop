@@ -1,4 +1,5 @@
 import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
+import { facebookObservedFetch } from './facebook-graph-usage'
 import { facebookCatalogMessage, type PublicFacebookProduct } from './facebook-catalog-message'
 
 type Env = { SUPABASE_URL: string; SUPABASE_SECRET_KEY: string }
@@ -43,22 +44,22 @@ async function tokenFor(env:Env,key:string,postId:string){
   return {token:cr.pageAccessToken,pageId:cr.pageId}
 }
 
-async function graph<T>(path:string,token:string,params:Record<string,string>|null=null):Promise<T>{
+async function graph<T>(env:Env,key:string,path:string,token:string,params:Record<string,string>|null=null):Promise<T>{
   const url='https://graph.facebook.com/v23.0/'+path
   const init:RequestInit=params?{
     method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({...params,access_token:token}),
   }:undefined as unknown as RequestInit
   const target=params?url:url+'?'+new URLSearchParams({fields:'id,message',access_token:token})
-  const res=await fetch(target,init)
+  const res=await facebookObservedFetch(env,key,params?'catalog-write':'catalog-read',target,init)
   const json=await res.json() as T & {error?:{message?:string}}
   if(!res.ok || json.error)
     throw new Error('CATALOG_GRAPH_'+res.status+':'+String((json.error as any)?.code||'')+':'+String(json.error?.message||'Unknown').slice(0,320))
   return json
 }
 
-async function readMessage(postId:string,token:string):Promise<string>{
-  const obj=await graph<{id:string;message?:string}>(encodeURIComponent(postId),token)
+async function readMessage(env:Env,key:string,postId:string,token:string):Promise<string>{
+  const obj=await graph<{id:string;message?:string}>(env,key,encodeURIComponent(postId),token)
   if(obj.id!==postId)throw new Error('CATALOG_POST_ID_MISMATCH')
   return String(obj.message||'')
 }
@@ -70,9 +71,9 @@ async function patchLedger(env:Env,c:Candidate,updates:Record<string,unknown>){
   })
 }
 
-async function readPhotoIds(postId:string,token:string):Promise<string[]>{
+async function readPhotoIds(env:Env,key:string,postId:string,token:string):Promise<string[]>{
   const fields='id,attachments{target,subattachments}'
-  const r=await fetch('https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+
+  const r=await facebookObservedFetch(env,key,'catalog-photo-verify','https://graph.facebook.com/v23.0/'+encodeURIComponent(postId)+
     '?'+new URLSearchParams({fields,access_token:token}))
   const obj=await r.json() as any
   if(!r.ok||obj.error||obj.id!==postId)
@@ -105,7 +106,7 @@ async function tryUpdatePhotos(env:Env,c:Candidate,pageId:string,token:string){
     if(url.protocol!=='https:' || url.hostname!=='amphon-product-images.noteroru2.workers.dev'
       || !item.object_key.startsWith('products/'+c.product_id+'/'))
       throw new Error('CATALOG_MEDIA_MANUAL_REVIEW_REQUIRED:UNTRUSTED_IMAGE')
-    const uploaded=await graph<{id:string}>(encodeURIComponent(pageId)+'/photos',token,{
+    const uploaded=await graph<{id:string}>(env,c.connection_key,encodeURIComponent(pageId)+'/photos',token,{
       url:url.toString(),published:'false',
     })
     if(!uploaded.id)throw new Error('CATALOG_MEDIA_UPLOAD_NOT_CONFIRMED')
@@ -114,10 +115,10 @@ async function tryUpdatePhotos(env:Env,c:Candidate,pageId:string,token:string){
   if(!await authority(env,c))return false
   const params:Record<string,string>={}
   media.forEach((id,i)=>{params['attached_media['+i+']']=JSON.stringify({media_fbid:id})})
-  const result=await graph<{success?:boolean;id?:string}>(encodeURIComponent(c.post_id),token,params)
+  const result=await graph<{success?:boolean;id?:string}>(env,c.connection_key,encodeURIComponent(c.post_id),token,params)
   if(result.success!==true && result.id!==c.post_id)
     throw new Error('CATALOG_MEDIA_EDIT_UNCONFIRMED')
-  const recorded=await readPhotoIds(c.post_id,token)
+  const recorded=await readPhotoIds(env,c.connection_key,c.post_id,token)
   if(media.some(id=>!recorded.includes(id)))
     throw new Error('CATALOG_MEDIA_MANUAL_REVIEW_REQUIRED:READBACK_MISMATCH')
   return true
@@ -134,13 +135,13 @@ export async function runFacebookCatalogSyncSweep(env:Env){
       const p=await authority(env,c)
       if(!p){results.push({sku:c.sku,postId:c.post_id,status:'STALE_OR_SOLD'});return}
       const {token,pageId}=await tokenFor(env,c.connection_key,c.post_id)
-      const before=await readMessage(c.post_id,token)
+      const before=await readMessage(env,c.connection_key,c.post_id,token)
       const next=facebookCatalogMessage(before,p)
       if(next.changed){
         if(!await authority(env,c)){results.push({sku:c.sku,postId:c.post_id,status:'STALE'});return}
-        const updated=await graph<{success?:boolean;id?:string}>(encodeURIComponent(c.post_id),token,{message:next.message})
+        const updated=await graph<{success?:boolean;id?:string}>(env,c.connection_key,encodeURIComponent(c.post_id),token,{message:next.message})
         if(updated.success!==true&&updated.id!==c.post_id)throw new Error('CATALOG_MESSAGE_EDIT_UNCONFIRMED')
-        if(await readMessage(c.post_id,token)!==next.message)
+        if(await readMessage(env,c.connection_key,c.post_id,token)!==next.message)
           throw new Error('CATALOG_MESSAGE_READBACK_MISMATCH')
       }
       // If photos changed after the publication snapshot, attempt an in-place
