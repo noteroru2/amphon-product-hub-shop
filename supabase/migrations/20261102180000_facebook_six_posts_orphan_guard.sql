@@ -13,10 +13,11 @@ BEGIN
     SET status='FAILED',
       attempts=greatest(q.attempts,3),
       last_error='FACEBOOK_FEED_HTTP_200_UNRECONCILED_MANUAL_REVIEW_REQUIRED',
-      next_attempt_at=NULL,claim_token=NULL,claimed_at=NULL
+      next_attempt_at=NULL,claim_token=NULL
   WHERE q.post_id IS NULL
     AND q.status IN ('CLAIMED','FAILED','PLANNED')
     AND q.claimed_at IS NOT NULL
+    AND q.attempts<3
     AND q.claimed_at<now()-interval '10 minutes'
     AND EXISTS (
       SELECT 1 FROM public.facebook_graph_usage_samples u
