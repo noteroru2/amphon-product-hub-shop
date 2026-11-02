@@ -122,10 +122,10 @@ async function createFacebookFeed(env:Env,key:string,url:string,params:URLSearch
  if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
  return j
 }
-async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string){
- return withFacebookPageWrite(env,key,()=>publishFacebookRotationPostUnchecked(env,productId,key,templateId))
+async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string,queueId:string){
+ return withFacebookPageWrite(env,key,()=>publishFacebookRotationPostUnchecked(env,productId,key,templateId,queueId))
 }
-async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key:string,templateId:string){
+async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key:string,templateId:string,queueId:string){
  const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version,one_stock_age_days,one_quick_sale_price,one_dealer_price,one_dealer_eligibility&limit=1'),stock=authority?.[0]
  if(!stock||stock.one_availability!=='IN_STOCK'||!['ready_to_list','published','reserved'].includes(stock.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
@@ -135,6 +135,16 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await facebookObservedFetch(env,key,'photo-upload','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj));mediaIds.push(String(uj.id))}
  const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
  else {j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
+
+ // Record the Graph ID BEFORE releasing the page lease or requesting Graph
+ // readback. If this Supabase write fails, do not re-publish this queue item.
+ try {
+  const saved=await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(queueId)+'&status=eq.CLAIMED&select=id',{
+   method:'PATCH',headers:{prefer:'return=representation'},
+   body:JSON.stringify({post_id:String(j.id),posted_at:new Date().toISOString()}),
+  })
+  if(!Array.isArray(saved)||saved.length!==1)throw new Error('POST_ID_NOT_DURABLE')
+ }catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
@@ -177,7 +187,7 @@ export async function runFacebookRotationSweep(env:Env){
  for(const job of Array.isArray(jobs)?jobs:[]){
   try{
    // A recorded external ID is a completed publish, even if follow-up work failed.
-   const out=job.post_id?{postId:String(job.post_id),pageId:String((await creds(env,'facebook_page',String(job.connection_key))).pageId)}:await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id))
+   const out=job.post_id?{postId:String(job.post_id),pageId:String((await creds(env,'facebook_page',String(job.connection_key))).pageId)}:await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id),String(job.id))
    const postedAt=job.posted_at||new Date().toISOString()
    await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({post_id:out.postId,posted_at:postedAt})})
    const verified=await verifyFacebookPost(env,String(job.connection_key),String(out.postId))

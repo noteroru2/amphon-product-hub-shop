@@ -1,0 +1,298 @@
+-- Gradual six-post pilot on both Facebook Pages following Meta Error 368.
+-- Six posts per rolling 24h per Page is merchant policy, NOT Meta's quota.
+-- Preserve 120min min gap and 09:00-21:00 Bangkok publishing window.
+-- Guard against lost post IDs even when Meta accepted HTTP 200 /feed.
+CREATE OR REPLACE FUNCTION public.facebook_rotation_quarantine_unreconciled()
+RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path TO '' AS $quarantine$
+DECLARE v_jobs integer;
+BEGIN
+  -- In particular, avoid retries following lost responses after Meta has
+  -- already accepted /feed. A successful HTTP response is NOT proof the
+  -- content exists on the Page; the original job requires manual review.
+  UPDATE public.facebook_rotation_queue q
+    SET status='FAILED',
+      attempts=greatest(q.attempts,3),
+      last_error='FACEBOOK_FEED_HTTP_200_UNRECONCILED_MANUAL_REVIEW_REQUIRED',
+      next_attempt_at=NULL,claim_token=NULL
+  WHERE q.post_id IS NULL
+    AND q.status IN ('CLAIMED','FAILED','PLANNED')
+    AND q.claimed_at IS NOT NULL
+    AND q.attempts<3
+    AND q.claimed_at<now()-interval '10 minutes'
+    AND EXISTS (
+      SELECT 1 FROM public.facebook_graph_usage_samples u
+      WHERE u.connection_key=q.connection_key
+        AND u.operation='feed-publish'
+        AND u.http_status BETWEEN 200 AND 299
+        AND u.recorded_at BETWEEN q.claimed_at AND q.claimed_at+interval '10 minutes'
+    );
+  GET DIAGNOSTICS v_jobs=ROW_COUNT;
+  RETURN v_jobs;
+END
+$quarantine$;
+REVOKE ALL ON FUNCTION public.facebook_rotation_quarantine_unreconciled() FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.facebook_rotation_quarantine_unreconciled() TO service_role;
+
+CREATE OR REPLACE FUNCTION public.facebook_page_publish_gate(p_connection_key text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  s public.facebook_rotation_settings%rowtype;
+  v_local timestamp;
+  v_window_resume timestamptz;
+  v_retry timestamptz;
+  v_count integer;
+  v_last timestamptz;
+  v_oldest timestamptz;
+BEGIN
+  SELECT * INTO s FROM public.facebook_rotation_settings WHERE id=true;
+  IF NOT FOUND OR NOT s.enabled OR s.dry_run OR
+     NOT p_connection_key=ANY(s.active_connection_keys) OR
+     p_connection_key=ANY(s.paused_connection_keys) THEN
+    RETURN jsonb_build_object('allowed',false,'retry_at',now()+interval '1 hour','reason','PUBLISH_DISABLED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.sales_channel_connections c
+                 WHERE c.channel_key='facebook_page' AND c.connection_key=p_connection_key
+                   AND c.environment='PRODUCTION' AND c.activation_status='ACTIVE') THEN
+    RETURN jsonb_build_object('allowed',false,'retry_at',now()+interval '1 hour','reason','PAGE_NOT_ACTIVE');
+  END IF;
+  SELECT retry_at INTO v_retry FROM public.facebook_page_write_state WHERE connection_key=p_connection_key;
+  IF v_retry>now() THEN
+    RETURN jsonb_build_object('allowed',false,'retry_at',v_retry,'reason','PAGE_COOLDOWN');
+  END IF;
+
+  -- Meta's usage headers are rolling signals, not a published universal quota.
+  -- Hold new publishing for at least 60 minutes if a response reached >= 80%.
+  IF EXISTS (
+    SELECT 1 FROM public.facebook_graph_usage_samples u
+    WHERE u.connection_key=p_connection_key
+      AND u.recorded_at>now()-interval '24 hours'
+      AND greatest(u.recorded_at+interval '60 minutes',
+        u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440)))>now()
+      AND (greatest(coalesce(u.app_call_percent,0),coalesce(u.business_call_percent,0))>=80
+           OR coalesce(u.business_recovery_minutes,0)>0)
+  ) THEN
+    SELECT max(greatest(u.recorded_at+interval '60 minutes',
+      u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440))))
+    INTO v_retry FROM public.facebook_graph_usage_samples u
+    WHERE u.connection_key=p_connection_key AND u.recorded_at>now()-interval '24 hours'
+      AND greatest(u.recorded_at+interval '60 minutes',
+        u.recorded_at+make_interval(mins=>least(greatest(coalesce(u.business_recovery_minutes,0),0),1440)))>now()
+      AND (greatest(coalesce(u.app_call_percent,0),coalesce(u.business_call_percent,0))>=80
+           OR coalesce(u.business_recovery_minutes,0)>0);
+    IF v_retry>now() THEN
+      RETURN jsonb_build_object('allowed',false,'retry_at',v_retry,
+        'reason','META_USAGE_SAFETY_HOLD');
+    END IF;
+  END IF;
+  v_local:=now() AT TIME ZONE s.timezone;
+  IF extract(hour FROM v_local)::int<s.publish_window_start_hour OR
+     extract(hour FROM v_local)::int>=s.publish_window_end_hour THEN
+    v_window_resume:=(
+      CASE WHEN extract(hour FROM v_local)::int>=s.publish_window_end_hour
+        THEN v_local::date+1 ELSE v_local::date END
+      +make_interval(hours=>s.publish_window_start_hour)
+    ) AT TIME ZONE s.timezone;
+    RETURN jsonb_build_object('allowed',false,'retry_at',v_window_resume,'reason','OUTSIDE_PUBLISHING_HOURS');
+  END IF;
+  -- Deduplicate by exact Graph post ID: the same external post can appear in
+  -- both queue and ledger with slightly different timestamps.
+  SELECT count(*)::integer, max(published_at), min(published_at)
+    INTO v_count,v_last,v_oldest
+  FROM (
+    SELECT post_id,min(published_at) AS published_at
+    FROM (
+      SELECT q.post_id,q.posted_at AS published_at FROM public.facebook_rotation_queue q
+      WHERE q.connection_key=p_connection_key AND q.post_id IS NOT NULL
+        AND q.posted_at>now()-interval '24 hours'
+      UNION ALL
+      SELECT l.post_id,l.published_at FROM public.facebook_post_ledger l
+      WHERE l.connection_key=p_connection_key AND l.post_id IS NOT NULL
+        AND l.published_at>now()-interval '24 hours'
+      UNION ALL
+      -- A successful /feed HTTP response can be lost before queue ID persistence.
+      -- Count the attempt conservatively, and NEVER resubmit its original job.
+      SELECT 'UNRECONCILED_FEED:'||u.id::text AS post_id,u.recorded_at AS published_at
+      FROM public.facebook_graph_usage_samples u
+      JOIN public.facebook_rotation_queue q ON q.connection_key=u.connection_key
+        AND q.claimed_at IS NOT NULL
+        AND u.recorded_at BETWEEN q.claimed_at AND q.claimed_at+interval '10 minutes'
+      WHERE u.connection_key=p_connection_key
+        AND u.operation='feed-publish'
+        AND u.http_status BETWEEN 200 AND 299
+        AND q.post_id IS NULL
+        AND q.status IN ('FAILED','CLAIMED','PLANNED')
+        AND u.recorded_at>now()-interval '24 hours'
+    ) publication_events
+    GROUP BY post_id
+  ) distinct_posts;
+  IF v_count>=least(s.page_daily_budget,s.rolling_24h_budget) THEN
+    RETURN jsonb_build_object('allowed',false,
+      'retry_at',v_oldest+interval '24 hours 1 second','reason','ROLLING_24H_POST_LIMIT',
+      'posts_24h',v_count);
+  END IF;
+  IF v_last IS NOT NULL AND v_last+make_interval(mins=>s.min_page_gap_minutes)>now() THEN
+    RETURN jsonb_build_object('allowed',false,
+      'retry_at',v_last+make_interval(mins=>s.min_page_gap_minutes),
+      'reason','MIN_PUBLISH_GAP');
+  END IF;
+  RETURN jsonb_build_object('allowed',true,'posts_24h',coalesce(v_count,0));
+END $function$;
+CREATE OR REPLACE FUNCTION public.facebook_rotation_claim_due(max_jobs integer DEFAULT 3)
+ RETURNS SETOF facebook_rotation_queue
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  s public.facebook_rotation_settings%rowtype;
+  j public.facebook_rotation_queue%rowtype;
+  picked integer := 0;
+  local_today date;
+BEGIN
+  SELECT * INTO s FROM public.facebook_rotation_settings WHERE id=true FOR UPDATE;
+  PERFORM public.facebook_rotation_expire_stale(48);
+  PERFORM public.facebook_rotation_quarantine_unreconciled();
+  IF NOT s.enabled OR s.dry_run THEN RETURN; END IF;
+  local_today := (now() AT TIME ZONE s.timezone)::date;
+
+  FOR j IN
+    SELECT q.* FROM public.facebook_rotation_queue q
+    JOIN public.products p ON p.id=q.product_id
+    WHERE q.status IN ('PLANNED','FAILED') AND q.scheduled_at<=now()
+      AND coalesce(q.next_attempt_at,q.scheduled_at)<=now() AND q.attempts<3
+      AND (s.canary_job_id IS NULL OR q.id=s.canary_job_id)
+      AND (s.canary_job_id IS NOT NULL OR
+           (q.connection_key=ANY(s.active_connection_keys)
+            AND NOT (q.connection_key=ANY(s.paused_connection_keys))))
+      AND NOT EXISTS (
+        SELECT 1 FROM public.facebook_page_write_state w
+        WHERE w.connection_key=q.connection_key AND w.retry_at>now()
+      )
+      AND p.one_availability='IN_STOCK'
+      AND p.status IN ('ready_to_list','published','reserved')
+    ORDER BY CASE WHEN q.lane='NEW_ARRIVAL' THEN 0 ELSE 1 END,
+      CASE WHEN q.lane='NEW_ARRIVAL' THEN q.scheduled_at END DESC NULLS LAST,
+      q.scheduled_at,q.id
+    FOR UPDATE OF q SKIP LOCKED
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM public.facebook_rotation_queue x
+      WHERE x.connection_key=j.connection_key AND x.status='CLAIMED'
+    ) THEN CONTINUE; END IF;
+
+    -- Shared per-page rolling budget and allowed-hours gate. Failed checks never claim a job.
+    IF j.post_id IS NULL AND coalesce((public.facebook_page_publish_gate(j.connection_key)->>'allowed')::boolean,false)=false THEN CONTINUE; END IF;
+
+    -- Resuming a known external post ID only repairs local bookkeeping, never publishes.
+    IF j.post_id IS NULL THEN
+      IF EXISTS (
+        SELECT 1 FROM public.facebook_post_ledger l
+        WHERE l.product_id=j.product_id AND l.connection_key=j.connection_key
+          AND l.status<>'DELETED'
+          AND l.published_at>now()-make_interval(hours=>s.min_product_gap_hours)
+      ) THEN CONTINUE; END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM public.facebook_rotation_queue x
+        WHERE x.product_id=j.product_id AND x.connection_key=j.connection_key
+          AND x.post_id IS NOT NULL
+          AND x.posted_at>now()-make_interval(hours=>s.min_product_gap_hours)
+      ) THEN CONTINUE; END IF;
+
+      -- Both lanes obey the 25-minute spacing, not just ROTATION.
+      IF EXISTS (
+        SELECT 1 FROM public.facebook_rotation_queue x
+        WHERE x.connection_key=j.connection_key AND x.post_id IS NOT NULL
+          AND x.posted_at>now()-make_interval(mins=>s.min_page_gap_minutes)
+      ) OR EXISTS (
+        SELECT 1 FROM public.facebook_post_ledger l
+        WHERE l.connection_key=j.connection_key AND l.published_at>
+          now()-make_interval(mins=>s.min_page_gap_minutes)
+      ) THEN CONTINUE; END IF;
+
+      -- UNION removes the duplicate for posts present in both queue and ledger.
+      -- Count every post, including NEW_ARRIVAL, under one daily per-Page ceiling.
+      IF (
+        SELECT count(*) FROM (
+          SELECT q2.post_id FROM public.facebook_rotation_queue q2
+          WHERE q2.connection_key=j.connection_key AND q2.post_id IS NOT NULL
+            AND (q2.posted_at AT TIME ZONE s.timezone)::date=local_today
+          UNION
+          SELECT l.post_id FROM public.facebook_post_ledger l
+          WHERE l.connection_key=j.connection_key AND l.post_id IS NOT NULL
+            AND (l.published_at AT TIME ZONE s.timezone)::date=local_today
+        ) counted_posts
+      )>=s.page_daily_budget THEN CONTINUE; END IF;
+    END IF;
+
+    UPDATE public.facebook_rotation_queue
+      SET status='CLAIMED',claimed_at=now(),claim_token=gen_random_uuid(),
+          attempts=attempts+1
+    WHERE id=j.id RETURNING * INTO j;
+    RETURN NEXT j;
+    picked:=picked+1;
+    EXIT WHEN picked>=greatest(1,least(max_jobs,10));
+  END LOOP;
+END $function$;
+UPDATE public.facebook_rotation_settings
+SET page_daily_budget=6,rolling_24h_budget=6,
+    min_page_gap_minutes=greatest(min_page_gap_minutes,120),
+    updated_at=now()
+WHERE id=true
+ AND enabled=true
+ AND sold_sync_paused=true AND price_sync_paused=true AND catalog_sync_paused=true;
+
+-- Stop six-post pilot and restore three-post limits automatically on Meta 368/80001/etc.
+CREATE OR REPLACE FUNCTION public.facebook_page_write_result(p_connection_key text, p_token uuid, p_error text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_retry_at timestamptz;
+  v_attempts integer;
+  v_is_meta_block boolean;
+BEGIN
+  v_is_meta_block := p_error IS NOT NULL AND
+    p_error ~* '(จำกัดจำนวน|ป้องกันการสแปม|temporarily blocked|rate.limit|too many|:368:|:80001:|:613:|:4:|:17:|:32:)';
+  UPDATE public.facebook_page_write_state SET
+    attempts=CASE WHEN p_error IS NULL THEN 0 ELSE least(attempts+1,10) END,
+    retry_at=GREATEST(retry_at,now()+CASE
+      WHEN p_error IS NULL THEN interval '20 minutes'
+      WHEN v_is_meta_block THEN interval '24 hours'
+      ELSE interval '5 minutes'*least(power(2,least(attempts,3)),8)
+    END),
+    last_error=left(p_error,800),token=NULL,updated_at=now()
+  WHERE connection_key=p_connection_key AND token=p_token
+  RETURNING retry_at,attempts INTO v_retry_at,v_attempts;
+
+  IF NOT FOUND THEN RETURN; END IF;
+  IF v_is_meta_block THEN
+    -- Automatically roll back the six-post recovery pilot if Meta imposes
+    -- another restriction. Never shorten the individual Page cooldown.
+    UPDATE public.facebook_rotation_settings
+    SET page_daily_budget=least(page_daily_budget,3),
+        rolling_24h_budget=least(rolling_24h_budget,3),
+        updated_at=now()
+    WHERE id=true;
+    INSERT INTO public.distribution_alerts(
+      alert_key,alert_type,severity,connection_key,details,
+      last_seen_at,resolved_at,status
+    ) VALUES (
+      'FB_RATE_LIMIT:'||p_connection_key,'FACEBOOK_RATE_LIMITED','CRITICAL',
+      p_connection_key,
+      jsonb_build_object('error',left(p_error,350),
+        'retryAt',v_retry_at,'attempts',v_attempts,'reason','META_WRITE_RESTRICTION'),
+      now(),NULL,'OPEN'
+    )
+    ON CONFLICT(alert_key) DO UPDATE SET
+      severity='CRITICAL',details=EXCLUDED.details,last_seen_at=now(),
+      resolved_at=NULL,status='OPEN';
+  ELSIF p_error IS NULL THEN
+    UPDATE public.distribution_alerts SET status='RESOLVED',
+      resolved_at=now(),last_seen_at=now()
+    WHERE alert_key='FB_RATE_LIMIT:'||p_connection_key AND status='OPEN';
+  END IF;
+END $function$;

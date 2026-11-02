@@ -22,7 +22,7 @@ test('ledger write failure resumes external post; learning failure preserves POS
   if(u.includes('/rest/v1/rpc/'))return ok(0)
   if(u.includes('/rest/v1/products?'))return ok([{status:'published',one_availability:'IN_STOCK'}])
   if(u.includes('/rest/v1/commerce_public_listing_v'))return ok([{status:'published',sku:'AT-NB',title:'Laptop',price:10000,images:[]}])
-  if(u.includes('/rest/v1/facebook_rotation_queue?')){Object.assign(job,body);return ok(null)}
+  if(u.includes('/rest/v1/facebook_rotation_queue?')){Object.assign(job,body);return ok(String(init.headers?.prefer||'').includes('return=representation')?[{id:job.id}]:null)}
   if(u.includes('/rest/v1/facebook_post_ledger?')){assert.ok(u.includes('on_conflict=post_id'));ledgerWrites++;return ledgerWrites===1?new Response('DB temporarily unavailable',{status:503}):ok(null)}
   if(u.includes('/rest/v1/facebook_learning_ledger')&&init.method==='POST')return failLearning?new Response('Learning unavailable',{status:503}):ok(null)
   if(u.includes('/rest/v1/facebook_learning_ledger'))return ok([])
