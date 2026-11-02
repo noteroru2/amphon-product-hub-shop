@@ -243,3 +243,56 @@ SET page_daily_budget=6,rolling_24h_budget=6,
 WHERE id=true
  AND enabled=true
  AND sold_sync_paused=true AND price_sync_paused=true AND catalog_sync_paused=true;
+
+-- Stop six-post pilot and restore three-post limits automatically on Meta 368/80001/etc.
+CREATE OR REPLACE FUNCTION public.facebook_page_write_result(p_connection_key text, p_token uuid, p_error text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_retry_at timestamptz;
+  v_attempts integer;
+  v_is_meta_block boolean;
+BEGIN
+  v_is_meta_block := p_error IS NOT NULL AND
+    p_error ~* '(จำกัดจำนวน|ป้องกันการสแปม|temporarily blocked|rate.limit|too many|:368:|:80001:|:613:|:4:|:17:|:32:)';
+  UPDATE public.facebook_page_write_state SET
+    attempts=CASE WHEN p_error IS NULL THEN 0 ELSE least(attempts+1,10) END,
+    retry_at=GREATEST(retry_at,now()+CASE
+      WHEN p_error IS NULL THEN interval '20 minutes'
+      WHEN v_is_meta_block THEN interval '24 hours'
+      ELSE interval '5 minutes'*least(power(2,least(attempts,3)),8)
+    END),
+    last_error=left(p_error,800),token=NULL,updated_at=now()
+  WHERE connection_key=p_connection_key AND token=p_token
+  RETURNING retry_at,attempts INTO v_retry_at,v_attempts;
+
+  IF NOT FOUND THEN RETURN; END IF;
+  IF v_is_meta_block THEN
+    -- Automatically roll back the six-post recovery pilot if Meta imposes
+    -- another restriction. Never shorten the individual Page cooldown.
+    UPDATE public.facebook_rotation_settings
+    SET page_daily_budget=least(page_daily_budget,3),
+        rolling_24h_budget=least(rolling_24h_budget,3),
+        updated_at=now()
+    WHERE id=true;
+    INSERT INTO public.distribution_alerts(
+      alert_key,alert_type,severity,connection_key,details,
+      last_seen_at,resolved_at,status
+    ) VALUES (
+      'FB_RATE_LIMIT:'||p_connection_key,'FACEBOOK_RATE_LIMITED','CRITICAL',
+      p_connection_key,
+      jsonb_build_object('error',left(p_error,350),
+        'retryAt',v_retry_at,'attempts',v_attempts,'reason','META_WRITE_RESTRICTION'),
+      now(),NULL,'OPEN'
+    )
+    ON CONFLICT(alert_key) DO UPDATE SET
+      severity='CRITICAL',details=EXCLUDED.details,last_seen_at=now(),
+      resolved_at=NULL,status='OPEN';
+  ELSIF p_error IS NULL THEN
+    UPDATE public.distribution_alerts SET status='RESOLVED',
+      resolved_at=now(),last_seen_at=now()
+    WHERE alert_key='FB_RATE_LIMIT:'||p_connection_key AND status='OPEN';
+  END IF;
+END $function$;
