@@ -1,0 +1,10 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript');
+const output=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/pricebook-import-guard.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const mod={exports:{}};new Function('module','exports',output)(mod,mod.exports);
+const {resolvePriceBookImportPolicy:guard}=mod.exports;
+test('missing activate is draft by default',()=>assert.deepEqual(guard({categoryRuleCount:0}),{activate:false}));
+test('explicit false remains draft',()=>assert.deepEqual(guard({activate:false,categoryRuleCount:0}),{activate:false}));
+test('explicit true only activates when no unversioned rules',()=>assert.deepEqual(guard({activate:true,categoryRuleCount:0}),{activate:true}));
+test('draft with category rules must not mutate live policy',()=>assert.throws(()=>guard({activate:false,categoryRuleCount:1}),/UNVERSIONED_CATEGORY_RULES_BLOCKED/));
+test('activation with category rules blocked until versioned',()=>assert.throws(()=>guard({activate:true,categoryRuleCount:1}),/UNVERSIONED_CATEGORY_RULES_BLOCKED/));
+test('malformed activation is rejected',()=>assert.throws(()=>guard({activate:"true",categoryRuleCount:0}),/ACTIVATE_FLAG_INVALID/));
