@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseHistoryCostCsv,splitHistoryCsv} from '../src/lib/aiBuyerCostHistory.ts';
+import fs from 'node:fs';
+import ts from 'typescript';
+const source=fs.readFileSync(new URL('../src/lib/aiBuyerCostHistory.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const moduleMock={exports:{}};
+new Function('require','module','exports',compiled)(()=>({supabase:null}),moduleMock,moduleMock.exports);
+const {parseHistoryCostCsv,splitHistoryCsv}=moduleMock.exports;
 test('inventory history is detected without importing as active price',()=>{
  const x=parseHistoryCostCsv('id,code,name,cost,quantity,sourceType,status,category\n1,INV-1,Notebook,10000,1,PURCHASE,SOLD,NOTEBOOK');
  assert.equal(x.kind,'INVENTORY');assert.equal(x.rows.length,1);assert.equal(x.rows[0].cost,'10000');
