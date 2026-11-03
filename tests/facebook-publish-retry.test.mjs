@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from '../workers/r2-upload/node_modules/typescript/lib/typescript.js'
 const source=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8').replace("import { facebookSoldMessage } from './facebook-content'",'const facebookSoldMessage=()=>"sold"')
-const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()').replace("import { facebookObservedFetch } from './facebook-graph-usage'",'const facebookObservedFetch=async(env,key,operation,url,init)=>fetch(url,init)')
+const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()').replace("import { facebookObservedFetch, facebookRecordGraphResponse } from './facebook-graph-usage'",'const facebookObservedFetch=async(env,key,operation,url,init)=>fetch(url,init); const facebookRecordGraphResponse=async()=>{}')
 const selfContainedSource = guardedSource.replace("import { reconcileFacebookPublishAttempts } from './facebook-post-reconcile'",'const reconcileFacebookPublishAttempts=async()=>[]').replace(
  "import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'",
  'const WARRANTY_POST_REPAIR_TAG="", WARRANTY_POST_REPAIRS=[], correctFacebookWarrantyText=()=>({message:"",changed:false}), addMissingFacebookWarrantyText=()=>({message:"",changed:false})'
@@ -11,7 +11,7 @@ const selfContainedSource = guardedSource.replace("import { reconcileFacebookPub
 const code=ts.transpileModule(selfContainedSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const {runFacebookRotationSweep}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))
 test('ledger write failure resumes external post; learning failure preserves POSTED',async()=>{
- const original=globalThis.fetch,originalError=console.error,job={id:'job',product_id:'product',connection_key:'page_1',template_id:'ROT-1'},env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
+ const original=globalThis.fetch,originalError=console.error,job={id:'job',product_id:'product',connection_key:'page_1',template_id:'ROT-1',claim_token:'mock-claim'},env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
  console.error=()=>{}
  let creates=0,ledgerWrites=0,failLearning=false
  globalThis.fetch=async(url,init={})=>{
