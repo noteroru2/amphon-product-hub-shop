@@ -6,7 +6,7 @@ import {
 import {validatePricebookV28Csv,PRICEBOOK_V28_HEADERS,type PricebookV28CsvResult} from '../lib/pricebookV28Csv';
 
 const empty:Pb28Row={category:'NOTEBOOK',brand:'',model:'',model_code:'',condition_key:'NORMAL',
- estimated_resale:0,opening_offer:0,target_buy:0,hard_max:0,active:true,note:''};
+ estimated_resale:0,opening_offer:0,target_buy:0,hard_max:0,active:true,note:'',aliases:[],spec_match:{},adjustments:{}};
 const fmt=(n:number)=>new Intl.NumberFormat('th-TH',{maximumFractionDigits:0}).format(n);
 const date=(v:string)=>new Intl.DateTimeFormat('th-TH',{dateStyle:'short',timeStyle:'short'}).format(new Date(v));
 const baseInput:React.CSSProperties={minWidth:0,width:'100%',boxSizing:'border-box',padding:'9px 10px',
@@ -28,6 +28,7 @@ export function PriceBookV28Admin(){
  const [selectedId,setSelectedId]=useState(''),[entries,setEntries]=useState<Pb28Entry[]>([]),[audit,setAudit]=useState<Pb28Audit[]>([]);
  const [title,setTitle]=useState('AMPHON PriceBook V2.8 Draft'),[clone,setClone]=useState(true);
  const [editingId,setEditingId]=useState<string|null>(null),[entry,setEntry]=useState<Pb28Row>({...empty});
+ const [advanced,setAdvanced]=useState({aliases:'[]',spec_match:'{}',adjustments:'{}'});
  const [query,setQuery]=useState(''),[checked,setChecked]=useState<string[]>([]);
  const [bulkField,setBulkField]=useState<(typeof bulkFields)[number]>('target_buy'),[delta,setDelta]=useState('');
  const [csv,setCsv]=useState(blankCsv),[tab,setTab]=useState<'entries'|'audit'>('entries');
@@ -54,7 +55,18 @@ export function PriceBookV28Admin(){
   finally{setBusy(false)}
  };
  const create=async()=>{let id='';await handle(async()=>{id=await createPb28Draft(title.trim(),clone)},'สร้าง Draft สำเร็จ');if(id){setSelectedId(id);setChecked([])}};
- const save=async()=>{if(!selectedId)return;await handle(()=>savePb28Entry(selectedId,editingId,entry),'บันทึกรายการพร้อม Audit Log แล้ว');setEntry({...empty});setEditingId(null)};
+ const save=async()=>{if(!selectedId)return;
+  let row:Pb28Row;
+  try{
+   const aliases=JSON.parse(advanced.aliases),spec_match=JSON.parse(advanced.spec_match),adjustments=JSON.parse(advanced.adjustments);
+   if(!Array.isArray(aliases)||!aliases.every(x=>typeof x==='string')||!spec_match||Array.isArray(spec_match)||typeof spec_match!=='object'||!adjustments||Array.isArray(adjustments)||typeof adjustments!=='object')throw new Error('JSON รูปแบบไม่ถูกต้อง');
+   row={...entry,aliases,spec_match,adjustments};
+  }catch(e){setError('ตรวจ JSON ของชื่อรุ่นเพิ่มเติม / สเปก / กฎปรับราคา: '+(e instanceof Error?e.message:String(e)));return;}
+  setBusy(true);setError('');setNotice('');
+  try{await savePb28Entry(selectedId,editingId,row);await reload();setNotice('บันทึกรายการพร้อม Audit Log แล้ว');setEntry({...empty});setAdvanced({aliases:'[]',spec_match:'{}',adjustments:'{}'});setEditingId(null)}
+  catch(e){setError(e instanceof Error?e.message:String(e))}
+  finally{setBusy(false)}
+ };
  const remove=async(r:Pb28Entry)=>{if(!window.confirm('ลบรายการ '+r.model+' จาก Draft นี้?'))return;
   await handle(()=>deletePb28Entry(selectedId,r.id),'ลบรายการจาก Draft แล้ว');
   setChecked(a=>a.filter(id=>id!==r.id));if(editingId===r.id){setEntry({...empty});setEditingId(null)}
@@ -76,7 +88,7 @@ export function PriceBookV28Admin(){
    category:row.category,brand:row.brand,model:row.model,model_code:row.model_code,
    condition_key:row.condition_key,estimated_resale:Number(row.estimated_resale),
    opening_offer:Number(row.opening_offer),target_buy:Number(row.target_buy),hard_max:Number(row.hard_max),
-   active:true,note:'CSV draft import',
+   active:true,note:'CSV draft import',aliases:[],spec_match:{},adjustments:{},
   }));
   await handle(()=>importPb28Rows(selectedId,rows),'นำเข้า Draft สำเร็จ ไม่กระทบ V2.7');setCsv(blankCsv());
  };
@@ -101,7 +113,7 @@ export function PriceBookV28Admin(){
    </div>
    <div style={{...grid,marginTop:12}}>
     <label style={{display:'grid',gap:4}}>เลือกร่างที่จะแก้ไข
-     <select style={baseInput} value={selectedId} onChange={e=>{setSelectedId(e.target.value);setChecked([]);setEntry({...empty});setEditingId(null);setCsv(blankCsv())}}>
+     <select style={baseInput} value={selectedId} onChange={e=>{setSelectedId(e.target.value);setChecked([]);setEntry({...empty});setAdvanced({aliases:'[]',spec_match:'{}',adjustments:'{}'});setEditingId(null);setCsv(blankCsv())}}>
       <option value="">-- เลือก Draft --</option>{drafts.map(d=><option key={d.id} value={d.id}>{d.title} · {date(d.updated_at)}</option>)}
      </select>
     </label>
@@ -128,9 +140,18 @@ export function PriceBookV28Admin(){
      <label style={{display:'grid',gap:4,fontSize:13}}>บันทึกเพิ่มเติม<input style={baseInput} value={entry.note} maxLength={800} onChange={e=>setEntry(p=>({...p,note:e.target.value}))}/></label>
      <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={entry.active} onChange={e=>setEntry(p=>({...p,active:e.target.checked}))}/> เปิดรายการในร่าง</label>
     </div>
+    <details style={{marginTop:12}}>
+      <summary style={{cursor:'pointer',fontWeight:600}}>ข้อมูลจับคู่รุ่นและกฎปรับราคา (ขั้นสูง)</summary>
+      <p style={{fontSize:12,opacity:.8}}>รูปแบบ JSON · คัดลอกจาก V2.7 โดยไม่ลบเงื่อนไขเดิม · ตรวจสอบก่อนบันทึก</p>
+      <div style={grid}>
+       {(['aliases','spec_match','adjustments'] as const).map(key=><label key={key} style={{display:'grid',gap:4,fontSize:12}}>
+        {key}<textarea style={{...baseInput,minHeight:80,fontFamily:'monospace'}} value={advanced[key]} onChange={e=>setAdvanced(p=>({...p,[key]:e.target.value}))}/>
+       </label>)}
+      </div>
+    </details>
     <div style={{display:'flex',gap:8,margin:'12px 0',flexWrap:'wrap'}}>
      <button style={button} disabled={busy||selected.status!=='DRAFT'||!entry.model.trim()||!entry.category.trim()} onClick={()=>void save()}>{editingId?'บันทึกแก้ไขรายการ':'เพิ่มรายการใน Draft'}</button>
-     <button style={button} disabled={busy} onClick={()=>{setEditingId(null);setEntry({...empty})}}>ล้างฟอร์ม</button>
+     <button style={button} disabled={busy} onClick={()=>{setEditingId(null);setEntry({...empty});setAdvanced({aliases:'[]',spec_match:'{}',adjustments:'{}'})}}>ล้างฟอร์ม</button>
     </div>
     <section style={alert}>
      <strong>Import CSV — ตรวจ Preview ก่อนนำเข้า</strong>
@@ -170,7 +191,7 @@ export function PriceBookV28Admin(){
         <td><input type="checkbox" checked={checked.includes(r.id)} onChange={e=>setChecked(p=>e.target.checked?[...p,r.id]:p.filter(id=>id!==r.id))}/></td>
         <td>{r.category} · {r.brand} {r.model}<div style={{opacity:.7}}>{r.model_code} {r.active?'':'(ปิด)'}</div></td>
         <td>{r.condition_key}</td><td>{fmt(r.opening_offer)}</td><td>{fmt(r.target_buy)}</td><td>{fmt(r.hard_max)}</td>
-        <td><button style={button} onClick={()=>{setEditingId(r.id);setEntry({...r});window.scrollTo({top:0,behavior:'smooth'})}}>แก้</button> <button style={button} disabled={busy||selected.status!=='DRAFT'} onClick={()=>void remove(r)}>ลบ</button></td>
+        <td><button style={button} onClick={()=>{setEditingId(r.id);setEntry({...r});setAdvanced({aliases:JSON.stringify(r.aliases??[],null,2),spec_match:JSON.stringify(r.spec_match??{},null,2),adjustments:JSON.stringify(r.adjustments??{},null,2)});window.scrollTo({top:0,behavior:'smooth'})}}>แก้</button> <button style={button} disabled={busy||selected.status!=='DRAFT'} onClick={()=>void remove(r)}>ลบ</button></td>
        </tr>)}</tbody>
       </table>
       {!filtered.length&&<p style={{opacity:.7}}>ไม่พบรายการ</p>}
