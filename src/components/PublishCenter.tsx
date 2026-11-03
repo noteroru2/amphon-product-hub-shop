@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { draftFromProduct } from "../lib/backend";
 import { listActiveFacebookPages, facebookPublishSelected, facebookSyncProduct, getFacebookRotationStatus, updateFacebookRotationSettings, getFacebookLearningDashboard, type FacebookRotationStatus, type FacebookLearningDashboard } from "../lib/channelSettings";
+import FacebookAutomationDashboard from './FacebookAutomationDashboard'
 import { copyText } from "../lib/sales";
 import { ProductImageExportActions } from "./ProductImageExportActions";
 import {
@@ -239,7 +240,23 @@ export function PublishCenter({
     }
   }
 
-  async function publishFacebookSelected(product:ProductSummary){if(!canManage||fbPublishing||fbActiveKeys.length===0)return;if(!window.confirm('ยืนยันโพสต์ '+product.sku+' ไป Facebook Page ที่ ACTIVE ทั้ง '+fbActiveKeys.length+' เพจ?'))return;setFbPublishing(product.id);try{const x=await facebookPublishSelected(product.id,fbActiveKeys);setBulkMessage('Facebook โพสต์สำเร็จ '+x.results.length+' เพจ');setError(null)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setFbPublishing(null)}}
+  async function publishFacebookSelected(product:ProductSummary){
+  if(!['owner','admin'].includes(profile.role)||fbPublishing||fbActiveKeys.length===0)return
+  if(!window.confirm('ส่ง '+product.sku+' เข้าคิว Facebook '+fbActiveKeys.length+' เพจ? ระบบจะโพสต์เมื่อผ่านโควตาและระยะห่าง ไม่ใช่โพสต์ทันที'))return
+  setFbPublishing(product.id)
+  try{
+    const x=await facebookPublishSelected(product.id,fbActiveKeys)
+    const queued=x.results.filter(r=>r.ok&&r.status==='QUEUED').length
+    const reused=x.results.filter(r=>r.ok&&['ALREADY_PUBLISHED','REPAIR_PENDING','IN_PROGRESS'].includes(r.status)).length
+    const manualReview=x.results.filter(r=>!r.ok||r.status==='NEEDS_REVIEW')
+    setBulkMessage('Facebook: เข้าคิว '+queued+' เพจ · มีโพสต์เดิม/อยู่ระหว่างทำ '+reused+' เพจ (รอความถี่ที่กำหนด)')
+    if(manualReview.length)setError('บางเพจต้องตรวจสอบก่อน: '+manualReview.map(r=>r.connectionKey+' ('+r.status+')').join(', '))
+    else setError(null)
+    await refresh(true)
+    if(manualReview.length)setError('บางเพจต้องตรวจสอบก่อน: '+manualReview.map(r=>r.connectionKey+' ('+r.status+')').join(', '))
+  }catch(e){setError(e instanceof Error?e.message:String(e))}
+  finally{setFbPublishing(null)}
+ }
   async function syncFacebook(product:ProductSummary){setFbPublishing(product.id);try{const x=await facebookSyncProduct(product.id);setBulkMessage('Facebook Sync สำเร็จ '+x.results.length+' เพจ');setError(null)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setFbPublishing(null)}}
 
   async function publishAllReady() {
@@ -457,7 +474,7 @@ export function PublishCenter({
         <div className="auto-publish-banner">
           <div>
             <strong>Facebook Control Tower: {fbRotation.settings.enabled && !fbRotation.settings.dry_run ? 'PRODUCTION' : 'PAUSED / DRY RUN'}</strong>
-            <span>เป้าหมาย {fbRotation.settings.posts_per_product_per_week} ครั้ง/สินค้า/สัปดาห์ · เว้นอย่างน้อย {fbRotation.settings.min_page_gap_minutes} นาที · สูงสุด {fbRotation.settings.page_daily_budget} โพสต์/เพจ/วัน</span>
+            <span>เป้าหมาย {fbRotation.settings.posts_per_product_per_week} ครั้ง/สินค้า/สัปดาห์ · เว้นอย่างน้อย {fbRotation.settings.min_page_gap_minutes} นาที · สูงสุด {fbRotation.settings.page_daily_budget} โพสต์/เพจ/24 ชั่วโมงย้อนหลัง</span>
             <span>สร้างคิวล่าสุด {fbRotation.settings.last_generated_week || 'คิวเริ่มต้น'} {fbRotation.settings.last_generated_at ? '· '+formatDate(fbRotation.settings.last_generated_at) : ''}</span>
           </div>
           <div className="auto-publish-stats">
@@ -472,6 +489,8 @@ export function PublishCenter({
           </div>}
         </div>
       )}
+
+      <FacebookAutomationDashboard />
 
       {fbLearning && ['owner','admin'].includes(profile.role) && (
         <div className="auto-publish-banner">

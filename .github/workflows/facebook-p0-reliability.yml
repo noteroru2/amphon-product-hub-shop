@@ -26,3 +26,5 @@ jobs:
         run: cd workers/r2-upload && node --test tests/facebook-graph-usage.test.mjs
       - name: Publication receipt reconciliation tests
         run: cd workers/r2-upload && node --test tests/facebook-post-reconcile.test.mjs
+      - name: Facebook unified manual and dashboard tests
+        run: cd workers/r2-upload && node --test tests/facebook-unified-dashboard.test.mjs
