@@ -10,7 +10,7 @@ export type CostLearningCohort = {
  id:string;model:string;rawCategory:string;pricebookCategory:string;brand:string;
  purchaseSamples:number;soldItems:number;saleEvents:number;
  buyMedian:number;soldBuyMedian:number|null;saleMedian:number|null;
- realizedGrossSpreadMedian:number|null;daysToSellMedian:number|null;
+ realizedGrossSpreadMedian:number|null;actualProfitMedian:number|null;daysToSellMedian:number|null;
  lastSaleAt:string|null;inventoryCodes:string[];evidenceKeys:string[];
  qualified:boolean;reason:string;estimatedResale:number|null;
  openingOffer:number|null;targetBuy:number|null;hardMax:number|null;
@@ -89,15 +89,24 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
    return unitSalePrices[idx]-Number(item.buy_cost)-totalExpense;
   });
   const spreadMedian=median(spreads);
+  // Actual profitability may include concessions absent from the inventory snapshot.
+  // Price suggestions require verified positive recorded profit on independent sold items.
+  const profitPerItem=completed.map(({sales:events})=>{
+   if(events.some(e=>e.actual_profit===null||!Number.isFinite(Number(e.actual_profit))))return null;
+   const units=events.reduce((sum,e)=>sum+Number(e.quantity),0);
+   return units>0?events.reduce((sum,e)=>sum+Number(e.actual_profit),0)/units:null;
+  });
+  const actualProfitMedian=median(profitPerItem.filter((n):n is number=>n!==null));
+  const confirmedProfitable=profitPerItem.length>=3&&profitPerItem.every(n=>n!==null&&n>0);
   const days=completed.map(x=>median(x.sales.map(s=>asNumber(s.details?.stock_age_days)).filter((n):n is number=>n!==null))).filter((n):n is number=>n!==null&&n>=0);
   const lastSaleAt=completed.flatMap(x=>x.sales.map(s=>s.occurred_at).filter((v):v is string=>Boolean(v))).sort().at(-1)??null;
   const freshness=lastSaleAt!==null&&new Date(lastSaleAt).getTime()>=now.getTime()-180*86400000&&new Date(lastSaleAt).getTime()<=now.getTime()+86400000;
   const validSale=saleMedian!==null&&saleMedian>0;
   const distinct=completed.length;
-  const qualified=items.length>=3&&distinct>=3&&freshness&&validSale&&spreadMedian!==null&&spreadMedian>0;
+  const qualified=items.length>=3&&distinct>=3&&freshness&&validSale&&spreadMedian!==null&&spreadMedian>0&&confirmedProfitable;
   const reason=qualified?'ผ่านเกณฑ์ขั้นต่ำ 3 เครื่องซื้อจริงและขายจริงใน 180 วัน (ยังต้องตรวจราคาตลาด)':
     items.length<3||distinct<3?'หลักฐานเครื่องที่ซื้อและขายจริงยังไม่ถึง 3 รหัสสินค้า':
-    !freshness?'ไม่มีหลักฐานขายภายใน 180 วัน':!validSale?'ยังไม่มีราคาขายจริงที่ตรวจได้':'ผลต่างทุน–ขายไม่เป็นบวก';
+    !freshness?'ไม่มีหลักฐานขายภายใน 180 วัน':!validSale?'ยังไม่มีราคาขายจริงที่ตรวจได้':!confirmedProfitable?'กำไรจริงไม่ครบหรือไม่เป็นบวกทุกเครื่อง':'ผลต่างทุน–ขายไม่เป็นบวก';
   let estimatedResale:number|null=null,openingOffer:number|null=null,targetBuy:number|null=null,hardMax:number|null=null;
   if(qualified&&saleMedian!==null&&soldBuyMedian!==null){
    estimatedResale=round100(saleMedian);
@@ -113,7 +122,7 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
    pricebookCategory:mapCostHistoryCategory(items[0].category,items[0].product_name),
    brand:inferCostBrand(items[0].product_name),
    purchaseSamples:items.length,soldItems:distinct,saleEvents,buyMedian,soldBuyMedian,
-   saleMedian,realizedGrossSpreadMedian:spreadMedian,daysToSellMedian:median(days),lastSaleAt,
+   saleMedian,realizedGrossSpreadMedian:spreadMedian,actualProfitMedian,daysToSellMedian:median(days),lastSaleAt,
    inventoryCodes:items.map(i=>i.inventory_code),evidenceKeys:completed.flatMap(x=>x.sales.map(s=>s.source_key)),
    qualified:qualified&&hardMax!==null,reason,
    estimatedResale,openingOffer,targetBuy,hardMax
