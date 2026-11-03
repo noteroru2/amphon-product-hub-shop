@@ -1,6 +1,8 @@
+import { facebookQueueSelected } from './facebook-manual-queue'
+import { facebookAutomationReport } from './facebook-automation-report'
 import { one4SystemStockEnabled, releaseOne4SystemStock, reserveOne4SystemStock, type One4SystemStockEnv } from './one4-system-stock'
 import { handleShopeeRoutes, runShopeePublishSweep, type ShopeeEnv } from './shopee'
-import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookPublishSelected, facebookSyncProduct, facebookLedger, runFacebookRotationSweep, runFacebookSoldSyncSweep, recoverFacebookHistory, runFacebookWarrantyRepairSweep } from './channel-auth'
+import { beginOAuth, oauthCallback, testConnection, markTestPublish, facebookTestPublish, facebookDeleteTest, activateChannel, listFacebookPages, selectFacebookPage, facebookSyncProduct, facebookLedger, runFacebookRotationSweep, runFacebookSoldSyncSweep, recoverFacebookHistory, runFacebookWarrantyRepairSweep } from './channel-auth'
 
 interface Env extends One4SystemStockEnv, ShopeeEnv {
   IMAGES: R2Bucket
@@ -1905,7 +1907,7 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
   }
   if (url.pathname === '/commerce/channel-connections/facebook-pages' && request.method === 'POST') { try{return json(request,env,await listFacebookPages(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/facebook-select-page' && request.method === 'POST') { try{return json(request,env,await selectFacebookPage(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
-  if (url.pathname === '/commerce/facebook/publish-selected' && request.method === 'POST') { try{return json(request,env,await facebookPublishSelected(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
+  if (url.pathname === '/commerce/facebook/publish-selected' && request.method === 'POST') { try{return json(request,env,await facebookQueueSelected(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/facebook/sync-product' && request.method === 'POST') { try{return json(request,env,await facebookSyncProduct(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/facebook/ledger' && request.method === 'POST') { try{return json(request,env,await facebookLedger(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
   if (url.pathname === '/commerce/channel-connections/facebook-test-publish' && request.method === 'POST') { try{return json(request,env,await facebookTestPublish(env,context,await request.json().catch(()=>({}))))}catch(error){return json(request,env,{error:error instanceof Error?error.message:String(error)},400)} }
@@ -1975,6 +1977,18 @@ async function handleCommerceRoutes(request: Request, env: Env, url: URL): Promi
     const health = await serviceRest<any[]>(env, 'facebook_rotation_health_v?select=*')
     const pageSummary = Array.from(new Set(ledger.map((x:any)=>x.connection_key))).map(key=>{const rows=ledger.filter((x:any)=>x.connection_key===key),col=rows.filter((x:any)=>x.metric_status==='COLLECTED');return {connectionKey:key,posts:rows.length,collected:col.length,pending:rows.filter((x:any)=>x.metric_status==='PENDING').length,avgReach:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.reach||0),0)/col.length):null,avgImpressions:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.impressions||0),0)/col.length):null,avgEngaged:col.length?Math.round(col.reduce((a:number,x:any)=>a+Number(x.engaged_users||0),0)/col.length):null}})
     return json(request,env,{settings:settings[0]||null,pageSummary,feedback,ledger,health:health[0]||null})
+  }
+  if (url.pathname === '/commerce/facebook/automation-dashboard' && request.method === 'GET') {
+    if (!['owner','admin','sales'].includes(context.profile.role))
+      return json(request,env,{error:'NOT_AUTHORIZED'},403)
+    try{
+      const data=await facebookAutomationReport(
+        <T=any>(path:string,init:RequestInit={})=>serviceRest<T>(env,path,init),
+        context.profile.role)
+      return json(request,env,data)
+    }catch(error){
+      return json(request,env,{error:error instanceof Error?error.message:'DASHBOARD_FAILED'},500)
+    }
   }
   if (url.pathname === '/commerce/facebook/rotation-status' && request.method === 'GET') {
     if (!['owner','admin'].includes(context.profile.role)) return json(request, env, { error: 'ADMIN_ONLY' }, 403)
