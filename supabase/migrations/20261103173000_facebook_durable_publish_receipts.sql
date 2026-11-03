@@ -199,7 +199,7 @@ BEGIN
     SELECT q.* FROM public.facebook_rotation_queue q
     JOIN public.products p ON p.id=q.product_id
     WHERE q.status IN ('PLANNED','FAILED') AND q.scheduled_at<=now()
-      AND coalesce(q.next_attempt_at,q.scheduled_at)<=now() AND q.attempts<3
+      AND coalesce(q.next_attempt_at,q.scheduled_at)<=now() AND (q.post_id IS NOT NULL OR q.attempts<3)
       AND (s.canary_job_id IS NULL OR q.id=s.canary_job_id)
       AND (s.canary_job_id IS NOT NULL OR
            (q.connection_key=ANY(s.active_connection_keys)
@@ -396,3 +396,15 @@ BEGIN
   END IF;
   RETURN jsonb_build_object('allowed',true,'posts_24h',coalesce(v_count,0));
 END $function$;
+
+-- Seed previously quarantined no-ID responses for one bounded Graph
+-- reconciliation attempt. Older posts lack a marker and will be matched only
+-- to the exact SKU link plus the original 10-minute claim window.
+INSERT INTO public.facebook_publish_attempts(
+ queue_id,connection_key,product_id,marker,state,started_at,next_reconcile_at)
+SELECT q.id,q.connection_key,q.product_id,NULL,'NEEDS_REVIEW',q.claimed_at,now()
+FROM public.facebook_rotation_queue q
+WHERE q.post_id IS NULL
+ AND q.last_error='FACEBOOK_FEED_HTTP_200_UNRECONCILED_MANUAL_REVIEW_REQUIRED'
+ AND q.claimed_at IS NOT NULL
+ON CONFLICT(queue_id) DO NOTHING;
