@@ -1,3 +1,4 @@
+import {extractStructuredSpecs,type StructuredSpecs} from './aiBuyerStructuredSpecs';
 // AI Buyer Cost Learning V1: read-only evidence, never an autonomous pricing authority.
 // Strict model matching deliberately keeps RAM/SSD/CPU variants separated.
 export type CostHistoryRecord = {
@@ -8,6 +9,7 @@ export type CostHistoryRecord = {
 };
 export type CostLearningCohort = {
  id:string;model:string;rawCategory:string;pricebookCategory:string;brand:string;
+ structured:StructuredSpecs;matchMethod:'STRICT_NAME'|'STRUCTURED_EXACT';
  purchaseSamples:number;soldItems:number;saleEvents:number;
  buyMedian:number;soldBuyMedian:number|null;saleMedian:number|null;
  realizedGrossSpreadMedian:number|null;actualProfitMedian:number|null;daysToSellMedian:number|null;
@@ -18,7 +20,7 @@ export type CostLearningCohort = {
 export type LearningSummary={
  inventory:number;sales:number;field:number;forfeit:number;fieldDraft:number;uncategorized:number;
  saleMatched:number;saleUnmatched:number;saleForfeit:number;
- cohorts:number;qualified:number;
+ cohorts:number;qualified:number;structuredComplete:number;structuredPartial:number;structuredUnknown:number;canonicalizedCohorts:number;
 };
 export type LearningReport={summary:LearningSummary;cohorts:CostLearningCohort[]};
 
@@ -66,9 +68,17 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
   const list=soldByCode.get(sale.inventory_code)??[];list.push(sale);soldByCode.set(sale.inventory_code,list);
  }
  const buckets=new Map<string,CostHistoryRecord[]>();
+ const parsedByCode=new Map<string,StructuredSpecs>();
  for(const item of inventories){
   if(item.source_type!=='PURCHASE'||!(Number(item.buy_cost)>0)||!item.product_name?.trim()||!item.category?.trim())continue;
-  const key=normalizeCostModel(item.category)+'|'+normalizeCostModel(item.product_name);
+  const parsed=extractStructuredSpecs(item.product_name,mapCostHistoryCategory(item.category,item.product_name));
+  parsedByCode.set(item.inventory_code,parsed);
+  // Structured equivalence only for known complete model/spec and identical condition labels.
+  // Otherwise retain exact-name matching; no fuzzy model mixing or synthetic prices.
+  const condition=normalizeCostModel(String(item.details?.condition??''));
+  const key=parsed.canonicalKey
+   ?'SPEC|'+parsed.canonicalKey+'|CONDITION='+condition
+   :'NAME|'+normalizeCostModel(item.category)+'|'+normalizeCostModel(item.product_name);
   const list=buckets.get(key)??[];list.push(item);buckets.set(key,list);
  }
  const cohorts:CostLearningCohort[]=[];
@@ -119,6 +129,8 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
   }
   cohorts.push({
    id:key,model:items[0].product_name,rawCategory:items[0].category,
+   structured:parsedByCode.get(items[0].inventory_code)??extractStructuredSpecs(items[0].product_name,mapCostHistoryCategory(items[0].category,items[0].product_name)),
+   matchMethod:key.startsWith('SPEC|')?'STRUCTURED_EXACT':'STRICT_NAME',
    pricebookCategory:mapCostHistoryCategory(items[0].category,items[0].product_name),
    brand:inferCostBrand(items[0].product_name),
    purchaseSamples:items.length,soldItems:distinct,saleEvents,buyMedian,soldBuyMedian,
@@ -138,6 +150,10 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
   saleUnmatched:sales.filter(x=>!byCode.has(x.inventory_code)).length,
   saleForfeit:sales.filter(x=>byCode.get(x.inventory_code)?.source_type==='FORFEIT').length,
   cohorts:cohorts.length,qualified:cohorts.filter(x=>x.qualified).length,
+  structuredComplete:[...parsedByCode.values()].filter(x=>x.confidence==='COMPLETE').length,
+  structuredPartial:[...parsedByCode.values()].filter(x=>x.confidence==='PARTIAL').length,
+  structuredUnknown:[...parsedByCode.values()].filter(x=>x.confidence==='UNKNOWN').length,
+  canonicalizedCohorts:cohorts.filter(x=>x.matchMethod==='STRUCTURED_EXACT').length,
  };
  return {summary,cohorts};
 }
