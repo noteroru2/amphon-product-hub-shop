@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { ProductSummary, Profile } from "../types/product";
 import { PriceBookV28Preview } from "./PriceBookV28Preview";
+import { PriceBookV28Admin } from "./PriceBookV28Admin";
 import {
   approveAiBuyerOffer,
   loadAiBuyerCase,
@@ -599,6 +600,7 @@ export function AiBuyerAdmin({
         </div>
       )}
 
+      <PriceBookV28Admin />
       <PriceBookV28Preview />
       <div className="ai-summary-grid">
         <SummaryCard label="เคส" value={String(dashboard?.summary.total || 0)} />
