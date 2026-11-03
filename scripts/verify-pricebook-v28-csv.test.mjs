@@ -1,0 +1,14 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {validatePricebookV28Csv,PRICEBOOK_V28_HEADERS} from "../src/lib/pricebookV28Csv.ts";
+const header=PRICEBOOK_V28_HEADERS.join(",");
+const good="NOTEBOOK,Dell,Latitude 7440,7440,NORMAL,18000,10000,11500,12500";
+test("valid CSV can be previewed without a write",()=>{const x=validatePricebookV28Csv(header+"\n"+good);assert.equal(x.valid,true);assert.equal(x.rows.length,1)});
+test("duplicate variant rejected",()=>assert.ok(validatePricebookV28Csv(header+"\n"+good+"\n"+good).errors.some(x=>x.includes("DUPLICATE_VARIANT"))));
+test("incorrect price hierarchy rejected",()=>assert.ok(validatePricebookV28Csv(header+"\nNOTEBOOK,Dell,X,X,NORMAL,9000,8500,9500,10000").errors.some(x=>x.includes("PRICE_ORDER_INVALID"))));
+test("missing columns rejected",()=>assert.ok(validatePricebookV28Csv("category,model\nNOTEBOOK,A").errors.some(x=>x.startsWith("MISSING_HEADER"))));
+test("bad/NaN amounts rejected",()=>assert.ok(validatePricebookV28Csv(header+"\nNOTEBOOK,Dell,X,X,NORMAL,NaN,100,200,300").errors.some(x=>x.includes("INVALID_AMOUNT"))));
+test("quoted commas in model parsed",()=>assert.equal(validatePricebookV28Csv(header+'\nNOTEBOOK,Dell,"Latitude, 7440",7440,NORMAL,18000,10000,11000,12000').rows[0].model,"Latitude, 7440"));
+test("formula-like cells rejected",()=>assert.ok(validatePricebookV28Csv(header+"\nNOTEBOOK,Dell,=cmd(),X,NORMAL,9000,100,200,300").errors.some(x=>x.includes("FORMULA_LIKE_CELL"))));
+test("unclosed quoted CSV rejected",()=>assert.equal(validatePricebookV28Csv(header+'\n"broken').valid,false));
+test("empty CSV rejected",()=>assert.ok(validatePricebookV28Csv("").errors.includes("EMPTY_FILE")));
