@@ -24,3 +24,5 @@ jobs:
         run: node --test tests/facebook-publish-retry.test.mjs tests/facebook-sold-content.test.mjs tests/facebook-price-content.test.mjs tests/facebook-catalog-content.test.mjs tests/facebook-safe-resume.test.mjs
       - name: Meta Graph usage telemetry tests
         run: cd workers/r2-upload && node --test tests/facebook-graph-usage.test.mjs
+      - name: Publication receipt reconciliation tests
+        run: cd workers/r2-upload && node --test tests/facebook-post-reconcile.test.mjs
