@@ -1,6 +1,6 @@
 import {supabase} from './supabase';
 
-export type Pb28Draft={id:string;title:string;status:'DRAFT';source_version_id:string|null;created_at:string;updated_at:string};
+export type Pb28Draft={id:string;title:string;status:'DRAFT'|'FROZEN'|'ARCHIVED';source_version_id:string|null;created_at:string;updated_at:string};
 export type Pb28Entry={
  id:string;draft_id:string;category:string;brand:string;model:string;model_code:string;condition_key:string;
  estimated_resale:number;opening_offer:number;target_buy:number;hard_max:number;active:boolean;note:string;updated_at:string;
@@ -43,4 +43,9 @@ export async function importPb28Rows(draftId:string,rows:Pb28Row[]){
  if(rows.length===0||rows.length>250)throw new Error('นำเข้าได้ครั้งละ 1–250 รายการ');
  const {data,error}=await client().rpc('ai_buyer_pb28_import_rows',{p_draft_id:draftId,p_rows:rows});
  return checked(data,error) as number;
+}
+
+export async function managePb28Draft(draftId:string,action:'RENAME'|'FREEZE'|'REOPEN'|'ARCHIVE',title?:string){
+ const {data,error}=await client().rpc('ai_buyer_pb28_manage_draft',{p_draft_id:draftId,p_action:action,p_title:title??null});
+ return checked(data,error) as 'DRAFT'|'FROZEN'|'ARCHIVED';
 }
