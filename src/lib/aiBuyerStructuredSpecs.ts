@@ -106,7 +106,7 @@ export function extractStructuredSpecs(name:string,pricebookCategory:string):Str
  const cpu=extractCpu(n),gpu=extractGpu(n);
  const memory=extractRamAndStorage(n,category);
  const modelCode=extractModelCode(n,family);
- const screen=n.match(/\b(1[1-9]|2[0-9])(?:\.(?:3|4|5|6|8|9))?\s*(?:inch|inches|["]|นิ้ว)\b/);
+ const screen=n.match(/\b(?:1[1-9]|2[0-9])(?:\.(?:3|4|5|6|8|9))?\s*(?:inches|inch|[\"]|นิ้ว)(?=$|[\s/|,])/);
  const screenInches=screen?Number(screen[0].match(/\d+(?:\.\d+)?/)?.[0]):null;
  const warnings=[...memory.warnings];
  const damage=/เสีย|ซาก|เปิดไม่ติด|น้ำเข้า|จอแตก|จอเสีย|ล๊อค|ล็อค|อะไหล่|แบตเสื่อม|ตำหนิ/.test(n);
