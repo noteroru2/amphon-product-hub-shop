@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {
  listPb28Drafts,listPb28Entries,listPb28Audit,createPb28Draft,savePb28Entry,deletePb28Entry,
- bulkPb28Edit,importPb28Rows,type Pb28Draft,type Pb28Entry,type Pb28Row,type Pb28Audit,
+ bulkPb28Edit,importPb28Rows,managePb28Draft,type Pb28Draft,type Pb28Entry,type Pb28Row,type Pb28Audit,
 } from '../lib/priceBookV28Admin';
 import {validatePricebookV28Csv,PRICEBOOK_V28_HEADERS,type PricebookV28CsvResult} from '../lib/pricebookV28Csv';
 
@@ -111,6 +111,15 @@ export function PriceBookV28Admin(){
    {notice&&<p role="status" style={alert}>{notice}</p>}
    {selected&&<>
     <p style={{fontSize:13,marginTop:12}}>เวอร์ชันร่าง: <strong>{selected.title}</strong> · {entries.length} รายการ · สถานะ {selected.status} · ไม่พร้อมเผยแพร่โดยอัตโนมัติ</p>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+      {selected.status==='DRAFT'&&<>
+       <button style={button} disabled={busy} onClick={()=>{const next=window.prompt('แก้ชื่อ Draft',selected.title);if(next!==null)void handle(()=>managePb28Draft(selectedId,'RENAME',next),'เปลี่ยนชื่อ Draft แล้ว')}}>เปลี่ยนชื่อ</button>
+       <button style={button} disabled={busy} onClick={()=>void handle(()=>managePb28Draft(selectedId,'FREEZE'),'ล็อกร่างเพื่อรอตรวจแล้ว')}>ล็อกร่าง (Freeze)</button>
+      </>}
+      {selected.status==='FROZEN'&&<button style={button} disabled={busy} onClick={()=>void handle(()=>managePb28Draft(selectedId,'REOPEN'),'เปิดร่างให้แก้ไขได้อีกครั้ง')}>เปิดให้แก้ไข (Reopen)</button>}
+      {selected.status!=='ARCHIVED'&&<button style={button} disabled={busy} onClick={()=>{if(window.confirm('Archive Draft นี้? ข้อมูลและ Audit Log จะยังเก็บไว้ และจะกลับมาแก้ไขไม่ได้'))void handle(()=>managePb28Draft(selectedId,'ARCHIVE'),'เก็บ Draft ลง Archive แล้ว')}}>Archive Draft</button>}
+    </div>
+    {selected.status!=='DRAFT'&&<p role="status" style={alert}>ร่างนี้เป็นแบบอ่านอย่างเดียว กรุณา Reopen หากต้องการแก้ไข หรือสร้างร่างใหม่</p>}
     <div style={grid}>
      {inputFields.map(([key,label])=><label key={key} style={{display:'grid',gap:4,fontSize:13}}>
       {label}<input style={baseInput} type={numericFields.has(key)?'number':'text'} min={numericFields.has(key)?0:undefined} step={numericFields.has(key)?1:undefined}
@@ -120,7 +129,7 @@ export function PriceBookV28Admin(){
      <label style={{display:'flex',alignItems:'center',gap:8}}><input type="checkbox" checked={entry.active} onChange={e=>setEntry(p=>({...p,active:e.target.checked}))}/> เปิดรายการในร่าง</label>
     </div>
     <div style={{display:'flex',gap:8,margin:'12px 0',flexWrap:'wrap'}}>
-     <button style={button} disabled={busy||!entry.model.trim()||!entry.category.trim()} onClick={()=>void save()}>{editingId?'บันทึกแก้ไขรายการ':'เพิ่มรายการใน Draft'}</button>
+     <button style={button} disabled={busy||selected.status!=='DRAFT'||!entry.model.trim()||!entry.category.trim()} onClick={()=>void save()}>{editingId?'บันทึกแก้ไขรายการ':'เพิ่มรายการใน Draft'}</button>
      <button style={button} disabled={busy} onClick={()=>{setEditingId(null);setEntry({...empty})}}>ล้างฟอร์ม</button>
     </div>
     <section style={alert}>
@@ -134,7 +143,7 @@ export function PriceBookV28Admin(){
        <thead><tr><th>รุ่น</th><th>Opening</th><th>Target</th><th>Hard Max</th></tr></thead>
        <tbody>{csv.result.rows.slice(0,8).map((r,i)=><tr key={i}><td>{r.model}</td><td>{fmt(Number(r.opening_offer))}</td><td>{fmt(Number(r.target_buy))}</td><td>{fmt(Number(r.hard_max))}</td></tr>)}</tbody>
       </table></div>}
-      <button style={{...button,marginTop:8}} disabled={busy||!csv.result.valid||csv.result.rows.length>250} onClick={()=>void applyImport()}>ยืนยัน Import เข้า Draft</button>
+      <button style={{...button,marginTop:8}} disabled={busy||selected.status!=='DRAFT'||!csv.result.valid||csv.result.rows.length>250} onClick={()=>void applyImport()}>ยืนยัน Import เข้า Draft</button>
      </div>}
     </section>
     <div style={{display:'flex',gap:8,margin:'14px 0',flexWrap:'wrap'}}>
@@ -151,7 +160,7 @@ export function PriceBookV28Admin(){
        </select>
       </label>
       <label style={{display:'grid',gap:4}}>เพิ่ม / ลด (บาท)<input style={baseInput} type="number" value={delta} onChange={e=>setDelta(e.target.value)}/></label>
-      <div style={{alignSelf:'end'}}><button style={button} disabled={busy||!checked.length||!delta.trim()||projected.some(p=>!p.ok)} onClick={()=>void bulk()}>Bulk Edit {checked.length} รายการ</button></div>
+      <div style={{alignSelf:'end'}}><button style={button} disabled={busy||selected.status!=='DRAFT'||!checked.length||!delta.trim()||projected.some(p=>!p.ok)} onClick={()=>void bulk()}>Bulk Edit {checked.length} รายการ</button></div>
      </div>
      {!!projected.length&&<small>Preview: {projected.slice(0,5).map(e=>e.model+': '+fmt(e[bulkField])+(e.ok?'':' (ผิดเงื่อนไข)')).join(' · ')}</small>}
      <div style={{overflowX:'auto',marginTop:10}}>
@@ -161,7 +170,7 @@ export function PriceBookV28Admin(){
         <td><input type="checkbox" checked={checked.includes(r.id)} onChange={e=>setChecked(p=>e.target.checked?[...p,r.id]:p.filter(id=>id!==r.id))}/></td>
         <td>{r.category} · {r.brand} {r.model}<div style={{opacity:.7}}>{r.model_code} {r.active?'':'(ปิด)'}</div></td>
         <td>{r.condition_key}</td><td>{fmt(r.opening_offer)}</td><td>{fmt(r.target_buy)}</td><td>{fmt(r.hard_max)}</td>
-        <td><button style={button} onClick={()=>{setEditingId(r.id);setEntry({...r});window.scrollTo({top:0,behavior:'smooth'})}}>แก้</button> <button style={button} disabled={busy} onClick={()=>void remove(r)}>ลบ</button></td>
+        <td><button style={button} onClick={()=>{setEditingId(r.id);setEntry({...r});window.scrollTo({top:0,behavior:'smooth'})}}>แก้</button> <button style={button} disabled={busy||selected.status!=='DRAFT'} onClick={()=>void remove(r)}>ลบ</button></td>
        </tr>)}</tbody>
       </table>
       {!filtered.length&&<p style={{opacity:.7}}>ไม่พบรายการ</p>}
