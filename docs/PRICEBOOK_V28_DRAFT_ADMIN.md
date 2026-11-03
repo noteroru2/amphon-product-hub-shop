@@ -20,6 +20,7 @@ The following SQL scripts are applied in order (do NOT run the older AI Buyer Pr
 2. `supabase/pricebook_v28_draft_lifecycle.sql`
 3. `supabase/pricebook_v28_preserve_matching.sql`
 4. `supabase/pricebook_v28_spec_variant_identity.sql`
+5. `supabase/pricebook_v28_performance_indexes.sql`
 
 These scripts were executed against the connected Supabase project on November 3, 2026 and tested inside transaction rollbacks. They are intentionally **not** auto-run by frontend deployment, and do not rewrite the original pricebook tables. Before an additional environment setup, review and register the scripts into that environment's migration workflow.
 
@@ -36,3 +37,5 @@ These scripts were executed against the connected Supabase project on November 3
 - Verify authenticated Owner/Admin UI and Supabase REST response in the browser; do not test with real sale negotiations.
 - Check legacy V2.7 is still ACTIVE; `ai_buyer_category_automation_modes` stays APPROVAL.
 - Before ANY actual V2.8 pricing promotion, separately create validated publish + rollback with versioned category rules and worker approval E2E. Server-side guard PR #126 remains Draft and is NOT part of this deployment.
+
+Security advisor note: the five write APIs and lifecycle API intentionally use authenticated `SECURITY DEFINER` RPC so mutations are audited while direct DML grants remain revoked. Every RPC verifies the current JWT `auth.uid()` belongs to an active Owner/Admin profile; PUBLIC and anon EXECUTE are revoked. The Supabase advisor flags these intentional authenticated callable functions for review, not as evidence of bypassed role checks. Do not reuse these APIs for public customer pricing.
