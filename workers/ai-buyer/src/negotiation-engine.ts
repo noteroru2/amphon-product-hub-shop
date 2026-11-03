@@ -1,4 +1,5 @@
 import { createGuardedOffer } from './pricing-engine'
+import { evaluateApprovalGuard } from './offer-approval-guard'
 
 export interface OfferFlowEnv {
   SUPABASE_URL: string
@@ -751,6 +752,27 @@ export async function approvePreparedOffer(
   ))
   const offer = rows[0]
   if (!offer) return { handled: false, reason: 'OFFER_NOT_APPROVABLE' }
+
+  // Enforce the pricing/version/amount invariants on the SERVER before
+  // constructing an outbound action. The browser's preview is not authoritative.
+  const decision = await loadDecision(env, caseId)
+  const activeVersionId = decision?.price_source === 'PRICE_BOOK'
+    ? await loadActivePriceBookVersionId(env)
+    : null
+  const guarded = evaluateApprovalGuard({
+    categoryEnabled: rollout.active,
+    categoryMode: rollout.mode,
+    caseState: caseRow.state,
+    offerDecisionId: offer.pricing_decision_id,
+    latestDecisionId: decision?.id || '',
+    offerAmount: Number(offer.amount),
+    decisionHardMax: Number(decision?.hard_max),
+    decisionConfidence: Number(decision?.pricing_confidence),
+    priceSource: decision?.price_source || '',
+    decisionVersionId: decision?.price_book_version_id || null,
+    activeVersionId,
+  })
+  if (!guarded.allowed) return { handled: false, reason: guarded.reason }
 
   const text = initialOfferText(offer.amount)
   const action = await createOutboundAction(env, {
