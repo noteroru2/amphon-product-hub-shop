@@ -1,5 +1,6 @@
 import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
 import { facebookObservedFetch, facebookRecordGraphResponse } from './facebook-graph-usage'
+import { reconcileFacebookPublishAttempts } from './facebook-post-reconcile'
 import { facebookSoldMessage } from './facebook-content'
 import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'
 type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
@@ -221,6 +222,8 @@ async function collectFacebookLearning(env:Env){
   }catch(e){const msg=e instanceof Error?e.message:String(e);await rest(env,'facebook_learning_ledger?id=eq.'+encodeURIComponent(row.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({metric_status:/permission|unsupported/i.test(msg)?'UNAVAILABLE':'ERROR',metric_error:msg.slice(0,800),measured_at:new Date().toISOString(),updated_at:new Date().toISOString()})})}}
 }
 export async function runFacebookRotationSweep(env:Env){
+  // Read-only Graph reconciliation happens before any new publish claims.
+  try{await reconcileFacebookPublishAttempts(env)}catch(e){console.error('FACEBOOK_POST_ID_RECONCILE_FAILED',e instanceof Error?e.message:'unknown')}
  const bkk=new Date(Date.now()+7*60*60*1000);if(bkk.getUTCDay()===1&&bkk.getUTCHours()>=0&&bkk.getUTCHours()<2){try{await rest(env,'rpc/facebook_rotation_generate_week',{method:'POST',body:JSON.stringify({target_date:bkk.toISOString().slice(0,10)})})}catch(e){console.error('FACEBOOK ROTATION weekly generation failed',e)}}
  await rest(env,'rpc/facebook_rotation_recover_stale',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_cancel_sold',{method:'POST',body:'{}'});await rest(env,'rpc/facebook_rotation_reconcile_false_skips',{method:'POST',body:'{}'})
  const jobs=await rest(env,'rpc/facebook_rotation_claim_due',{method:'POST',body:JSON.stringify({max_jobs:3})})
