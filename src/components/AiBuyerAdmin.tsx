@@ -20,6 +20,7 @@ import {
 import type { ProductSummary, Profile } from "../types/product";
 import { PriceBookV28Preview } from "./PriceBookV28Preview";
 import { PriceBookV28Admin } from "./PriceBookV28Admin";
+import { AiBuyerCostHistoryImporter } from "./AiBuyerCostHistoryImporter";
 import {
   approveAiBuyerOffer,
   loadAiBuyerCase,
@@ -600,6 +601,7 @@ export function AiBuyerAdmin({
         </div>
       )}
 
+      <AiBuyerCostHistoryImporter />
       <PriceBookV28Admin />
       <PriceBookV28Preview />
       <div className="ai-summary-grid">

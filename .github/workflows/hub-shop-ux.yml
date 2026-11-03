@@ -9,6 +9,7 @@ on:
       - 'supabase/migrations/**'
       - 'supabase/functions/seo-connector/**'
       - 'tests/seo-connector.test.mjs'
+      - 'scripts/verify-ai-buyer-cost-history.test.mjs'
       - 'scripts/verify-pricebook-v28.test.mjs'
       - 'scripts/verify-pricebook-v28-csv.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
@@ -66,6 +67,9 @@ jobs:
 
       - name: PriceBook V2.8 independent safety contracts
         run: node --experimental-strip-types --test scripts/verify-pricebook-v28.test.mjs scripts/verify-pricebook-v28-csv.test.mjs
+
+      - name: Verify AI Buyer cost-history parser
+        run: node --experimental-strip-types --test scripts/verify-ai-buyer-cost-history.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck
