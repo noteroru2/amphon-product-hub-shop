@@ -152,10 +152,10 @@ async function createFacebookFeed(env:Env,key:string,queueId:string,marker:strin
  if(!r.ok&&j?.error)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
  throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
 }
-async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string,queueId:string){
- return withFacebookPageWrite(env,key,()=>publishFacebookRotationPostUnchecked(env,productId,key,templateId,queueId))
+async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string,queueId:string,claimToken:string){
+ return withFacebookPageWrite(env,key,()=>publishFacebookRotationPostUnchecked(env,productId,key,templateId,queueId,claimToken))
 }
-async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key:string,templateId:string,queueId:string){
+async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key:string,templateId:string,queueId:string,claimToken:string){
  const authority=await rest(env,'products?id=eq.'+encodeURIComponent(productId)+'&select=status,one_availability,one_availability_version,one_stock_age_days,one_quick_sale_price,one_dealer_price,one_dealer_eligibility&limit=1'),stock=authority?.[0]
  if(!stock||stock.one_availability!=='IN_STOCK'||!['ready_to_list','published','reserved'].includes(stock.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const rows=await rest(env,'commerce_public_listing_v?product_id=eq.'+encodeURIComponent(productId)+'&select=product_id,sku,title,status,condition_percent,price,warranty_until,defects,specs,images,slug&limit=1'),p=rows?.[0]
@@ -175,7 +175,7 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  }
  // Every unique queue attempt must be committed BEFORE Facebook /feed.
  const prepared=await rest(env,'rpc/facebook_publish_prepare',{method:'POST',body:JSON.stringify({
-   p_queue_id:queueId,p_connection_key:key,p_claim_token:null,
+   p_queue_id:queueId,p_connection_key:key,p_claim_token:claimToken,
  })})
  if(!prepared?.ready||!prepared.marker)throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
  const fullMessage=message+'\n\n🔖 รหัสประกาศ: '+String(prepared.marker)
@@ -228,7 +228,7 @@ export async function runFacebookRotationSweep(env:Env){
  for(const job of Array.isArray(jobs)?jobs:[]){
   try{
    // A recorded external ID is a completed publish, even if follow-up work failed.
-   const out=job.post_id?{postId:String(job.post_id),pageId:String((await creds(env,'facebook_page',String(job.connection_key))).pageId)}:await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id),String(job.id))
+   const out=job.post_id?{postId:String(job.post_id),pageId:String((await creds(env,'facebook_page',String(job.connection_key))).pageId)}:await publishFacebookRotationPost(env,String(job.product_id),String(job.connection_key),String(job.template_id),String(job.id),String(job.claim_token))
    const postedAt=job.posted_at||new Date().toISOString()
    await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(job.id),{method:'PATCH',headers:{prefer:'return=minimal'},body:JSON.stringify({post_id:out.postId,posted_at:postedAt})})
    const verified=await verifyFacebookPost(env,String(job.connection_key),String(out.postId))
