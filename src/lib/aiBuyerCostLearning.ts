@@ -113,10 +113,13 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
   const freshness=lastSaleAt!==null&&new Date(lastSaleAt).getTime()>=now.getTime()-180*86400000&&new Date(lastSaleAt).getTime()<=now.getTime()+86400000;
   const validSale=saleMedian!==null&&saleMedian>0;
   const distinct=completed.length;
-  const qualified=items.length>=3&&distinct>=3&&freshness&&validSale&&spreadMedian!==null&&spreadMedian>0&&confirmedProfitable;
+  // Even exact legacy names are not sufficient for automated numeric suggestions
+  // if CPU/RAM/SSD/model-family or condition remains uncertain.
+  const specsVerified=items.every(item=>parsedByCode.get(item.inventory_code)?.confidence==='COMPLETE');
+  const qualified=items.length>=3&&distinct>=3&&specsVerified&&freshness&&validSale&&spreadMedian!==null&&spreadMedian>0&&confirmedProfitable;
   const reason=qualified?'ผ่านเกณฑ์ขั้นต่ำ 3 เครื่องซื้อจริงและขายจริงใน 180 วัน (ยังต้องตรวจราคาตลาด)':
     items.length<3||distinct<3?'หลักฐานเครื่องที่ซื้อและขายจริงยังไม่ถึง 3 รหัสสินค้า':
-    !freshness?'ไม่มีหลักฐานขายภายใน 180 วัน':!validSale?'ยังไม่มีราคาขายจริงที่ตรวจได้':!confirmedProfitable?'กำไรจริงไม่ครบหรือไม่เป็นบวกทุกเครื่อง':'ผลต่างทุน–ขายไม่เป็นบวก';
+    !specsVerified?'สเปกหรือสภาพไม่ครบถ้วน ต้องตรวจด้วยคนก่อน':!freshness?'ไม่มีหลักฐานขายภายใน 180 วัน':!validSale?'ยังไม่มีราคาขายจริงที่ตรวจได้':!confirmedProfitable?'กำไรจริงไม่ครบหรือไม่เป็นบวกทุกเครื่อง':'ผลต่างทุน–ขายไม่เป็นบวก';
   let estimatedResale:number|null=null,openingOffer:number|null=null,targetBuy:number|null=null,hardMax:number|null=null;
   if(qualified&&saleMedian!==null&&soldBuyMedian!==null){
    estimatedResale=round100(saleMedian);
