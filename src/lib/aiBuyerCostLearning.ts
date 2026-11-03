@@ -115,7 +115,14 @@ export function analyzeCostHistory(records:CostHistoryRecord[],now=new Date()):L
   const distinct=completed.length;
   // Even exact legacy names are not sufficient for automated numeric suggestions
   // if CPU/RAM/SSD/model-family or condition remains uncertain.
-  const specsVerified=items.every(item=>parsedByCode.get(item.inventory_code)?.confidence==='COMPLETE');
+  const specsVerified=items.every(item=>{
+   const parsed=parsedByCode.get(item.inventory_code);
+   // Preserve the source device's defect flags even after an owner normalizes its name.
+   const original=String(item.details?._original_product_name??item.product_name);
+   const originalCondition=String(item.details?.condition??'');
+   const defects=/เสีย|ซาก|เปิดไม่ติด|น้ำเข้า|จอแตก|จอเสีย|ล๊อค|ล็อค|อะไหล่|แบตเสื่อม|ตำหนิ/.test(original+' '+originalCondition);
+   return parsed?.confidence==='COMPLETE'&&!defects;
+  });
   const qualified=items.length>=3&&distinct>=3&&specsVerified&&freshness&&validSale&&spreadMedian!==null&&spreadMedian>0&&confirmedProfitable;
   const reason=qualified?'ผ่านเกณฑ์ขั้นต่ำ 3 เครื่องซื้อจริงและขายจริงใน 180 วัน (ยังต้องตรวจราคาตลาด)':
     items.length<3||distinct<3?'หลักฐานเครื่องที่ซื้อและขายจริงยังไม่ถึง 3 รหัสสินค้า':
