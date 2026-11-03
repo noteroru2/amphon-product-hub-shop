@@ -18,12 +18,31 @@ export interface FacebookPageOption{id:string;name:string}
 export async function listFacebookPages(connectionKey:string){return call<{ok:boolean;pages:FacebookPageOption[]}>('/commerce/channel-connections/facebook-pages',{method:'POST',body:JSON.stringify({connectionKey})})}
 export async function selectFacebookPage(connectionKey:string,pageId:string){return call<{ok:boolean;page:FacebookPageOption}>('/commerce/channel-connections/facebook-select-page',{method:'POST',body:JSON.stringify({connectionKey,pageId})})}
 
-export async function facebookPublishSelected(productId:string,connectionKeys:string[]){return call<{ok:boolean;results:Array<{connectionKey:string;postId:string;reused:boolean}>}>('/commerce/facebook/publish-selected',{method:'POST',body:JSON.stringify({productId,connectionKeys})})}
+export type FacebookManualEnqueueResult={connectionKey:string;ok:boolean;status:'QUEUED'|'ALREADY_PUBLISHED'|'IN_PROGRESS'|'REPAIR_PENDING'|'NEEDS_REVIEW'|'NOT_PUBLISHABLE'|'PAGE_NOT_ACTIVE'|'ERROR';queueId?:string;postId?:string;reusedQueue?:boolean;error?:string}
+export async function facebookPublishSelected(productId:string,connectionKeys:string[]){return call<{ok:boolean;results:FacebookManualEnqueueResult[]}>('/commerce/facebook/publish-selected',{method:'POST',body:JSON.stringify({productId,connectionKeys})})}
 export async function facebookSyncProduct(productId:string){return call<{ok:boolean;results:unknown[]}>('/commerce/facebook/sync-product',{method:'POST',body:JSON.stringify({productId})})}
 
 export async function listActiveFacebookPages(){return call<{pages:Array<{connectionKey:string;label:string;pageId:string|null}>}>('/commerce/facebook/active-pages')}
 
 export type FacebookRotationStatus={settings:{enabled:boolean;dry_run:boolean;posts_per_product_per_week:number;min_page_gap_minutes:number;min_product_gap_hours:number;page_daily_budget:number;active_connection_keys?:string[];paused_connection_keys?:string[];sold_sync_paused?:boolean;price_sync_paused?:boolean;catalog_sync_paused?:boolean;last_generated_week?:string|null;last_generated_at?:string|null}|null;queue:Array<{id:string;product_id:string;connection_key:string;scheduled_at:string;rotation_no:number;template_id:string;status:string;post_id?:string|null;last_error?:string|null;product?:{id:string;sku:string;title:string;status:string;price:number}|null}>}
+export type FacebookAutomationQueueItem={
+ id:string;product_id:string;connection_key:string;lane:string;status:string;attention_state:string;gate_reason:string;
+ next_eligible_at?:string|null;scheduled_at:string;sku:string;title:string;category:string;stock_age_days:number;attempts:number;last_error?:string|null
+}
+export type FacebookAutomationPage={
+ connectionKey:string;postsToday:number;postsLast7Days:number;feedSuccess24h:number;graphErrors24h:number;
+ usagePercent:number;confirmedReceipts:number;needsPostIdReview:number;ledgerLast7Days:number;
+ queueCounts:Record<string,number>;cooldownUntil:string|null;cooldownReason:string|null;directSales:number|null;directProfit:number|null
+}
+export type FacebookAutomationDashboard={
+ generatedAt:string;settings:{rolling_24h_budget:number;min_page_gap_minutes:number;publish_window_start_hour:number;publish_window_end_hour:number;enabled:boolean;dry_run:boolean}|null;
+ pages:FacebookAutomationPage[];queue:FacebookAutomationQueueItem[];
+ daily:Array<{day_bkk:string;connection_key:string;posted_count:number;new_arrival_count:number;rotation_count:number}>;
+ alerts:Array<{alert_type:string;connection_key:string;severity:string;last_seen_at:string}>;
+ metricSource:string;financeVisible:boolean
+}
+export async function getFacebookAutomationDashboard(){return call<FacebookAutomationDashboard>('/commerce/facebook/automation-dashboard')}
+
 export async function getFacebookRotationStatus(){return call<FacebookRotationStatus>('/commerce/facebook/rotation-status')}
 export async function updateFacebookRotationSettings(patch:{enabled?:boolean;dryRun?:boolean;activeConnectionKeys?:string[];pausedConnectionKeys?:string[]}){return call<{ok:boolean}>('/commerce/facebook/rotation-settings',{method:'PATCH',body:JSON.stringify(patch)})}
 
