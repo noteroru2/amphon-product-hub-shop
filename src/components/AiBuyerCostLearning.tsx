@@ -32,7 +32,7 @@ export function AiBuyerCostLearning(){
  const onSave=async()=>{
   if(!selected||!fields||!verified||!draftId){setError('กรุณาเลือก Draft และยืนยันว่าตรวจรุ่น สเปก สภาพ และราคาตลาดแล้ว');return}
   const e=Number(fields.estimatedResale),o=Number(fields.openingOffer),t=Number(fields.targetBuy),h=Number(fields.hardMax);
-  if(!fields.model.trim()||!fields.category.trim()||![e,o,t,h].every(Number.isFinite)||!(e>0&&o>=0&&o<=t&&t<=h&&h<=e)){
+  if(!fields.model.trim()||!fields.category.trim()||![fields.estimatedResale,fields.openingOffer,fields.targetBuy,fields.hardMax].every(x=>x.trim()!=='')||![e,o,t,h].every(Number.isFinite)||!(e>0&&o>=0&&o<=t&&t<=h&&h<=e)){
    setError('ตรวจตัวเลขอีกครั้ง ต้องเป็น ราคาเปิดรับ ≤ เป้าหมาย ≤ เพดาน ≤ ราคาขายต่อ และราคาขายต่อมากกว่า 0');return;
   }
   if(fields.category==='OTHER'&&!window.confirm('หมวด OTHER อาจไม่ตรงกับรุ่นจริง ตรวจสอบหมวดแล้วใช่ไหม?'))return;
@@ -43,7 +43,7 @@ export function AiBuyerCostLearning(){
   try{
    const existing=await listPb28Entries(draftId);
    const match=existing.find(x=>[x.category,x.brand,x.model,x.model_code,x.condition_key].map(s=>s.trim().toLowerCase()).join('|')===
-     [fields.category,fields.brand,fields.model,fields.modelCode,'NORMAL'].map(s=>s.trim().toLowerCase()).join('|')&&Object.keys(x.spec_match??{}).length===0);
+     [fields.category,fields.brand,fields.model,fields.modelCode,'NORMAL'].map(s=>s.trim().toLowerCase()).join('|'));
    if(match)throw new Error('พบรายการรุ่นนี้ใน Draft อยู่แล้ว กรุณาตรวจและแก้ไขจากหน้า PriceBook Admin เพื่อไม่ให้ทับราคาเดิม');
    const refs=selected.inventoryCodes.slice(0,8).join(',');
    const note='Owner reviewed Cost Learning V1 | sample units '+selected.purchaseSamples+
