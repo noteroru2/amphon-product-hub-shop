@@ -605,7 +605,7 @@ export function PublishCenter({
                   </span>
                 </div>
                 </button>
-                {fbActiveKeys.length > 0 && (
+                {['owner','admin'].includes(profile.role) && fbActiveKeys.length > 0 && (
                   <div className="publish-facebook-actions" onClick={(event) => event.stopPropagation()}>
                     {['ready_to_list','published','reserved'].includes(product.status) && (
                       <button
@@ -614,10 +614,10 @@ export function PublishCenter({
                         disabled={fbPublishing === product.id}
                         onClick={(event) => { event.stopPropagation(); void publishFacebookSelected(product); }}
                       >
-                        {fbPublishing === product.id ? 'กำลังโพสต์…' : `🔵 โพสต์ Facebook (${fbActiveKeys.length})`}
+                        {fbPublishing === product.id ? 'กำลังเข้าคิว…' : `🔵 เข้าคิว Facebook (${fbActiveKeys.length})`}
                       </button>
                     )}
-                    {['published','reserved','sold'].includes(product.status) && (
+                    {!(fbRotation?.settings?.sold_sync_paused || fbRotation?.settings?.price_sync_paused || fbRotation?.settings?.catalog_sync_paused) && ['published','reserved','sold'].includes(product.status) && (
                       <button
                         type="button"
                         className="facebook-sync-button"
