@@ -1,5 +1,5 @@
 import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'
-import { facebookObservedFetch } from './facebook-graph-usage'
+import { facebookObservedFetch, facebookRecordGraphResponse } from './facebook-graph-usage'
 import { facebookSoldMessage } from './facebook-content'
 import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'
 type Env={SUPABASE_URL:string;SUPABASE_SECRET_KEY:string;CHANNEL_OAUTH_CALLBACK_URL?:string}
@@ -116,11 +116,41 @@ function facebookGraphDiagnostics(response: Response, data: any): string {
  return parts.length?':'+parts.join(':'):''
 }
 
-async function createFacebookFeed(env:Env,key:string,url:string,params:URLSearchParams){
+async function createFacebookFeed(env:Env,key:string,queueId:string,marker:string,url:string,params:URLSearchParams){
+ // Do NOT await analytics before reading and durably saving a successful Graph ID.
  let r:Response,j:any
- try{r=await facebookObservedFetch(env,key,'feed-publish',url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params});j=await r.json()}catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
- if(!r.ok||j.error||!j.id)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
- return j
+ try{
+   r=await fetch(url,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:params})
+   j=await r.json()
+ }catch{
+   // Graph may have accepted the post; the preflight receipt prevents retries.
+   throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
+ }
+ if(r.ok&&!j?.error&&j?.id){
+   let saved=false
+   for(let attempt=0;attempt<3&&!saved;attempt++){
+     try {
+       const record=await rest(env,'rpc/facebook_publish_capture',{
+         method:'POST',body:JSON.stringify({p_queue_id:queueId,p_connection_key:key,
+           p_post_id:String(j.id),p_marker:marker}),
+       })
+       saved=record?.ok===true && record?.post_id===String(j.id)
+     }catch(e){console.error('FACEBOOK_POST_ID_CAPTURE_RETRY',key,attempt+1)}
+   }
+   if(!saved)throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
+   // Metrics must never stand between Graph 200 and the durable Post ID.
+   try{await facebookRecordGraphResponse(env,key,'feed-publish',r,j)}catch{}
+   return j
+ }
+ try{await facebookRecordGraphResponse(env,key,'feed-publish',r,j)}catch{}
+ if(!r.ok&&r.status>=400&&r.status<500&&j?.error?.code){
+   try{await rest(env,'rpc/facebook_publish_reject',{method:'POST',body:JSON.stringify({
+     p_queue_id:queueId,p_connection_key:key,p_error:String(j.error.message||r.status),
+   })})}catch{console.error('FACEBOOK_PUBLISH_REJECTION_RECORD_FAILED',key)}
+ }
+ if(!r.ok&&r.status>=500)throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
+ if(!r.ok&&j?.error)throw new Error('FACEBOOK_PUBLISH_FAILED:'+(j.error?.code||'')+':'+(j.error?.message||r.status)+facebookGraphDiagnostics(r,j))
+ throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
 }
 async function publishFacebookRotationPost(env:Env,productId:string,key:string,templateId:string,queueId:string){
  return withFacebookPageWrite(env,key,()=>publishFacebookRotationPostUnchecked(env,productId,key,templateId,queueId))
@@ -132,19 +162,30 @@ async function publishFacebookRotationPostUnchecked(env:Env,productId:string,key
  if(!p||!['ready_to_list','published','reserved'].includes(p.status))throw new Error('PRODUCT_NOT_PUBLISHABLE')
  const cr=await creds(env,'facebook_page',key);if(!cr.pageAccessToken||!cr.pageId)throw new Error('FACEBOOK_PAGE_TOKEN_MISSING')
  const {message,shop,images}=facebookSalesContent({...p,...stock},templateId);let j:any
- if(images.length){const mediaIds:string[]=[];for(const url of images){const ur=await facebookObservedFetch(env,key,'photo-upload','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken})});const uj:any=await ur.json();if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj));mediaIds.push(String(uj.id))}
- const params=new URLSearchParams({message,access_token:cr.pageAccessToken});mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})));j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)}
- else {j=await createFacebookFeed(env,key,'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',new URLSearchParams({message,link:shop,access_token:cr.pageAccessToken}))}
+ const mediaIds:string[]=[]
+ // Unpublished photos can be safely uploaded before the durable /feed preflight.
+ for(const url of images){
+   const ur=await facebookObservedFetch(env,key,'photo-upload','https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/photos',{
+     method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
+     body:new URLSearchParams({url,published:'false',access_token:cr.pageAccessToken}),
+   })
+   const uj:any=await ur.json()
+   if(!ur.ok||uj.error||!uj.id)throw new Error('PHOTO_UPLOAD_FAILED:'+(uj.error?.code||'')+':'+(uj.error?.message||ur.status)+facebookGraphDiagnostics(ur,uj))
+   mediaIds.push(String(uj.id))
+ }
+ // Every unique queue attempt must be committed BEFORE Facebook /feed.
+ const prepared=await rest(env,'rpc/facebook_publish_prepare',{method:'POST',body:JSON.stringify({
+   p_queue_id:queueId,p_connection_key:key,p_claim_token:null,
+ })})
+ if(!prepared?.ready||!prepared.marker)throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')
+ const fullMessage=message+'\n\n🔖 รหัสประกาศ: '+String(prepared.marker)
+ const params=new URLSearchParams({message:fullMessage,access_token:cr.pageAccessToken})
+ if(mediaIds.length)mediaIds.forEach((id,i)=>params.set('attached_media['+i+']',JSON.stringify({media_fbid:id})))
+ else params.set('link',shop)
+ j=await createFacebookFeed(env,key,queueId,String(prepared.marker),
+   'https://graph.facebook.com/v23.0/'+encodeURIComponent(cr.pageId)+'/feed',params)
 
- // Record the Graph ID BEFORE releasing the page lease or requesting Graph
- // readback. If this Supabase write fails, do not re-publish this queue item.
- try {
-  const saved=await rest(env,'facebook_rotation_queue?id=eq.'+encodeURIComponent(queueId)+'&status=eq.CLAIMED&select=id',{
-   method:'PATCH',headers:{prefer:'return=representation'},
-   body:JSON.stringify({post_id:String(j.id),posted_at:new Date().toISOString()}),
-  })
-  if(!Array.isArray(saved)||saved.length!==1)throw new Error('POST_ID_NOT_DURABLE')
- }catch{throw new Error('FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED')}
+ // The atomic Graph capture RPC has already written queue and ledger receipts.
  return {postId:String(j.id),pageId:String(cr.pageId),imageCount:images.length}
 }
 
