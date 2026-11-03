@@ -3,7 +3,7 @@ import {supabase} from './supabase';
 export type Pb28Draft={id:string;title:string;status:'DRAFT'|'FROZEN'|'ARCHIVED';source_version_id:string|null;created_at:string;updated_at:string};
 export type Pb28Entry={
  id:string;draft_id:string;category:string;brand:string;model:string;model_code:string;condition_key:string;
- estimated_resale:number;opening_offer:number;target_buy:number;hard_max:number;active:boolean;note:string;updated_at:string;
+ estimated_resale:number;opening_offer:number;target_buy:number;hard_max:number;active:boolean;note:string;aliases:string[];spec_match:Record<string,unknown>;adjustments:Record<string,unknown>;updated_at:string;
 };
 export type Pb28Row=Omit<Pb28Entry,'id'|'draft_id'|'updated_at'>;
 export type Pb28Audit={id:number;draft_id:string;entry_id:string|null;actor_id:string;action:string;before_data:Record<string,unknown>|null;after_data:Record<string,unknown>|null;created_at:string};
@@ -16,7 +16,7 @@ export async function listPb28Drafts(){
  return checked(data,error) as Pb28Draft[];
 }
 export async function listPb28Entries(draftId:string){
- const {data,error}=await client().from('ai_buyer_pb28_entries').select('id,draft_id,category,brand,model,model_code,condition_key,estimated_resale,opening_offer,target_buy,hard_max,active,note,updated_at').eq('draft_id',draftId).order('category').order('model').limit(1000);
+ const {data,error}=await client().from('ai_buyer_pb28_entries').select('id,draft_id,category,brand,model,model_code,condition_key,estimated_resale,opening_offer,target_buy,hard_max,active,note,aliases,spec_match,adjustments,updated_at').eq('draft_id',draftId).order('category').order('model').limit(1000);
  return checked(data,error) as Pb28Entry[];
 }
 export async function listPb28Audit(draftId:string){
