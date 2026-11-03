@@ -222,3 +222,13 @@ test('Facebook queue attention view suppresses budget gap and cooldown alerts',(
  assert.doesNotMatch(sql,/where q\.status in \('PLANNED','CLAIMED','FAILED'\)\s+and q\.scheduled_at<now\(\)-interval '30 minutes'/i)
  assert.match(sql,/CREATE OR REPLACE VIEW public\.facebook_automation_daily_v/)
 })
+
+test('scheduled future jobs are a wait, not false budget-alert work',()=>{
+ const sql=readFileSync(new URL('../supabase/migrations/20261103192500_facebook_future_schedule_attention_fix.sql',import.meta.url),'utf8')
+ const scheduled=sql.indexOf("q.status='PLANNED' AND q.scheduled_at>now()")
+ const budget=sql.indexOf("g.gate->>'reason'='ROLLING_24H_POST_LIMIT'")
+ assert.ok(scheduled>=0 && budget>scheduled)
+ assert.match(sql,/THEN 'WAITING_GAP'/)
+ assert.match(sql,/WITH \(security_invoker=true\)/)
+ assert.doesNotMatch(sql,/GRANT SELECT ON public\.facebook_automation_queue_status_v TO authenticated/)
+})
