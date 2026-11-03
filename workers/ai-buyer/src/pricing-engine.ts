@@ -1,4 +1,5 @@
 import { guardedOpenAIFetch, type RuntimeControlEnv } from './runtime-control'
+import { resolvePriceBookImportPolicy } from './pricebook-import-guard'
 export interface PricingEnv extends RuntimeControlEnv {
   AI_BUYER_MARKET_ENABLED?: string
   SUPABASE_URL: string
@@ -407,6 +408,8 @@ export async function importPriceBook(env: PricingEnv, payload: PriceBookImportP
   const checksum = clean(payload.source_checksum, 240) || null
   const entries = Array.isArray(payload.entries) ? payload.entries.map(normalizeEntry) : []
   const rules = Array.isArray(payload.category_rules) ? payload.category_rules.map(normalizeRule) : []
+  // A draft import must never mutate active category pricing policies.
+  const importPolicy = resolvePriceBookImportPolicy({activate:payload.activate,categoryRuleCount:rules.length})
 
   const entryKeys = new Set<string>()
   for (const entry of entries) {
@@ -489,7 +492,7 @@ export async function importPriceBook(env: PricingEnv, payload: PriceBookImportP
       }
     }
 
-    if (payload.activate !== false) {
+    if (importPolicy.activate) {
       await rpc(env, 'ai_buyer_activate_price_book', { p_version_id: version.id })
     }
 
@@ -506,7 +509,7 @@ export async function importPriceBook(env: PricingEnv, payload: PriceBookImportP
       versionName,
       entries: entries.length,
       rules: rules.length,
-      active: payload.activate !== false,
+      active: importPolicy.activate,
     }
   } catch (error) {
     await patchRows(env, 'ai_buyer_price_book_imports?id=eq.' + encodeURIComponent(importId), {
