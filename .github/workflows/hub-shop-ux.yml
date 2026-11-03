@@ -9,6 +9,8 @@ on:
       - 'supabase/migrations/**'
       - 'supabase/functions/seo-connector/**'
       - 'tests/seo-connector.test.mjs'
+      - 'scripts/verify-pricebook-v28.test.mjs'
+      - 'scripts/verify-pricebook-v28-csv.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
       - 'scripts/verify-merchant-shopee-foundation.mjs'
       - 'scripts/verify-shopee-auto-publish.mjs'
@@ -61,6 +63,9 @@ jobs:
 
       - name: Save, navigation and inventory regressions
         run: node --test tests/save-navigation.test.mjs tests/inventory-work-queue.test.mjs tests/hub-operations-guardrails.test.mjs tests/warranty-date.test.mjs tests/battery-condition.test.mjs tests/sold-stock.test.mjs
+
+      - name: PriceBook V2.8 independent safety contracts
+        run: node --experimental-strip-types --test scripts/verify-pricebook-v28.test.mjs scripts/verify-pricebook-v28-csv.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck
