@@ -32,7 +32,7 @@ export function validatePricebookV28Csv(csv:string):PricebookV28CsvResult {
   const raw=Object.fromEntries(headings.map((h,j)=>[h,values[j].trim()])) as PricebookV28Row;
   if(!raw.category||!raw.brand||!raw.model||!raw.model_code||!raw.condition_key)errors.push("ROW_"+(i+1)+":IDENTITY_MISSING");
   if(Object.values(raw).some(v=>/^[=+@]/.test(v)))errors.push("ROW_"+(i+1)+":FORMULA_LIKE_CELL");
-  const key=[raw.category,raw.brand,raw.model_code,raw.condition_key].map(s=>s.toLowerCase()).join("|");
+  const key=[raw.category,raw.brand,raw.model,raw.model_code,raw.condition_key].map(s=>s.trim().toLowerCase()).join("|");
   if(seen.has(key))errors.push("ROW_"+(i+1)+":DUPLICATE_VARIANT");
   seen.add(key);
   const amounts=["estimated_resale","opening_offer","target_buy","hard_max"].map(k=>number(raw[k as keyof PricebookV28Row]));
