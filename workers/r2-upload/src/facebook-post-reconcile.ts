@@ -32,7 +32,7 @@ async function pagePosts(env:Env,key:string):Promise<Post[]>{
  })
  if(!credentials?.pageId||!credentials.pageAccessToken)throw new Error('FACEBOOK_RECONCILE_CREDENTIAL_MISSING')
  const c=String(credentials.pageId),token=String(credentials.pageAccessToken)
- const since=Math.floor((Date.now()-4*24*60*60*1000)/1000)
+ const since=Math.floor((Date.now()-7*24*60*60*1000)/1000)
  const all:Post[]=[]
  let after:string|null=null
  for(let page=0;page<2;page++){
