@@ -76,6 +76,10 @@ BEGIN
   VALUES(q.id,q.connection_key,q.product_id,NULL,'CONFIRMED',p_post_id,q.claimed_at,now())
   RETURNING * INTO a;
  ELSE
+  IF a.marker IS NULL AND (p_verified_at IS NULL OR q.claimed_at IS NULL OR
+     abs(extract(epoch from(p_verified_at-q.claimed_at)))>600) THEN
+    RAISE EXCEPTION 'FACEBOOK_LEGACY_RECOVERY_TIME_MISMATCH';
+  END IF;
   IF a.connection_key<>p_connection_key OR a.product_id<>q.product_id OR
      a.marker IS DISTINCT FROM p_marker OR
      (a.post_id IS NOT NULL AND a.post_id<>p_post_id) THEN
@@ -85,6 +89,12 @@ BEGIN
   SET state='CONFIRMED',post_id=p_post_id,confirmed_at=coalesce(confirmed_at,now()),
       last_error=NULL,next_reconcile_at=NULL,updated_at=now()
   WHERE queue_id=p_queue_id;
+ END IF;
+ IF EXISTS (
+   SELECT 1 FROM public.facebook_post_ledger l WHERE l.post_id=p_post_id
+     AND (l.product_id<>q.product_id OR l.connection_key<>q.connection_key)
+ ) THEN
+   RAISE EXCEPTION 'FACEBOOK_LEDGER_POST_ID_ALREADY_BELONGS_TO_ANOTHER_PRODUCT';
  END IF;
  v_time:=coalesce(p_verified_at,now());
  UPDATE public.facebook_rotation_queue
