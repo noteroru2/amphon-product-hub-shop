@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { previewPriceV28, type PriceInput } from "../lib/pricebookV28";
+import {validatePricebookV28Csv,PRICEBOOK_V28_HEADERS, type PricebookV28CsvResult} from "../lib/pricebookV28Csv";
 
 const initial:PriceInput={
  versionId:"v2.8-draft-local",versionStatus:"DRAFT",entryId:"",
@@ -18,6 +19,7 @@ function Amount({label,value,onChange}:{label:string;value?:number;onChange:(nex
 /** Manual preview, never loads or updates customer, LINE, or live PriceBook data. */
 export function PriceBookV28Preview(){
  const [expanded,setExpanded]=useState(false);
+ const [csvResult,setCsvResult]=useState<PricebookV28CsvResult|null>(null);
  const [form,setForm]=useState<PriceInput>(initial);
  const [repair,setRepair]=useState<number|undefined>();
  const [residual,setResidual]=useState<number|undefined>();
@@ -50,6 +52,19 @@ export function PriceBookV28Preview(){
     {([["modelConfirmed","ยืนยันรุ่น"],["conditionConfirmed","ตรวจสภาพแล้ว"],["ownershipClear","ตรวจสิทธิ์เจ้าของแล้ว"]] as const).map(([k,label])=><label key={k}><input type="checkbox" checked={form[k]} onChange={e=>change(k,e.target.checked)}/> {label}</label>)}
     {form.logistics.method!=="IN_STORE"&&<label><input type="checkbox" checked={form.logistics.verified===true} onChange={e=>change("logistics",{...form.logistics,verified:e.target.checked})}/> ยืนยันค่าใช้จ่ายต่างจังหวัด</label>}
    </div>
+   <section style={{margin:"12px 0",padding:12,border:"1px dashed #8889",borderRadius:9}}>
+    <strong style={{display:"block",marginBottom:5}}>ทดลองตรวจไฟล์ CSV — ไม่บันทึกข้อมูล</strong>
+    <small style={{display:"block",marginBottom:9}}>คอลัมน์: {PRICEBOOK_V28_HEADERS.join(", ")}</small>
+    <input type="file" accept=".csv,text/csv" onChange={async e=>{
+      const file=e.target.files?.[0];if(!file)return;
+      if(file.size>1000000){setCsvResult({valid:false,rows:[],errors:["FILE_TOO_LARGE"]});return;}
+      setCsvResult(validatePricebookV28Csv(await file.text()));
+    }} />
+    {csvResult&&<div style={{marginTop:8}}>
+      <div><strong>{csvResult.valid?"ผ่านการตรวจรูปแบบ":"พบข้อผิดพลาด"}</strong> · {csvResult.rows.length} รายการ · ไม่ได้นำเข้าฐานข้อมูล</div>
+      {csvResult.errors.length>0&&<ul>{csvResult.errors.slice(0,12).map((error,i)=><li key={i}>{error}</li>)}</ul>}
+    </div>}
+   </section>
    <div style={{padding:12,borderRadius:10,background:"var(--surface-secondary,#80808015)"}}>
     <strong>เพดานคำนวณ: {money(result.maximumBuy)}</strong>
     <p style={{margin:"5px 0",fontSize:13}}>สถานะ: {result.status==="BLOCKED"?"ระงับ":result.status==="PREVIEW_ONLY"?"จำลองเท่านั้น":"รออนุมัติ"} · ส่ง LINE ไม่ได้ทุกกรณี</p>
