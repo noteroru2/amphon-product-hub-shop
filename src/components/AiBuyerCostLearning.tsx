@@ -76,7 +76,7 @@ export function AiBuyerCostLearning(){
    </div>
    {report&&<>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))',gap:9,margin:'12px 0'}}>
-     {([['สต๊อก',report.summary.inventory],['บันทึกขาย',report.summary.sales],['ซื้อขายจับคู่',report.summary.saleMatched],['หลุดขายฝาก',report.summary.forfeit],['ไม่ระบุหมวด',report.summary.uncategorized],['กลุ่มรุ่น',report.summary.cohorts],['ผ่านเกณฑ์',report.summary.qualified]] as [string,number][]).map(([name,count])=>
+     {([['สต๊อก',report.summary.inventory],['บันทึกขาย',report.summary.sales],['ซื้อขายจับคู่',report.summary.saleMatched],['หลุดขายฝาก',report.summary.forfeit],['ไม่ระบุหมวด',report.summary.uncategorized],['กลุ่มรุ่น',report.summary.cohorts],['แยกสเปกครบ',report.summary.structuredComplete],['ต้องตรวจสเปก',report.summary.structuredPartial+report.summary.structuredUnknown],['ผ่านเกณฑ์',report.summary.qualified]] as [string,number][]).map(([name,count])=>
       <div key={name} style={{border:'1px solid #7a87964a',borderRadius:9,padding:10}}><div style={{fontSize:12,opacity:.7}}>{name}</div><strong style={{fontSize:21}}>{fmt(count)}</strong></div>
      )}
     </div>
@@ -89,7 +89,10 @@ export function AiBuyerCostLearning(){
      <table style={{width:'100%',minWidth:780,fontSize:12,borderCollapse:'collapse'}}>
       <thead><tr><th>รุ่น</th><th>รับซื้อ (รหัส)</th><th>ขายจริง (รหัส/เหตุการณ์)</th><th>ทุนมัธยฐาน</th><th>ขายมัธยฐาน</th><th>ส่วนต่างขั้นต้น</th><th>การใช้ข้อมูล</th></tr></thead>
       <tbody>{shown.map(c=><tr key={c.id} style={{borderTop:'1px solid #7a879644'}}>
-       <td style={{maxWidth:230,overflowWrap:'anywhere'}}>{c.model}<div style={{opacity:.7}}>{c.rawCategory}</div></td>
+       <td style={{maxWidth:260,overflowWrap:'anywhere'}}>{c.model}
+        <div style={{opacity:.7}}>{c.rawCategory} · {c.structured.confidence==='COMPLETE'?'จับคู่สเปกครบ':c.structured.confidence==='PARTIAL'?'สเปกบางส่วน':'ยังระบุสเปกไม่ได้'}</div>
+        <div style={{fontSize:11,opacity:.76}}>CPU {c.structured.cpu??'?'} · GPU {c.structured.gpu??'?'} · RAM {c.structured.ramGb??'?'}GB · SSD {c.structured.storageGb??'?'}GB</div>
+       </td>
        <td style={{textAlign:'center'}}>{c.purchaseSamples}</td><td style={{textAlign:'center'}}>{c.soldItems} / {c.saleEvents}</td>
        <td style={{textAlign:'right'}}>{fmt(c.buyMedian)}</td><td style={{textAlign:'right'}}>{fmt(c.saleMedian)}</td><td style={{textAlign:'right'}}>{fmt(c.realizedGrossSpreadMedian)}</td>
        <td><div style={{fontWeight:600}}>{c.qualified?'มีข้อเสนอเบื้องต้น':'ต้องตรวจราคาด้วยตนเอง'}</div><button style={btn} onClick={()=>edit(c)}>ดูหลักฐาน / ทำ Draft</button></td>
@@ -103,6 +106,9 @@ export function AiBuyerCostLearning(){
     <strong>หลักฐานก่อนสร้าง Draft: {selected.model}</strong>
     <p style={{fontSize:12}}>รับซื้อ {selected.purchaseSamples} รหัส · ขายจริง {selected.soldItems} รหัส · {selected.saleEvents} เหตุการณ์ · ทุนมัธยฐาน {fmt(selected.buyMedian)} บาท · ขายมัธยฐาน {fmt(selected.saleMedian)} บาท</p>
     <p style={{fontSize:12}}>{selected.reason} {selected.daysToSellMedian!==null?' · วันถือครองมัธยฐาน '+selected.daysToSellMedian:''}</p>
+    <p style={{fontSize:12}}>สเปกที่แยกได้: {selected.structured.brand||'ไม่พบยี่ห้อ'} · {selected.structured.family??'ไม่ทราบตระกูล'} · รหัสรุ่น {selected.structured.modelCode??'ไม่พบ'} · CPU {selected.structured.cpu??'?'} · GPU {selected.structured.gpu??'?'} · RAM {selected.structured.ramGb??'?'}GB · SSD {selected.structured.storageGb??'?'}GB</p>
+    <p style={{fontSize:12}}>การจับคู่: {selected.matchMethod==='STRUCTURED_EXACT'?'รหัสรุ่นและสเปกตรงกันครบ':'ตรงชื่อสินค้าดั้งเดิมเท่านั้น'} · ความครบถ้วน {selected.structured.confidence}</p>
+    {!!selected.structured.warnings.length&&<p style={{fontSize:12,color:'#b9842e'}}>จุดที่ต้องตรวจ: {selected.structured.warnings.join(', ')}</p>}
     <p style={{fontSize:11,overflowWrap:'anywhere'}}>หลักฐานรหัสสต๊อก: {selected.inventoryCodes.slice(0,15).join(', ')}</p>
     {!selected.qualified&&<p role="status" style={{fontSize:12,color:'#b9842e'}}>ยังไม่พอสำหรับสร้างราคาจากสูตรอัตโนมัติ — ต้องกรอกตัวเลขเองหลังตรวจราคาตลาด สเปก และตำหนิ</p>}
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
