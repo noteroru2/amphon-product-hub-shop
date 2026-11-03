@@ -199,8 +199,16 @@ export function PriceBookV28Admin(){
     </>:<div style={{overflowX:'auto'}}>
      <table style={{width:'100%',minWidth:520,fontSize:12}}><thead><tr><th>เวลา</th><th>การเปลี่ยนแปลง</th><th>รายการ</th><th>ค่าก่อน / หลัง</th></tr></thead>
       <tbody>{audit.map(a=><tr key={a.id} style={{borderTop:'1px solid #8894a633'}}>
-       <td>{date(a.created_at)}</td><td>{a.action}</td><td>{a.entry_id?.slice(0,8)??'Draft'}</td>
-       <td>{a.before_data?.['hard_max']!=null?String(a.before_data['hard_max']):'—'} → {a.after_data?.['hard_max']!=null?String(a.after_data['hard_max']):'—'}</td>
+       <td>{date(a.created_at)}<div style={{opacity:.7}}>ผู้ดำเนินการ: {a.actor_id.slice(0,8)}</div></td><td>{a.action}</td><td>{a.entry_id?.slice(0,8)??'Draft'}</td>
+       <td>
+        <div>{a.before_data?.['hard_max']!=null?String(a.before_data['hard_max']):'—'} → {a.after_data?.['hard_max']!=null?String(a.after_data['hard_max']):'—'}</div>
+        <details><summary style={{cursor:'pointer'}}>ดูข้อมูลก่อน / หลัง</summary>
+         <div style={{display:'grid',gap:6,gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+          <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:11}}>{JSON.stringify(a.before_data,null,2)??'ไม่มี'}</pre>
+          <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:11}}>{JSON.stringify(a.after_data,null,2)??'ไม่มี'}</pre>
+         </div>
+        </details>
+       </td>
       </tr>)}</tbody>
      </table>{!audit.length&&<p>ยังไม่มีประวัติ</p>}
     </div>}
