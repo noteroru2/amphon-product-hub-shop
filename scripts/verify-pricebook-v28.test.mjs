@@ -1,0 +1,13 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {previewPriceV28} from "../src/lib/pricebookV28.ts";
+const base={versionId:"v28",versionStatus:"DRAFT",entryId:"sku",modelConfirmed:true,conditionConfirmed:true,ownershipClear:true,resale:18000,targetProfit:3500,processing:500,warranty:300,marketCeiling:15000,deductions:[{code:"BATTERY",repairCost:800}],logistics:{method:"PARCEL",province:"Bangkok",verified:true,shipping:200,packaging:100,insurance:100}};
+test("draft cannot send LINE",()=>{const r=previewPriceV28(base);assert.equal(r.maximumBuy,12500);assert.equal(r.status,"PREVIEW_ONLY");assert.equal(r.canSendLine,false)});
+test("active still needs approval",()=>{const r=previewPriceV28({...base,versionStatus:"ACTIVE"});assert.equal(r.status,"READY_FOR_APPROVAL");assert.equal(r.requiresOwnerApproval,true);assert.equal(r.canSendLine,false)});
+test("unverified provincial fee blocks",()=>assert.ok(previewPriceV28({...base,logistics:{...base.logistics,verified:false}}).reasons.includes("PROVINCIAL_COST_UNVERIFIED")));
+test("missing book entry blocks",()=>assert.equal(previewPriceV28({...base,entryId:undefined}).status,"BLOCKED"));
+test("duplicate defect blocks",()=>assert.ok(previewPriceV28({...base,deductions:[{code:"SCREEN",repairCost:500},{code:"SCREEN",repairCost:500}]}).reasons.includes("DUPLICATE_OR_MISSING_DEFECT")));
+test("ownership unknown blocks",()=>assert.ok(previewPriceV28({...base,ownershipClear:false}).reasons.includes("OWNERSHIP_RISK")));
+test("market ceiling and hard-max enforced",()=>{const r=previewPriceV28({...base,marketCeiling:10000,offer:11000});assert.equal(r.maximumBuy,10000);assert.ok(r.reasons.includes("HARD_MAX_EXCEEDED"))});
+test("invalid amounts block",()=>{for(const n of [-1,NaN,Infinity])assert.equal(previewPriceV28({...base,targetProfit:n}).status,"BLOCKED")});
+test("residual loss explicit, not automatic double-charge",()=>{const r=previewPriceV28({...base,deductions:[{code:"SCREEN",repairCost:1000,residualLoss:250}]});assert.equal(r.breakdown.condition,1250)});
