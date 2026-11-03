@@ -40,3 +40,37 @@ test('ledger write failure resumes external post; learning failure preserves POS
   assert.equal(creates,1);assert.equal(job.status,'POSTED')
  }finally{globalThis.fetch=original;console.error=originalError}
 })
+
+test('Graph HTTP 200 with capture database failure fails closed and NEVER creates a second /feed',async()=>{
+ const original=globalThis.fetch,originalError=console.error
+ console.error=()=>{}
+ const job={id:'job-uncertain',product_id:'product',connection_key:'page_1',template_id:'ARRIVAL',
+   claim_token:'mock-claim',attempts:1,status:'CLAIMED',post_id:null}
+ const env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
+ let feeds=0,captures=0
+ const ok=x=>new Response(JSON.stringify(x),{status:200})
+ globalThis.fetch=async(url,init={})=>{
+  const u=String(url),body=init.body&&String(init.body).startsWith('{')?JSON.parse(init.body):{}
+  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([job])
+  if(u.includes('/rest/v1/rpc/central_channel_read_credentials'))return ok({pageId:'page',pageAccessToken:'test'})
+  if(u.includes('/rest/v1/rpc/facebook_publish_prepare'))return ok({ready:true,marker:'AMPHON-uncertain'})
+  if(u.includes('/rest/v1/rpc/facebook_publish_capture')){captures++;return new Response('DB unavailable',{status:503})}
+  if(u.includes('/rest/v1/rpc/'))return ok(0)
+  if(u.includes('/rest/v1/products?'))return ok([{status:'published',one_availability:'IN_STOCK'}])
+  if(u.includes('/rest/v1/commerce_public_listing_v'))return ok([{status:'published',sku:'AT-NB',title:'Laptop',price:10000,images:[]}])
+  if(u.includes('/rest/v1/facebook_rotation_queue?')){Object.assign(job,body);return ok(null)}
+  if(u.includes('/rest/v1/facebook_learning_ledger'))return ok([])
+  if(u.includes('/feed')){feeds++;return ok({id:'page_post'})}
+  if(u.includes('graph.facebook.com'))return ok({id:'page_post'})
+  throw new Error('Unexpected URL '+u)
+ }
+ try{
+  const r=await runFacebookRotationSweep(env)
+  assert.equal(feeds,1)
+  assert.equal(captures,3)
+  assert.equal(job.status,'FAILED')
+  assert.equal(job.attempts,3)
+  assert.equal(job.post_id,null)
+  assert.match(r[0].error,/FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED/)
+ }finally{globalThis.fetch=original;console.error=originalError}
+})
