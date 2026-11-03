@@ -17,8 +17,8 @@ async function enqueue(env:Env,productId:string,key:string){
 export async function facebookQueueSelected(env:Env,ctx:Ctx,body:any){
  if(!['owner','admin'].includes(ctx.profile.role))throw new Error('ADMIN_ONLY')
  const id=String(body.productId||'')
- const pages=Array.isArray(body.connectionKeys)?body.connectionKeys.map(String):[]
- const keys=Array.from(new Set(pages))
+ const pages:string[]=Array.isArray(body.connectionKeys)?body.connectionKeys.map(String):[]
+ const keys:string[]=Array.from(new Set<string>(pages))
  if(!/^[a-f0-9-]{36}$/i.test(id)||keys.length<1||keys.length>2
     ||keys.some(key=>!['page_1','page_2'].includes(key)))
    throw new Error('PRODUCT_AND_VALID_FACEBOOK_PAGES_REQUIRED')
