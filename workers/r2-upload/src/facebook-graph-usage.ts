@@ -24,13 +24,12 @@ function usage(headers:Headers){
   } catch { /* May be absent or malformed. */ }
   return {app,business,recovery}
 }
-export async function facebookObservedFetch(
- env:Env,connectionKey:string,operation:string,url:string,init?:RequestInit,
-):Promise<Response>{
-  const response=await fetch(url,init)
+export async function facebookRecordGraphResponse(
+ env:Env,connectionKey:string,operation:string,response:Response,data?:any,
+):Promise<void>{
   const {app,business,recovery}=usage(response.headers)
-  let error:any={}
-  if(!response.ok)try{error=((await response.clone().json()) as any)?.error||{}}catch{}
+  let error:any=data?.error||{}
+  if(!response.ok && !data)try{error=((await response.clone().json()) as any)?.error||{}}catch{}
   const errorCode=numeric(error.code),errorSubcode=numeric(error.error_subcode)
   // Write one small service-role-only row for every Graph response.
   try {
@@ -44,10 +43,17 @@ export async function facebookObservedFetch(
     })
     if(!recorded.ok)console.error('FACEBOOK_USAGE_RECORD_FAILED',connectionKey,operation,recorded.status)
   }catch{console.error('FACEBOOK_USAGE_RECORD_UNAVAILABLE',connectionKey,operation)}
-  // Stop before publishing /feed when photo upload reports elevated Meta usage.
-  // A successful /feed response is NEVER turned into an error, preserving post ID.
-  if(operation==='photo-upload'&&response.ok&&
-     (Math.max(app??0,business??0)>=80||(recovery??0)>0))
-    throw new Error('META_USAGE_SAFETY_HOLD:graph-usage-high')
-  return response
+}
+
+export async function facebookObservedFetch(
+ env:Env,connectionKey:string,operation:string,url:string,init?:RequestInit,
+):Promise<Response>{
+ const response=await fetch(url,init)
+ await facebookRecordGraphResponse(env,connectionKey,operation,response)
+ // Only unpublished photo uploads should abort a multi-photo publish.
+ const {app,business,recovery}=usage(response.headers)
+ if(operation==='photo-upload'&&response.ok&&
+    (Math.max(app??0,business??0)>=80||(recovery??0)>0))
+   throw new Error('META_USAGE_SAFETY_HOLD:graph-usage-high')
+ return response
 }

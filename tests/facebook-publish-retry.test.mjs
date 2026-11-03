@@ -3,21 +3,23 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import ts from '../workers/r2-upload/node_modules/typescript/lib/typescript.js'
 const source=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8').replace("import { facebookSoldMessage } from './facebook-content'",'const facebookSoldMessage=()=>"sold"')
-const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()').replace("import { facebookObservedFetch } from './facebook-graph-usage'",'const facebookObservedFetch=async(env,key,operation,url,init)=>fetch(url,init)')
-const selfContainedSource = guardedSource.replace(
+const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()').replace("import { facebookObservedFetch, facebookRecordGraphResponse } from './facebook-graph-usage'",'const facebookObservedFetch=async(env,key,operation,url,init)=>fetch(url,init); const facebookRecordGraphResponse=async()=>{}')
+const selfContainedSource = guardedSource.replace("import { reconcileFacebookPublishAttempts } from './facebook-post-reconcile'",'const reconcileFacebookPublishAttempts=async()=>[]').replace(
  "import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'",
  'const WARRANTY_POST_REPAIR_TAG="", WARRANTY_POST_REPAIRS=[], correctFacebookWarrantyText=()=>({message:"",changed:false}), addMissingFacebookWarrantyText=()=>({message:"",changed:false})'
 )
 const code=ts.transpileModule(selfContainedSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const {runFacebookRotationSweep}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))
 test('ledger write failure resumes external post; learning failure preserves POSTED',async()=>{
- const original=globalThis.fetch,originalError=console.error,job={id:'job',product_id:'product',connection_key:'page_1',template_id:'ROT-1'},env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
+ const original=globalThis.fetch,originalError=console.error,job={id:'job',product_id:'product',connection_key:'page_1',template_id:'ROT-1',claim_token:'mock-claim'},env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
  console.error=()=>{}
  let creates=0,ledgerWrites=0,failLearning=false
  globalThis.fetch=async(url,init={})=>{
   const u=String(url),body=init.body?JSON.parse(String(init.body).startsWith('{')?init.body:'{}'):{}
   const ok=x=>new Response(JSON.stringify(x),{status:200})
-  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([{...job}])
+  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([{...job,claim_token:'mock-claim'}])
+   if(u.includes('/rest/v1/rpc/facebook_publish_prepare'))return ok({ready:true,marker:'AMPHON-test'})
+   if(u.includes('/rest/v1/rpc/facebook_publish_capture')){job.post_id=body.p_post_id;return ok({ok:true,post_id:body.p_post_id})}
   if(u.includes('/rest/v1/rpc/central_channel_read_credentials'))return ok({pageId:'page',pageAccessToken:'test'})
   if(u.includes('/rest/v1/rpc/'))return ok(0)
   if(u.includes('/rest/v1/products?'))return ok([{status:'published',one_availability:'IN_STOCK'}])
@@ -36,5 +38,39 @@ test('ledger write failure resumes external post; learning failure preserves POS
   failLearning=true
   await runFacebookRotationSweep(env)
   assert.equal(creates,1);assert.equal(job.status,'POSTED')
+ }finally{globalThis.fetch=original;console.error=originalError}
+})
+
+test('Graph HTTP 200 with capture database failure fails closed and NEVER creates a second /feed',async()=>{
+ const original=globalThis.fetch,originalError=console.error
+ console.error=()=>{}
+ const job={id:'job-uncertain',product_id:'product',connection_key:'page_1',template_id:'ARRIVAL',
+   claim_token:'mock-claim',attempts:1,status:'CLAIMED',post_id:null}
+ const env={SUPABASE_URL:'https://db.test',SUPABASE_SECRET_KEY:'test'}
+ let feeds=0,captures=0
+ const ok=x=>new Response(JSON.stringify(x),{status:200})
+ globalThis.fetch=async(url,init={})=>{
+  const u=String(url),body=init.body&&String(init.body).startsWith('{')?JSON.parse(init.body):{}
+  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([job])
+  if(u.includes('/rest/v1/rpc/central_channel_read_credentials'))return ok({pageId:'page',pageAccessToken:'test'})
+  if(u.includes('/rest/v1/rpc/facebook_publish_prepare'))return ok({ready:true,marker:'AMPHON-uncertain'})
+  if(u.includes('/rest/v1/rpc/facebook_publish_capture')){captures++;return new Response('DB unavailable',{status:503})}
+  if(u.includes('/rest/v1/rpc/'))return ok(0)
+  if(u.includes('/rest/v1/products?'))return ok([{status:'published',one_availability:'IN_STOCK'}])
+  if(u.includes('/rest/v1/commerce_public_listing_v'))return ok([{status:'published',sku:'AT-NB',title:'Laptop',price:10000,images:[]}])
+  if(u.includes('/rest/v1/facebook_rotation_queue?')){Object.assign(job,body);return ok(null)}
+  if(u.includes('/rest/v1/facebook_learning_ledger'))return ok([])
+  if(u.includes('/feed')){feeds++;return ok({id:'page_post'})}
+  if(u.includes('graph.facebook.com'))return ok({id:'page_post'})
+  throw new Error('Unexpected URL '+u)
+ }
+ try{
+  const r=await runFacebookRotationSweep(env)
+  assert.equal(feeds,1)
+  assert.equal(captures,3)
+  assert.equal(job.status,'FAILED')
+  assert.equal(job.attempts,3)
+  assert.equal(job.post_id,null)
+  assert.match(r[0].error,/FACEBOOK_PUBLISH_UNCERTAIN_REVIEW_REQUIRED/)
  }finally{globalThis.fetch=original;console.error=originalError}
 })
