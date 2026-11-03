@@ -5,8 +5,12 @@ import ts from 'typescript';
 
 const source=fs.readFileSync(new URL('../src/lib/aiBuyerCostLearning.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const specSource=fs.readFileSync(new URL('../src/lib/aiBuyerStructuredSpecs.ts',import.meta.url),'utf8');
+const specCompiled=ts.transpileModule(specSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const specs={exports:{}};
+new Function('module','exports',specCompiled)(specs,specs.exports);
 const moduleMock={exports:{}};
-new Function('module','exports',compiled)(moduleMock,moduleMock.exports);
+new Function('require','module','exports',compiled)((path)=>{if(path==='./aiBuyerStructuredSpecs')return specs.exports;throw Error('unexpected import: '+path)},moduleMock,moduleMock.exports);
 const {analyzeCostHistory,mapCostHistoryCategory,normalizeCostModel}=moduleMock.exports;
 
 const now=new Date('2026-11-03T17:00:00Z');
