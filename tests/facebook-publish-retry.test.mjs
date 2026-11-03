@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs'
 import ts from '../workers/r2-upload/node_modules/typescript/lib/typescript.js'
 const source=readFileSync(new URL('../workers/r2-upload/src/channel-auth.ts',import.meta.url),'utf8').replace("import { facebookSoldMessage } from './facebook-content'",'const facebookSoldMessage=()=>"sold"')
 const guardedSource = source.replace("import { withFacebookPageWrite, FacebookWriteDeferred } from './facebook-write-guard'",'class FacebookWriteDeferred extends Error {}; const withFacebookPageWrite=async(env,key,write)=>write()').replace("import { facebookObservedFetch } from './facebook-graph-usage'",'const facebookObservedFetch=async(env,key,operation,url,init)=>fetch(url,init)')
-const selfContainedSource = guardedSource.replace(
+const selfContainedSource = guardedSource.replace("import { reconcileFacebookPublishAttempts } from './facebook-post-reconcile'",'const reconcileFacebookPublishAttempts=async()=>[]').replace(
  "import { WARRANTY_POST_REPAIR_TAG, WARRANTY_POST_REPAIRS, correctFacebookWarrantyText, addMissingFacebookWarrantyText } from './facebook-warranty-repair'",
  'const WARRANTY_POST_REPAIR_TAG="", WARRANTY_POST_REPAIRS=[], correctFacebookWarrantyText=()=>({message:"",changed:false}), addMissingFacebookWarrantyText=()=>({message:"",changed:false})'
 )
@@ -17,7 +17,9 @@ test('ledger write failure resumes external post; learning failure preserves POS
  globalThis.fetch=async(url,init={})=>{
   const u=String(url),body=init.body?JSON.parse(String(init.body).startsWith('{')?init.body:'{}'):{}
   const ok=x=>new Response(JSON.stringify(x),{status:200})
-  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([{...job}])
+  if(u.includes('/rest/v1/rpc/facebook_rotation_claim_due'))return ok([{...job,claim_token:'mock-claim'}])
+   if(u.includes('/rest/v1/rpc/facebook_publish_prepare'))return ok({ready:true,marker:'AMPHON-test'})
+   if(u.includes('/rest/v1/rpc/facebook_publish_capture')){job.post_id=body.p_post_id;return ok({ok:true,post_id:body.p_post_id})}
   if(u.includes('/rest/v1/rpc/central_channel_read_credentials'))return ok({pageId:'page',pageAccessToken:'test'})
   if(u.includes('/rest/v1/rpc/'))return ok(0)
   if(u.includes('/rest/v1/products?'))return ok([{status:'published',one_availability:'IN_STOCK'}])
