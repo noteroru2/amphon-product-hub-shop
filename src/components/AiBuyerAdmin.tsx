@@ -24,6 +24,7 @@ import { AiBuyerCostHistoryImporter } from "./AiBuyerCostHistoryImporter";
 import { AiBuyerCostLearning } from "./AiBuyerCostLearning";
 import { AiBuyerCostReviewQueue } from "./AiBuyerCostReviewQueue";
 import { AiBuyerChatPriceControl } from "./AiBuyerChatPriceControl";
+import { AiBuyerChatPriceInbox } from "./AiBuyerChatPriceInbox";
 import {
   approveAiBuyerOffer,
   loadAiBuyerCase,
@@ -605,6 +606,7 @@ export function AiBuyerAdmin({
       )}
 
       {profile.role === "owner" && <AiBuyerChatPriceControl />}
+      {profile.role === "owner" && <AiBuyerChatPriceInbox />}
       <AiBuyerCostHistoryImporter />
       <AiBuyerCostReviewQueue />
       <AiBuyerCostLearning />
