@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {listPb28Drafts,listPb28Entries,type Pb28Draft} from '../lib/priceBookV28Admin';
 import {parseChatPriceProposal,prepareChatPriceDiff,type ChatPricePreview} from '../lib/aiBuyerChatPriceControl';
-import {applyChatPriceDiff,listChatPriceBatches,type ChatPriceBatch} from '../lib/aiBuyerChatPriceControlData';
+import {applyChatPriceDiff,listChatPriceBatches,listChatPriceInbox,approveChatPriceInbox,dismissChatPriceInbox,type ChatPriceBatch,type ChatPriceInboxItem} from '../lib/aiBuyerChatPriceControlData';
 
 const panel:React.CSSProperties={padding:13,border:'1px solid #71809a66',borderRadius:12,marginTop:12};
 const button:React.CSSProperties={padding:'9px 12px',border:'1px solid #71809a88',borderRadius:8,cursor:'pointer'};
@@ -19,11 +19,12 @@ const example=JSON.stringify({
 export function AiBuyerChatPriceControl(){
  const [open,setOpen]=useState(false),[drafts,setDrafts]=useState<Pb28Draft[]>([]),[draftId,setDraftId]=useState('');
  const [input,setInput]=useState(''),[preview,setPreview]=useState<ChatPricePreview[]>([]);
+ const [inbox,setInbox]=useState<ChatPriceInboxItem[]>([]),[inboxId,setInboxId]=useState<string|null>(null);
  const [snapshot,setSnapshot]=useState(''),[confirmed,setConfirmed]=useState(false);
  const [audit,setAudit]=useState<ChatPriceBatch[]>([]),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
  const selected=drafts.find(d=>d.id===draftId);
  const reload=useCallback(async()=>{
-  const ds=await listPb28Drafts();setDrafts(ds);
+  const [ds,pending]=await Promise.all([listPb28Drafts(),listChatPriceInbox()]);setDrafts(ds);setInbox(pending);
   setDraftId(current=>ds.some(d=>d.id===current&&d.status==='DRAFT')?current:ds.find(d=>d.status==='DRAFT')?.id??'');
  },[]);
  useEffect(()=>{if(!open)return;void reload().catch(e=>setError(String(e.message||e)))},[open,reload]);
@@ -51,19 +52,53 @@ export function AiBuyerChatPriceControl(){
   setBusy(true);setError('');setNotice('');
   try{
    const payload=parseChatPriceProposal(input);
-   const batchId=await applyChatPriceDiff(draftId,preview.map(p=>p.after),payload.instruction??'');
+   const batchId=inboxId?await approveChatPriceInbox(inboxId,draftId,preview.map(p=>p.after)):
+    await applyChatPriceDiff(draftId,preview.map(p=>p.after),payload.instruction??'');
    setNotice('อนุมัติบันทึก Draft แล้ว · Audit ID: '+batchId);
-   setPreview([]);setSnapshot('');setConfirmed(false);
-   setAudit(await listChatPriceBatches(draftId));
+   setPreview([]);setSnapshot('');setConfirmed(false);setInboxId(null);
+   setAudit(await listChatPriceBatches(draftId));setInbox(await listChatPriceInbox());
   }catch(e){setError('ยังไม่บันทึก: '+(e instanceof Error?e.message:String(e))+' · หากราคาใน Draft เปลี่ยนไป กรุณากด Preview ใหม่')}
+  finally{setBusy(false)}
+ };
+ const chooseInbox=(record:ChatPriceInboxItem)=>{
+  setInput(JSON.stringify(record.proposed_json,null,2));setInboxId(record.id);
+  setPreview([]);setSnapshot('');setConfirmed(false);setError('');setNotice('');
+  if(record.draft_id&&drafts.some(d=>d.id===record.draft_id&&d.status==='DRAFT'))setDraftId(record.draft_id);
+ };
+ const dismissInbox=async(record:ChatPriceInboxItem)=>{
+  if(!window.confirm('ยกเลิกข้อเสนอจากแชทโดยไม่บันทึกราคาหรือไม่?'))return;
+  setBusy(true);setError('');
+  try{
+   await dismissChatPriceInbox(record.id);setInbox(await listChatPriceInbox());
+   if(inboxId===record.id){setInboxId(null);setPreview([]);setConfirmed(false)}
+   setNotice('ยกเลิกข้อเสนอรอตรวจแล้ว');
+  }catch(e){setError(e instanceof Error?e.message:String(e))}
   finally{setBusy(false)}
  };
  return <section style={panel}>
   <button style={{...button,width:'100%',textAlign:'left',fontWeight:700}} aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
    Chat Price Control — รับชุดราคาจาก ChatGPT และอนุมัติใน Hub {open?'▴':'▾'}
   </button>
-  <p style={{fontSize:12,opacity:.78}}>ทางปลอดภัย: ให้ ChatGPT วิเคราะห์ทุนและสร้าง JSON → วางที่นี่ → ตรวจราคาเดิม/ราคาใหม่ → Owner ยืนยัน · ไม่ใช่ LINE AUTO</p>
+  <p style={{fontSize:12,opacity:.78}}>คุยราคากับ ChatGPT → เลือกข้อเสนอในคิว → ตรวจราคาเดิม/ใหม่ → Owner ยืนยัน · หรือวาง JSON เองก็ได้ · ไม่ใช่ LINE AUTO</p>
   {open&&<>
+   <div style={{...panel,marginTop:12}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+     <strong>ข้อเสนอรอตรวจจากแชท ({inbox.length})</strong>
+     <button style={button} disabled={busy} onClick={()=>void reload().catch(e=>setError(String(e.message||e)))}>รีเฟรชคิว</button>
+    </div>
+    {inbox.length===0?<p style={{fontSize:12,opacity:.75}}>ยังไม่มีข้อเสนอที่ส่งจาก ChatGPT · สามารถวาง JSON เองด้านล่างได้</p>:
+     <div style={{display:'grid',gap:8,marginTop:8}}>{inbox.map(record=>
+      <div key={record.id} style={{borderTop:'1px solid #71809a44',paddingTop:8}}>
+       <div style={{fontSize:12}}><strong>{record.instruction||'ข้อเสนอปรับราคาจาก ChatGPT'}</strong></div>
+       <div style={{fontSize:11,opacity:.7}}>{new Date(record.created_at).toLocaleString('th-TH')} · {record.source_label}</div>
+       <div style={{display:'flex',gap:8,marginTop:6}}>
+        <button style={button} disabled={busy} onClick={()=>chooseInbox(record)}>เลือกเพื่อ Preview</button>
+        <button style={button} disabled={busy} onClick={()=>void dismissInbox(record)}>ยกเลิกข้อเสนอ</button>
+       </div>
+      </div>
+     )}</div>}
+   </div>
+   {inboxId&&<p style={{fontSize:12,color:'#0b9274'}}>กำลังตรวจข้อเสนอที่ส่งจากแชท · Server จะตรวจว่าแต่ละราคาตรงกับข้อเสนอเดิมก่อนอนุมัติ</p>}
    <div style={{display:'grid',gap:5,marginTop:12}}>
     <label style={{fontSize:13}}>Draft ปลายทาง
      <select style={control} value={draftId} onChange={e=>setDraftId(e.target.value)}>
@@ -73,11 +108,11 @@ export function AiBuyerChatPriceControl(){
     </label>
     <label style={{fontSize:13}}>ชุดราคา JSON จากแชท
      <textarea style={{...control,minHeight:160,fontFamily:'monospace',resize:'vertical'}} value={input}
-      onChange={e=>{setInput(e.target.value);setPreview([]);setConfirmed(false)}} placeholder="คัดลอก JSON ชุดราคาจากแชท ChatGPT มาวางตรงนี้" />
+      onChange={e=>{setInput(e.target.value);setInboxId(null);setPreview([]);setConfirmed(false)}} placeholder="คัดลอก JSON ชุดราคาจากแชท ChatGPT มาวางตรงนี้" />
     </label>
     <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
      <button type="button" style={button} disabled={busy||!input.trim()} onClick={()=>void display()}>ตรวจ Diff ก่อนบันทึก</button>
-     <button type="button" style={button} disabled={busy} onClick={()=>{setInput(example);setPreview([]);setConfirmed(false)}}>ดูตัวอย่างรูปแบบ JSON (ไม่ใช่ราคาจริง)</button>
+     <button type="button" style={button} disabled={busy} onClick={()=>{setInput(example);setInboxId(null);setPreview([]);setConfirmed(false)}}>ดูตัวอย่างรูปแบบ JSON (ไม่ใช่ราคาจริง)</button>
     </div>
    </div>
    {preview.length>0&&<div style={{...panel,border:'1px solid #d6a66d88'}}>
