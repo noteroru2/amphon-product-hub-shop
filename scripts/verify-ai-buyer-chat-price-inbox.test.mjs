@@ -55,7 +55,7 @@ test('SQL approval must require owner JWT, exact snapshot, and write only draft,
  const sql=fs.readFileSync(new URL('../supabase/ai_buyer_chat_price_inbox.sql',import.meta.url),'utf8');
  assert.match(sql,/p\.role='owner'/);
  assert.match(sql,/CHAT_PRICE_STALE_BASELINE/);
- assert.match(sql,/status='DRAFT'/);
+ assert.match(sql,/draft\.status<>'DRAFT'/);
  assert.match(sql,/after_entry.*chat_price_proposal_id/s);
  assert.match(sql,/ai_buyer_pb28_audit/);
  assert.match(sql,/revoke all on function public\.ai_buyer_chat_price_enqueue/u);
