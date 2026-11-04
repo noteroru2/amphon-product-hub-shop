@@ -96,11 +96,11 @@ begin
   where id=req.entry_id and draft_id=req.draft_id for update;
  if not found then raise exception 'CHAT_PRICE_ENTRY_MISSING'; end if;
  before_entry:=to_jsonb(entry);
- if entry.updated_at is distinct from req.expected_entry_updated_at or
-    before_entry is distinct from req.before_snapshot then
-  raise exception 'CHAT_PRICE_STALE_BASELINE';
- end if;
  if p_action='APPROVE' then
+   if entry.updated_at is distinct from req.expected_entry_updated_at or
+      before_entry is distinct from req.before_snapshot then
+     raise exception 'CHAT_PRICE_STALE_BASELINE';
+   end if;
    if (select count(*) from jsonb_object_keys(req.proposed_prices))<>4 or
       not (req.proposed_prices ?& array['estimated_resale','opening_offer','target_buy','hard_max']) then
      raise exception 'CHAT_PRICE_PRICE_FIELDS_INVALID';
