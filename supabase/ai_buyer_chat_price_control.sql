@@ -16,7 +16,6 @@ create table if not exists public.ai_buyer_chat_price_proposals (
  proposed_prices jsonb not null check(jsonb_typeof(proposed_prices)='object'),
  preview_hash text generated always as (
    md5(draft_id::text || ':' || entry_id::text || ':' ||
-       expected_entry_updated_at::text || ':' ||
        before_snapshot::text || ':' || proposed_prices::text)
  ) stored,
  status text not null default 'PENDING' check(status in ('PENDING','APPROVED','REJECTED')),
@@ -102,7 +101,7 @@ begin
   raise exception 'CHAT_PRICE_STALE_BASELINE';
  end if;
  if p_action='APPROVE' then
-   if jsonb_object_length(req.proposed_prices)<>4 or
+   if (select count(*) from jsonb_object_keys(req.proposed_prices))<>4 or
       not (req.proposed_prices ?& array['estimated_resale','opening_offer','target_buy','hard_max']) then
      raise exception 'CHAT_PRICE_PRICE_FIELDS_INVALID';
    end if;
@@ -125,8 +124,8 @@ begin
    update public.ai_buyer_pb28_entries set
      estimated_resale=n_resale,opening_offer=n_opening,target_buy=n_target,
      hard_max=n_max,updated_at=now()
-    where id=req.entry_id and draft_id=req.draft_id
-    returning to_jsonb(public.ai_buyer_pb28_entries.*) into after_entry;
+    where id=req.entry_id and draft_id=req.draft_id;
+   select to_jsonb(e) into after_entry from public.ai_buyer_pb28_entries e where e.id=req.entry_id;
    insert into public.ai_buyer_pb28_audit(draft_id,entry_id,actor_id,action,before_data,after_data)
      values(req.draft_id,req.entry_id,actor,'UPDATE_ENTRY',before_entry,
       after_entry||jsonb_build_object('chat_price_proposal_id',req.id,'channel','CHAT_PRICE_CONTROL'));
