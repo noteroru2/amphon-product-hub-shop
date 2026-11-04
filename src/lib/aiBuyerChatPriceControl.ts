@@ -84,7 +84,7 @@ export function prepareChatPriceDiff(proposal:ChatPriceProposal,existing:Pb28Ent
    expected_hard_max:before?.hard_max??null
   };
   if(after.note.length>800)throw new Error('หมายเหตุยาวเกินไป: '+item.model);
-  const changed=numeric.filter(k=>before?.[k]!==after[k]).map(k=>k);
+  const changed:string[]=numeric.filter(k=>before?.[k]!==after[k]);
   if(!before)changed.unshift('NEW_ENTRY');
   if(!changed.length)throw new Error('รายการ '+(i+1)+' ไม่มีราคาเปลี่ยนแปลง');
   return {before,after,changed};
