@@ -23,7 +23,7 @@ export function AiBuyerNotebookCoverage(){
    <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',margin:'10px 0'}}>
     <strong>พบโน๊ตบุ๊ค {report?.inventory??'…'} เครื่อง</strong>
     <span>ต้องตรวจสเปก {report?.unknown??'…'} เครื่อง</span>
-    <span>{report?.buckets.length??'…'} กลุ่ม</span>
+    <span>{report?.buckets.filter(r=>r.count>0).length??'…'} กลุ่มมีประวัติ / {report?.buckets.length??'…'} กลุ่มในแคตตาล็อก</span>
     <button style={btn} disabled={busy} onClick={()=>void load()}>{busy?'กำลังโหลด':'รีเฟรช'}</button>
    </div>
    <div style={{display:'flex',gap:7,flexWrap:'wrap',margin:'8px 0'}}>
@@ -37,7 +37,7 @@ export function AiBuyerNotebookCoverage(){
     <thead><tr><th>ประเภท</th><th>CPU</th><th>GPU</th><th>เครื่อง</th><th>ขายแล้ว</th><th>ทุนกลางย้อนหลัง*</th><th>กฎราคารับซื้อ</th></tr></thead>
     <tbody>{rows.slice(0,limit).map(r=><tr key={r.key} style={{borderTop:'1px solid #8290a144'}}>
      <td>{labels[r.kind]}</td><td>{r.cpu}</td><td>{r.gpu}</td><td>{r.count}</td><td>{r.sold}</td><td>{fmt(r.medianBuy)}</td>
-     <td>{r.kind==='REVIEW'?'ต้องตรวจสเปกก่อน':'ใช้กฎที่ Owner อนุมัติ / ยังไม่มีกฎให้ตรวจเพิ่ม'}</td>
+     <td>{r.kind==='REVIEW'?'ต้องตรวจสเปกก่อน':'ดูรายการกฎ Owner แยก / ไม่กำหนดราคาในหน้านี้'}</td>
     </tr>)}</tbody>
    </table></div>
    {rows.length>limit&&<button style={{...btn,marginTop:8}} onClick={()=>setLimit(n=>n+40)}>แสดงเพิ่ม ({rows.length-limit})</button>}
