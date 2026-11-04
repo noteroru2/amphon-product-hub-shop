@@ -23,6 +23,7 @@ import { PriceBookV28Admin } from "./PriceBookV28Admin";
 import { AiBuyerCostHistoryImporter } from "./AiBuyerCostHistoryImporter";
 import { AiBuyerCostLearning } from "./AiBuyerCostLearning";
 import { AiBuyerCostReviewQueue } from "./AiBuyerCostReviewQueue";
+import { AiBuyerChatPriceControl } from "./AiBuyerChatPriceControl";
 import {
   approveAiBuyerOffer,
   loadAiBuyerCase,
@@ -604,6 +605,7 @@ export function AiBuyerAdmin({
       )}
 
       <AiBuyerCostHistoryImporter />
+      <AiBuyerChatPriceControl />
       <AiBuyerCostReviewQueue />
       <AiBuyerCostLearning />
       <PriceBookV28Admin />
