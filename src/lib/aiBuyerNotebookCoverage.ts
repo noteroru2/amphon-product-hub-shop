@@ -24,9 +24,23 @@ export function isNotebookCostRecord(r:CostHistoryRecord):boolean{
 }
 function extractGpu(n:string):string{
  const m=n.match(/\b(?:rtx|gtx)\s*[- ]?(\d{3,4})\s*(ti|super)?\b/);
- if(m)return n.slice(m.index??0,(m.index??0)+3).toUpperCase()+m[1]+(m[2]?m[2].toUpperCase():'');
+ if(m){
+  const code=n.slice(m.index??0,(m.index??0)+3).toUpperCase()+m[1]+(m[2]?m[2].toUpperCase():'');
+  if(code==='RTX3050'){
+   const tail=n.slice((m.index??0)+m[0].length).match(/^\\s*(4|6)\\s*gb\\b/);
+   return tail?'RTX3050_'+tail[1]+'GB':'RTX3050_UNSPEC';
+  }
+  return code;
+ }
  const m2=n.match(/(?:^|[/| ])(1050|1050ti|1650|1650ti|1660|1660ti|2050|3050|3050ti|3060|4050|4060|4070|5050|5060|5070)(?=\/|\||\s|$)/);
- if(m2)return (m2[1].startsWith('1')?'GTX':'RTX')+m2[1].toUpperCase();
+ if(m2){
+  const code=(m2[1].startsWith('1')?'GTX':'RTX')+m2[1].toUpperCase();
+  if(code==='RTX3050'){
+   const tail=n.slice((m2.index??0)+m2[0].length).match(/^\\s*(4|6)\\s*gb\\b/);
+   return tail?'RTX3050_'+tail[1]+'GB':'RTX3050_UNSPEC';
+  }
+  return code;
+ }
  return 'INTEGRATED_OR_UNKNOWN';
 }
 function cpu(n:string):string{
@@ -63,7 +77,7 @@ export const NOTEBOOK_PRICE_TAXONOMY=(()=>{
  for(const generation of [1,2,3,4,5])
   groups.push({kind:'MACBOOK',cpu:'Apple M'+generation,gpu:'INTEGRATED_OR_UNKNOWN',family:'MacBook'});
  for(const gpu of ['GTX1050','GTX1050TI','GTX1060','GTX1650','GTX1650TI','GTX1660TI',
-  'RTX2050','RTX3050','RTX3050TI','RTX3060','RTX3070','RTX3080',
+  'RTX2050','RTX3050_4GB','RTX3050_6GB','RTX3050_UNSPEC','RTX3050TI','RTX3060','RTX3070','RTX3080',
   'RTX4050','RTX4060','RTX4070','RTX4080','RTX4090',
   'RTX5050','RTX5060','RTX5070','RTX5080','RTX5090'])
   groups.push({kind:'GAMING',cpu:'CPU ตามรุ่น (ต้องตรวจ)',gpu,family:'Gaming GPU'});
