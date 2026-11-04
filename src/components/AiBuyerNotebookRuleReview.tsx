@@ -26,8 +26,9 @@ export function AiBuyerNotebookRuleReview(){
   </div>
   <p style={{fontSize:12,opacity:.75}}>ข้อเสนอจาก ChatGPT เป็นช่วงราคาเริ่มเจรจา · กฎนี้ไม่ทำงานใน LINE/Worker แม้ Owner อนุมัติเป็น Draft</p>
   {batches.length===0?<p style={{fontSize:12}}>ยังไม่มีข้อเสนอช่วงราคาแบบหลายสเปก</p>:
-   batches.map(batch=><div key={batch.id} style={{borderTop:'1px solid #71809a55',padding:'10px 0'}}>
-    <strong>{batch.title}</strong>
+   batches.map((batch,index)=><div key={batch.id} style={{borderTop:'1px solid #71809a55',padding:'10px 0'}}>
+    <strong>{batch.title}</strong> {index>0&&<span style={{fontSize:11,opacity:.75}}>· ประวัติชุดก่อน (โปรดใช้ข้อเสนอแก้ไขล่าสุดด้านบน)</span>}
+    {index===0&&batch.status==='PENDING'&&<p style={{fontSize:12,color:'#c48729'}}>ข้อเสนอใหม่รอ Owner อนุมัติ · กฎเก่าที่เคยอนุมัติยังอยู่เป็นประวัติ ไม่ใช่ราคาที่เปลี่ยนแล้ว</p>}
     <p style={{fontSize:12,opacity:.75}}>สถานะ: {batch.status==='PENDING'?'รออนุมัติ':batch.status==='APPROVED_DRAFT'?'อนุมัติเป็นกฎร่างแล้ว':'ยกเลิก'} · {new Date(batch.created_at).toLocaleString('th-TH')}</p>
     <div style={{overflowX:'auto'}}>
      <table style={{minWidth:690,width:'100%',borderCollapse:'collapse',fontSize:12}}>
