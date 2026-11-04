@@ -148,6 +148,63 @@ begin
    'entry_id',req.entry_id,'draft_id',req.draft_id);
 end;$$;
 
+-- Trusted Supabase connector / server-side assistant transport may only enqueue an untrusted
+-- request. It cannot approve any price change; that requires an Owner JWT in the Hub.
+create or replace function public.ai_buyer_chat_price_enqueue(
+ p_entry_id uuid,p_prices jsonb,p_reason text,p_summary text default '',
+ p_batch_id uuid default null
+) returns uuid language plpgsql security invoker set search_path='' as $
+declare
+ entry public.ai_buyer_pb28_entries%rowtype;
+ draft public.ai_buyer_pb28_drafts%rowtype;
+ next_id uuid; n_resale numeric; n_opening numeric; n_target numeric; n_max numeric;
+begin
+ if p_prices is null or jsonb_typeof(p_prices)<>'object' or
+  (select count(*) from jsonb_object_keys(p_prices))<>4 or
+  not (p_prices ?& array['estimated_resale','opening_offer','target_buy','hard_max']) or
+  length(coalesce(p_reason,''))>800 or length(coalesce(p_summary,''))>500
+ then raise exception 'CHAT_PRICE_ENQUEUE_INVALID';end if;
+ begin
+  n_resale:=(p_prices->>'estimated_resale')::numeric;
+  n_opening:=(p_prices->>'opening_offer')::numeric;
+  n_target:=(p_prices->>'target_buy')::numeric;
+  n_max:=(p_prices->>'hard_max')::numeric;
+ exception when invalid_text_representation or numeric_value_out_of_range then
+  raise exception 'CHAT_PRICE_AMOUNTS_INVALID';
+ end;
+ if n_resale is null or n_opening is null or n_target is null or n_max is null or
+  n_resale<=0 or n_resale>10000000 or n_opening<0 or n_opening>n_target or
+  n_target>n_max or n_max>n_resale then
+  raise exception 'CHAT_PRICE_PRICE_ORDER_INVALID';
+ end if;
+ select * into entry from public.ai_buyer_pb28_entries where id=p_entry_id;
+ if not found then raise exception 'CHAT_PRICE_ENTRY_NOT_FOUND';end if;
+ select * into draft from public.ai_buyer_pb28_drafts where id=entry.draft_id;
+ if not found or draft.status<>'DRAFT' then raise exception 'CHAT_PRICE_DRAFT_NOT_EDITABLE';end if;
+ if entry.estimated_resale=n_resale and entry.opening_offer=n_opening and
+  entry.target_buy=n_target and entry.hard_max=n_max then
+  raise exception 'CHAT_PRICE_NO_CHANGE';
+ end if;
+ if (select count(*) from public.ai_buyer_chat_price_proposals p
+   where p.entry_id=p_entry_id and p.status='PENDING' and p.expires_at>now())>=3 then
+   raise exception 'CHAT_PRICE_TOO_MANY_PENDING';
+ end if;
+ insert into public.ai_buyer_chat_price_proposals(
+  batch_id,draft_id,entry_id,request_origin,reason,summary,
+  expected_entry_updated_at,before_snapshot,proposed_prices
+ ) values(
+  coalesce(p_batch_id,gen_random_uuid()),entry.draft_id,entry.id,
+  'CHATGPT_CONNECTOR',coalesce(p_reason,''),coalesce(p_summary,''),
+  entry.updated_at,to_jsonb(entry),
+  jsonb_build_object('estimated_resale',n_resale,'opening_offer',n_opening,
+    'target_buy',n_target,'hard_max',n_max)
+ ) returning id into next_id;
+ return next_id;
+end;$;
+revoke all on function public.ai_buyer_chat_price_enqueue(uuid,jsonb,text,text,uuid)
+ from public,anon,authenticated;
+grant execute on function public.ai_buyer_chat_price_enqueue(uuid,jsonb,text,text,uuid) to service_role;
+
 revoke all on function public.ai_buyer_chat_price_decide(uuid,text,text) from public,anon;
 grant execute on function public.ai_buyer_chat_price_decide(uuid,text,text) to authenticated;
 commit;
