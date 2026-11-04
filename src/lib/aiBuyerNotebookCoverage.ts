@@ -17,10 +17,10 @@ export function isNotebookCostRecord(r:CostHistoryRecord):boolean{
  if(mac.test(n))return true;
  if(['โน๊ตบุ๊ค','โน้ตบุ๊ก','notebook','laptop'].includes(c))return true;
  if(/โน๊ตบุ๊ค|โน้ตบุ๊ค|โน้ตบุ๊ก|\bnotebook\b|\blaptop\b/.test(n))return true;
- return (notebookModel.test(n)&&/(?:i[3579]|ryzen|r[3579]\\s?\\d{3,5}|core|ultra|celeron|pentium|athlon|n100|n200|rtx\\s?\\d{4}|[48]\\/\\d{3})/.test(n))
- || (/^(?:hp|asus|acer|lenovo|dell|msi|huawei|samsung|lg|microsoft)\\b/.test(n)
-   &&/(?:i[3579]\\s*(?:gen|g|[- ])\\s*\\d|ryzen\\s*[3579]|r[3579]\\s*\\d{4,5}|core\\s*ultra)/.test(n)
-   &&/\\b(?:4|8|12|16|24|32|64)\\s*[/|]\\s*(?:128|256|500|512|1000|1024)\\b/.test(n));
+ return (notebookModel.test(n)&&/(?:i[3579]|ryzen|r[3579]\s?\d{3,5}|core|ultra|celeron|pentium|athlon|n100|n200|rtx\s?\d{4}|[48]\/\d{3})/.test(n))
+ || (/^(?:hp|asus|acer|lenovo|dell|msi|huawei|samsung|lg|microsoft)\b/.test(n)
+   &&/(?:i[3579]\s*(?:gen|g|[- ])\s*\d|ryzen\s*[3579]|r[3579]\s*\d{4,5}|core\s*ultra)/.test(n)
+   &&/\b(?:4|8|12|16|24|32|64)\s*[/|]\s*(?:128|256|500|512|1000|1024)\b/.test(n));
 }
 function extractGpu(n:string):string{
  const m=n.match(/\b(?:rtx|gtx)\s*[- ]?(\d{3,4})\s*(ti|super)?\b/);
