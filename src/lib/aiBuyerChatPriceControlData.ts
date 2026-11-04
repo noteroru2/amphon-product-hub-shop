@@ -21,3 +21,29 @@ export async function listChatPriceBatches(draftId:string):Promise<ChatPriceBatc
  if(error)throw new Error(error.message);
  return (data??[]) as ChatPriceBatch[];
 }
+
+export type ChatPriceInboxItem={
+ id:string;draft_id:string|null;proposed_json:unknown;instruction:string;source_label:string;
+ status:'PENDING'|'APPROVED'|'DISMISSED';created_at:string;approved_batch_id:string|null;
+};
+export async function listChatPriceInbox():Promise<ChatPriceInboxItem[]>{
+ if(!supabase)throw new Error('ไม่ได้เชื่อมต่อ Supabase');
+ const {data,error}=await supabase.from('ai_buyer_chat_price_inbox')
+  .select('id,draft_id,proposed_json,instruction,source_label,status,created_at,approved_batch_id')
+  .eq('status','PENDING').order('created_at',{ascending:false}).limit(40);
+ if(error)throw new Error(error.message);
+ return (data??[]) as ChatPriceInboxItem[];
+}
+export async function approveChatPriceInbox(id:string,draftId:string,rows:ChatPricePrepared[]):Promise<string>{
+ if(!supabase)throw new Error('ไม่ได้เชื่อมต่อ Supabase');
+ const {data,error}=await supabase.rpc('ai_buyer_chat_price_apply_inbox',{
+  p_inbox_id:id,p_draft_id:draftId,p_items:rows
+ });
+ if(error)throw new Error(error.message);
+ return String(data);
+}
+export async function dismissChatPriceInbox(id:string):Promise<void>{
+ if(!supabase)throw new Error('ไม่ได้เชื่อมต่อ Supabase');
+ const {error}=await supabase.rpc('ai_buyer_chat_price_dismiss_inbox',{p_inbox_id:id});
+ if(error)throw new Error(error.message);
+}
