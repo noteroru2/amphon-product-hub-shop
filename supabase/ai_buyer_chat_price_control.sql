@@ -153,7 +153,7 @@ end;$$;
 create or replace function public.ai_buyer_chat_price_enqueue(
  p_entry_id uuid,p_prices jsonb,p_reason text,p_summary text default '',
  p_batch_id uuid default null
-) returns uuid language plpgsql security invoker set search_path='' as $
+) returns uuid language plpgsql security invoker set search_path='' as $$
 declare
  entry public.ai_buyer_pb28_entries%rowtype;
  draft public.ai_buyer_pb28_drafts%rowtype;
@@ -200,7 +200,7 @@ begin
     'target_buy',n_target,'hard_max',n_max)
  ) returning id into next_id;
  return next_id;
-end;$;
+end;$$;
 revoke all on function public.ai_buyer_chat_price_enqueue(uuid,jsonb,text,text,uuid)
  from public,anon,authenticated;
 grant execute on function public.ai_buyer_chat_price_enqueue(uuid,jsonb,text,text,uuid) to service_role;
