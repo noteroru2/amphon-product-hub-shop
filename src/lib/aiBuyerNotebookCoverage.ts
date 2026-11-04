@@ -27,7 +27,7 @@ function extractGpu(n:string):string{
  if(m){
   const code=n.slice(m.index??0,(m.index??0)+3).toUpperCase()+m[1]+(m[2]?m[2].toUpperCase():'');
   if(code==='RTX3050'){
-   const tail=n.slice((m.index??0)+m[0].length).match(/^\\s*(4|6)\\s*gb\\b/);
+   const tail=n.slice((m.index??0)+m[0].length).match(/^\s*(4|6)\s*gb\b/);
    return tail?'RTX3050_'+tail[1]+'GB':'RTX3050_UNSPEC';
   }
   return code;
@@ -36,7 +36,7 @@ function extractGpu(n:string):string{
  if(m2){
   const code=(m2[1].startsWith('1')?'GTX':'RTX')+m2[1].toUpperCase();
   if(code==='RTX3050'){
-   const tail=n.slice((m2.index??0)+m2[0].length).match(/^\\s*(4|6)\\s*gb\\b/);
+   const tail=n.slice((m2.index??0)+m2[0].length).match(/^\s*(4|6)\s*gb\b/);
    return tail?'RTX3050_'+tail[1]+'GB':'RTX3050_UNSPEC';
   }
   return code;
