@@ -605,7 +605,7 @@ export function AiBuyerAdmin({
       )}
 
       <AiBuyerCostHistoryImporter />
-      <AiBuyerChatPriceControl />
+      {profile.role === 'owner' && <AiBuyerChatPriceControl />}
       <AiBuyerCostReviewQueue />
       <AiBuyerCostLearning />
       <PriceBookV28Admin />
