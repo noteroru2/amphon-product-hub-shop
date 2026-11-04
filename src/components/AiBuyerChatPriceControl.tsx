@@ -1,4 +1,5 @@
 import {AiBuyerChatOfferRuleReview} from './AiBuyerChatOfferRuleReview';
+import {AiBuyerNotebookRuleReview} from './AiBuyerNotebookRuleReview';
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {listPb28Drafts,listPb28Entries,type Pb28Draft} from '../lib/priceBookV28Admin';
 import {parseChatPriceProposal,prepareChatPriceDiff,type ChatPricePreview} from '../lib/aiBuyerChatPriceControl';
@@ -82,6 +83,7 @@ export function AiBuyerChatPriceControl(){
   </button>
   <p style={{fontSize:12,opacity:.78}}>คุยราคากับ ChatGPT → เลือกข้อเสนอในคิว → ตรวจราคาเดิม/ใหม่ → Owner ยืนยัน · หรือวาง JSON เองก็ได้ · ไม่ใช่ LINE AUTO</p>
   {open&&<>
+   <AiBuyerNotebookRuleReview />
    <AiBuyerChatOfferRuleReview />
    <div style={{...panel,marginTop:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
