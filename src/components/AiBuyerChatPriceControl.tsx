@@ -1,3 +1,4 @@
+import {AiBuyerNotebookCoverage} from './AiBuyerNotebookCoverage';
 import {AiBuyerChatOfferRuleReview} from './AiBuyerChatOfferRuleReview';
 import {AiBuyerNotebookRuleReview} from './AiBuyerNotebookRuleReview';
 import {useCallback,useEffect,useMemo,useState} from 'react';
@@ -84,6 +85,7 @@ export function AiBuyerChatPriceControl(){
   <p style={{fontSize:12,opacity:.78}}>คุยราคากับ ChatGPT → เลือกข้อเสนอในคิว → ตรวจราคาเดิม/ใหม่ → Owner ยืนยัน · หรือวาง JSON เองก็ได้ · ไม่ใช่ LINE AUTO</p>
   {open&&<>
    <AiBuyerNotebookRuleReview />
+   <AiBuyerNotebookCoverage />
    <AiBuyerChatOfferRuleReview />
    <div style={{...panel,marginTop:12}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
