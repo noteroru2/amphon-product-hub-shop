@@ -30,7 +30,7 @@ test('Intel generation parsing distinguishes 9th from 10th/13th',()=>{
  const b=analyzeNotebookCoverage(rows).buckets.filter(x=>x.count>0);
  assert.ok(b.some(x=>x.cpu==='i5 Gen 9'&&x.gpu==='GTX1050'));
  assert.ok(b.some(x=>x.cpu==='i5 Gen 10'&&x.gpu==='GTX1650'));
- assert.ok(b.some(x=>x.cpu==='i5 Gen 13'&&x.gpu==='RTX3050'));
+ assert.ok(b.some(x=>x.cpu==='i5 Gen 13'&&x.gpu==='RTX3050_6GB'));
 });
 test('GTX1050 and GTX1050 Ti are kept in separate buckets',()=>{
  const b=analyzeNotebookCoverage([
@@ -68,4 +68,13 @@ test('explicit price taxonomy includes no-history generations without making up 
  assert.ok(r.buckets.some(x=>x.gpu==='RTX5060'&&x.count===0));
  assert.ok(r.buckets.some(x=>x.cpu==='Apple M5'&&x.count===0));
  assert.equal(r.inventory,0);
+});
+
+test('RTX3050 4GB, 6GB and unknown VRAM are never combined',()=>{
+ const r=analyzeNotebookCoverage([
+ item('a','Acer Nitro i5-12500H/RTX3050 4GB/16/512','โน๊ตบุ๊ค'),
+ item('b','Lenovo LOQ i5-13450HX/RTX3050 6GB/16/512','โน๊ตบุ๊ค'),
+ item('c','ASUS TUF i5-11400H/RTX3050/16/512','โน๊ตบุ๊ค')]);
+ const gp=new Set(r.buckets.filter(x=>x.count>0).map(x=>x.gpu));
+ assert.ok(gp.has('RTX3050_4GB'));assert.ok(gp.has('RTX3050_6GB'));assert.ok(gp.has('RTX3050_UNSPEC'));
 });
