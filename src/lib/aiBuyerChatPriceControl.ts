@@ -33,12 +33,20 @@ export function chatPriceDiff(p:ChatPriceProposal){
   delta:Number(p.proposed_prices[k])-Number(p.before_snapshot[k])
  }));
 }
+function canonical(value:unknown):string{
+ if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
+ if(value!==null&&typeof value==='object'){
+  const object=value as Record<string,unknown>;
+  return '{'+Object.keys(object).sort().map(k=>JSON.stringify(k)+':'+canonical(object[k])).join(',')+'}';
+ }
+ return JSON.stringify(value);
+}
 export function chatPriceIsStale(p:ChatPriceProposal,current:ChatPriceEntrySnapshot|null){
  if(!current||p.entry_id!==current.id||p.draft_id!==current.draft_id)return true;
  const before=p.before_snapshot;
- // Re-check entire snapshot, not only price fields; any concurrent identity, spec or status edit makes approval stale.
- return current.updated_at!==p.expected_entry_updated_at ||
-  JSON.stringify(current)!==JSON.stringify(before);
+ // Compare all identity and spec fields, not just prices; JSON object order is irrelevant.
+ // PostgreSQL enforces exact microsecond timestamp + complete JSONB snapshot again during approval.
+ return canonical(current)!==canonical(before);
 }
 
 export async function loadChatPriceProposals(){
