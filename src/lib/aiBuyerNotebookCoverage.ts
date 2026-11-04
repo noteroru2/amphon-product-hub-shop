@@ -50,6 +50,26 @@ function cpu(n:string):string{
  return 'CPU UNKNOWN';
 }
 function med(a:number[]){if(!a.length)return null;const x=[...a].sort((m,n)=>m-n);const p=Math.floor(x.length/2);return x.length%2?x[p]:Math.round((x[p-1]+x[p])/2)}
+// Explicit fallback coverage catalog even when zero examples exist in historical stock.
+// Unknown group prices remain null and must be supplied/approved by Owner.
+export const NOTEBOOK_PRICE_TAXONOMY=(()=>{
+ const groups:{kind:NotebookBucket['kind'];cpu:string;gpu:string;family:string}[]=[];
+ for(const rank of [3,5,7,9])for(let gen=4;gen<=14;gen++)
+  groups.push({kind:'GENERAL',cpu:'i'+rank+' Gen '+gen,gpu:'INTEGRATED_OR_UNKNOWN',family:'Windows / General'});
+ for(const rank of [3,5,7,9])for(const series of [1,2,3])
+  groups.push({kind:'GENERAL',cpu:'Core Ultra '+rank+' Series '+series,gpu:'INTEGRATED_OR_UNKNOWN',family:'Windows / General'});
+ for(const rank of [3,5,7,9])for(let series=2;series<=9;series++)
+  groups.push({kind:'GENERAL',cpu:'Ryzen '+rank+' '+series+'000 Series',gpu:'INTEGRATED_OR_UNKNOWN',family:'Windows / General'});
+ for(const generation of [1,2,3,4,5])
+  groups.push({kind:'MACBOOK',cpu:'Apple M'+generation,gpu:'INTEGRATED_OR_UNKNOWN',family:'MacBook'});
+ for(const gpu of ['GTX1050','GTX1050TI','GTX1060','GTX1650','GTX1650TI','GTX1660TI',
+  'RTX2050','RTX3050','RTX3050TI','RTX3060','RTX3070','RTX3080',
+  'RTX4050','RTX4060','RTX4070','RTX4080','RTX4090',
+  'RTX5050','RTX5060','RTX5070','RTX5080','RTX5090'])
+  groups.push({kind:'GAMING',cpu:'CPU ตามรุ่น (ต้องตรวจ)',gpu,family:'Gaming GPU'});
+ groups.push({kind:'GENERAL',cpu:'Entry / Celeron / Pentium',gpu:'INTEGRATED_OR_UNKNOWN',family:'Windows / General'});
+ return groups;
+})();
 export function analyzeNotebookCoverage(records:CostHistoryRecord[]):NotebookCoverage{
  const sold=new Set(records.filter(r=>r.source_kind==='SALE'&&r.inventory_code).map(r=>r.inventory_code));
  const all=records.filter(isNotebookCostRecord);
@@ -69,7 +89,12 @@ export function analyzeNotebookCoverage(records:CostHistoryRecord[]):NotebookCov
   const value=buckets.get(key)??{family,cpu:chip,gpu,kind:safeKind,rows:[]};
   value.rows.push(r);buckets.set(key,value);
  }
- const output=[...buckets].map(([key,v])=>{
+ // Present zero-evidence families as explicit gaps; never impute cost or opening price.
+ for(const target of NOTEBOOK_PRICE_TAXONOMY){
+  const key=[target.kind,target.cpu,target.gpu].join('|');
+  if(!buckets.has(key))buckets.set(key,{family:target.family,cpu:target.cpu,gpu:target.gpu,kind:target.kind,rows:[]});
+ }
+  const output=[...buckets].map(([key,v])=>{
   // Only verified PURCHASE acquisitions with no defect signals can form descriptive medians.
   const prices=v.rows.filter(r=>r.source_type==='PURCHASE'&&Number(r.buy_cost)>0
     &&!/เสีย|ซาก|น้ำเข้า|เปิดไม่ติด|จอแตก|ล๊อค|ล็อค|อะไหล่|ตำหนิ/.test(low(r.product_name+' '+String(r.details?.condition??''))))
@@ -78,7 +103,7 @@ export function analyzeNotebookCoverage(records:CostHistoryRecord[]):NotebookCov
    sold:v.rows.filter(r=>sold.has(r.inventory_code)).length,medianBuy:med(prices),
    minBuy:prices.length?Math.min(...prices):null,maxBuy:prices.length?Math.max(...prices):null,
    examples:v.rows.slice(0,3).map(r=>r.product_name),kind:v.kind} satisfies NotebookBucket;
- }).sort((a,b)=>({GAMING:0,GENERAL:1,BUSINESS:2,MACBOOK:3,REVIEW:4}[a.kind]-{GAMING:0,GENERAL:1,BUSINESS:2,MACBOOK:3,REVIEW:4}[b.kind])||b.count-a.count);
+ }).sort((a,b)=>({GAMING:0,GENERAL:1,BUSINESS:2,MACBOOK:3,REVIEW:4}[a.kind]-{GAMING:0,GENERAL:1,BUSINESS:2,MACBOOK:3,REVIEW:4}[b.kind])||b.count-a.count||a.cpu.localeCompare(b.cpu)||a.gpu.localeCompare(b.gpu));
  return {inventory:pool.length,matched:pool.length-unknown,unknown,
   forfeit:pool.filter(r=>r.source_type==='FORFEIT').length,buckets:output,excludedNotebooks:records.filter(r=>r.source_kind==='INVENTORY').length-pool.length};
 }
