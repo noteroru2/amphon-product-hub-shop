@@ -7,7 +7,6 @@ export type NotebookBucket={key:string;family:string;cpu:string;gpu:string;count
 export type NotebookCoverage={inventory:number;matched:number;unknown:number;forfeit:number;
  buckets:NotebookBucket[];excludedNotebooks:number;};
 const low=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
-const gaming=/(?:rtx|gtx)\s*[- ]?\d{3,4}|\b(?:16[56]0|1050|20[67]0|30[5678]0|40[5678]0|50[5678]0)\s*ti?\b/i;
 const notebookModel=/\b(?:tuf|rog|nitro|victus|omen|loq|legion|ideapad|thinkpad|thinkbook|yoga|vivobook|zenbook|expertbook|swift|aspire|latitude|inspiron|precision|elitebook|probook|pavilion|zbook|matebook|modern|katana|cyborg|gf63|gf65|stealth|raider|titan|gram|surface laptop|xps)\b/;
 const exclude=/^(?:pc\b|desktop\b|gpu\b|การ์ดจอ|จอ |monitor\b|mainboard\b|motherboard\b|cpu\b|rtx\s?\d+\b|gtx\s?\d+\b|ram\b|ssd\b|keyboard\b|คีย์บอร์ด|ipad\b|iphone\b|imac\b|mac mini\b|mac studio\b)/;
 const mac=/\bmacbook\b|แมคบุ๊ค|แมคบุก/;
@@ -18,7 +17,10 @@ export function isNotebookCostRecord(r:CostHistoryRecord):boolean{
  if(mac.test(n))return true;
  if(['โน๊ตบุ๊ค','โน้ตบุ๊ก','notebook','laptop'].includes(c))return true;
  if(/โน๊ตบุ๊ค|โน้ตบุ๊ค|โน้ตบุ๊ก|\bnotebook\b|\blaptop\b/.test(n))return true;
- return notebookModel.test(n)&&/(?:i[3579]|ryzen|r[3579]\s?\d{3,5}|core|ultra|celeron|pentium|athlon|n100|n200|[48]\/\d{3})/.test(n);
+ return (notebookModel.test(n)&&/(?:i[3579]|ryzen|r[3579]\\s?\\d{3,5}|core|ultra|celeron|pentium|athlon|n100|n200|rtx\\s?\\d{4}|[48]\\/\\d{3})/.test(n))
+ || (/^(?:hp|asus|acer|lenovo|dell|msi|huawei|samsung|lg|microsoft)\\b/.test(n)
+   &&/(?:i[3579]\\s*(?:gen|g|[- ])\\s*\\d|ryzen\\s*[3579]|r[3579]\\s*\\d{4,5}|core\\s*ultra)/.test(n)
+   &&/\\b(?:4|8|12|16|24|32|64)\\s*[/|]\\s*(?:128|256|500|512|1000|1024)\\b/.test(n));
 }
 function extractGpu(n:string):string{
  const m=n.match(/\b(?:rtx|gtx)\s*[- ]?(\d{3,4})\s*(ti|super)?\b/);
@@ -31,7 +33,7 @@ function cpu(n:string):string{
  const intel=n.match(/\bi\s*([3579])\s*(?:gen\s*|g\s*)(\d{1,2})\b/);
  if(intel)return 'i'+intel[1]+' Gen '+Number(intel[2]);
  const chip=n.match(/\bi([3579])[- ]?(\d{4,5})[a-z]{0,3}\b/);
- if(chip){const digits=chip[2];const gen=digits.length===5?Number(digits.slice(0,2)):Number(digits.slice(0,1))<=6?Number(digits.slice(0,1)):Number(digits.slice(0,2));
+ if(chip){const digits=chip[2];const gen=digits.length===5?Number(digits.slice(0,2)):Number(digits.slice(0,2))>=10&&Number(digits.slice(0,2))<=14?Number(digits.slice(0,2)):Number(digits.slice(0,1));
   return 'i'+chip[1]+' Gen '+gen;
  }
  const ultra=n.match(/\b(?:core\s*)?ultra\s*([3579])\s*[- ]?(\d{3})\b/);
