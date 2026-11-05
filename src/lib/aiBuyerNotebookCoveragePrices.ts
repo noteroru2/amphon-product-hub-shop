@@ -3,7 +3,7 @@ import type {NotebookSpecOfferBatch,NotebookSpecOfferRule} from './aiBuyerNotebo
 import type {OfficeNotebookRuleBatch,OfficeNotebookRule} from './aiBuyerOfficeNotebookRules';
 import type {BusinessNotebookRuleBatch,BusinessNotebookRule} from './aiBuyerBusinessNotebookRules';
 export type CoveragePriceMatch={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:'Gaming'|'Office'|'Business';rule:string;warning:string};
-type Row={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:CoveragePriceMatch['source'];rule:string;warning:string;score:number};
+type Row={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:CoveragePriceMatch['source'];rule:string;warning:string};
 const normalized=(s:string)=>s.toUpperCase().replace(/\s+/g,'').replace(/–/g,'-');
 function cpuRankGen(s:string):{rank:number;gen:number}|null{
  const m=s.match(/^i([3579]) Gen (\d{1,2})$/);return m?{rank:Number(m[1]),gen:Number(m[2])}:null;
