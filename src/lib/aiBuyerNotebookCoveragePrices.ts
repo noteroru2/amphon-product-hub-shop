@@ -71,7 +71,7 @@ export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
  });
  const bus=latest(sources.business);
  if(bus)for(const r of bus.rules)if(business(b,r))rows.push({
-  low:r.opening_min,high:r.opening_max,status:bus.status as Row['status'],source:'Business',rule:r.cpu,score:2,
+  low:r.opening_min,high:r.opening_max,status:bus.status as Row['status'],source:'Business',rule:r.cpu,
   warning:'ต้องยืนยันรุ่น Business จริง, GPU ออนบอร์ด, สภาพและราคาขายต่อก่อนเสนอราคา'
  });
  // Ambiguous overlapping price rules must not be resolved by guessing.
