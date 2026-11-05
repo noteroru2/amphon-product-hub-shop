@@ -45,10 +45,10 @@ function gaming(b:NotebookBucket,r:NotebookSpecOfferRule):boolean{
  const rank=cpuRankGen(cpu);
  const spec=r.cpu;
  if(rank){
-  const re=/i([3579])(?:\/i([3579]))? Gen (\d+)(?:[–-](\d+))?/;
-  const m=spec.match(re);
+  const m=spec.match(/^(i[3579](?:\/i[3579])?) Gen (\d+)(?:[–-](\d+))?/);
   if(!m)return false;
-  return [m[1],m[2]].includes(String(rank.rank))&&rank.gen>=Number(m[3])&&rank.gen<=Number(m[4]??m[3]);
+  const ranks=m[1].split('/').map(x=>Number(x.slice(1)));
+  return ranks.includes(rank.rank)&&rank.gen>=Number(m[2])&&rank.gen<=Number(m[3]??m[2]);
  }
  const ryzen=cpu.match(/^Ryzen ([3579]) (\d)000 Series/);
  if(ryzen&&/Ryzen [3579]/.test(spec))return spec.includes('Ryzen '+ryzen[1]);
@@ -61,12 +61,12 @@ export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
  const rows:Row[]=[];
  const g=latest(sources.gaming);
  if(g)for(const r of g.rules)if(gaming(b,r))rows.push({
-  low:r.opening_min,high:r.opening_max,status:g.status as Row['status'],source:'Gaming',rule:r.spec,score:3,
+  low:r.opening_min,high:r.opening_max,status:g.status as Row['status'],source:'Gaming',rule:r.spec,
   warning:'ตรง CPU/GPU เบื้องต้นเท่านั้น ต้องยืนยัน RAM, SSD, VRAM และสภาพเครื่องก่อนเสนอราคา'
  });
  const o=latest(sources.office);
  if(o)for(const r of o.rules)if(office(b,r))rows.push({
-  low:r.opening_min,high:r.opening_max,status:o.status as Row['status'],source:'Office',rule:r.cpu,score:2,
+  low:r.opening_min,high:r.opening_max,status:o.status as Row['status'],source:'Office',rule:r.cpu,
   warning:'การ์ดจอออนบอร์ดยังไม่ยืนยันจากชื่อสินค้า ต้องตรวจ GPU, RAM/SSD, CPU รุ่นเต็มและสภาพก่อนเสนอราคา'
  });
  const bus=latest(sources.business);
