@@ -15,6 +15,7 @@ on:
       - 'scripts/verify-ai-buyer-cost-review.test.mjs'
       - 'scripts/verify-ai-buyer-chat-price-control.test.mjs'
       - 'scripts/verify-ai-buyer-notebook-coverage.test.mjs'
+      - 'scripts/verify-ai-buyer-notebook-coverage-prices.test.mjs'
       - 'scripts/verify-pricebook-v28.test.mjs'
       - 'scripts/verify-pricebook-v28-csv.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
@@ -90,6 +91,9 @@ jobs:
 
       - name: Verify notebook price coverage and no-guess safety
         run: node --test scripts/verify-ai-buyer-notebook-coverage.test.mjs
+
+      - name: Verify notebook rule-price coverage matching
+        run: node --test scripts/verify-ai-buyer-notebook-coverage-prices.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck
