@@ -1,3 +1,4 @@
+import {AiBuyerBusinessNotebookRuleReview} from './AiBuyerBusinessNotebookRuleReview';
 import {AiBuyerOfficeNotebookRuleReview} from './AiBuyerOfficeNotebookRuleReview';
 import {AiBuyerNotebookCoverage} from './AiBuyerNotebookCoverage';
 import {AiBuyerChatOfferRuleReview} from './AiBuyerChatOfferRuleReview';
@@ -87,6 +88,7 @@ export function AiBuyerChatPriceControl(){
   {open&&<>
    <AiBuyerNotebookRuleReview />
    <AiBuyerOfficeNotebookRuleReview />
+   <AiBuyerBusinessNotebookRuleReview />
    <AiBuyerNotebookCoverage />
    <AiBuyerChatOfferRuleReview />
    <div style={{...panel,marginTop:12}}>
