@@ -1,8 +1,9 @@
+import type {NotebookGapBatch} from './aiBuyerNotebookGapRules';
 import type {NotebookBucket} from './aiBuyerNotebookCoverage';
 import type {NotebookSpecOfferBatch,NotebookSpecOfferRule} from './aiBuyerNotebookRuleBatches';
 import type {OfficeNotebookRuleBatch,OfficeNotebookRule} from './aiBuyerOfficeNotebookRules';
 import type {BusinessNotebookRuleBatch,BusinessNotebookRule} from './aiBuyerBusinessNotebookRules';
-export type CoveragePriceMatch={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:'Gaming'|'Office'|'Business';rule:string;warning:string};
+export type CoveragePriceMatch={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:'Gaming'|'Office'|'Business'|'Historical Gap';rule:string;warning:string};
 type Row={low:number|null;high:number|null;status:'APPROVED_DRAFT'|'PENDING';source:CoveragePriceMatch['source'];rule:string;warning:string};
 const normalized=(s:string)=>s.toUpperCase().replace(/\s+/g,'').replace(/–/g,'-');
 function cpuRankGen(s:string):{rank:number;gen:number}|null{
@@ -55,7 +56,7 @@ function gaming(b:NotebookBucket,r:NotebookSpecOfferRule):boolean{
  return false;
 }
 export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
- gaming:NotebookSpecOfferBatch[];office:OfficeNotebookRuleBatch[];business:BusinessNotebookRuleBatch[]
+ gaming:NotebookSpecOfferBatch[];office:OfficeNotebookRuleBatch[];business:BusinessNotebookRuleBatch[];gaps?:NotebookGapBatch[]
 }):CoveragePriceMatch|null{
  if(b.kind==='REVIEW'||b.kind==='MACBOOK')return null;
  const rows:Row[]=[];
@@ -74,6 +75,25 @@ export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
   low:r.opening_min,high:r.opening_max,status:bus.status as Row['status'],source:'Business',rule:r.cpu,
   warning:'ต้องยืนยันรุ่น Business จริง, GPU ออนบอร์ด, สภาพและราคาขายต่อก่อนเสนอราคา'
  });
+ // Only attach a gap proposal if it does not override any existing Owner rule.
+ // Entry CPU N5030/N6000 and MacBook chip-only families remain unpriced at aggregated bucket level.
+ if(rows.length===0&&sources.gaps?.length){
+  const gap=latest(sources.gaps);
+  if(gap){
+   const found=gap.rules.filter(r=>{
+    if(b.kind==='MACBOOK'||b.kind==='REVIEW')return false;
+    const category=b.kind==='GAMING'?'NOTEBOOK_GAMING':b.kind==='BUSINESS'?'NOTEBOOK_BUSINESS':'NOTEBOOK_GENERAL';
+    return r.category===category&&r.cpu===b.cpu&&
+     (b.kind==='GAMING'?r.gpu===b.gpu:r.gpu==='INTEGRATED_ONLY'&&b.gpu==='INTEGRATED_OR_UNKNOWN');
+   });
+   if(found.length===1){
+    const r=found[0];rows.push({
+     low:r.opening_min,high:r.opening_max,status:gap.status as Row['status'],source:'Historical Gap',rule:r.cpu+' / '+r.gpu,
+     warning:'ข้อเสนอเติมช่องว่างจากประวัติจริง ไม่ใช่ราคาที่ Owner ยืนยัน · ต้องตรวจ CPU/GPU/สภาพและราคาขายก่อนใช้งาน'
+    });
+   }
+  }
+ }
  // Ambiguous overlapping price rules must not be resolved by guessing.
  if(rows.length!==1)return null;
  const x=rows[0];return {low:x.low,high:x.high,status:x.status,source:x.source,rule:x.rule,warning:x.warning};
