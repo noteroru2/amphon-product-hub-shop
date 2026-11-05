@@ -33,7 +33,7 @@ export function AiBuyerBusinessNotebookRuleReview(){
      </select>
     </label>
    </div>
-   {!batches.length&&<p>ยังไม่มีชุดราคาทั่วไปจากแชท</p>}
+   {!batches.length&&<p>ยังไม่มีชุดราคา Business Notebook จากแชท</p>}
    {batches.map((batch,index)=><div key={batch.id} style={{borderTop:'1px solid #71809a44',marginTop:12,paddingTop:10}}>
     <strong>{batch.title}</strong>
     <p style={{fontSize:12,opacity:.74}}>สถานะ: {batch.status==='PENDING'?'รอ Owner อนุมัติ':batch.status==='APPROVED_DRAFT'?'อนุมัติเป็นกฎร่างแล้ว':'ยกเลิก'} · {batch.rules.length} กลุ่ม · {new Date(batch.created_at).toLocaleString('th-TH')}{index>0?' · ประวัติข้อเสนอ':''}</p>
