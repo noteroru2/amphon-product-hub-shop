@@ -1,9 +1,9 @@
 import {supabase} from './supabase';
 export type BusinessNotebookRule={
  key:string;category:'NOTEBOOK_BUSINESS';family:string;cpu:string;gpu:'INTEGRATED_ONLY';
- ram_gb:number;ssd_gb:number[];condition_key:'NORMAL';
+ condition_key:'NORMAL';
  opening_min:number|null;opening_max:number|null;review_type:'RANGE'|'PER_MODEL';
- caution:string;notes:string;
+ review:string;notes:string;
 };
 export type BusinessNotebookRuleBatch={
  id:string;draft_id:string;title:string;status:'PENDING'|'APPROVED_DRAFT'|'DISMISSED';
