@@ -45,3 +45,31 @@ test('core ultra per-model rule never becomes zero-price',()=>{
  const p=match(b('GENERAL','Core Ultra 7 Series 2'),src);
  assert.equal(p.low,null);assert.equal(p.high,null);
 });
+
+test('historical gap prices display only for uncovered exact CPU and GPU',()=>{
+ const gaps=pack('PENDING',[
+  {category:'NOTEBOOK_GAMING',cpu:'i5 Gen 11',gpu:'RTX3060',opening_min:11000,opening_max:12500},
+  {category:'NOTEBOOK_BUSINESS',cpu:'i3 Gen 11',gpu:'INTEGRATED_ONLY',opening_min:2000,opening_max:3000}
+ ]);
+ const src={gaming:[],office:[],business:[],gaps};
+ assert.equal(match(b('GAMING','i5 Gen 11','RTX3060'),src)?.low,11000);
+ assert.equal(match(b('BUSINESS','i3 Gen 11'),src)?.low,2000);
+ assert.equal(match(b('GAMING','i7 Gen 11','RTX3060'),src),null);
+ assert.equal(match(b('GENERAL','i3 Gen 11'),src),null);
+});
+test('historical gap does not override already staged owner price',()=>{
+ const gaps=pack('PENDING',[{category:'NOTEBOOK_BUSINESS',cpu:'i3 Gen 11',gpu:'INTEGRATED_ONLY',opening_min:2000,opening_max:3000}]);
+ const src={gaming:[],office:[],business:pack('APPROVED_DRAFT',[rule('i3 Gen 11',2500,3500)]),gaps};
+ const p=match(b('BUSINESS','i3 Gen 11'),src);
+ assert.equal(p.low,2500);assert.equal(p.source,'Business');
+});
+test('historical gap cannot convert unknown hardware, MacBook or Entry CPU to priced offer',()=>{
+ const gaps=pack('PENDING',[
+  {category:'NOTEBOOK_GAMING',cpu:'i5 Gen 11',gpu:'RTX3050_6GB',opening_min:12000,opening_max:14000},
+  {category:'NOTEBOOK_GENERAL',cpu:'Pentium N6000',gpu:'INTEGRATED_ONLY',opening_min:1500,opening_max:2500}
+ ]);
+ const src={gaming:[],office:[],business:[],gaps};
+ assert.equal(match(b('GAMING','i5 Gen 11','RTX3050_UNSPEC'),src),null);
+ assert.equal(match(b('GENERAL','Entry / Celeron / Pentium'),src),null);
+ assert.equal(match(b('MACBOOK','Apple M2'),src),null);
+});
