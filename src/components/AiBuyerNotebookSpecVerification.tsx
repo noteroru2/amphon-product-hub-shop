@@ -50,6 +50,9 @@ export function AiBuyerNotebookSpecVerification(){
  const refresh=async()=>{await load()};
  function parseCheck(n:string){
   const p=parseNotebookVerification(n);
+  if(!selected)return false;
+  if(selected.issues.some(i=>i.startsWith('RTX3050'))&&!(p.gpu==='RTX3050'&&p.vramGb))return false;
+  if(selected.issues.some(i=>i.startsWith('MAC_'))&&!(p.macFamily&&(p.chip||p.year)&&p.ramGb&&p.ssdGb&&p.screenInches))return false;
   return p.issues.length===0;
  }
  return <section style={{border:'1px solid #8290a166',borderRadius:12,padding:12,margin:'12px 0'}}>
