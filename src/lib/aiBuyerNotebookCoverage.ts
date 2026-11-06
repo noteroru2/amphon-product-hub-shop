@@ -1,3 +1,4 @@
+import {parseNotebookVerification} from './aiBuyerNotebookSpecVerification';
 import type {CostHistoryRecord} from './aiBuyerCostLearning';
 // Read-only coverage inventory. No inference can authorize a price or LINE response.
 export type NotebookBucket={key:string;family:string;cpu:string;gpu:string;count:number;sold:number;
@@ -93,10 +94,21 @@ export function analyzeNotebookCoverage(records:CostHistoryRecord[]):NotebookCov
  let unknown=0;
  for(const r of pool){
   const n=low(r.product_name);
-  const chip=cpu(n),gpu=extractGpu(n);
+  const parsed=parseNotebookVerification(r.product_name);
+  const baseCpu=cpu(n);
+  const chip=mac.test(n)?[
+   parsed.chip?'Apple '+parsed.chip:parsed.year?'Intel '+parsed.year:'Mac CPU UNKNOWN',
+   parsed.macFamily??'Family UNKNOWN',
+   parsed.screenInches?String(parsed.screenInches)+'in':'Screen UNKNOWN',
+   parsed.ramGb??'RAM UNKNOWN',
+   parsed.ssdGb??'SSD UNKNOWN'
+  ].join(' | '):baseCpu;
+  const gpu=parsed.gpu==='RTX3050'
+   ?parsed.vramGb?'RTX3050_'+parsed.vramGb+'GB':'RTX3050_UNSPEC'
+   :extractGpu(n);
   const family=mac.test(n)?'MacBook':gpu!=='INTEGRATED_OR_UNKNOWN'?'Gaming GPU':/thinkpad|latitude|elitebook|probook|expertbook|precision|zbook|thinkbook/.test(n)?'Business / Workstation':'Windows / General';
   const kind:NotebookBucket['kind']=family==='MacBook'?'MACBOOK':family==='Gaming GPU'?'GAMING':family==='Business / Workstation'?'BUSINESS':'GENERAL';
-  const uncertain=chip==='CPU UNKNOWN'||(gpu==='INTEGRATED_OR_UNKNOWN'&&/(?:gaming|nitro|tuf|rog|legion|loq|victus)/.test(n));
+  const uncertain=chip==='CPU UNKNOWN'||(mac.test(n)&&(!parsed.macFamily||(!parsed.chip&&!parsed.year)))||(gpu==='INTEGRATED_OR_UNKNOWN'&&/(?:gaming|nitro|tuf|rog|legion|loq|victus)/.test(n));
   if(uncertain)unknown++;
   const safeKind=uncertain?'REVIEW':kind;
   const key=[safeKind,chip,gpu].join('|');

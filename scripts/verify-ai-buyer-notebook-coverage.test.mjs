@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import ts from 'typescript';
 const source=fs.readFileSync(new URL('../src/lib/aiBuyerNotebookCoverage.ts',import.meta.url),'utf8');
 const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const mod={exports:{}};new Function('module','exports',js)(mod,mod.exports);
+const mod={exports:{}};
+const verificationCode=fs.readFileSync(new URL('../src/lib/aiBuyerNotebookSpecVerification.ts',import.meta.url),'utf8');
+const verificationJs=ts.transpileModule(verificationCode,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const verificationMod={exports:{}};
+new Function('module','exports','require',verificationJs)(verificationMod,verificationMod.exports,()=>mod.exports);
+new Function('module','exports','require',js)(mod,mod.exports,()=>verificationMod.exports);
 const {isNotebookCostRecord,analyzeNotebookCoverage}=mod.exports;
 const item=(key,name,category='',cost=5000,type='PURCHASE')=>({
  source_kind:'INVENTORY',source_key:key,inventory_code:key,product_name:name,category,

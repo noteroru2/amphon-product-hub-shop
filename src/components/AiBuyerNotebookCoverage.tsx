@@ -1,10 +1,12 @@
+import {applyCostSpecReviews} from '../lib/aiBuyerCostReviewRules';
+import {AiBuyerNotebookSpecVerification} from './AiBuyerNotebookSpecVerification';
 import {listNotebookGapBatches,type NotebookGapBatch} from '../lib/aiBuyerNotebookGapRules';
 import {listNotebookRuleBatches,type NotebookSpecOfferBatch} from '../lib/aiBuyerNotebookRuleBatches';
 import {listOfficeNotebookRules,type OfficeNotebookRuleBatch} from '../lib/aiBuyerOfficeNotebookRules';
 import {listBusinessNotebookRules,type BusinessNotebookRuleBatch} from '../lib/aiBuyerBusinessNotebookRules';
 import {matchNotebookCoveragePrice} from '../lib/aiBuyerNotebookCoveragePrices';
 import {useEffect,useMemo,useState} from 'react';
-import {loadCostLearningRecords} from '../lib/aiBuyerCostLearningData';
+import {loadCostLearningRecords,loadCostSpecReviews} from '../lib/aiBuyerCostLearningData';
 import {analyzeNotebookCoverage,type NotebookCoverage,type NotebookBucket} from '../lib/aiBuyerNotebookCoverage';
 const fmt=(v:number|null)=>v===null?'ไม่มีข้อมูล':new Intl.NumberFormat('th-TH').format(v)+' ฿';
 const labels:Record<NotebookBucket['kind'],string>={GAMING:'Gaming',GENERAL:'ทำงานทั่วไป',BUSINESS:'Business',MACBOOK:'MacBook',REVIEW:'ตรวจสเปก'};
@@ -15,7 +17,7 @@ export function AiBuyerNotebookCoverage(){
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const [kind,setKind]=useState('ALL'),[search,setSearch]=useState(''),[limit,setLimit]=useState(40);
  const load=async()=>{setBusy(true);setError('');
-  try{const [records,gaming,office,business,gaps]=await Promise.all([loadCostLearningRecords(),listNotebookRuleBatches(),listOfficeNotebookRules(),listBusinessNotebookRules(),listNotebookGapBatches()]);setReport(analyzeNotebookCoverage(records));setRules({gaming,office,business,gaps})}
+  try{const [records,reviews,gaming,office,business,gaps]=await Promise.all([loadCostLearningRecords(),loadCostSpecReviews(),listNotebookRuleBatches(),listOfficeNotebookRules(),listBusinessNotebookRules(),listNotebookGapBatches()]);setReport(analyzeNotebookCoverage(applyCostSpecReviews(records,reviews)));setRules({gaming,office,business,gaps})}
   catch(e){setError(e instanceof Error?e.message:String(e))}
   finally{setBusy(false)}};
  useEffect(()=>{if(open)void load()},[open]);
@@ -26,7 +28,8 @@ export function AiBuyerNotebookCoverage(){
   void navigator.clipboard.writeText(message).catch(()=>setError('คัดลอกไม่สำเร็จ'));};
  return <section style={{margin:'12px 0',border:'1px solid #8290a166',borderRadius:12,padding:12}}>
   <button style={{...btn,width:'100%',textAlign:'left',fontWeight:700}} aria-expanded={open} onClick={()=>setOpen(v=>!v)}>Notebook Coverage — ครอบคลุมทุก CPU/GPU ที่พบ {open?'▴':'▾'}</button>
-  <p style={{fontSize:12,opacity:.75}}>ข้อมูลอ้างอิงพร้อมราคาเปิดรับจากกฎร่างและข้อเสนอเติมช่องว่างจากสต๊อกจริงที่จับคู่ CPU/GPU ได้ · สถานะ PENDING/APPROVED_DRAFT ไม่ใช่ราคา LINE AUTO · สเปกไม่ครบต้องตรวจเพิ่ม</p>
+  <AiBuyerNotebookSpecVerification />
+  <p style={{fontSize:12,opacity:.75}}>ข้อมูลอ้างอิงหลังนำ Owner Spec Review Overlay มาประกอบ พร้อมราคาเปิดรับจากกฎร่างและข้อเสนอเติมช่องว่างจากสต๊อกจริงที่จับคู่ CPU/GPU ได้ · สถานะ PENDING/APPROVED_DRAFT ไม่ใช่ราคา LINE AUTO · สเปกไม่ครบต้องตรวจเพิ่ม</p>
   {open&&<>
    <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',margin:'10px 0'}}>
     <strong>พบโน๊ตบุ๊ค {report?.inventory??'…'} เครื่อง</strong>

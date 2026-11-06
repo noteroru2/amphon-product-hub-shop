@@ -16,6 +16,7 @@ on:
       - 'scripts/verify-ai-buyer-chat-price-control.test.mjs'
       - 'scripts/verify-ai-buyer-notebook-coverage.test.mjs'
       - 'scripts/verify-ai-buyer-notebook-coverage-prices.test.mjs'
+      - 'scripts/verify-ai-buyer-notebook-spec-verification.test.mjs'
       - 'scripts/verify-pricebook-v28.test.mjs'
       - 'scripts/verify-pricebook-v28-csv.test.mjs'
       - 'scripts/verify-auto-publish.mjs'
@@ -94,6 +95,9 @@ jobs:
 
       - name: Verify notebook rule-price coverage matching
         run: node --test scripts/verify-ai-buyer-notebook-coverage-prices.test.mjs
+
+      - name: Verify RTX3050 VRAM and MacBook exact-spec review queue
+        run: node --test scripts/verify-ai-buyer-notebook-spec-verification.test.mjs
 
       - name: Hub TypeScript
         run: npm run typecheck
