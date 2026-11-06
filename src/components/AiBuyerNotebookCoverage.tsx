@@ -14,20 +14,39 @@ const btn:React.CSSProperties={padding:'8px 11px',border:'1px solid #8290a188',b
 export function AiBuyerNotebookCoverage(){
  const [open,setOpen]=useState(false),[report,setReport]=useState<NotebookCoverage|null>(null);
  const [rules,setRules]=useState<{gaming:NotebookSpecOfferBatch[];office:OfficeNotebookRuleBatch[];business:BusinessNotebookRuleBatch[];gaps:NotebookGapBatch[]}>({gaming:[],office:[],business:[],gaps:[]});
- const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[loadedAt,setLoadedAt]=useState<Date|null>(null);
  const [kind,setKind]=useState('ALL'),[search,setSearch]=useState(''),[limit,setLimit]=useState(40);
  const load=async()=>{setBusy(true);setError('');
-  try{const [records,reviews,gaming,office,business,gaps]=await Promise.all([loadCostLearningRecords(),loadCostSpecReviews(),listNotebookRuleBatches(),listOfficeNotebookRules(),listBusinessNotebookRules(),listNotebookGapBatches()]);setReport(analyzeNotebookCoverage(applyCostSpecReviews(records,reviews)));setRules({gaming,office,business,gaps})}
+  try{const [records,reviews,gaming,office,business,gaps]=await Promise.all([loadCostLearningRecords(),loadCostSpecReviews(),listNotebookRuleBatches(),listOfficeNotebookRules(),listBusinessNotebookRules(),listNotebookGapBatches()]);setReport(analyzeNotebookCoverage(applyCostSpecReviews(records,reviews)));setRules({gaming,office,business,gaps});setLoadedAt(new Date())}
   catch(e){setError(e instanceof Error?e.message:String(e))}
   finally{setBusy(false)}};
  useEffect(()=>{if(open)void load()},[open]);
  const rows=useMemo(()=>report?.buckets.filter(r=>(kind==='ALL'||r.kind===kind)&&[r.cpu,r.gpu,r.family,...r.examples].join(' ').toLowerCase().includes(search.toLowerCase().trim()))??[],[report,kind,search]);
  const money=(v:number|null)=>v===null?'รายรุ่น':new Intl.NumberFormat('th-TH').format(v);
  const match=(r:NotebookBucket)=>matchNotebookCoveragePrice(r,rules);
- const copy=()=>{const message=rows.map(r=>{const price=match(r);return labels[r.kind]+' / '+r.cpu+' / '+r.gpu+' | ทุนกลาง '+fmt(r.medianBuy)+' | '+(price?('ราคาเปิดรับร่าง '+money(price.low)+'–'+money(price.high)+' บาท ['+price.status+'] ตรวจสเปกก่อนใช้'):'ไม่พบกฎที่ยืนยันความตรงของสเปก');}).join('\n');
+ const counts=useMemo(()=>{
+  const observed=report?.buckets.filter(r=>r.count>0)??[];
+  const priced=observed.filter(r=>matchNotebookCoveragePrice(r,rules)!==null).length;
+  const missing=observed.filter(r=>matchNotebookCoveragePrice(r,rules)===null);
+  const ambiguous=missing.filter(r=>r.kind==='REVIEW'||r.gpu==='RTX3050_UNSPEC'||r.kind==='MACBOOK').length;
+  const latest=(items:{created_at:string;rules:unknown[]}[])=>[...items].sort((a,b)=>b.created_at.localeCompare(a.created_at))[0]?.rules.length??0;
+  return {priced,unpriced:missing.length,ambiguous,gaming:latest(rules.gaming),office:latest(rules.office),business:latest(rules.business),gaps:latest(rules.gaps)};
+ },[report,rules]);
+ const missingReason=(r:NotebookBucket)=>{
+  if(r.kind==='REVIEW')return 'ข้อมูล CPU/GPU หรือประเภทเครื่องไม่ครบ ต้องตรวจสเปก';
+  if(r.kind==='MACBOOK')return 'MacBook ต้องตรวจ Air/Pro, ชิป, ปี, หน้าจอ, RAM/SSD และ PriceBook รายรุ่น';
+  if(r.gpu==='RTX3050_UNSPEC')return 'RTX 3050 ยังไม่ทราบ VRAM 4GB/6GB — ไม่สามารถใช้ราคาอัตโนมัติ';
+  if(r.count===0)return 'ไม่มีประวัติซื้อจริงและยังไม่มีกฎตรงรุ่น';
+  return 'ไม่พบกฎที่ตรง CPU/GPU หรือเป็นรุ่นที่ต้องตรวจรายเครื่อง';
+ };
+ const copy=()=>{const message=rows.map(r=>{const price=match(r);return labels[r.kind]+' / '+r.cpu+' / '+r.gpu+' | ทุนกลาง '+fmt(r.medianBuy)+' | '+(price?('ราคาเปิดรับร่าง '+money(price.low)+'–'+money(price.high)+' บาท ['+price.status+'] ตรวจสเปกก่อนใช้'):missingReason(r));}).join('\n');
   void navigator.clipboard.writeText(message).catch(()=>setError('คัดลอกไม่สำเร็จ'));};
  return <section style={{margin:'12px 0',border:'1px solid #8290a166',borderRadius:12,padding:12}}>
   <button style={{...btn,width:'100%',textAlign:'left',fontWeight:700}} aria-expanded={open} onClick={()=>setOpen(v=>!v)}>Notebook Coverage — ครอบคลุมทุก CPU/GPU ที่พบ {open?'▴':'▾'}</button>
+  <div style={{fontSize:11,opacity:.8,margin:'8px 0'}}>
+   Coverage UI: Spec Verification + Historical Gaps · 2026-11-06
+   {loadedAt?' · โหลดข้อมูลล่าสุด '+loadedAt.toLocaleString('th-TH'):' · ยังไม่ได้โหลดข้อมูล'}
+  </div>
   <AiBuyerNotebookSpecVerification />
   <p style={{fontSize:12,opacity:.75}}>ข้อมูลอ้างอิงหลังนำ Owner Spec Review Overlay มาประกอบ พร้อมราคาเปิดรับจากกฎร่างและข้อเสนอเติมช่องว่างจากสต๊อกจริงที่จับคู่ CPU/GPU ได้ · สถานะ PENDING/APPROVED_DRAFT ไม่ใช่ราคา LINE AUTO · สเปกไม่ครบต้องตรวจเพิ่ม</p>
   {open&&<>
@@ -36,6 +55,7 @@ export function AiBuyerNotebookCoverage(){
     <span>ต้องตรวจสเปก {report?.unknown??'…'} เครื่อง</span>
     <span>{report?.buckets.filter(r=>r.count>0).length??'…'} กลุ่มมีประวัติ / {report?.buckets.length??'…'} กลุ่มในแคตตาล็อก</span>
     <button style={btn} disabled={busy} onClick={()=>void load()}>{busy?'กำลังโหลด':'รีเฟรช'}</button>
+    <span style={{fontSize:12}}>กฎร่าง Gaming {counts.gaming} / Office {counts.office} / Business {counts.business} / Gap {counts.gaps} · จับคู่ได้ {counts.priced} / ไม่มีราคา {counts.unpriced} (ต้องตรวจสเปก {counts.ambiguous}) กลุ่มที่มีประวัติ</span>
    </div>
    <div style={{display:'flex',gap:7,flexWrap:'wrap',margin:'8px 0'}}>
     <select style={btn} value={kind} onChange={e=>{setKind(e.target.value);setLimit(40)}}>
@@ -53,7 +73,7 @@ export function AiBuyerNotebookCoverage(){
       <div style={{fontSize:11,color:p.status==='PENDING'?'#bf8732':'#39856b'}}>{p.status==='PENDING'?'รอ Owner อนุมัติ':'อนุมัติเป็นกฎร่าง'} · {p.source}</div>
       <div style={{fontSize:11,opacity:.7}}>{p.warning}</div>
      </div>;
-     return <span style={{fontSize:12,opacity:.77}}>{r.kind==='REVIEW'?'ต้องตรวจสเปกก่อน':r.kind==='MACBOOK'?'MacBook ต้องตรวจ Air/Pro, ปี, RAM/SSD และ PriceBook รายรุ่น':r.count===0?'ยังไม่มีประวัติ / ไม่มีกฎตรงรุ่น':'ยังไม่พบกฎที่ตรงเงื่อนไข CPU/GPU'} </span>})()}</td>
+     return <span style={{fontSize:12,opacity:.77}}>{missingReason(r)} </span>})()}</td>
     </tr>)}</tbody>
    </table></div>
    {rows.length>limit&&<button style={{...btn,marginTop:8}} onClick={()=>setLimit(n=>n+40)}>แสดงเพิ่ม ({rows.length-limit})</button>}
