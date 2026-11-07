@@ -83,7 +83,6 @@ export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
   const ordered=[...sources.gaps].filter(x=>x.status==='PENDING'||x.status==='APPROVED_DRAFT')
    .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
   for(const gap of ordered)for(const r of gap.rules){
-   if(b.kind==='MACBOOK'||b.kind==='REVIEW')continue;
    const category=b.kind==='GAMING'?'NOTEBOOK_GAMING':b.kind==='BUSINESS'?'NOTEBOOK_BUSINESS':'NOTEBOOK_GENERAL';
    if(r.category!==category||r.cpu!==b.cpu)continue;
    const gpuMatch=b.kind==='GAMING'?r.gpu===b.gpu:r.gpu==='INTEGRATED_ONLY'&&b.gpu==='INTEGRATED_OR_UNKNOWN';
