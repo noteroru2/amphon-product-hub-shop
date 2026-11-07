@@ -13,9 +13,10 @@ function ramAndStorage(s:string):{ramGb:number|null;ssdGb:number|null}{
 }
 export function parseNotebookVerification(name:string){
  const n=norm(name), mac=/\bmac\s*book\b|\bmacbook\b|แมคบุ๊ค|แมคบุก/i.test(n);
- const gpu=/\b(?:rtx\s*3050|(?<=[\/\s])3050)(?!\s*ti\b)/i.test(n)?'RTX3050':null;
- // VRAM must be anchored to the graphics card token, not RAM/SSD later in the name.
- const gpuToken=n.match(/\b(?:rtx\s*3050|3050)(?!\s*ti\b)/i);
+ // Require a full 3050 token: AMD Athlon 3050U is a CPU, not an RTX GPU.
+ // Never read /16/512 as VRAM after a bare 3050.
+ const gpuToken=n.match(/\b(?:rtx\s*3050|3050)\b(?!\s*ti\b)/i);
+ const gpu=gpuToken?'RTX3050':null;
  const after=gpuToken?n.slice((gpuToken.index??0)+gpuToken[0].length):'';
  const explicit=after.match(/^\s*(?:\(|\/)?\s*(4|6)\s*(?:GB|G)\b/i);
  const before=gpuToken?n.slice(Math.max(0,(gpuToken.index??0)-22),gpuToken.index??0):'';

@@ -16,12 +16,19 @@ export function AiBuyerNotebookCoverage(){
  const [rules,setRules]=useState<{gaming:NotebookSpecOfferBatch[];office:OfficeNotebookRuleBatch[];business:BusinessNotebookRuleBatch[];gaps:NotebookGapBatch[]}>({gaming:[],office:[],business:[],gaps:[]});
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[loadedAt,setLoadedAt]=useState<Date|null>(null);
  const [kind,setKind]=useState('ALL'),[search,setSearch]=useState(''),[limit,setLimit]=useState(40);
+ const [coverageView,setCoverageView]=useState<'OBSERVED'|'UNPRICED'|'REVIEW'|'ALL'>('OBSERVED');
  const load=async()=>{setBusy(true);setError('');
   try{const [records,reviews,gaming,office,business,gaps]=await Promise.all([loadCostLearningRecords(),loadCostSpecReviews(),listNotebookRuleBatches(),listOfficeNotebookRules(),listBusinessNotebookRules(),listNotebookGapBatches()]);setReport(analyzeNotebookCoverage(applyCostSpecReviews(records,reviews)));setRules({gaming,office,business,gaps});setLoadedAt(new Date())}
   catch(e){setError(e instanceof Error?e.message:String(e))}
   finally{setBusy(false)}};
  useEffect(()=>{if(open)void load()},[open]);
- const rows=useMemo(()=>report?.buckets.filter(r=>(kind==='ALL'||r.kind===kind)&&[r.cpu,r.gpu,r.family,...r.examples].join(' ').toLowerCase().includes(search.toLowerCase().trim()))??[],[report,kind,search]);
+ const rows=useMemo(()=>report?.buckets.filter(r=>
+  (kind==='ALL'||r.kind===kind)&&
+  (coverageView==='ALL'||r.count>0)&&
+  (coverageView!=='UNPRICED'||matchNotebookCoveragePrice(r,rules)===null)&&
+  (coverageView!=='REVIEW'||(r.kind==='REVIEW'||r.kind==='MACBOOK'||r.gpu==='RTX3050_UNSPEC'))&&
+  [r.cpu,r.gpu,r.family,...r.examples].join(' ').toLowerCase().includes(search.toLowerCase().trim())
+ )??[],[report,kind,search,coverageView,rules]);
  const money=(v:number|null)=>v===null?'รายรุ่น':new Intl.NumberFormat('th-TH').format(v);
  const match=(r:NotebookBucket)=>matchNotebookCoveragePrice(r,rules);
  const counts=useMemo(()=>{
@@ -55,19 +62,29 @@ export function AiBuyerNotebookCoverage(){
     <span>ต้องตรวจสเปก {report?.unknown??'…'} เครื่อง</span>
     <span>{report?.buckets.filter(r=>r.count>0).length??'…'} กลุ่มมีประวัติ / {report?.buckets.length??'…'} กลุ่มในแคตตาล็อก</span>
     <button style={btn} disabled={busy} onClick={()=>void load()}>{busy?'กำลังโหลด':'รีเฟรช'}</button>
-    <span style={{fontSize:12}}>กฎร่าง Gaming {counts.gaming} / Office {counts.office} / Business {counts.business} / Gap {counts.gaps} · จับคู่ได้ {counts.priced} / ไม่มีราคา {counts.unpriced} (ต้องตรวจสเปก {counts.ambiguous}) กลุ่มที่มีประวัติ</span>
+    <span style={{fontSize:12}}>กฎร่าง Gaming {counts.gaming} / Office {counts.office} / Business {counts.business} / Gap {counts.gaps} · มีประวัติ {counts.priced+counts.unpriced} กลุ่ม · พบกฎเสนอราคา {counts.priced} · ยังไม่มีราคา {counts.unpriced} (ต้องตรวจสเปก/ MacBook {counts.ambiguous}, กลุ่มอื่น {counts.unpriced-counts.ambiguous})</span>
    </div>
    <div style={{display:'flex',gap:7,flexWrap:'wrap',margin:'8px 0'}}>
     <select style={btn} value={kind} onChange={e=>{setKind(e.target.value);setLimit(40)}}>
      <option value="ALL">ทุกหมวด</option>{Object.entries(labels).map(([k,v])=><option key={k} value={k}>{v}</option>)}
     </select>
-    <input style={{...btn,flex:1,minWidth:150}} placeholder="ค้นหา CPU/GPU/รุ่น" value={search} onChange={e=>setSearch(e.target.value)}/>
+    <select aria-label="กรองการครอบคลุมราคา" style={btn} value={coverageView} onChange={e=>{setCoverageView(e.target.value as typeof coverageView);setLimit(40)}}>
+     <option value="OBSERVED">เฉพาะรุ่นที่มีประวัติ</option>
+     <option value="UNPRICED">ยังไม่มีราคา (มีประวัติ)</option>
+     <option value="REVIEW">ต้องตรวจสเปก / MacBook</option>
+     <option value="ALL">ทุกกลุ่มรวมไม่มีประวัติ</option>
+    </select>
+    <input style={{...btn,flex:1,minWidth:150}} placeholder="ค้นหา CPU/GPU/รุ่น" value={search} onChange={e=>{setSearch(e.target.value);setLimit(40)}}/>
     <button style={btn} disabled={!rows.length} onClick={copy}>คัดลอกสเปกไปตั้งราคากับ ChatGPT</button>
    </div>
    <div style={{overflowX:'auto'}}><table style={{minWidth:940,width:'100%',fontSize:12,borderCollapse:'collapse'}}>
     <thead><tr><th>ประเภท</th><th>CPU</th><th>GPU</th><th>เครื่อง</th><th>ขายแล้ว</th><th>ทุนกลางย้อนหลัง*</th><th>กฎราคารับซื้อ</th></tr></thead>
     <tbody>{rows.slice(0,limit).map(r=><tr key={r.key} style={{borderTop:'1px solid #8290a144'}}>
-     <td>{labels[r.kind]}</td><td>{r.cpu}</td><td>{r.gpu}</td><td>{r.count}</td><td>{r.sold}</td><td>{fmt(r.medianBuy)}</td>
+     <td>{labels[r.kind]}</td><td><strong>{r.cpu}</strong>
+      {r.count>0&&<details><summary style={{cursor:'pointer',opacity:.8}}>ดูตัวอย่างรุ่น</summary>
+       {r.examples.map((name,i)=><div key={i} style={{fontSize:11,marginTop:4}}>{name}</div>)}
+      </details>}
+     </td><td>{r.gpu}</td><td>{r.count}</td><td>{r.sold}</td><td>{fmt(r.medianBuy)}</td>
      <td>{(()=>{const p=match(r);if(p)return <div>
       <strong>{p.low===null?'ตีราคารายรุ่น':money(p.low)+'–'+money(p.high)+' บาท'}</strong>
       <div style={{fontSize:11,color:p.status==='PENDING'?'#bf8732':'#39856b'}}>{p.status==='PENDING'?'รอ Owner อนุมัติ':'อนุมัติเป็นกฎร่าง'} · {p.source}</div>
