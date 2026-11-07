@@ -56,3 +56,12 @@ test('review queue excludes PC RTX3050 and prioritizes in-stock unverifiable lap
  ]);
  assert.equal(rows.length,2);assert.equal(rows[0].inventory_code,'stock');
 });
+
+test('Athlon 3050U is not an RTX3050 GPU and needs no false VRAM review',()=>{
+ const cpu='โน๊ตบุ๊ค Acer Aspire 3 AMD ATHLON silver 3050U/4/256';
+ assert.equal(parseNotebookVerification(cpu).gpu,null);
+ assert.ok(!parseNotebookVerification(cpu).issues.includes('RTX3050_VRAM_MISSING'));
+ const bucket=analyzeNotebookCoverage([rec('athlon',cpu)]).buckets.find(x=>x.count===1);
+ assert.equal(bucket?.gpu,'INTEGRATED_OR_UNKNOWN');
+ assert.equal(bucket?.kind,'GENERAL');
+});
