@@ -75,24 +75,25 @@ export function matchNotebookCoveragePrice(b:NotebookBucket,sources:{
   low:r.opening_min,high:r.opening_max,status:bus.status as Row['status'],source:'Business',rule:r.cpu,
   warning:'ต้องยืนยันรุ่น Business จริง, GPU ออนบอร์ด, สภาพและราคาขายต่อก่อนเสนอราคา'
  });
- // Only attach a gap proposal if it does not override any existing Owner rule.
- // Entry CPU N5030/N6000 and MacBook chip-only families remain unpriced at aggregated bucket level.
+ // Search across all draft batches, not only newest. Earlier 11 PENDING
+ // proposals must not disappear when a later evidence batch is staged.
+ // A duplicate key across batches is ambiguous and deliberately stays unpriced.
  if(rows.length===0&&sources.gaps?.length){
-  const gap=latest(sources.gaps);
-  if(gap){
-   const found=gap.rules.filter(r=>{
-    if(b.kind==='MACBOOK'||b.kind==='REVIEW')return false;
-    const category=b.kind==='GAMING'?'NOTEBOOK_GAMING':b.kind==='BUSINESS'?'NOTEBOOK_BUSINESS':'NOTEBOOK_GENERAL';
-    return r.category===category&&r.cpu===b.cpu&&
-     (b.kind==='GAMING'?r.gpu===b.gpu:r.gpu==='INTEGRATED_ONLY'&&b.gpu==='INTEGRATED_OR_UNKNOWN');
+  const matches:Row[]=[];
+  const ordered=[...sources.gaps].filter(x=>x.status==='PENDING'||x.status==='APPROVED_DRAFT')
+   .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+  for(const gap of ordered)for(const r of gap.rules){
+   if(b.kind==='MACBOOK'||b.kind==='REVIEW')continue;
+   const category=b.kind==='GAMING'?'NOTEBOOK_GAMING':b.kind==='BUSINESS'?'NOTEBOOK_BUSINESS':'NOTEBOOK_GENERAL';
+   if(r.category!==category||r.cpu!==b.cpu)continue;
+   const gpuMatch=b.kind==='GAMING'?r.gpu===b.gpu:r.gpu==='INTEGRATED_ONLY'&&b.gpu==='INTEGRATED_OR_UNKNOWN';
+   if(!gpuMatch)continue;
+   matches.push({low:r.opening_min,high:r.opening_max,status:gap.status as Row['status'],
+    source:'Historical Gap',rule:r.cpu+' / '+r.gpu,
+    warning:'ข้อเสนอราคาตามทุนและยอดขายจริง ('+r.sample_count+' เครื่อง) · '+(r.risk==='HIGH'?'หลักฐานน้อย ต้องตรวจเพิ่ม · ':'')+'ยังไม่ใช่ราคา Active ต้องตรวจสเปกและราคาขายก่อนรับซื้อ'
    });
-   if(found.length===1){
-    const r=found[0];rows.push({
-     low:r.opening_min,high:r.opening_max,status:gap.status as Row['status'],source:'Historical Gap',rule:r.cpu+' / '+r.gpu,
-     warning:'ข้อเสนอเติมช่องว่างจากประวัติจริง ไม่ใช่ราคาที่ Owner ยืนยัน · ต้องตรวจ CPU/GPU/สภาพและราคาขายก่อนใช้งาน'
-    });
-   }
   }
+  if(matches.length===1)rows.push(matches[0]);
  }
  // Ambiguous overlapping price rules must not be resolved by guessing.
  if(rows.length!==1)return null;
