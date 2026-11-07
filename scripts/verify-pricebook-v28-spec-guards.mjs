@@ -33,6 +33,12 @@ const cases=[
  ['RAM must match',()=>assert.equal(decideMac({family:'AIR',chip:'M3',screen:13,ram:8,ssd:256},macRules),'NO_MATCH')],
  ['duplicate approved rules blocked',()=>assert.equal(decideMac({family:'AIR',chip:'M3',screen:13,ram:16,ssd:256},[...macRules,{...macRules[0],code:'DUP'}]),'AMBIGUOUS')]
 ];
+cases.push(
+ ['GTX 3050 not RTX 3050',()=>assert.equal(parse('GTX 3050 4GB').gpu,null)],
+ ['RTX4050 must not match RTX3050',()=>assert.equal(parse('RTX4050 6GB').gpu,null)],
+ ['two approved GPU variant rules ambiguous',()=>assert.equal(decideGpu({gpu:'RTX3050',vram:6},[...gpuRules,{gpu:'RTX3050',vram:6,code:'duplicate'}]),'AMBIGUOUS')],
+ ['unknown MacBook family blocked',()=>assert.equal(decideMac({chip:'M3',screen:13,ram:16,ssd:256},macRules),'REVIEW_REQUIRED')]
+);
 const historicalUnknown = [
  ['INV-2026-0064','Asus Tuf i5-11400H/RTX3050/8/512'],
  ['INV-2026-0189','Acer Nitro5 i7-11800H/RTX3050/8/512'],
