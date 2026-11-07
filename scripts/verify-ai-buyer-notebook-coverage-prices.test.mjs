@@ -73,3 +73,24 @@ test('historical gap cannot convert unknown hardware, MacBook or Entry CPU to pr
  assert.equal(match(b('GENERAL','Entry / Celeron / Pentium'),src),null);
  assert.equal(match(b('MACBOOK','Apple M2'),src),null);
 });
+
+test('historical gap batch 2 does not hide earlier batch 1',()=>{
+ const older={status:'PENDING',created_at:'2026-11-05T11:50:00.000Z',rules:[{
+  category:'NOTEBOOK_GAMING',cpu:'i5 Gen 11',gpu:'RTX3060',opening_min:11000,opening_max:12500,sample_count:3,risk:'NORMAL'
+ }]};
+ const newer={status:'PENDING',created_at:'2026-11-07T07:50:00.000Z',rules:[{
+  category:'NOTEBOOK_GAMING',cpu:'i7 Gen 13',gpu:'RTX5050',opening_min:16500,opening_max:18000,sample_count:1,risk:'HIGH'
+ }]};
+ const src={gaming:[],office:[],business:[],gaps:[newer,older]};
+ assert.equal(match(b('GAMING','i5 Gen 11','RTX3060'),src)?.low,11000);
+ assert.equal(match(b('GAMING','i7 Gen 13','RTX5050'),src)?.low,16500);
+ assert.equal(match(b('MACBOOK','Apple M3'),src),null);
+});
+test('conflicting duplicate evidence drafts must not quote a price',()=>{
+ const g={category:'NOTEBOOK_GAMING',cpu:'i7 Gen 13',gpu:'RTX5050',sample_count:1,risk:'HIGH'};
+ const src={gaming:[],office:[],business:[],gaps:[
+  {status:'PENDING',created_at:'2026-11-07',rules:[{...g,opening_min:16500,opening_max:18000}]},
+  {status:'APPROVED_DRAFT',created_at:'2026-11-05',rules:[{...g,opening_min:18000,opening_max:19500}]}
+ ]};
+ assert.equal(match(b('GAMING','i7 Gen 13','RTX5050'),src),null);
+});

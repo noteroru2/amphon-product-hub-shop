@@ -37,7 +37,7 @@ export function AiBuyerNotebookCoverage(){
   const missing=observed.filter(r=>matchNotebookCoveragePrice(r,rules)===null);
   const ambiguous=missing.filter(r=>r.kind==='REVIEW'||r.gpu==='RTX3050_UNSPEC'||r.kind==='MACBOOK').length;
   const latest=(items:{created_at:string;rules:unknown[]}[])=>[...items].sort((a,b)=>b.created_at.localeCompare(a.created_at))[0]?.rules.length??0;
-  return {priced,unpriced:missing.length,ambiguous,gaming:latest(rules.gaming),office:latest(rules.office),business:latest(rules.business),gaps:latest(rules.gaps)};
+  return {priced,unpriced:missing.length,ambiguous,gaming:latest(rules.gaming),office:latest(rules.office),business:latest(rules.business),gaps:rules.gaps.filter(x=>x.status==='PENDING'||x.status==='APPROVED_DRAFT').reduce((n,x)=>n+x.rules.length,0)};
  },[report,rules]);
  const missingReason=(r:NotebookBucket)=>{
   if(r.kind==='REVIEW')return 'ข้อมูล CPU/GPU หรือประเภทเครื่องไม่ครบ ต้องตรวจสเปก';
