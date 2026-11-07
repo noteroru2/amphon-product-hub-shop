@@ -33,5 +33,17 @@ const cases=[
  ['RAM must match',()=>assert.equal(decideMac({family:'AIR',chip:'M3',screen:13,ram:8,ssd:256},macRules),'NO_MATCH')],
  ['duplicate approved rules blocked',()=>assert.equal(decideMac({family:'AIR',chip:'M3',screen:13,ram:16,ssd:256},[...macRules,{...macRules[0],code:'DUP'}]),'AMBIGUOUS')]
 ];
+const historicalUnknown = [
+ ['INV-2026-0064','Asus Tuf i5-11400H/RTX3050/8/512'],
+ ['INV-2026-0189','Acer Nitro5 i7-11800H/RTX3050/8/512'],
+ ['INV-2026-0214','Asus Tuf A17 Ryzen7 4800H/RTX3050/8/512/17.3'],
+ ['INV-2026-0292','MSI Thin 15 i5-124500H/RTX3050/16/512'],
+ ['INV-2026-0436','Asus TUF gaming F15 i5-11400 RTX3050/16/512'],
+ ['INV-2026-0458','ASUS TUF A15 Ryzen 7 170 / RTX3050 /16/512/15.6'],
+ ['INV-2026-0459','Asus TUF F15 i5-11400H / RTX3050 /16 /512/15.6'],
+];
+for(const [id,description] of historicalUnknown) {
+ cases.push([id+' must request VRAM verification',()=>assert.equal(decideGpu(parse(description),gpuRules),'REVIEW_REQUIRED')]);
+}
 for(const [name,fn] of cases){fn();console.log('PASS',name)}
 console.log(cases.length+'/'+cases.length+' independent guard tests passed; production matcher not changed.');
