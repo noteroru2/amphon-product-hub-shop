@@ -1,0 +1,18 @@
+name: PriceBook V2.8 standalone QA
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-pricebook-v28-spec-guards.mjs'
+      - '.github/workflows/pricebook-v28-qa.yml'
+permissions:
+  contents: read
+jobs:
+  spec-guard-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Standalone tests (no credentials, no live writes)
+        run: node scripts/verify-pricebook-v28-spec-guards.mjs
