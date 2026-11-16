@@ -1,3 +1,4 @@
+import { trackShopEvent } from './conversion-events'
 const endpoint='https://mfpdtlxwdbxitgfzdape.supabase.co/functions/v1/seo-workbench/contact'
 const storageKey='amphon-source-v1'
 export function initSeoAttribution() {
@@ -14,6 +15,7 @@ export function initSeoAttribution() {
   document.addEventListener('click',event=>{
     const target=event.target instanceof Element?event.target.closest<HTMLAnchorElement>('a'):null
     if(!target || !/^https:\/\/line\.me\/(R\/)?(ti\/p|oaMessage)\/(~|%7e)?(%40|@)webuy([/?#]|$)/i.test(target.href)) return
+    trackShopEvent('line_click',{source:'shop',item_id:document.getElementById('add-to-cart')?.dataset.sku || document.querySelector<HTMLElement>('[data-shop-product]')?.dataset.sku || undefined})
     const url=new URL(endpoint)
     url.search=new URLSearchParams({site:'shop',page:location.origin+location.pathname,session:source.session,referrer:source.referrer,sku:document.getElementById('add-to-cart')?.dataset.sku || ''}).toString()
     target.href=url.href
