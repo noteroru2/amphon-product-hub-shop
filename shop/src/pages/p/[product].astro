@@ -97,13 +97,13 @@ if (product) {
             ? { categorySlug: product.categorySlug }
             : { category: product.category }
     const related = await listStoreProducts({ ...filters, availability: 'available', limit: 9 })
-    relatedProducts = related.products.filter((item) => item.sku !== product?.sku).slice(0, 6)
+    relatedProducts = related.products.filter((item) => item.sku !== product?.sku && item.status === 'published' && item.availability === 'available' && item.price > 0).slice(0, 6)
     // A sold one-off model may have no replacement in its exact model/series.
     // Broaden to the category so the archived page still leads to real stock.
     if (relatedProducts.length < 6 && product.categorySlug) {
       const categoryStock = await listStoreProducts({ categorySlug: product.categorySlug, availability: 'available', limit: 9 })
       const seen = new Set([product.sku, ...relatedProducts.map((item) => item.sku)])
-      relatedProducts.push(...categoryStock.products.filter((item) => !seen.has(item.sku)))
+      relatedProducts.push(...categoryStock.products.filter((item) => !seen.has(item.sku) && item.status === 'published' && item.availability === 'available' && item.price > 0))
       relatedProducts = relatedProducts.slice(0, 6)
     }
   } catch (error) {
