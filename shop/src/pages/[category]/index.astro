@@ -49,7 +49,7 @@ try {
     soldProducts.push(...sold.products)
   }
   const newestFirst = (a: StoreProduct, b: StoreProduct) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
-  products = products.sort(newestFirst).slice(0, 48)
+  products = products.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0).sort(newestFirst).slice(0, 48)
   soldProducts = soldProducts.sort(newestFirst).slice(0, 12)
 } catch (error) {
   apiError = true
