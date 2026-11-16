@@ -63,6 +63,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
 {turnstileEnabled && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
 <script>
   import { clearCart, readCartSkus } from '../../lib/cart'
+  import { trackShopEvent } from '../../lib/conversion-events'
   import {
     attachCustomerCheckoutIdentity,
     friendlyCheckoutIdentityError,
@@ -89,6 +90,7 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
   const api = form?.dataset.api || itemsTarget?.dataset.api || ''
   const skus = readCartSkus()
   let cartValid = false
+  let checkoutTracked = false
   let memberPolicyLoaded = false
   let memberCheckoutRequired = true
   let memberReady = false
@@ -274,8 +276,13 @@ const turnstileEnabled = Boolean(settings?.checkout?.turnstileEnabled && setting
       const response = await fetch(`${api}/products/${encodeURIComponent(sku)}`)
       return response.ok ? (await response.json()).product : null
     }))
-    cartValid = products.every((item) => item?.availability === 'available')
-    const subtotal = products.reduce((sum, item) => sum + Number(item?.price || 0), 0)
+    const sellable = (item: any) => item?.status === 'published' && item?.availability === 'available' && Number.isFinite(Number(item.price)) && Number(item.price) > 0
+    cartValid = products.every(sellable)
+    const subtotal = products.reduce((sum, item) => sum + (sellable(item) ? Number(item.price) : 0), 0)
+    if (cartValid && !checkoutTracked) {
+      checkoutTracked = true
+      trackShopEvent('begin_checkout', { currency: 'THB', value: subtotal, source: 'web_checkout' })
+    }
     itemsTarget.innerHTML = `${products.map((item, i) => `<div class="checkout-item"><span>${esc(item?.title || skus[i])}</span><strong>${item ? money(Number(item.price || 0)) : 'ไม่พร้อมขาย'}</strong></div>`).join('')}<div class="checkout-total"><span>ยอดสินค้า</span><strong>${money(subtotal)}</strong></div><small>ค่าจัดส่งขึ้นอยู่กับวิธีรับสินค้า</small>${cartValid ? '' : '<div class="notice">มีสินค้าที่ไม่พร้อมสั่งซื้อ กรุณากลับไปตรวจสอบตะกร้า</div>'}`
     refreshSubmitState()
   }
