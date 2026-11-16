@@ -151,7 +151,7 @@ if (searchIntent?.faqs.length) {
         </div>
       </div>
       {products.length ? (
-        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+        <div class="product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div>
       ) : (
         <div class="empty human-empty">{apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองรีเฟรชอีกครั้งในอีกสักครู่ครับ' : 'ยังไม่มีของพร้อมขายในหมวดนี้ตอนนี้ แต่หมวดนี้ยังเปิดไว้เพราะมีสินค้าเข้าหมุนเวียนเป็นระยะครับ'}</div>
       )}
