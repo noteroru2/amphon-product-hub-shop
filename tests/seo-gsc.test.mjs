@@ -77,6 +77,7 @@ test('request handler rejects anonymous/staff access and fake scheduler keys; st
   const request=(action,headers={})=>new Request('https://test.supabase.co/functions/v1/seo-gsc',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify({action})})
   assert.equal((await handler(request('status'))).status,401)
   assert.equal((await handler(request('status',{authorization:'Bearer valid'}))).status,403)
+  assert.equal((await handler(request('portfolio',{authorization:'Bearer valid'}))).status,403)
   assert.equal((await handler(request('run',{'x-gsc-scheduler-key':'wrong'}))).status,401)
   role='admin'
   const result=await handler(request('status',{authorization:'Bearer valid'}))
