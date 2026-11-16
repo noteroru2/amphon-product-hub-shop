@@ -10,6 +10,7 @@ import { absoluteUrl, productPath } from '../lib/seo'
 import { shopFaqs, shopKeywordPillars } from '../config/search-intent-content'
 import BuybackCTA from '../components/BuybackCTA.astro'
 import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/ecosystem'
+import { MERCHANT_CONTACT } from '../config/merchant-identity'
 
 Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=15, must-revalidate')
 
@@ -46,6 +47,15 @@ const schema: Record<string, unknown>[] = [
     '@id': `${absoluteUrl('/')}#store`,
     name: 'AMPHON TRADING',
     legalName: MAIN_LEGAL_NAME,
+    telephone: MERCHANT_CONTACT.phoneE164,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: MERCHANT_CONTACT.streetAddress,
+      addressLocality: MERCHANT_CONTACT.district,
+      addressRegion: MERCHANT_CONTACT.province,
+      postalCode: MERCHANT_CONTACT.postalCode,
+      addressCountry: MERCHANT_CONTACT.country,
+    },
     url: absoluteUrl('/'),
     parentOrganization: { '@id': MAIN_ORGANIZATION_ID },
     sameAs: [mainWebsiteUrl, facebookPageUrl],
