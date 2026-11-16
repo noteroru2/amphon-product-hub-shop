@@ -342,7 +342,7 @@ if (product && evidence?.hasProductEvidence) {
           ) : <div class="gallery-placeholder main-photo">ยังไม่มีรูปสินค้า</div>}
         </section>
 
-        <aside class="panel buy-panel">
+        <aside class="panel buy-panel" data-shop-product data-sku={product.sku} data-title={product.title} data-price={product.price} data-category={product.categorySlug || product.category} data-availability={product.availability}>
           <div class="status-row">
             <span class:list={['badge', product.availability !== 'available' && 'badge-reserved']}>{availabilityLabel}</span>
             <span class="trust-pill">{conditionLabel}</span>
@@ -625,12 +625,24 @@ if (product && evidence?.hasProductEvidence) {
 </BaseLayout>
 
 <script>
-  import { addCartSku } from '../../lib/cart'
+  import { addCartSku, readCartSkus } from '../../lib/cart'
+  import { trackShopEvent } from '../../lib/conversion-events'
+  const productPanel = document.querySelector<HTMLElement>('[data-shop-product]')
+  const eventItem = productPanel ? {
+    item_id: productPanel.dataset.sku,
+    item_name: productPanel.dataset.title,
+    item_category: productPanel.dataset.category,
+    price: Number(productPanel.dataset.price),
+    currency: 'THB' as const,
+  } : null
+  if (eventItem) trackShopEvent('view_item', { ...eventItem, value: Number(eventItem.price) })
   const button = document.getElementById('add-to-cart') as HTMLButtonElement | null
   const message = document.getElementById('cart-message')
   button?.addEventListener('click', () => {
     const sku = button.dataset.sku || ''
+    const alreadyInCart = readCartSkus().includes(sku)
     const cart = addCartSku(sku)
+    if (!alreadyInCart && cart.includes(sku) && eventItem) trackShopEvent('add_to_cart', { ...eventItem, value: Number(eventItem.price) })
     if (message) message.textContent = `ใส่ตะกร้าแล้ว · ตอนนี้มี ${cart.length} รายการ`
     button.textContent = 'ใส่ตะกร้าแล้ว'
     window.setTimeout(() => { button.textContent = 'ใส่ตะกร้า' }, 1400)
