@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import ProductCard from '../../components/ProductCard.astro'
+import { listStoreProducts, type StoreProduct } from '../../lib/store-api'
+
+const query = String(Astro.url.searchParams.get('q') || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+let products: StoreProduct[] = []
+let total = 0
+let apiError = false
+
+Astro.response.headers.set('Cache-Control', 'no-store')
+if (query.length >= 2) {
+  try {
+    const result = await listStoreProducts({ q: query, availability: 'available', limit: 48 })
+    // Never show a product as ready to buy when upstream stock disagrees.
+    products = result.products.filter((item) => item.status === 'published' && item.availability === 'available')
+    total = result.pagination.total
+  } catch (error) {
+    console.error('SHOP_SEARCH_STORE_API', error)
+    apiError = true
+    Astro.response.status = 503
+    Astro.response.headers.set('Retry-After', '300')
+  }
+}
+const title = query ? `ผลค้นหา ${query} | AMPHON SHOP` : 'ค้นหาสินค้าไอทีมือสอง | AMPHON SHOP'
+const description = 'ค้นหาสินค้าไอทีมือสองที่มีจริงจาก AMPHON TRADING ดูราคา รูป สเปก สภาพ และสอบถามผ่าน LINE @webuy'
+---
+<BaseLayout title={title} description={description} canonicalPath="/search/" robots="noindex,follow">
+  <section class="section shop-search-page">
+    <div class="container">
+      <div class="breadcrumbs"><ol><li><a href="/">หน้าแรก</a></li><li>ค้นหาสินค้า</li></ol></div>
+      <div class="section-head">
+        <div><div class="eyebrow">AMPHON SHOP</div><h1>ค้นหาสินค้าไอทีมือสอง</h1><p class="muted">พิมพ์ชื่อรุ่น ยี่ห้อ หรือรหัสสินค้าเพื่อดูรายการที่ยังพร้อมขาย</p></div>
+      </div>
+      <form class="shop-search-page-form" role="search" action="/search/" method="get">
+        <label for="shop-search-query">ชื่อสินค้า / รุ่น / รหัสสินค้า</label>
+        <div class="shop-search-input-row">
+          <input id="shop-search-query" type="search" name="q" value={query} minlength="2" maxlength="80" required placeholder="เช่น Lenovo LOQ, MacBook M1 หรือรหัสสินค้า" autocomplete="off" />
+          <button type="submit" class="button button-primary">ค้นหา</button>
+        </div>
+      </form>
+      {apiError ? (
+        <div class="empty" role="alert">ระบบค้นหาไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่อีกครั้ง หรือสอบถามร้านผ่าน LINE</div>
+      ) : query.length < 2 ? (
+        <div class="empty">พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อเริ่มค้นหา</div>
+      ) : (
+        <>
+          <p class="shop-search-count" aria-live="polite">{products.length ? `พบสินค้าพร้อมขายที่ตรงคำค้น ${products.length} รายการ${total > products.length ? ` (แสดง ${products.length} รายการแรก)` : ''}` : `ไม่พบสินค้าพร้อมขายสำหรับ “${query}” ในขณะนี้`}</p>
+          {products.length ? <div class="product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div> :
+            <div class="empty"><p>สินค้าไอทีมือสองเข้าร้านเป็นรอบ ๆ ลองใช้คำที่กว้างขึ้น หรือดูสินค้าเข้าใหม่แทน</p><a class="button button-secondary" href="/new-arrivals/">ดูสินค้าเข้าใหม่</a></div>}
+        </>
+      )}
+    </div>
+  </section>
+</BaseLayout>
