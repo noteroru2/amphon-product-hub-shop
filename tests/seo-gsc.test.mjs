@@ -5,7 +5,7 @@ import ts from 'typescript'
 const transpile=source=>ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const moduleUrl=code=>`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 const coreUrl=moduleUrl(transpile(readFileSync(new URL('../supabase/functions/seo-gsc/core.ts',import.meta.url),'utf8')))
-const {dateWindow,hostFilter,mapProperties,fetchSnapshot,fetchJson,GscError}=await import(coreUrl)
+const {dateWindow,hostFilter,mapProperties,fetchSnapshot,fetchPortfolioPageQueries,fetchJson,GscError}=await import(coreUrl)
 const main={id:'amphon',origin:'https://amphon.co.th',label:'amphon.co.th',gsc_property:'sc-domain:amphon.co.th'}
 const shop={id:'shop',origin:'https://shop.amphon.co.th',label:'shop.amphon.co.th',gsc_property:'sc-domain:amphon.co.th'}
 const row={clicks:10,impressions:100,ctr:0.1,position:3.2}
@@ -84,4 +84,39 @@ test('request handler rejects anonymous/staff access and fake scheduler keys; st
   assert.equal((await handler(request('configure',{authorization:'Bearer valid'}))).status,403)
   assert.equal((await handler(new Request('https://test.supabase.co/functions/v1/seo-gsc/callback'))).status,302)
   assert.ok(!operations.includes('claim')); delete globalThis.__gscMock
+})
+
+test('portfolio final windows use 7 and 14 Pacific-final dates and query/page order',async()=>{
+  const requests=[]
+  const fake=async(url,init)=>{
+    const body=JSON.parse(init.body); requests.push(body)
+    return response({rows:[{...row,keys:['รับซื้อโน๊ตบุ๊ค','https://amphon.co.th/บริการ/โน๊ตบุ๊ค']}]})
+  }
+  const found=await fetchPortfolioPageQueries(main,main.gsc_property,'TOKEN','2026-11-11',fake)
+  assert.deepEqual(found.map(v=>[v.days,v.start_date,v.end_date]),[
+    [7,'2026-11-05','2026-11-11'],[14,'2026-10-29','2026-11-11']])
+  assert.equal(found[0].rows[0].query,'รับซื้อโน๊ตบุ๊ค')
+  assert.equal(found[0].rows[0].page,'https://amphon.co.th/บริการ/โน๊ตบุ๊ค')
+  assert.ok(found.every(v=>v.pagination_complete && v.rows.length===1))
+  assert.ok(requests.every(v=>v.dataState==='final' && v.dimensions[0]==='query' && v.dimensions[1]==='page'))
+  assert.ok(requests.every(v=>new RegExp(v.dimensionFilterGroups[0].filters[0].expression).test('https://amphon.co.th/a')))
+})
+test('portfolio page/query pagination is bounded and explicitly marked partial',async()=>{
+  const starts=[]
+  const fake=async(url,init)=>{
+    const body=JSON.parse(init.body); starts.push(body.startRow)
+    return response({rows:Array.from({length:1000},(_,i)=>({...row,keys:['q'+(body.startRow+i),'https://amphon.co.th/a']}))})
+  }
+  const found=await fetchPortfolioPageQueries(main,main.gsc_property,'TOKEN','2026-11-11',fake,[7])
+  assert.deepEqual(starts,[0,1000,2000])
+  assert.equal(found.length,1)
+  assert.equal(found[0].rows.length,3000)
+  assert.equal(found[0].pagination_complete,false)
+})
+test('portfolio page/query rejects malformed numerical data and never treats it as zero',async()=>{
+  await assert.rejects(()=>fetchPortfolioPageQueries(main,main.gsc_property,'TOKEN','2026-11-11',
+    async()=>response({rows:[{...row,position:NaN,keys:['x','https://amphon.co.th/a']}]}),[7]),
+  /Invalid page\/query observation/)
+  await assert.rejects(()=>fetchPortfolioPageQueries(main,main.gsc_property,'TOKEN','not-a-date',
+    async()=>response({}),[7]),/Invalid final GSC date/)
 })
