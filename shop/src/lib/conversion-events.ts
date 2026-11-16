@@ -21,13 +21,13 @@ export function trackShopEvent(event: CommerceName, payload: CommercePayload = {
   if (typeof window === 'undefined') return
   const normalized = Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-  )
+  ) as CommercePayload
   const detail = { event, ...normalized }
   const state = window as Window & { dataLayer?: Record<string, unknown>[] }
   if (Array.isArray(state.dataLayer)) {
     if (event === 'line_click') state.dataLayer.push(detail)
     else {
-      const { event: _event, source: _source, ...fields } = detail
+      const { source: _source, ...fields } = normalized
       const data = 'items' in fields ? fields : {
         ...fields,
         ...(fields.item_id ? { items: [{ item_id: fields.item_id, item_name: fields.item_name || '', price: fields.price || 0, quantity: 1 }] } : {}),
