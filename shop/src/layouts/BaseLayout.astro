@@ -3,6 +3,7 @@ import { indexCategories } from '../config/catalog'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { absoluteUrl } from '../lib/seo'
 import { MAIN_BUYBACK_URL } from '../config/ecosystem'
+import { MERCHANT_CONTACT } from '../config/merchant-identity'
 import '../styles/global.css'
 import '../styles/auth.css'
 import '../styles/mobile-first.css'
@@ -126,9 +127,12 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
             <a href="/shipping/">การจัดส่ง</a>
             <a href="/warranty/">การรับประกัน</a>
             <a href="/returns/">การคืนสินค้า</a>
+            <a href="/privacy/">ความเป็นส่วนตัว</a>
+            <a href="/terms/">ข้อกำหนดการขาย</a>
             <a href="/new-arrivals/">สินค้าเข้าใหม่</a>
             <a href={MAIN_BUYBACK_URL}>ขายสินค้าให้เรา</a>
           </nav>
+          <div class="footer-small merchant-footer-identity"><strong>{MERCHANT_CONTACT.legalName}</strong><span>{MERCHANT_CONTACT.streetAddress} {MERCHANT_CONTACT.subdistrict} {MERCHANT_CONTACT.district} {MERCHANT_CONTACT.province} {MERCHANT_CONTACT.postalCode} ประเทศไทย</span><a href={`tel:${MERCHANT_CONTACT.phoneE164}`}>โทร {MERCHANT_CONTACT.phoneDisplay}</a></div>
           <div class="footer-small">
             ช่องทางทางการ:
             <a href={mainWebsiteUrl} target="_blank" rel="noopener noreferrer">เว็บไซต์หลัก AMPHON TRADING</a>
