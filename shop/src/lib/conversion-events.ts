@@ -1,5 +1,5 @@
 /**
- * Consent-aware hook for a configured GA4/GTM dataLayer. No customer identity,
+ * Privacy-minimized hook for an already configured GA4/GTM dataLayer. No customer identity,
  * contact text or personal details are sent. When GA4 is not configured this
  * only emits a local browser event for future integrations.
  */
