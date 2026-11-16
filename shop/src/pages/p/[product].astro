@@ -333,7 +333,7 @@ if (product && evidence?.hasProductEvidence) {
                       aria-label={`ดูรูปที่ ${index + 1}: ${imageRoleLabel(image.role)}`}
                       aria-current={index === 0 ? 'true' : 'false'}
                     >
-                      <img src={image.url} alt="" loading="lazy" decoding="async" />
+                      <img src={image.url} alt="" width={image.width || 160} height={image.height || 120} loading="lazy" decoding="async" />
                     </button>
                   ))}
                 </div>
