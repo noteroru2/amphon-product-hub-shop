@@ -20,6 +20,7 @@ async function loadTs(path) {
 const load = async path => import(await loadTs(new URL(path, import.meta.url)))
 const seo = await load('../shop/src/lib/seo.ts')
 const merchant = await load('../shop/src/lib/merchant-schema.ts')
+const { normalizeStoreProduct } = await load('../shop/src/lib/stock-status.ts')
 const { catalogCategories } = await load('../shop/src/config/catalog.ts')
 const { effectiveCategoryIndexPolicy, categoryStockStateFromProducts } = await load('../shop/src/config/category-governance.ts')
 const { categorySeoContent } = await load('../shop/src/config/category-seo-content.ts')
@@ -94,7 +95,7 @@ test('Shop all-stock requests preserve availability=all for sold URLs and catego
       : { products: [{ sku: 'LIVE', status: 'published' }], pagination: { hasMore: true } }
     return { ok: true, json: async () => page }
   }
-  const { getAllStoreProducts, listStoreProducts } = new Function('fetch', `${js}\nreturn { getAllStoreProducts, listStoreProducts }`)(fetch)
+  const { getAllStoreProducts, listStoreProducts } = new Function('fetch', 'normalizeStoreProduct', `${js}\nreturn { getAllStoreProducts, listStoreProducts }`)(fetch, normalizeStoreProduct)
   const products = await getAllStoreProducts()
   assert.deepEqual(products.map(p => p.sku), ['LIVE', 'SOLD'])
   await listStoreProducts({ availability: 'all', categorySlug: 'notebooks', limit: 1 })
