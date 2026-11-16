@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0'
-import { READ_SCOPE, GscError, fetchJson, fetchSnapshot, mapProperties, type Site } from './core.ts'
+import { READ_SCOPE, GscError, fetchJson, fetchSnapshot, fetchPortfolioPageQueries, mapProperties, type Site } from './core.ts'
 
 const projectUrl=Deno.env.get('SUPABASE_URL')!
 const hub='https://hub.amphon.co.th'
@@ -39,6 +39,55 @@ async function sites():Promise<Site[]> {
 async function tokenRequest(body:Record<string,string>) {
   return fetchJson('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)})
 }
+
+/** Runs under the existing OAuth scheduler, no new secrets or cron jobs. */
+async function savePortfolioWindows(site: Site, property: string, accessToken: string, endDate: string, fetcher: typeof fetch, onlyDays: readonly (7 | 14)[]) {
+  const windows = await fetchPortfolioPageQueries(site,property,accessToken,endDate,fetcher,onlyDays)
+  for (const window of windows) {
+    const rows = window.rows.map(row => ({
+      site_id:site.id,window_days:window.days,start_date:window.start_date,end_date:window.end_date,
+      query:row.query,page:row.page,clicks:row.clicks,impressions:row.impressions,position:row.position,
+      partial_window:!window.pagination_complete,source:'GSC_FINAL_DIRECT_OAUTH'
+    }))
+    for (let i=0;i<rows.length;i+=200) {
+      const {error}=await db.from('commerce_seo_portfolio_gsc_query_pages')
+        .upsert(rows.slice(i,i+200),{onConflict:'site_id,window_days,end_date,query,page'})
+      if(error) throw new Error('PORTFOLIO_QUERY_PAGE_WRITE_FAILED')
+    }
+    const {error}=await db.from('commerce_seo_portfolio_gsc_ingest_runs').upsert({
+      site_id:site.id,window_days:window.days,start_date:window.start_date,end_date:window.end_date,
+      source:'GSC_FINAL_DIRECT_OAUTH',rows_written:rows.length,
+      data_complete:window.pagination_complete,status:'SUCCESS',error_class:null,completed_at:new Date().toISOString()
+    },{onConflict:'site_id,window_days,end_date,source'})
+    if(error) throw new Error('PORTFOLIO_INGEST_RECEIPT_FAILED')
+  }
+}
+async function portfolioData(siteId:string,windowDays:7|14|28) {
+  const [sites,projects,windows,roles,releases,funnel,ingests]=await Promise.all([
+    db.from('commerce_seo_sites').select('id,label,origin').eq('enabled',true).order('id'),
+    db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed'),
+    db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
+    db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300),
+    db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(100),
+    db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
+    db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150)
+  ])
+  for(const result of [sites,projects,windows,roles,releases,funnel,ingests]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
+  const enabled=(sites.data||[]) as {id:string}[]
+  if(!enabled.some(row=>row.id===siteId)) throw new Error('SITE_NOT_FOUND')
+  const receipts=(ingests.data||[]).filter(row=>row.site_id===siteId && row.window_days===windowDays)
+  const selectedEnd=receipts[0]?.end_date
+  let query=db.from('commerce_seo_portfolio_query_page_all_v')
+    .select('site_id,window_days,query,page,clicks,impressions,position,partial_window,source,end_date')
+    .eq('site_id',siteId).eq('window_days',windowDays).order('impressions',{ascending:false}).limit(70)
+  if(selectedEnd) query=query.eq('end_date',selectedEnd)
+  const details=await query
+  if(details.error) throw new Error('PORTFOLIO_QUERIES_READ_FAILED')
+  return {sites:sites.data,projects:projects.data,windows:windows.data,roles:roles.data,
+    releases:releases.data,funnel:funnel.data,ingests:ingests.data,
+    queries:details.data||[],selectedSite:siteId,selectedWindow:windowDays}
+}
+
 async function run() {
   const config=await rpc('config')
   if(!config.client_id || !config.client_secret) return {processed:0,configured:false}
@@ -50,7 +99,27 @@ async function run() {
       const token=await tokenRequest({client_id:config.client_id,client_secret:config.client_secret,refresh_token:job.refresh_token,grant_type:'refresh_token'})
       const snapshot=await fetchSnapshot({id:job.site_id,origin:job.origin,label:job.label,gsc_property:job.property},job.property,token.access_token,boundedFetch)
       await rpc('finish',{site_id:job.site_id,lease_id:job.lease_id,snapshot})
-      outcomes.push({site_id:job.site_id,success:true})
+      // The normal GSC snapshot is committed first. Granular ingestion is best-effort
+      // and MUST NOT mark the existing authoritative GSC sync as failed.
+      let portfolio='success'
+      for (const days of [7,14] as const) {
+        try {
+          await savePortfolioWindows({id:job.site_id,origin:job.origin,label:job.label,gsc_property:job.property},
+            job.property,token.access_token,snapshot.end_date,boundedFetch,[days])
+        } catch {
+          portfolio='retry_on_next_sync'
+          const start=new Date(snapshot.end_date+'T00:00:00Z')
+          start.setUTCDate(start.getUTCDate()-days+1)
+          // No credential or exception body is stored; never overwrite a prior SUCCESS.
+          await db.from('commerce_seo_portfolio_gsc_ingest_runs').upsert({
+            site_id:job.site_id,window_days:days,start_date:start.toISOString().slice(0,10),
+            end_date:snapshot.end_date,source:'GSC_FINAL_DIRECT_OAUTH',rows_written:0,
+            data_complete:false,status:'FAILED',error_class:'GSC_PORTFOLIO_INGEST_FAILED',
+            completed_at:new Date().toISOString()
+          },{onConflict:'site_id,window_days,end_date,source',ignoreDuplicates:true})
+        }
+      }
+      outcomes.push({site_id:job.site_id,success:true,portfolio})
     } catch(error) {
       const message=error instanceof GscError ? error.message : 'ดึงข้อมูล GSC ไม่สำเร็จ ระบบจะลองใหม่อัตโนมัติ'
       await rpc('fail',{site_id:job.site_id,lease_id:job.lease_id,error:message,reauth:error instanceof GscError && error.reauth})
@@ -92,6 +161,13 @@ Deno.serve(async(req:Request)=>{
       return json(await run())
     }
     const user=await actor(req)
+    if(body.action==='portfolio') {
+      const siteId=String(body.site_id || 'amphon')
+      const windowDays=Number(body.window_days || 28)
+      if(![7,14,28].includes(windowDays) || !/^[a-z0-9_-]{2,24}$/.test(siteId))
+        return json({error:'Invalid portfolio selection'},400)
+      return json(await portfolioData(siteId,windowDays as 7|14|28))
+    }
     if(body.action==='status') {
       const status=await rpc('status')
       status.jobs=status.jobs.filter((job:any)=>job.next_at!=='infinity')
