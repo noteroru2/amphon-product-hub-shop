@@ -7,6 +7,7 @@ import BuybackCTA from '../../components/BuybackCTA.astro'
 import { catalogCategories, categoryCollectionSlugs, getCategoryBySlug } from '../../config/catalog'
 import { getCategorySeoContent } from '../../config/category-seo-content'
 import { getCategorySearchIntent } from '../../config/search-intent-content'
+import { categoryInspectionNotes } from '../../config/category-inspection-notes'
 import { effectiveCategoryIndexPolicy } from '../../config/category-governance'
 import { listEvergreenPages, listStoreProducts, type EvergreenPage, type StoreProduct } from '../../lib/store-api'
 import { absoluteUrl, productPath } from '../../lib/seo'
@@ -48,7 +49,7 @@ try {
     soldProducts.push(...sold.products)
   }
   const newestFirst = (a: StoreProduct, b: StoreProduct) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
-  products = products.sort(newestFirst).slice(0, 48)
+  products = products.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0).sort(newestFirst).slice(0, 48)
   soldProducts = soldProducts.sort(newestFirst).slice(0, 12)
 } catch (error) {
   apiError = true
@@ -66,6 +67,7 @@ const robots = !apiError && effectiveIndexPolicy === 'INDEX'
   : 'noindex,follow'
 const canonicalPath = `/${category.slug}/`
 const seoContent = getCategorySeoContent(category.key)
+const inspectionNotes = categoryInspectionNotes[category.slug] || null
 const searchIntent = getCategorySearchIntent(category.key)
 const relatedCategories = (seoContent?.relatedSlugs || [])
   .map((slug) => catalogCategories.find((item) => item.slug === slug))
@@ -151,7 +153,7 @@ if (searchIntent?.faqs.length) {
         </div>
       </div>
       {products.length ? (
-        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+        <div class="product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div>
       ) : (
         <div class="empty human-empty">{apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองรีเฟรชอีกครั้งในอีกสักครู่ครับ' : 'ยังไม่มีของพร้อมขายในหมวดนี้ตอนนี้ แต่หมวดนี้ยังเปิดไว้เพราะมีสินค้าเข้าหมุนเวียนเป็นระยะครับ'}</div>
       )}
@@ -169,6 +171,20 @@ if (searchIntent?.faqs.length) {
 
   <BuyingResources categorySlug={category.slug} />
   <StockComparison products={products} />
+
+  {inspectionNotes && (
+    <section class="section category-inspection-notes" aria-labelledby="category-inspection-heading">
+      <div class="container">
+        <article class="panel editorial-panel">
+          <div class="eyebrow">คู่มือก่อนซื้อจาก AMPHON</div>
+          <h2 id="category-inspection-heading">{inspectionNotes.heading}</h2>
+          <p>{inspectionNotes.intro}</p>
+          <ul class="inspection-list">{inspectionNotes.checks.map((check) => <li>{check}</li>)}</ul>
+          <p class="muted">รายการตรวจและอุปกรณ์ที่แสดงในหน้าสินค้าแต่ละชิ้นเป็นหลักฐานเฉพาะรายการ หากข้อมูลใดยังไม่ระบุ ให้สอบถามร้านก่อนชำระ</p>
+        </article>
+      </div>
+    </section>
+  )}
 
   <BuybackCTA categorySlug={category.slug} />
 

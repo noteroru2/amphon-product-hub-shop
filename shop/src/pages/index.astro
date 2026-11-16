@@ -10,6 +10,7 @@ import { absoluteUrl, productPath } from '../lib/seo'
 import { shopFaqs, shopKeywordPillars } from '../config/search-intent-content'
 import BuybackCTA from '../components/BuybackCTA.astro'
 import { MAIN_LEGAL_NAME, MAIN_ORGANIZATION_ID, MAIN_SITE_URL } from '../config/ecosystem'
+import { MERCHANT_CONTACT } from '../config/merchant-identity'
 
 Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=15, must-revalidate')
 
@@ -19,7 +20,7 @@ let homeCategories = catalogCategories.filter((category) => category.indexPolicy
 let apiError = false
 try {
   const allProducts = await getAllStoreProducts()
-  const currentProducts = allProducts.filter((product) => product.status === 'published' || product.status === 'reserved')
+  const currentProducts = allProducts.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0)
   products = currentProducts.slice(0, 16)
   homeCategories = catalogCategories.filter((category) =>
     categoryIsEffectivelyIndexable(category, categoryStockStateFromProducts(category.slug, allProducts)),
@@ -46,6 +47,15 @@ const schema: Record<string, unknown>[] = [
     '@id': `${absoluteUrl('/')}#store`,
     name: 'AMPHON TRADING',
     legalName: MAIN_LEGAL_NAME,
+    telephone: MERCHANT_CONTACT.phoneE164,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: MERCHANT_CONTACT.streetAddress,
+      addressLocality: MERCHANT_CONTACT.district,
+      addressRegion: MERCHANT_CONTACT.province,
+      postalCode: MERCHANT_CONTACT.postalCode,
+      addressCountry: MERCHANT_CONTACT.country,
+    },
     url: absoluteUrl('/'),
     parentOrganization: { '@id': MAIN_ORGANIZATION_ID },
     sameAs: [mainWebsiteUrl, facebookPageUrl],
@@ -139,7 +149,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         <a class="section-link" href="/new-arrivals/">ดูสินค้าเข้าใหม่ทั้งหมด →</a>
       </div>
       {products.length ? (
-        <div class="product-grid home-product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+        <div class="product-grid home-product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div>
       ) : (
         <div class="empty human-empty">
           {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองเข้ามาใหม่อีกครั้งในอีกสักครู่ครับ' : 'ตอนนี้ยังไม่มีของใหม่ลงหน้าเว็บ ลองแวะกลับมาดูอีกครั้งครับ'}

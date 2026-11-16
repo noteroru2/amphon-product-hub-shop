@@ -1,0 +1,54 @@
+/* AMPHON SHOP search and interaction clarity. Loaded last to preserve legacy layout. */
+.header-search-row { padding: 0 0 10px; }
+.header-search-form {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  min-height: 44px;
+}
+.header-search-form label { font-size: .82rem; font-weight: 800; flex: 0 0 auto; color: #393939; }
+.header-search-form input,
+.shop-search-page-form input {
+  width: 100%; min-width: 0; flex: 1; min-height: 44px;
+  padding: 10px 14px; color: #161616; background: #fff;
+  border: 1px solid #d2d2d2; border-radius: 12px; font-size: 16px;
+}
+.header-search-form button {
+  flex: 0 0 auto; min-width: 78px; min-height: 44px;
+  padding: 0 14px; color: #fff; background: #202020;
+  border: 0; border-radius: 12px; font-weight: 850; cursor: pointer;
+}
+.header-search-form button:hover { background: #363636; }
+.header-search-form input:focus-visible,
+.shop-search-page-form input:focus-visible,
+.header-search-form button:focus-visible { outline: 3px solid #f26a21; outline-offset: 2px; }
+.shop-search-page { min-height: 55vh; }
+.shop-search-page-form { margin: 15px 0 20px; }
+.shop-search-page-form label { display: block; font-size: .85rem; font-weight: 750; margin-bottom: 7px; }
+.shop-search-input-row { display: flex; gap: 9px; }
+.shop-search-input-row .button { flex: 0 0 auto; }
+.shop-search-count { margin: 10px 0 16px; font-weight: 800; }
+.category-live-evidence { margin: 10px 0 0; }
+.category-live-evidence .muted { margin: 7px 0 0; line-height: 1.65; }
+.product-card:focus-visible { outline: 3px solid #f26a21; outline-offset: 3px; }
+@media (max-width: 720px) {
+  html { scroll-padding-top: 158px; }
+  .header-search-row { width: min(calc(100% - 20px),1180px); padding-bottom: 9px; }
+  .header-search-form { gap: 7px; }
+  .header-search-form label { display: none; }
+  .header-search-form input { min-height: 44px; padding-inline: 12px; font-size: 16px; }
+  .header-search-form button { min-width: 72px; padding-inline: 10px; }
+  .shop-search-page-form { margin: 12px 0 18px; }
+  .shop-search-input-row { gap: 7px; }
+  .shop-search-input-row .button { padding-inline: 12px; }
+  .product-card { contain: layout style; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+.merchant-footer-identity { display: flex; flex-wrap: wrap; gap: 5px 14px; padding-top: 12px; line-height: 1.55; }
+.merchant-footer-identity strong { color: #202020; }
+.merchant-footer-identity a { text-decoration: underline; text-underline-offset: 2px; }
+
+.category-inspection-notes .editorial-panel { max-width: 1080px; margin-inline: auto; line-height: 1.7; }
+.category-inspection-notes .inspection-list { display: grid; gap: 8px; padding-left: 23px; }
+.category-inspection-notes .inspection-list li { padding-left: 3px; }

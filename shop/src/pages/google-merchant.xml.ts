@@ -12,7 +12,7 @@ export const GET: APIRoute = async () => {
     return new Response(body, {
       headers: {
         'content-type': 'application/xml; charset=utf-8',
-        'cache-control': 'public, max-age=60, must-revalidate',
+        'cache-control': 'no-store, max-age=0',
         'x-robots-tag': 'noindex',
       },
     })

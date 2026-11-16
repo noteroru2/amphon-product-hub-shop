@@ -10,7 +10,7 @@ let products: StoreProduct[] = []
 let apiError = false
 try {
   const result = await listStoreProducts({ availability: 'available', limit: 60 })
-  products = result.products
+  products = result.products.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0)
 } catch (error) {
   apiError = true
   console.error('SHOP_NEW_ARRIVALS_STORE_API', error)
@@ -49,7 +49,7 @@ const schema = [
   <section class="section">
     <div class="container">
       {products.length ? (
-        <div class="product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+        <div class="product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div>
       ) : (
         <div class="empty human-empty">
           {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ' : 'ตอนนี้ยังไม่มีสินค้าใหม่ที่พร้อมขายครับ'}

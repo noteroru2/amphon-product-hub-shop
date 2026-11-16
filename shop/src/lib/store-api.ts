@@ -1,3 +1,4 @@
+import { normalizeStoreProduct } from './stock-status'
 export type StoreAvailability = 'available' | 'reserved' | 'out_of_stock'
 export type IndexPolicy = 'INDEX' | 'NOINDEX' | 'HOLD' | 'RETIRED'
 export type EvergreenPageType = 'BRAND' | 'SERIES' | 'MODEL'
@@ -270,7 +271,8 @@ export async function getStoreSettings(): Promise<StoreSettings | null> {
 }
 
 export async function listStoreProducts(params: ListStoreProductsParams = {}): Promise<ProductListResult> {
-  return fetchJson<ProductListResult>(`${storeApiBase()}/products${queryString(params)}`)
+  const result = await fetchJson<ProductListResult>(`${storeApiBase()}/products${queryString(params)}`)
+  return { ...result, products: result.products.map(normalizeStoreProduct) }
 }
 
 export async function getStoreProduct(sku: string): Promise<StoreProduct | null> {
@@ -284,7 +286,7 @@ export async function getStoreProduct(sku: string): Promise<StoreProduct | null>
     throw new Error(`Store API ${response.status}${body ? `: ${body.slice(0, 180)}` : ''}`)
   }
   const data = await response.json() as { product: StoreProduct }
-  return data.product
+  return normalizeStoreProduct(data.product)
 }
 
 

@@ -16,7 +16,7 @@ const statusText = (labels:Record<string,string>, value:string) => labels[value]
 ---
 <BaseLayout title={order ? `${order.orderNumber} | AMPHON SHOP` : 'สถานะคำสั่งซื้อ | AMPHON SHOP'} description="ตรวจสอบสถานะคำสั่งซื้อ การชำระเงิน การจัดส่ง เอกสาร และประกัน" canonicalPath={Astro.url.pathname} robots="noindex,nofollow">
   <section class="section checkout-shell"><div class="container narrow-container">
-    {order ? <div id="order-app" class="panel order-panel" data-api={apiBase} data-token={order.publicToken}>
+    {order ? <div id="order-app" class="panel order-panel" data-api={apiBase} data-token={order.publicToken} data-paid={order.paymentStatus === 'PAID' && !['CANCELLED', 'REFUNDED'].includes(order.orderStatus) ? '1' : '0'} data-order-number={order.orderNumber} data-order-total={order.total} data-order-shipping={order.shippingAmount} data-order-items={JSON.stringify(order.items.map((item) => ({ item_id: item.sku, item_name: item.title, price: item.unitPrice, quantity: 1 })))}>
       <div class="eyebrow">สถานะคำสั่งซื้อ</div><h1 class="checkout-title">{order.orderNumber}</h1>
       <div class="order-status-grid"><div><span>สถานะคำสั่งซื้อ</span><strong>{statusText(orderStatusLabel, order.orderStatus)}</strong></div><div><span>การชำระเงิน</span><strong>{statusText(paymentStatusLabel, order.paymentStatus)}</strong></div></div>
       <div class="order-items">{order.items.map((item) => <div><span>{item.title}<small>รหัสสินค้า {item.sku}</small></span><strong>{formatPrice(item.unitPrice)}</strong></div>)}</div>
@@ -34,7 +34,27 @@ const statusText = (labels:Record<string,string>, value:string) => labels[value]
   </div></section>
 </BaseLayout>
 <script>
+  import { trackShopEvent } from '../../../lib/conversion-events'
   const app = document.getElementById('order-app') as HTMLElement | null
+  // A transaction counts as a purchase only after the backend confirms PAID.
+  // Pending transfers, reservations and successful checkout submissions are not purchases.
+  if (app?.dataset.paid === '1' && app.dataset.orderNumber) {
+    try {
+      const receiptKey = `amphon-shop-paid-${app.dataset.orderNumber}`
+      if (localStorage.getItem(receiptKey) !== '1') {
+        const items = JSON.parse(app.dataset.orderItems || '[]')
+        const value = Number(app.dataset.orderTotal)
+        const shipping = Number(app.dataset.orderShipping)
+        if (Array.isArray(items) && Number.isFinite(value) && value >= 0) {
+          trackShopEvent('purchase', {
+            transaction_id: app.dataset.orderNumber, currency: 'THB', value,
+            shipping: Number.isFinite(shipping) ? shipping : 0, items,
+          })
+          localStorage.setItem(receiptKey, '1')
+        }
+      }
+    } catch { /* Privacy settings/storage disabled: keep the order page usable. */ }
+  }
   const form = document.getElementById('payment-notify-form') as HTMLFormElement | null
   const message = document.getElementById('payment-message') as HTMLElement | null
   form?.addEventListener('submit', async (event) => {

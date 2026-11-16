@@ -3,12 +3,14 @@ import { indexCategories } from '../config/catalog'
 import { facebookPageUrl, mainWebsiteUrl, primaryLineId, primaryLineUrl } from '../lib/contact'
 import { absoluteUrl } from '../lib/seo'
 import { MAIN_BUYBACK_URL } from '../config/ecosystem'
+import { MERCHANT_CONTACT } from '../config/merchant-identity'
 import '../styles/global.css'
 import '../styles/auth.css'
 import '../styles/mobile-first.css'
 import '../styles/storefront-human.css'
 import '../styles/line-first.css'
 import '../styles/mobile-polish.css'
+import '../styles/search-performance.css'
 
 interface Props {
   title: string
@@ -52,6 +54,8 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <meta name="amphon-deploy-verification" content="shop-line-og-20260918" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="/amphon-mark.svg" type="image/svg+xml" sizes="any" />
     <meta name="robots" content={robots} />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content={ogType} />
@@ -80,7 +84,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <header class="site-header">
       <div class="container header-row">
         <a class="logo" href="/" aria-label="AMPHON SHOP หน้าแรก">
-          <span class="logo-mark">A</span>
+          <img class="logo-mark amphon-logo-image" src="/amphon-mark.svg" width="38" height="38" alt="" decoding="async" />
           <span>AMPHON SHOP</span>
         </a>
         <nav class="nav" aria-label="หมวดสินค้าหลัก">
@@ -95,6 +99,13 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           <a class="account-link orders-link" href="/account/orders/" aria-label="รายการสั่งซื้อของฉัน">รายการสั่งซื้อ</a>
           <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
         </div>
+      </div>
+      <div class="container header-search-row">
+        <form class="header-search-form" role="search" action="/search/" method="get">
+          <label for="header-search-query">ค้นหาสินค้าไอทีมือสอง</label>
+          <input id="header-search-query" type="search" name="q" minlength="2" maxlength="80" required placeholder="ค้นหาชื่อรุ่น แบรนด์ หรือรหัสสินค้า" aria-label="ค้นหาสินค้า AMPHON SHOP" autocomplete="off" />
+          <button type="submit" aria-label="ค้นหาสินค้า">ค้นหา</button>
+        </form>
       </div>
     </header>
     <main id="main-content">
@@ -116,9 +127,12 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
             <a href="/shipping/">การจัดส่ง</a>
             <a href="/warranty/">การรับประกัน</a>
             <a href="/returns/">การคืนสินค้า</a>
+            <a href="/privacy/">ความเป็นส่วนตัว</a>
+            <a href="/terms/">ข้อกำหนดการขาย</a>
             <a href="/new-arrivals/">สินค้าเข้าใหม่</a>
             <a href={MAIN_BUYBACK_URL}>ขายสินค้าให้เรา</a>
           </nav>
+          <div class="footer-small merchant-footer-identity"><strong>{MERCHANT_CONTACT.legalName}</strong><span>{MERCHANT_CONTACT.streetAddress} {MERCHANT_CONTACT.subdistrict} {MERCHANT_CONTACT.district} {MERCHANT_CONTACT.province} {MERCHANT_CONTACT.postalCode} ประเทศไทย</span><a href={`tel:${MERCHANT_CONTACT.phoneE164}`}>โทร {MERCHANT_CONTACT.phoneDisplay}</a></div>
           <div class="footer-small">
             ช่องทางทางการ:
             <a href={mainWebsiteUrl} target="_blank" rel="noopener noreferrer">เว็บไซต์หลัก AMPHON TRADING</a>
@@ -132,7 +146,20 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <script>
       import { CART_EVENT, readCartSkus } from '../lib/cart'
       import { initSeoAttribution } from '../lib/seo-attribution'
+      import { trackShopEvent } from '../lib/conversion-events'
       initSeoAttribution()
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-shop-select]') : null
+        if (!target) return
+        const price = Number(target.dataset.price)
+        trackShopEvent('select_item', {
+          item_id: target.dataset.sku,
+          item_name: target.dataset.title,
+          item_category: target.dataset.category,
+          ...(Number.isFinite(price) && price > 0 ? { price, value: price, currency: 'THB' as const } : {}),
+          item_list_name: window.location.pathname,
+        })
+      })
       const updateCartCount = () => {
         const target = document.getElementById('cart-count')
         if (target) target.textContent = String(readCartSkus().length)

@@ -17,7 +17,7 @@ const checks = [
   ['branded products do not falsely claim identifiers are absent', feedLib.includes("brand.toLowerCase() === 'custom pc'") && feedLib.includes('<g:identifier_exists>false</g:identifier_exists>')],
   ['feed includes campaign labels for future Shopping optimization', feedLib.includes('custom_label_') && feedLib.includes('conditionLabel(product)')],
   ['feed uses live store settings', feedRoute.includes('getStoreSettings') && feedRoute.includes('buildGoogleMerchantFeed(products, settings)')],
-  ['feed endpoint is noindex with bounded freshness (no stale-while-revalidate)', feedRoute.includes("'x-robots-tag': 'noindex'") && feedRoute.includes('max-age=60, must-revalidate') && !feedRoute.includes('stale-while-revalidate')],
+  ['feed endpoint is noindex and never caches stale inventory', feedRoute.includes("'x-robots-tag': 'noindex'") && feedRoute.includes("'cache-control': 'no-store, max-age=0'") && !feedRoute.includes('stale-while-revalidate')],
 ]
 
 const failed = checks.filter(([, ok]) => !ok)
