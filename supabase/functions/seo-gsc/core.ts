@@ -92,12 +92,13 @@ export interface PortfolioQueryWindow {
 }
 export async function fetchPortfolioPageQueries(
   site: Site, property: string, token: string, endDate: string,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  onlyDays: readonly (7 | 14)[] = [7,14]
 ): Promise<PortfolioQueryWindow[]> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error('Invalid final GSC date')
   const endpoint = 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(property) + '/searchAnalytics/query'
   const result: PortfolioQueryWindow[] = []
-  for (const days of [7,14] as const) {
+  for (const days of onlyDays) {
     const start = new Date(endDate + 'T00:00:00Z')
     start.setUTCDate(start.getUTCDate() - days + 1)
     const startDate = start.toISOString().slice(0,10)
