@@ -42,9 +42,9 @@ test('search is noindex, responsive and only shows verified live stock', async (
 })
 
 test('commerce events reflect actual item selection and purchase eligibility', async () => {
-  const [card, product, cart, checkout, attribution, tracking] = await Promise.all([
+  const [card, product, cart, checkout, attribution, tracking, order] = await Promise.all([
     read('src/components/ProductCard.astro'), read('src/pages/p/[product].astro'), read('src/pages/cart/index.astro'),
-    read('src/pages/checkout/index.astro'), read('src/lib/seo-attribution.ts'), read('src/lib/conversion-events.ts'),
+    read('src/pages/checkout/index.astro'), read('src/lib/seo-attribution.ts'), read('src/lib/conversion-events.ts'), read('src/pages/order/[token]/index.astro'),
   ])
   assert.ok(card.includes('data-shop-select'))
   assert.ok(product.includes("trackShopEvent('view_item'"))
@@ -54,7 +54,9 @@ test('commerce events reflect actual item selection and purchase eligibility', a
   assert.ok(checkout.includes("trackShopEvent('begin_checkout'"))
   assert.ok(attribution.includes("trackShopEvent('line_click'"))
   assert.ok(tracking.includes('amphon-shop-conversion'))
-  assert.ok(!tracking.includes("event: 'purchase'"), 'must not claim purchase without verified payment')
+  assert.ok(order.includes("order.paymentStatus === 'PAID'"), 'paid event must require confirmed payment')
+  assert.ok(order.includes("trackShopEvent('purchase'"))
+  assert.ok(tracking.includes('ecommerce: data'))
 })
 
 test('merchant trust and core SEO pages remain truthful', async () => {
