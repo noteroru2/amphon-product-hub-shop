@@ -26,7 +26,9 @@ All new tables have RLS enabled and are **service-role only**. Views use `securi
 
 The existing `seo-gsc` scheduler refreshes source snapshots; the 7/14/28 **property-level** view reads latest finalized daily and aggregate data without a second copy. The 28-day page/query view uses the existing Google-disclosed sample and reports truncation.
 
-**Not yet automatic**: Google final 7/14-day per-page/per-query ingestion, provider-verified release webhooks, and verified LINE→purchase→sale matching. Those must not be represented as completed until their event sources, credentials and end-to-end tests are in place. Blank or zero verified-sale metrics are not evidence of zero business sales.
+**Automatic now**: the existing scheduled `seo-gsc` Edge Function (version 3, 2026-11-16) also ingests final Google-disclosed query/page rows for separate 7-day and 14-day windows, with bounded pagination, partial status and sanitized failed-run receipts. This piggybacks on the existing 72-hour GSC sync cycle; no extra cron secret, chat automation or deployment permission is required. Live WEBUY canary returned HTTP 200 and stored 115 (7-day) / 125 (14-day) final rows through 2026-11-13. GSC can withhold anonymized queries and any capped page can remain partial.
+
+**Not automatic yet**: provider-verified DNS-to-production release webhooks and verified LINE→AMPHON System purchase→sale identity linkage. Blank or zero verified-sale metrics are not evidence of zero business sales.
 
 ## Evidence semantics (never conflate)
 
@@ -45,7 +47,7 @@ The existing `seo-gsc` scheduler refreshes source snapshots; the 7/14/28 **prope
 2. Extend the existing OAuth-backed GSC job to fetch final page+query observations for 7 and 14 days with pagination; upsert into `commerce_seo_portfolio_gsc_query_pages`; record `commerce_seo_portfolio_gsc_ingest_runs`. Maintain GSC anonymized-query and pagination caveats.
 3. Accept release events only after verifying hosted project/site mapping, environment, SHA, and provider deployment result; never treat a Git push alone as a production release. The portfolio ingest service must have no deployment-write scopes.
 4. Match CTA references only to verified LINE conversations and authoritative AMPHON System purchase records; mark sold/profit only once sale and cost evidence exist.
-5. Expose read-only portfolio UI to owner/admin with explicit authorization and regression tests; no public/client service-role keys.
+5. **Done**: the owner/admin-only `portfolio` action is available in `seo-gsc` and the Portfolio tab was deployed to `hub.amphon.co.th` in Hub release `ce131399` via GitHub Actions (verified live bundle). Client receives only selected read-only metrics, not any service-role secrets. The unauthenticated action was verified to return HTTP 401.
 6. Run `supabase/tests/seo_portfolio_control_assert.sql` after migrations/updates. Each website keeps its own PR approvals, QA and rollback.
 
 ## Read-only sample queries
