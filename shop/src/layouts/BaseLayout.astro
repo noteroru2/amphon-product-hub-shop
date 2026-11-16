@@ -98,6 +98,13 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
           <a class="cart-link" href="/cart/" aria-label="ตะกร้าสินค้า">ตะกร้า <span id="cart-count">0</span></a>
         </div>
       </div>
+      <div class="container header-search-row">
+        <form class="header-search-form" role="search" action="/search/" method="get">
+          <label for="header-search-query">ค้นหาสินค้าไอทีมือสอง</label>
+          <input id="header-search-query" type="search" name="q" minlength="2" maxlength="80" required placeholder="ค้นหาชื่อรุ่น แบรนด์ หรือรหัสสินค้า" aria-label="ค้นหาสินค้า AMPHON SHOP" autocomplete="off" />
+          <button type="submit" aria-label="ค้นหาสินค้า">ค้นหา</button>
+        </form>
+      </div>
     </header>
     <main id="main-content">
       <slot />
