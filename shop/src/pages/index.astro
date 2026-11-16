@@ -139,7 +139,7 @@ const categoryLooks: Record<string, { icon: string; note: string }> = {
         <a class="section-link" href="/new-arrivals/">ดูสินค้าเข้าใหม่ทั้งหมด →</a>
       </div>
       {products.length ? (
-        <div class="product-grid home-product-grid">{products.map((product) => <ProductCard product={product} />)}</div>
+        <div class="product-grid home-product-grid">{products.map((product, index) => <ProductCard product={product} priority={index === 0} />)}</div>
       ) : (
         <div class="empty human-empty">
           {apiError ? 'ตอนนี้โหลดรายการสินค้าไม่สำเร็จ ลองเข้ามาใหม่อีกครั้งในอีกสักครู่ครับ' : 'ตอนนี้ยังไม่มีของใหม่ลงหน้าเว็บ ลองแวะกลับมาดูอีกครั้งครับ'}
