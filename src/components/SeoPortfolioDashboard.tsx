@@ -20,7 +20,7 @@ const date = (value: string | null | undefined) => value ? new Date(value).toLoc
 const labelStatus: Record<string,string> = {
   APPROVED:'อนุมัติแล้ว', PROPOSED:'ข้อเสนอ • รอตรวจ', REJECTED:'ไม่อนุมัติ',
   PRIMARY:'หน้าแม่หลัก', SUPPORTING:'หน้าข้อมูลเสริม', LOCAL:'พื้นที่', COMMERCE:'หน้าขาย',
-  VERIFIED:'จับคู่ Vercel ได้', CANDIDATE:'Repo ที่คาดว่าใช่', MULTIPLE_CANDIDATES:'มี Repo หลายตัว', UNVERIFIED:'ยังจับคู่ไม่ได้',
+  VERIFIED:'ยืนยันคู่ Repo/Hosting แล้ว', CANDIDATE:'Repo ที่คาดว่าใช่', MULTIPLE_CANDIDATES:'มี Repo หลายตัว', UNVERIFIED:'ยังจับคู่ไม่ได้',
   COMMIT_OBSERVED:'พบ Commit (ไม่ใช่ Deploy)', DEPLOY_SUCCEEDED:'Deploy บน Provider สำเร็จ',
   PRODUCTION_VERIFIED:'ยืนยัน Production จริง', DEPLOY_FAILED:'Deploy ล้มเหลว',
 }
@@ -102,7 +102,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
           </article>
           <article>
             <h4>Repository / Release</h4>
-            <p>{labelStatus[selectedProject?.mapping_status||'']||'ยังไม่จับคู่'}</p>
+            <p>{labelStatus[selectedProject?.mapping_status||'']||'ยังไม่จับคู่'}</p><p>Hosting: {selectedProject?.hosting_provider||'ไม่ทราบ'}</p>
             {(selectedProject?.repo_candidates||[]).map(repo=><p key={repo}>
               <a href={'https://github.com/'+repo} target="_blank" rel="noopener noreferrer">{repo}</a>
             </p>)}
