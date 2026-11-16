@@ -52,6 +52,10 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <meta name="amphon-deploy-verification" content="shop-line-og-20260918" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#142338" />
+    <link rel="icon" href="/amphon-mark.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icon-192.png" sizes="192x192" />
     <meta name="robots" content={robots} />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content={ogType} />
@@ -80,7 +84,7 @@ const schemas = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []
     <header class="site-header">
       <div class="container header-row">
         <a class="logo" href="/" aria-label="AMPHON SHOP หน้าแรก">
-          <span class="logo-mark">A</span>
+          <img class="logo-mark amphon-logo-image" src="/amphon-mark.svg" width="38" height="38" alt="" decoding="async" />
           <span>AMPHON SHOP</span>
         </a>
         <nav class="nav" aria-label="หมวดสินค้าหลัก">
