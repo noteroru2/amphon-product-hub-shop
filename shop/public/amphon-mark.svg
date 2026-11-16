@@ -1,6 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-<title>AMPHON SHOP</title>
-<rect width="64" height="64" rx="15" fill="#142338"/>
-<path d="M11 47 27 15h10l16 32H42l-4-9H26l-4 9H11Zm19-18h4l-2-5-2 5Z" fill="#FFB547"/>
-<path d="M24 51h16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">AMPHON SHOP</title>
+<desc id="desc">Black letter A with a dynamic orange orbit on a white background</desc>
+<rect width="512" height="512" fill="#ffffff"/>
+<g fill="#080808">
+<path d="M198 361 L134 375 L98 379 L70 431 L163 431Z"/>
+<path d="M296 332 L347 431 L441 431 L370 299 L330 319Z"/>
+<path d="M255 82 L228 130 L123 332 L133 334 L151 333 L194 324 L255 198 L297 285 L312 278 L347 255 L300 163Z"/>
+</g>
+<g fill="#ff6500">
+<path d="M305 430 L255 345 L205 431Z"/>
+<path d="M441 197 L432 184 L418 176 L404 172 L369 170 L321 177 L351 177 L368 180 L389 190 L397 201 L398 214 L388 234 L371 252 L352 267 L298 298 L255 316 L214 330 L153 344 L133 345 L114 341 L104 331 L103 324 L106 312 L126 282 L153 256 L117 279 L82 311 L68 333 L66 350 L73 360 L89 366 L125 365 L216 345 L305 318 L370 286 L395 270 L415 254 L429 239 L438 225 L442 214Z"/>
+</g>
 </svg>
