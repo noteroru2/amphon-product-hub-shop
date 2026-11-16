@@ -101,6 +101,7 @@ function merchantProductType(product: StoreProduct) {
 }
 
 function conditionLabel(product: StoreProduct) {
+  if (product.conditionPercent === null || product.conditionPercent === undefined) return 'used_unspecified'
   const score = Number(product.conditionPercent)
   if (!Number.isFinite(score)) return 'used_unspecified'
   if (score >= 95) return 'used_like_new'
@@ -189,11 +190,18 @@ function shippingTag(settings: StoreSettings | null) {
   const transitMin = Number(shipping.transitMinDays)
   const transitMax = Number(shipping.transitMaxDays)
   const complete = country
+    && shipping.rate !== null
+    && shipping.handlingMinDays !== null
+    && shipping.handlingMaxDays !== null
+    && shipping.transitMinDays !== null
+    && shipping.transitMaxDays !== null
     && Number.isFinite(rate)
     && Number.isFinite(handlingMin)
     && Number.isFinite(handlingMax)
     && Number.isFinite(transitMin)
     && Number.isFinite(transitMax)
+    && rate >= 0 && handlingMin >= 0 && transitMin >= 0
+    && handlingMin <= handlingMax && transitMin <= transitMax
   if (!complete) return ''
 
   return `<g:shipping><g:country>${xmlEscape(country)}</g:country><g:service>Standard</g:service><g:price>${rate.toFixed(2)} ${xmlEscape(currency)}</g:price><g:min_handling_time>${Math.max(0, Math.trunc(handlingMin))}</g:min_handling_time><g:max_handling_time>${Math.max(0, Math.trunc(handlingMax))}</g:max_handling_time><g:min_transit_time>${Math.max(0, Math.trunc(transitMin))}</g:min_transit_time><g:max_transit_time>${Math.max(0, Math.trunc(transitMax))}</g:max_transit_time></g:shipping>`
@@ -217,7 +225,7 @@ export function merchantFeedEligible(product: StoreProduct) {
     && product.availability === 'available'
     && product.indexPolicy === 'INDEX'
     && product.merchantEnabled === true
-    && Number(product.price) > 0
+    && Number.isFinite(product.price) && product.price > 0
     && product.images.some((image) => Boolean(clean(image.url)))
 }
 
