@@ -68,7 +68,7 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
     db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300),
-    db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(100),
+    db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(300),
     db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
     db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150)
   ])
