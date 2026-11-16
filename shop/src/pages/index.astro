@@ -20,7 +20,7 @@ let homeCategories = catalogCategories.filter((category) => category.indexPolicy
 let apiError = false
 try {
   const allProducts = await getAllStoreProducts()
-  const currentProducts = allProducts.filter((product) => product.status === 'published' || product.status === 'reserved')
+  const currentProducts = allProducts.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0)
   products = currentProducts.slice(0, 16)
   homeCategories = catalogCategories.filter((category) =>
     categoryIsEffectivelyIndexable(category, categoryStockStateFromProducts(category.slug, allProducts)),
