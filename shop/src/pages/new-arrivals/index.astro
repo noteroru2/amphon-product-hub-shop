@@ -10,7 +10,7 @@ let products: StoreProduct[] = []
 let apiError = false
 try {
   const result = await listStoreProducts({ availability: 'available', limit: 60 })
-  products = result.products
+  products = result.products.filter((product) => product.status === 'published' && product.availability === 'available' && product.price > 0)
 } catch (error) {
   apiError = true
   console.error('SHOP_NEW_ARRIVALS_STORE_API', error)
