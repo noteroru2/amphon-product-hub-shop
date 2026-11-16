@@ -7,7 +7,7 @@ interface Props { product: StoreProduct; priority?: boolean }
 const { product, priority = false } = Astro.props
 const cover = [...product.images].sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)[0]
 ---
-<a class="product-card" href={productPath(product)}>
+<a class="product-card" href={productPath(product)} data-shop-select data-sku={product.sku} data-title={product.title} data-price={product.price} data-category={product.categorySlug || product.category}>
   <div class="product-image">
     {cover?.url ? (
       <img src={cover.url} alt={productImageSeoText(product, cover, 0).alt} width={cover.width || 640} height={cover.height || 480} sizes="(max-width: 720px) 50vw, (max-width: 1100px) 33vw, 280px" loading={priority ? 'eager' : 'lazy'} fetchpriority={priority ? 'high' : 'auto'} decoding="async" />
