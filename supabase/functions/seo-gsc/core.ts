@@ -81,3 +81,53 @@ export async function fetchSnapshot(site: Site, property: string, token: string,
     queries:rows.map(r=>({query:r.keys?.[0]||'',page:r.keys?.[1]||'',clicks:r.clicks,impressions:r.impressions,position:r.impressions>0?r.position:null})),
     query_truncated:truncated}
 }
+
+/** Final 7/14-day query/page observations. These rows are NOT site totals. */
+export interface PortfolioQueryRow {
+  query: string; page: string; clicks: number; impressions: number; position: number | null
+}
+export interface PortfolioQueryWindow {
+  days: 7 | 14; start_date: string; end_date: string
+  rows: PortfolioQueryRow[]; pagination_complete: boolean
+}
+export async function fetchPortfolioPageQueries(
+  site: Site, property: string, token: string, endDate: string,
+  fetcher: typeof fetch = fetch
+): Promise<PortfolioQueryWindow[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error('Invalid final GSC date')
+  const endpoint = 'https://www.googleapis.com/webmasters/v3/sites/' + encodeURIComponent(property) + '/searchAnalytics/query'
+  const result: PortfolioQueryWindow[] = []
+  for (const days of [7,14] as const) {
+    const start = new Date(endDate + 'T00:00:00Z')
+    start.setUTCDate(start.getUTCDate() - days + 1)
+    const startDate = start.toISOString().slice(0,10)
+    const rows: PortfolioQueryRow[] = []
+    let paginationComplete = false
+    for (let page = 0; page < 3; page++) {
+      const body = {
+        startDate, endDate, type: 'web', dataState: 'final',
+        dimensions: ['query','page'], rowLimit: 1000, startRow: page * 1000,
+        dimensionFilterGroups: [{ filters: [{ dimension:'page', operator:'includingRegex', expression:hostFilter(site) }] }]
+      }
+      const response = await fetchJson(endpoint, {
+        method:'POST', headers:{ Authorization:'Bearer ' + token, 'Content-Type':'application/json' },
+        body:JSON.stringify(body),
+      }, fetcher)
+      const batch = response.rows || []
+      if (!Array.isArray(batch)) throw new Error('Invalid page/query response')
+      for (const row of batch as GscRow[]) {
+        if (!Array.isArray(row.keys) || row.keys.length !== 2 ||
+          typeof row.keys[0] !== 'string' || typeof row.keys[1] !== 'string' ||
+          ![row.clicks,row.impressions,row.position].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)) {
+          throw new Error('Invalid page/query observation')
+        }
+        if (row.keys[0].length > 1000 || row.keys[1].length > 2048) throw new Error('GSC page/query too long')
+        rows.push({query:row.keys[0],page:row.keys[1],clicks:row.clicks,impressions:row.impressions,
+          position:row.impressions > 0 ? row.position : null})
+      }
+      if (batch.length < 1000) { paginationComplete = true; break }
+    }
+    result.push({days,start_date:startDate,end_date:endDate,rows,pagination_complete:paginationComplete})
+  }
+  return result
+}
