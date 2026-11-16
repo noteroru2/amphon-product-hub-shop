@@ -41,8 +41,8 @@ async function tokenRequest(body:Record<string,string>) {
 }
 
 /** Runs under the existing OAuth scheduler, no new secrets or cron jobs. */
-async function savePortfolioWindows(site: Site, property: string, accessToken: string, endDate: string, fetcher: typeof fetch) {
-  const windows = await fetchPortfolioPageQueries(site,property,accessToken,endDate,fetcher)
+async function savePortfolioWindows(site: Site, property: string, accessToken: string, endDate: string, fetcher: typeof fetch, onlyDays: readonly (7 | 14)[]) {
+  const windows = await fetchPortfolioPageQueries(site,property,accessToken,endDate,fetcher,onlyDays)
   for (const window of windows) {
     const rows = window.rows.map(row => ({
       site_id:site.id,window_days:window.days,start_date:window.start_date,end_date:window.end_date,
@@ -102,11 +102,22 @@ async function run() {
       // The normal GSC snapshot is committed first. Granular ingestion is best-effort
       // and MUST NOT mark the existing authoritative GSC sync as failed.
       let portfolio='success'
-      try {
-        await savePortfolioWindows({id:job.site_id,origin:job.origin,label:job.label,gsc_property:job.property},
-          job.property,token.access_token,snapshot.end_date,boundedFetch)
-      } catch {
-        portfolio='retry_on_next_sync'
+      for (const days of [7,14] as const) {
+        try {
+          await savePortfolioWindows({id:job.site_id,origin:job.origin,label:job.label,gsc_property:job.property},
+            job.property,token.access_token,snapshot.end_date,boundedFetch,[days])
+        } catch {
+          portfolio='retry_on_next_sync'
+          const start=new Date(snapshot.end_date+'T00:00:00Z')
+          start.setUTCDate(start.getUTCDate()-days+1)
+          // No credential or exception body is stored; never overwrite a prior SUCCESS.
+          await db.from('commerce_seo_portfolio_gsc_ingest_runs').upsert({
+            site_id:job.site_id,window_days:days,start_date:start.toISOString().slice(0,10),
+            end_date:snapshot.end_date,source:'GSC_FINAL_DIRECT_OAUTH',rows_written:0,
+            data_complete:false,status:'FAILED',error_class:'GSC_PORTFOLIO_INGEST_FAILED',
+            completed_at:new Date().toISOString()
+          },{onConflict:'site_id,window_days,end_date,source',ignoreDuplicates:true})
+        }
       }
       outcomes.push({site_id:job.site_id,success:true,portfolio})
     } catch(error) {
