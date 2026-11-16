@@ -23,6 +23,7 @@ button, input, select { font: inherit; }
 .header-row { min-height: 68px; display: flex; align-items: center; gap: 24px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; font-size: 1.05rem; font-weight: 900; letter-spacing: -.02em; white-space: nowrap; }
 .logo-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--brand); color: #fff; font-weight: 900; }
+.amphon-logo-image { display: block; flex: 0 0 auto; object-fit: contain; background: #fff; border-radius: 8px; }
 .nav { display: flex; gap: 18px; overflow-x: auto; margin-left: auto; font-size: .93rem; scrollbar-width: none; }
 .nav::-webkit-scrollbar { display: none; }
 .nav a { white-space: nowrap; color: #454545; }
