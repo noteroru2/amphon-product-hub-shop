@@ -11,7 +11,7 @@ export function merchantItemConditionSchema(product: StoreProduct) {
 }
 
 export function merchantAvailabilitySchema(product: StoreProduct) {
-  if (product.availability === 'available') return 'https://schema.org/InStock'
+  if (product.availability === 'available' && product.status === 'published' && Number.isFinite(product.price) && product.price > 0) return 'https://schema.org/InStock'
   if (product.availability === 'reserved') return 'https://schema.org/OutOfStock'
   return 'https://schema.org/SoldOut'
 }
@@ -63,8 +63,11 @@ export function buildShippingDetails(settings: StoreSettings | null) {
   if (!settings?.shipping.enabled) return undefined
   const shipping = settings.shipping
   const completeTime = [shipping.handlingMinDays, shipping.handlingMaxDays, shipping.transitMinDays, shipping.transitMaxDays]
-    .every((value) => value !== null && Number.isFinite(Number(value)))
+    .every((value) => value !== null && value !== undefined && Number.isFinite(Number(value)))
   if (!shipping.country || !completeTime || shipping.rate === null || !Number.isFinite(Number(shipping.rate))) return undefined
+  if (Number(shipping.rate) < 0 || Number(shipping.handlingMinDays) < 0 || Number(shipping.transitMinDays) < 0 ||
+      Number(shipping.handlingMinDays) > Number(shipping.handlingMaxDays) ||
+      Number(shipping.transitMinDays) > Number(shipping.transitMaxDays)) return undefined
   return {
     '@type': 'OfferShippingDetails',
     ...(shipping.rate !== null ? {
@@ -165,6 +168,8 @@ export function buildProductMerchantSchema(input: {
     } : {}),
     // Sold pages retain their factual last price and unavailable Offer even after
     // merchant feed eligibility is revoked by stock sync.
-    ...((settings?.purchaseEnabled && product.merchantEnabled) || (product.availability === 'out_of_stock' && product.price > 0) ? { offers: offer } : {}),
+    ...((Number.isFinite(product.price) && product.price > 0) &&
+       ((settings?.purchaseEnabled && product.merchantEnabled && product.status === 'published' && product.availability === 'available') || product.availability !== 'available')
+       ? { offers: offer } : {}),
   }
 }
