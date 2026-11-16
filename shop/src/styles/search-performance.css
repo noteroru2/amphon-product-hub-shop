@@ -44,3 +44,7 @@
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+.merchant-footer-identity { display: flex; flex-wrap: wrap; gap: 5px 14px; padding-top: 12px; line-height: 1.55; }
+.merchant-footer-identity strong { color: #202020; }
+.merchant-footer-identity a { text-decoration: underline; text-underline-offset: 2px; }
