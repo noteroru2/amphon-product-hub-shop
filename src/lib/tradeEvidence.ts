@@ -147,6 +147,23 @@ export async function getTradeEvidenceImageUrls(paths: string[]) {
   return result
 }
 
+export async function downloadReviewedEvidenceImage(image: TradeEvidenceImage): Promise<void> {
+  if (!image.approved_for_public) throw new Error('ภาพนี้ยังไม่ได้ผ่านการตรวจความเป็นส่วนตัว')
+  const { data, error } = await client().storage.from('trade-evidence-private').download(image.storage_path)
+  if (error || !data) throw error || new Error('ดาวน์โหลดรูปไม่สำเร็จ')
+  const url = URL.createObjectURL(data)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'amphon-trade-' + image.id + '.jpg'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+}
+
 export function generateWebsiteDraft(e: TradeEvidenceInput) {
   const verb = e.kind === 'purchase' ? 'รับซื้อ' : 'จำหน่าย'
   const location = e.city?.trim() ? ' ที่' + e.city.trim() : ''
