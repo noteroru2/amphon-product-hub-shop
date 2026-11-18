@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, BadgeCheck, Camera, ClipboardCopy, FileText, ImagePlus, LoaderCircle, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import {
-  addTradeEvidenceImages, approvedEvidenceForAi, changeTradeEvidenceStatus, generateFacebookDraft,
+  addTradeEvidenceImages, approvedEvidenceForAi, changeTradeEvidenceStatus, downloadReviewedEvidenceImage, generateFacebookDraft,
   generateWebsiteDraft, getTradeEvidenceImageUrls, listTradeEvidence, removeTradeEvidenceImage,
   saveTradeEvidence, setTradeEvidenceImageReview,
   type EvidenceKind, type TradeEvidence, type TradeEvidenceImage, type TradeEvidenceInput,
@@ -206,6 +206,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
               if (e.target.checked && !window.confirm('ตรวจแล้วว่ารูปนี้ไม่มีข้อมูลลูกค้าหรือรายละเอียดส่วนตัวที่ไม่ได้รับอนุญาต?')) return
               review(image,e.target.checked,image.alt_text)
             }}/> ผ่านการตรวจเพื่อใช้สื่อได้</label>
+            {current?.status === 'APPROVED' && image.approved_for_public && <button onClick={() => void perform(() => downloadReviewedEvidenceImage(image),'ดาวน์โหลดภาพแล้ว')}><ImagePlus size={14}/> ดาวน์โหลดภาพตรวจแล้ว</button>}
             {!locked && <button disabled={busy} onClick={() => remove(image)}><Trash2 size={14}/> ลบรูป</button>}
           </div>)}
         </div>
