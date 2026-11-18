@@ -9,6 +9,7 @@ import { seoAuthorizationRecovery } from './lib/seoAuthorizationRecovery'
 import './styles/app.css'
 import './styles/publishCenterOverlay.css'
 import './styles/hubEase.css'
+import './styles/tradeEvidence.css'
 import './styles/shopeeContentTemplate.css'
 import './styles/one2cEnrichment.css'
 
