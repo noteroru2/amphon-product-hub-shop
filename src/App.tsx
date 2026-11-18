@@ -70,6 +70,7 @@ import { SeoControlTower } from "./components/SeoControlTower";
 import { SeoChatgptConsent } from "./components/SeoChatgptConnection";
 import { MerchantDiagnosticsCenter } from "./components/MerchantDiagnosticsCenter";
 import { TrustReviewCenter } from "./components/TrustReviewCenter";
+import { TradeEvidenceCenter } from "./components/TradeEvidenceCenter";
 import { ChannelSettings } from "./components/ChannelSettings";
 import { loadAiBuyerChatUnreadTotal } from "./lib/aiBuyerAdmin";
 import { loadSeoAlertUnreadCount } from "./lib/seoControlTower";
@@ -141,6 +142,7 @@ type Tab =
   | "seo-control-tower"
   | "merchant-diagnostics"
   | "trust-reviews"
+  | "trade-evidence"
   | "channel-settings";
 type StatusFilter = "all" | "needs_details" | "ready_to_list" | "reserved";
 
@@ -938,6 +940,7 @@ function App() {
             seoAlertUnread={seoAlertUnread}
             onMerchant={() => setTab("merchant-diagnostics")}
             onTrustReviews={() => setTab("trust-reviews")}
+            onTradeEvidence={() => setTab("trade-evidence")}
             onChannelSettings={() => setTab("channel-settings")}
             onEdit={openEdit}
           />
@@ -1016,6 +1019,9 @@ function App() {
           ["owner", "admin"].includes(profile.role) && (
             <TrustReviewCenter onBack={goBack} />
           )}
+        {tab === "trade-evidence" && profile && ["owner", "admin"].includes(profile.role) && (
+          <TradeEvidenceCenter onBack={goBack} />
+        )}
         {tab === "channel-settings" && profile && ["owner", "admin"].includes(profile.role) && (
           <ChannelSettings profile={profile} onBack={goBack} />
         )}
@@ -1331,6 +1337,7 @@ function HomeScreen({
   seoAlertUnread,
   onMerchant,
   onTrustReviews,
+  onTradeEvidence,
   onChannelSettings,
   onEdit,
 }: {
@@ -1351,6 +1358,7 @@ function HomeScreen({
   seoAlertUnread: number;
   onMerchant: () => void;
   onTrustReviews: () => void;
+  onTradeEvidence: () => void;
   onChannelSettings: () => void;
   onEdit: (product: ProductSummary) => void;
 }) {
@@ -1512,6 +1520,13 @@ function HomeScreen({
                 <small>Feed preflight · Google issues · Shipping / Return policy</small>
               </span>
             </div>
+            <ChevronRight />
+          </button>
+          <button className="publish-center-launch" onClick={onTradeEvidence}>
+            <div><Camera size={21} /><span>
+              <strong>หลักฐานการซื้อขายจริง</strong>
+              <small>เพิ่มภาพรับซื้อ/ขาย · หลักฐานสำหรับเว็บ AI และเครดิต Facebook</small>
+            </span></div>
             <ChevronRight />
           </button>
           <button
