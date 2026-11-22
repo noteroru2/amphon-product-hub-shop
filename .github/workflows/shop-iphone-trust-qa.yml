@@ -1,0 +1,32 @@
+name: AMPHON SHOP evidence-first iPhone SEO
+on:
+  pull_request:
+    paths:
+      - "shop/src/config/catalog.ts"
+      - "shop/src/config/category-inspection-notes.ts"
+      - "shop/src/components/StockComparison.astro"
+      - "shop/scripts/verify-core-update-iphone-trust.mjs"
+      - ".github/workflows/shop-iphone-trust-qa.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  iphone-trust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: shop/package-lock.json
+      - run: npm --prefix shop ci
+      - name: Verify source truth and index/merchant invariants
+        run: node shop/scripts/verify-core-update-iphone-trust.mjs
+      - name: Existing product/evidence and Merchant checks
+        run: npm --prefix shop run verify:product-evidence && npm --prefix shop run verify:google-merchant-feed
+      - name: Astro check and build
+        run: npm --prefix shop run build

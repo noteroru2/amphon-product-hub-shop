@@ -51,7 +51,7 @@ const gatedSlugs = [
 const checks = [
   ['homepage derives governed categories from real stock', home.includes('homeCategories') && home.includes('categoryIsEffectivelyIndexable') && home.includes('getAllStoreProducts')],
   ['category listing uses canonical taxonomy ownership', categoryPage.includes('categorySlug: category.slug')],
-  ['iPhone category buyer intent remains distinct from buyback pages', catalog.includes("h1: 'เลือกซื้อ iPhone มือสอง พร้อมดูสภาพและราคาเครื่องจริง'") && catalog.includes("title: 'iPhone มือสอง ราคาและรูปเครื่องจริง เช็กแบตได้ | AMPHON SHOP'") && catalog.includes("description: 'เลือกซื้อ iPhone มือสองจาก AMPHON SHOP")],
+  ['iPhone category buyer intent remains distinct from buyback pages', catalog.includes("h1: 'เลือกซื้อ iPhone มือสอง พร้อมดูสภาพและราคาเครื่องจริง'") && catalog.includes("title: 'iPhone มือสอง พร้อมราคา สภาพและรูปเครื่องจริง | AMPHON SHOP'") && catalog.includes('ตรวจข้อมูลแบตและผลทดสอบเมื่อมีบันทึก') && catalog.includes("description: 'เลือกซื้อ iPhone มือสองจาก AMPHON SHOP")],
   ['category listing no longer queries source category directly', !categoryPage.includes('category: category.sourceCategory')],
   ['category commercial content is rendered', categoryPage.includes('category-commercial-content') && categoryPage.includes('seoContent.buyingPoints')],
   ['category has CollectionPage schema', categoryPage.includes("'@type': 'CollectionPage'")],
