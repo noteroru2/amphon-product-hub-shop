@@ -6,6 +6,7 @@ import {
   literalReplace,deterministicBranch,isAllowedContentPath,
 } from '../scripts/seo-draft-pr-executor-core.mjs'
 import {parseCli} from '../scripts/seo-draft-pr-executor.mjs'
+import {resolveApprovedTarget} from '../scripts/seo-draft-pr-target.mjs'
 
 const NOW=new Date('2026-11-23T12:00:00Z')
 const UUID='11111111-1111-4111-8111-111111111111'
@@ -167,4 +168,30 @@ test('staged DB receipt ledger enforces verified owner approval and PR/branch id
   assert.match(sql,/new.pr_url <> 'https:\/\/github.com\/'/)
   assert.match(sql,/request_id uuid primary key/)
   assert.ok(!/merge_pull_request|deploy.production/i.test(sql))
+})
+
+test('protected GitHub Actions target is derived from DB approval, not caller-supplied repo',async()=>{
+ const current=fixture()
+ const resolved=await resolveApprovedTarget(UUID,{
+   async loadSnapshot(id){assert.equal(id,UUID);return current}
+ },NOW)
+ assert.deepEqual(resolved,{owner:'noteroru2',repository:'amphon.co.th'})
+ const bad=fixture();bad.request.status='REVIEW_REQUIRED'
+ await assert.rejects(()=>resolveApprovedTarget(UUID,{async loadSnapshot(){return bad}},NOW),
+   /OWNER_APPROVAL_REQUIRED/)
+})
+test('manual operator workflow requires explicit protected environment + one-repo app token',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/seo-draft-pr-execute.yml',import.meta.url),'utf8')
+ assert.match(workflow,/workflow_dispatch:/)
+ assert.match(workflow,/environment: seo-draft-pr-protected/)
+ assert.match(workflow,/YES_OWNER_ENABLED/)
+ assert.match(workflow,/actions\/create-github-app-token@v2/)
+ assert.match(workflow,/owner: \$\{\{ steps.target.outputs.owner \}\}/)
+ assert.match(workflow,/repositories: \$\{\{ steps.target.outputs.repository \}\}/)
+ assert.match(workflow,/permission-contents: write/)
+ assert.match(workflow,/permission-pull-requests: write/)
+ assert.match(workflow,/--dry-run/)
+ assert.match(workflow,/--execute --owner-authorized/)
+ assert.ok(!/^\s*(schedule|push|pull_request_target):/m.test(workflow))
+ assert.ok(!/wrangler deploy|vercel deploy|gh pr merge|gh workflow run|gh release create/.test(workflow))
 })
