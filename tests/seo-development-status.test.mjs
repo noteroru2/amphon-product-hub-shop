@@ -10,7 +10,7 @@ const asOf = new Date('2026-11-23T09:00:00Z')
 const sha = 'f'.repeat(40)
 const sourceData = () => ({
   sites: [{ id: 'amphon', label: 'amphon.co.th', origin: 'https://amphon.co.th' }],
-  projects: [{ site_id: 'amphon', mapping_status: 'VERIFIED', production_repo: 'noteroru2/amphon.co.th', central_deploy_allowed: false }],
+  projects: [{ site_id: 'amphon', mapping_status: 'VERIFIED', production_repo: 'noteroru2/amphon.co.th', production_branch: 'main', central_deploy_allowed: false }],
   roles: [{ site_id: 'amphon', keyword: 'รับซื้อโน๊ตบุ๊ค', role: 'PRIMARY', approval_status: 'APPROVED' }],
   windows: [{ site_id: 'amphon', window_days: 28, end_date: '2026-11-19', dates_present: 28, provenance: 'GSC_FINAL' }],
   ingests: [{ site_id: 'amphon', window_days: 14, end_date: '2026-11-19', data_complete: true, status: 'SUCCESS', rows_written: 123 }],
@@ -84,11 +84,18 @@ test('production verified requires explicit event, environment, passed QA and 40
   assert.equal(assess(data).productionVerified, false)
   data.releases[0].repository = 'noteroru2/amphon.co.th'
   data.releases[0].release_proof = {
-    github_sha_verified: true, route_verified: true,
+    github_sha_verified: true, github_ref_verified:true, github_ref:'main',
+    hosting_source_verified:true, route_verified: true,
     live_response_verified: true, deployment_id_present: true,
     live_verified_at: '2026-11-20T00:15:00Z',
   }
   assert.equal(assess(data).productionVerified, true)
+  data.projects[0].production_branch = 'release/cloudflare-production'
+  assert.equal(assess(data).productionVerified, false)
+  data.projects[0].production_branch = 'main'
+  data.releases[0].release_proof.hosting_source_verified = false
+  assert.equal(assess(data).productionVerified, false)
+  data.releases[0].release_proof.hosting_source_verified = true
   data.releases[0].release_proof.live_response_verified = false
   assert.equal(assess(data).productionVerified, false)
   assert.equal(assess(data).automaticDeployAuthorized, false)
