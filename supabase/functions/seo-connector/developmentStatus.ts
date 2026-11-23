@@ -12,6 +12,7 @@ export interface DevelopmentProject {
   site_id: string
   mapping_status: string
   production_repo: string | null
+  production_branch?: string | null
   repo_candidates?: string[]
   central_deploy_allowed: boolean
 }
@@ -47,6 +48,9 @@ export interface DevelopmentRelease {
   repository?: string
   release_proof?: {
     github_sha_verified: boolean
+    github_ref_verified: boolean
+    github_ref: string | null
+    hosting_source_verified: boolean
     route_verified: boolean
     live_response_verified: boolean
     live_verified_at: string | null
@@ -110,7 +114,7 @@ const productionVerified = (
   records: DevelopmentRelease[], siteId: string,
   project: DevelopmentProject | undefined, now: Date,
 ): boolean => Boolean(project?.mapping_status === 'VERIFIED' &&
-  project.production_repo && records.some(row => {
+  project.production_repo && project.production_branch && records.some(row => {
     const p = row.release_proof
     const deployedAt=Date.parse(row.event_at),checkedAt=Date.parse(p?.live_verified_at||'')
     return row.site_id===siteId &&
@@ -118,7 +122,9 @@ const productionVerified = (
       row.event_kind==='PRODUCTION_VERIFIED' &&
       row.environment==='PRODUCTION' && row.qa_status==='PASS' &&
       /^[a-f0-9]{40}$/i.test(row.commit_sha) &&
-      p?.github_sha_verified===true && p?.route_verified===true &&
+      p?.github_sha_verified===true && p?.github_ref_verified===true &&
+      p?.github_ref===project.production_branch &&
+      p?.hosting_source_verified===true && p?.route_verified===true &&
       p?.live_response_verified===true && p?.deployment_id_present===true &&
       Number.isFinite(deployedAt) && Number.isFinite(checkedAt) &&
       checkedAt>=deployedAt && checkedAt<=now.getTime()
