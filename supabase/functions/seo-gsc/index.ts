@@ -67,7 +67,7 @@ async function savePortfolioWindows(site: Site, property: string, accessToken: s
 async function portfolioData(siteId:string,windowDays:7|14|28) {
   const [sites,projects,windows,roles,releases,funnel,ingests]=await Promise.all([
     db.from('commerce_seo_sites').select('id,label,origin').eq('enabled',true).order('id'),
-    db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed'),
+    db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
     db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300),
     db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(300),
@@ -108,7 +108,7 @@ async function releaseCompareData(body:Record<string,unknown>) {
     db.from('commerce_seo_sites').select('id,label,origin,enabled,gsc_property')
       .eq('id',siteId).eq('enabled',true).single(),
     db.from('commerce_seo_portfolio_projects')
-      .select('site_id,mapping_status,production_repo')
+      .select('site_id,mapping_status,production_repo,production_branch')
       .eq('site_id',siteId).maybeSingle(),
     db.from('commerce_seo_portfolio_release_events')
       .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
