@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {reconcileApprovedDraftPr} from '../scripts/seo-draft-pr-reconcile.mjs'
 import {parseCli} from '../scripts/seo-draft-pr-executor.mjs'
+import {resolveApprovedTarget} from '../scripts/seo-draft-pr-target.mjs'
+import {readFileSync} from 'node:fs'
 
 const UUID='11111111-1111-4111-8111-111111111111'
 const RECEIPT='711d5aba-710a-4db7-a1d9-d1df4558ec40'
@@ -170,4 +172,27 @@ test('CLI new reconcile mode defaults to read-only preview and keeps owner flag'
  const write=parseCli(['--request-id',UUID,'--reconcile','--execute','--owner-authorized'])
  assert.equal(write.reconcile,true)
  assert.equal(write.dryRun,false)
+})
+
+test('existing audit receipt cannot bypass initial target resolver, but explicit reconcile can read it',async()=>{
+ const snapshot=fixture()
+ snapshot.existingRun={request_id:UUID,pr_url:PR_URL}
+ const store={async loadSnapshot(){return snapshot}}
+ await assert.rejects(()=>resolveApprovedTarget(UUID,store,now),/ALREADY_RECORDED/)
+ const target=await resolveApprovedTarget(UUID,store,now,{reconcile:true})
+ assert.deepEqual(target,{owner:'noteroru2',repository:'amphon.co.th'})
+})
+test('owner-protected recovery workflow has no GitHub write capability and starts in dry-run',()=>{
+ const src=readFileSync(new URL('../.github/workflows/seo-draft-pr-reconcile.yml',import.meta.url),'utf8')
+ assert.match(src,/workflow_dispatch:/)
+ assert.match(src,/environment: seo-draft-pr-protected/)
+ assert.match(src,/YES_OWNER_ENABLED/)
+ assert.match(src,/permission-contents: read/)
+ assert.match(src,/permission-pull-requests: read/)
+ assert.match(src,/--reconcile --dry-run/)
+ assert.match(src,/--reconcile --execute --owner-authorized/)
+ assert.match(src,/if: inputs.write_audit_receipt/)
+ assert.match(src,/cancel-in-progress: false/)
+ assert.ok(!/permission-contents: write|permission-pull-requests: write/.test(src))
+ assert.ok(!/createDraftPr\(|gh pr merge|wrangler deploy|vercel deploy|schedule:|pull_request_target:/.test(src))
 })
