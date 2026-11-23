@@ -5,10 +5,14 @@ on:
     paths:
       - 'supabase/functions/seo-connector/core.ts'
       - 'supabase/functions/seo-connector/index.ts'
+      - 'supabase/functions/seo-connector/developmentStatus.ts'
       - 'src/components/SeoPortfolioDashboard.tsx'
       - 'src/components/SeoControlTower.tsx'
+      - 'src/components/SeoDevelopmentCenter.tsx'
+      - 'src/styles/seoDevelopmentCenter.css'
       - 'scripts/verify-seo-portfolio-mcp.mjs'
       - 'tests/seo-connector.test.mjs'
+      - 'tests/seo-development-status.test.mjs'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
   workflow_dispatch:
@@ -31,6 +35,8 @@ jobs:
         run: npm run verify:seo-portfolio-mcp
       - name: Verify OAuth MCP transport regression tests
         run: node --test tests/seo-connector.test.mjs
+      - name: Verify SEO project readiness and source safety gates
+        run: npm run verify:seo-development-status
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
