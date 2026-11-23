@@ -17,6 +17,11 @@ on:
       - 'tests/seo-connector.test.mjs'
       - 'tests/seo-development-status.test.mjs'
       - 'tests/seo-source-change.test.mjs'
+      - 'tests/seo-draft-pr-executor.test.mjs'
+      - 'scripts/seo-draft-pr-executor-core.mjs'
+      - 'scripts/seo-draft-pr-executor-adapters.mjs'
+      - 'scripts/seo-draft-pr-executor.mjs'
+      - 'supabase/migrations/20261123103000_seo_source_change_pr_runs.sql'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
   workflow_dispatch:
@@ -43,6 +48,8 @@ jobs:
         run: npm run verify:seo-development-status
       - name: Verify source proposal data, path and approval security gates
         run: npm run verify:seo-source-change
+      - name: Verify owner-gated Draft PR executor and immutable GitHub workflow
+        run: npm run verify:seo-draft-pr-executor
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
