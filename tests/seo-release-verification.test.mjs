@@ -11,7 +11,7 @@ const {
 }=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'))
 
 const SITE={id:'amphon',label:'amphon.co.th',origin:'https://amphon.co.th'}
-const PROJECT={site_id:'amphon',mapping_status:'VERIFIED',production_repo:'noteroru2/amphon.co.th'}
+const PROJECT={site_id:'amphon',mapping_status:'VERIFIED',production_repo:'noteroru2/amphon.co.th',production_branch:'main'}
 const SHA='f'.repeat(40)
 const now=new Date('2026-11-23T09:00:00Z')
 const row=(patch={})=>({
@@ -22,7 +22,9 @@ const row=(patch={})=>({
   event_at:'2026-11-15T03:00:00Z',qa_status:'PASS',
   affected_urls:['https://amphon.co.th/services/notebook'],
   evidence:{
-    github_sha_verified:true,domain_worker_mapping_verified:true,
+    github_sha_verified:true,github_ref_verified:true,github_ref:'main',
+    hosting_commit_verified:true,hosting_commit_sha:SHA,
+    domain_worker_mapping_verified:true,
     live_response_verified:true,live_verified_at:'2026-11-15T03:15:00Z',
   },...patch,
 })
@@ -161,4 +163,53 @@ test('newer provider deployment invalidates an old production verification until
   assert.equal(gate.verified_release_at,null)
   assert.equal(gate.confirmed_production_count,0)
   assert.equal(gate.measurement_windows[0].status,'PRODUCTION_NOT_VERIFIED')
+})
+
+test('short SHA and branch mismatch never count as a verified Production release',()=>{
+  const defaults=row().evidence
+  const bad=[
+    { ...defaults, hosting_commit_sha:'cb55117d' },
+    { ...defaults, hosting_commit_sha:'cb55117d'.padEnd(40,'0') },
+    { ...defaults, hosting_commit_verified:false },
+    { ...defaults, github_ref:'feat/editorial' },
+    { ...defaults, github_ref_verified:false },
+    { ...defaults, github_ref:'' },
+    { ...defaults, github_ref:'main', github_sha_verified:false },
+  ]
+  for(const evidence of bad){
+    const gate=assess([row({evidence})])
+    assert.notEqual(gate.level,'PRODUCTION_EVIDENCE_COMPLETE',JSON.stringify(evidence))
+    assert.equal(gate.confirmed_production_count,0)
+  }
+  assert.equal(assess([row()],{...PROJECT,production_branch:'release/cloudflare-production'})
+    .level,'LEDGER_CLAIM_INCOMPLETE')
+  assert.equal(assess([row()],{...PROJECT,production_branch:null})
+    .level,'LEDGER_CLAIM_INCOMPLETE')
+})
+
+test('matching immutable full artifact SHA-256 can substitute for unavailable hosting Git SHA',()=>{
+  const evidence={
+    ...row().evidence, hosting_commit_verified:false,
+    hosting_commit_sha:null,
+    github_artifact_sha256:'a'.repeat(64),
+    live_artifact_sha256:'a'.repeat(64),
+    artifact_checksum_verified:true,
+  }
+  assert.equal(assess([row({evidence})]).level,'PRODUCTION_EVIDENCE_COMPLETE')
+  assert.equal(assess([row({evidence:{...evidence,live_artifact_sha256:'b'.repeat(64)}})])
+    .level,'LEDGER_CLAIM_INCOMPLETE')
+  assert.equal(assess([row({evidence:{...evidence,artifact_checksum_verified:false}})])
+    .level,'LEDGER_CLAIM_INCOMPLETE')
+})
+
+test('only sanitized provenance booleans and branch leave the server, not raw provider notes',()=>{
+  const raw=row({evidence:{...row().evidence,webhook_secret:'private-do-not-expose',
+    workers_message:'fake SHA cb55117d from a deployment label',
+    provider_commit_sha:'unused'}})
+  const safe=sanitizeRelease(raw,SITE)
+  assert.equal(safe.release_proof.github_ref,'main')
+  assert.equal(safe.release_proof.hosting_source_verified,true)
+  assert.equal(safe.release_proof.github_ref_verified,true)
+  assert.ok(!JSON.stringify(safe).includes('private-do-not-expose'))
+  assert.ok(!JSON.stringify(safe).includes('fake SHA cb55117d'))
 })
