@@ -182,6 +182,9 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
       <a className="seo-dev-handoff" href="https://github.com/noteroru2/amphon-product-hub-shop/actions/workflows/seo-draft-pr-execute.yml" target="_blank" rel="noopener noreferrer">
        เปิด GitHub Actions (เมื่อเปิดใช้งานแล้ว) <ExternalLink size={13} aria-hidden/>
       </a>
+      <a className="seo-dev-handoff" href="https://github.com/noteroru2/amphon-product-hub-shop/actions/workflows/seo-draft-pr-reconcile.yml" target="_blank" rel="noopener noreferrer">
+       ตรวจ/กู้ Draft PR เดิม <ExternalLink size={13} aria-hidden/>
+      </a>
       <button type="button" className="seo-dev-handoff" onClick={()=>void copyDraftPrHandoff(item)}>ส่งต่อ ChatGPT</button>
      </div>
     </div>
