@@ -19,6 +19,9 @@ on:
       - 'tests/seo-source-change.test.mjs'
       - 'tests/seo-draft-pr-executor.test.mjs'
       - 'tests/seo-draft-pr-adapters.test.mjs'
+      - 'tests/seo-draft-pr-reconcile.test.mjs'
+      - 'scripts/seo-draft-pr-reconcile.mjs'
+      - '.github/workflows/seo-draft-pr-reconcile.yml'
       - 'scripts/seo-draft-pr-executor-core.mjs'
       - 'scripts/seo-draft-pr-executor-adapters.mjs'
       - 'scripts/seo-draft-pr-executor.mjs'
@@ -56,6 +59,8 @@ jobs:
         run: npm run verify:seo-draft-pr-executor
       - name: Verify GitHub and Supabase REST adapters with mocked network
         run: npm run verify:seo-draft-pr-adapters
+      - name: Verify read-only GitHub reconciliation and owner-receipt recovery
+        run: npm run verify:seo-draft-pr-reconcile
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
