@@ -146,3 +146,19 @@ test('source code cannot write database or auto-verify external hosting evidence
   assert.match(view,/uplift|Rolling GSC Snapshot/)
   assert.ok(!view.includes('PRODUCTION_VERIFIED_LEDGER_INSERT'))
 })
+
+test('newer provider deployment invalidates an old production verification until new SHA is verified',()=>{
+  const older=row({id:'verified-old'})
+  const latest=row({
+    id:'deploy-new',event_kind:'DEPLOY_SUCCEEDED',
+    event_at:'2026-11-18T12:00:00Z',
+    qa_status:'NOT_VERIFIED',
+    evidence:{github_sha_verified:false,domain_worker_mapping_verified:true,
+      live_response_verified:false},
+  })
+  const gate=assess([older,latest])
+  assert.equal(gate.level,'LEDGER_CLAIM_INCOMPLETE')
+  assert.equal(gate.verified_release_at,null)
+  assert.equal(gate.confirmed_production_count,0)
+  assert.equal(gate.measurement_windows[0].status,'PRODUCTION_NOT_VERIFIED')
+})
