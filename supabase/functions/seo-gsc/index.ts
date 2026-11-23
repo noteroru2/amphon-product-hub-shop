@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0'
 import { READ_SCOPE, GscError, fetchJson, fetchSnapshot, fetchPortfolioPageQueries, mapProperties, type Site } from './core.ts'
+import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from '../seo-connector/releaseMeasurement.ts'
 
 const projectUrl=Deno.env.get('SUPABASE_URL')!
 const hub='https://hub.amphon.co.th'
@@ -68,7 +69,7 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
     db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300),
-    db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(300),
+    db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(300),
     db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
     db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150)
   ])
@@ -83,8 +84,16 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
   if(selectedEnd) query=query.eq('end_date',selectedEnd)
   const details=await query
   if(details.error) throw new Error('PORTFOLIO_QUERIES_READ_FAILED')
+  const siteMap=new Map((sites.data||[]).map(site=>[site.id,site]))
+  const sanitizedReleases=(releases.data||[]).map(row=>
+    sanitizeRelease(row as RawReleaseEntry,siteMap.get(row.site_id)))
+  const releaseGates=assessReleasePortfolio(
+    sites.data||[],projects.data||[],sanitizedReleases)
+  // Only sanitized evidence flags leave this Edge Function; raw hosting
+  // evidence (including possible future provider secrets) stays server-side.
   return {sites:sites.data,projects:projects.data,windows:windows.data,roles:roles.data,
-    releases:releases.data,funnel:funnel.data,ingests:ingests.data,
+    releases:sanitizedReleases,release_gates:releaseGates,
+    funnel:funnel.data,ingests:ingests.data,
     queries:details.data||[],selectedSite:siteId,selectedWindow:windowDays}
 }
 
