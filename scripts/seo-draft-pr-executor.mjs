@@ -15,15 +15,17 @@
  */
 import { pathToFileURL } from 'node:url'
 import { executeApprovedDraftPr } from './seo-draft-pr-executor-core.mjs'
+import { reconcileApprovedDraftPr } from './seo-draft-pr-reconcile.mjs'
 import { githubAdapter, supabaseStore } from './seo-draft-pr-executor-adapters.mjs'
 
 export function parseCli(argv) {
-  const params={requestId:null,dryRun:true,authorized:false}
+  const params={requestId:null,dryRun:true,authorized:false,reconcile:false}
   for(let i=0;i<argv.length;i++){
     if(argv[i]==='--request-id'&&argv[i+1])params.requestId=argv[++i]
     else if(argv[i]==='--dry-run')params.dryRun=true
     else if(argv[i]==='--execute')params.dryRun=false
     else if(argv[i]==='--owner-authorized')params.authorized=true
+    else if(argv[i]==='--reconcile')params.reconcile=true
     else throw Error('SEO_DRAFT_PR_INVALID_CLI_ARGUMENT')
   }
   if(!params.requestId)throw Error('SEO_DRAFT_PR_REQUEST_ID_REQUIRED')
@@ -37,7 +39,8 @@ export async function runCli(argv=process.argv.slice(2),env=process.env) {
     key:env.AMPHON_SEO_SERVICE_ROLE_KEY,
   })
   const github=githubAdapter(env.AMPHON_SEO_GITHUB_TOKEN)
-  const result=await executeApprovedDraftPr(params.requestId,{
+  const command=params.reconcile?reconcileApprovedDraftPr:executeApprovedDraftPr
+  const result=await command(params.requestId,{
     store,github,dryRun:params.dryRun,
   })
   return result
