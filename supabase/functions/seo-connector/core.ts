@@ -29,14 +29,28 @@ export function validateGsc(a:Record<string,any>,now=new Date()) {
  if(!Number.isInteger(offset)||offset<0||offset>50000||!Number.isInteger(limit)||limit<1||limit>1000)throw new Error('offset 0–50000 and limit 1–1000 required')
  const filters=[]
  for(const [dimension,value] of [['page',a.page],['query',a.query],['country',a.country],['device',a.device]]) {
-  if(value!==undefined) {if(typeof value!=='string'||!value.trim()||value.length>2000)throw new Error('Invalid filter');filters.push({dimension,operator:'equals',expression:value})}
+  if(value!==undefined) {
+   if(typeof value!=='string'||!value.trim()||value.length>2000)throw new Error('Invalid filter')
+   let expression=value
+   if(dimension==='page') {
+    let url:URL
+    try{url=new URL(value)}catch{throw new Error('Invalid page URL')}
+    if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.port)
+      throw new Error('Invalid page URL')
+    // Google Search Console page keys use percent-encoded UTF-8 paths.
+    // new URL() is idempotent for already encoded paths and encodes Thai paths.
+    expression=url.href
+    if(expression.length>2000)throw new Error('Invalid page URL length')
+   }
+   filters.push({dimension,operator:'equals',expression})
+  }
  }
  if(a.country!==undefined&&!/^[a-z]{3}$/.test(a.country))throw new Error('country is an ISO-3166 alpha-3 code')
  if(a.device!==undefined&&!['DESKTOP','MOBILE','TABLET'].includes(a.device))throw new Error('Invalid device')
  return {startDate:a.start_date,endDate:a.end_date,type:'web',dataState:'final',dimensions:dims,rowLimit:limit,startRow:offset,...(filters.length?{dimensionFilterGroups:[{groupType:'and',filters}]}:{})}
 }
 const schema=(properties:Record<string,unknown>,required:string[]=[])=>({type:'object',properties,required,additionalProperties:false})
-const str={type:'string'},id={type:'integer',minimum:1},page={type:'string',description:'Exact HTTPS page URL from Hub, no query string'},pagination={offset:{type:'integer',minimum:0,default:0},limit:{type:'integer',minimum:1,maximum:500,default:100}}
+const str={type:'string'},id={type:'integer',minimum:1},page={type:'string',description:'Exact HTTPS page URL from Hub, no query string; Thai paths normalized to encoded Google page keys'},pagination={offset:{type:'integer',minimum:0,default:0},limit:{type:'integer',minimum:1,maximum:500,default:100}}
 const tool=(name:string,description:string,inputSchema:unknown,readOnlyHint=true)=>({name,description,inputSchema,annotations:{readOnlyHint,destructiveHint:false,idempotentHint:readOnlyHint,openWorldHint:false},securitySchemes:[{type:'oauth2',scopes:readOnlyHint?['seo:read']:['seo:read','seo:draft']}],_meta:{securitySchemes:[{type:'oauth2',scopes:readOnlyHint?['seo:read']:['seo:read','seo:draft']}]}})
 export const TOOLS=[
  tool('seo_sites','Read enabled network sites and current GSC coverage/freshness. Start here. Never treat sampled query sums as property totals.',schema({})),
