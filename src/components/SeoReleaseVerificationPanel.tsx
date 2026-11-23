@@ -248,8 +248,8 @@ export function SeoReleaseVerificationPanel({siteId,gates,lastUpdated}:Props) {
                   <tr><th>Impressions</th><td>{fmtMetric(currentComparison.before_metrics?.impressions)}</td>
                     <td>{fmtMetric(currentComparison.after_metrics?.impressions)}</td>
                     <td>{fmtMetric(currentComparison.changes?.impressions)} ({fmtMetric(currentComparison.changes?.impressions_pct,2)}%)</td></tr>
-                  <tr><th>CTR</th><td>{fmtMetric((currentComparison.before_metrics?.ctr??0)*100,2)}%</td>
-                    <td>{fmtMetric((currentComparison.after_metrics?.ctr??0)*100,2)}%</td>
+                  <tr><th>CTR</th><td>{fmtMetric(currentComparison.before_metrics?currentComparison.before_metrics.ctr*100:null,2)}%</td>
+                    <td>{fmtMetric(currentComparison.after_metrics?currentComparison.after_metrics.ctr*100:null,2)}%</td>
                     <td>{fmtMetric(currentComparison.changes?.ctr_percentage_points,2)} จุด</td></tr>
                   <tr><th>ตำแหน่งเฉลี่ย GSC</th>
                     <td>{fmtMetric(currentComparison.before_metrics?.position,2)}</td>
