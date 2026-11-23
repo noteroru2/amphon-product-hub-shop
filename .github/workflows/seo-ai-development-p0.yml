@@ -22,6 +22,10 @@ on:
       - 'tests/seo-draft-pr-reconcile.test.mjs'
       - 'tests/seo-release-verification.test.mjs'
       - 'tests/seo-release-comparison.test.mjs'
+      - 'tests/seo-production-evidence.test.mjs'
+      - 'scripts/seo-production-evidence.mjs'
+      - 'scripts/seo-production-evidence-core.mjs'
+      - '.github/workflows/seo-production-evidence-readonly.yml'
       - 'supabase/functions/seo-connector/releaseComparison.ts'
       - 'supabase/functions/seo-connector/releaseMeasurement.ts'
       - 'src/components/SeoReleaseVerificationPanel.tsx'
@@ -71,6 +75,8 @@ jobs:
         run: npm run verify:seo-release-verification
       - name: Verify Google-Pacific FINAL GSC release compare guardrails
         run: npm run verify:seo-release-comparison
+      - name: Verify read-only source and Cloudflare Worker discovery proof guards
+        run: npm run verify:seo-production-evidence
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
