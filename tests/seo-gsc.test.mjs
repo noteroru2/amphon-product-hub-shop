@@ -6,6 +6,7 @@ const transpile=source=>ts.transpileModule(source,{compilerOptions:{module:ts.Mo
 const moduleUrl=code=>`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 const coreUrl=moduleUrl(transpile(readFileSync(new URL('../supabase/functions/seo-gsc/core.ts',import.meta.url),'utf8')))
 const releaseProofUrl=moduleUrl(transpile(readFileSync(new URL('../supabase/functions/seo-connector/releaseMeasurement.ts',import.meta.url),'utf8')))
+const comparisonUrl=moduleUrl(transpile(readFileSync(new URL('../supabase/functions/seo-connector/releaseComparison.ts',import.meta.url),'utf8')))
 const {dateWindow,hostFilter,mapProperties,fetchSnapshot,fetchPortfolioPageQueries,fetchJson,GscError}=await import(coreUrl)
 const main={id:'amphon',origin:'https://amphon.co.th',label:'amphon.co.th',gsc_property:'sc-domain:amphon.co.th'}
 const shop={id:'shop',origin:'https://shop.amphon.co.th',label:'shop.amphon.co.th',gsc_property:'sc-domain:amphon.co.th'}
@@ -74,6 +75,7 @@ test('request handler rejects anonymous/staff access and fake scheduler keys; st
   source=source.replace(/import \{ createClient \} from '[^']+'/, 'const createClient = () => globalThis.__gscMock.db')
     .replace("from './core.ts'",`from '${coreUrl}'`)
     .replace("from '../seo-connector/releaseMeasurement.ts'",`from '${releaseProofUrl}'`)
+    .replace("from '../seo-connector/releaseComparison.ts'",`from '${comparisonUrl}'`)
   source=`const Deno={env:{get:(key)=>key==='SUPABASE_URL'?'https://test.supabase.co':'test'},serve:globalThis.__gscMock.serve};\n${source}`
   await import(moduleUrl(transpile(source)))
   const request=(action,headers={})=>new Request('https://test.supabase.co/functions/v1/seo-gsc',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify({action})})
