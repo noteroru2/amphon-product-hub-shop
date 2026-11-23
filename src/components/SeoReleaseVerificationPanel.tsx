@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ClipboardCopy, ShieldCheck, ExternalLink } from 'lucide-react'
+import { ClipboardCopy, ShieldCheck } from 'lucide-react'
 import type { SiteReleaseGate, ReleaseLevel, MeasurementStatus } from '../../supabase/functions/seo-connector/releaseMeasurement'
 
 type Props = {
