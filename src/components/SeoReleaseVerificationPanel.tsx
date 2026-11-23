@@ -56,6 +56,8 @@ const proofNames:Record<string,string> = {
   PRODUCTION_COMMIT_SHA_40_HEX:'ต้องยืนยัน Commit SHA ที่รันจริง',
   POST_DEPLOY_QA_PASS:'ต้องมี QA หลัง Deploy ที่ผ่านจริง',
   GITHUB_SHA_HOSTING_CORRELATION:'ต้องจับคู่ Hosting SHA กับ GitHub',
+  GITHUB_PRODUCTION_BRANCH_PROOF:'ต้องพิสูจน์ว่า SHA อยู่บน Branch Production ที่ทะเบียนกลางอนุมัติ',
+  HOSTING_EXACT_SOURCE_PROOF:'ต้องยืนยัน SHA เต็ม 40 ตัวจาก Hosting หรือเทียบ Checksum ไฟล์จริง SHA-256',
   APEX_DOMAIN_HOSTING_ROUTE_PROOF:'ต้องยืนยันว่าโดเมนจริงชี้ไป Deployment นี้',
   LIVE_HTTP_RESPONSE_PROOF:'ต้องมีหลักฐาน HTTP ของหน้าเว็บ Production',
   HOSTING_DEPLOYMENT_ID:'ต้องมี Deployment ID จาก Provider',
@@ -183,7 +185,7 @@ export function SeoReleaseVerificationPanel({siteId,gates,lastUpdated}:Props) {
               </tr>)}</tbody>
           </table></div>
           <p className="seo-dev-footnote">
-            ไม่มีการคำนวณอันดับเพิ่ม/ลดจาก Rolling GSC Snapshot • ต้องมี GSC ที่กรอง URL, คำค้น และช่วงก่อน/หลังให้ตรงกันก่อน
+            ยืนยันจาก SHA เพียง 8 ตัวในข้อความ Cloudflare ไม่เพียงพอ • ไม่มีการคำนวณอันดับเพิ่ม/ลดจาก Rolling GSC Snapshot • ต้องมี GSC ที่กรอง URL, คำค้น และช่วงก่อน/หลังให้ตรงกันก่อน
             {lastUpdated?' • รอบข้อมูล GSC ล่าสุด '+lastUpdated:''}
           </p>
 
