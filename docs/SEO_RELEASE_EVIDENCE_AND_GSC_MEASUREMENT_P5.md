@@ -29,7 +29,7 @@ The new UI under **SEO Control Tower → AI Development → Production Release V
 
 ## Date-scoped GSC after release
 
-Measurement clock starts from the **Bangkok calendar date** of an eligible Production-verified event. Release day `D` is excluded to avoid partial-day contamination.
+Measurement clock starts from the **Google Search Console Pacific reporting date** (`America/Los_Angeles`) of an eligible Production-verified event, not the Bangkok operational date. These can differ for a release occurring near midnight. Release day `D` is excluded to avoid partial-day contamination.
 
 | Horizon | Before (baseline) | After (measurement) | First eligible finality checkpoint |
 | --- | --- | --- | --- |
