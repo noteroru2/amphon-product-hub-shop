@@ -81,6 +81,35 @@ Migration staged as `supabase/migrations/20261123103000_seo_source_change_pr_run
 
 Do not apply to Production before staging DB smoke tests with Owner/Admin/Staff/Anon, including direct INSERT denial and duplicate request replay.
 
+## Manual cloud runner (no always-on server)
+
+The stacked PR also adds `.github/workflows/seo-draft-pr-execute.yml`:
+- `workflow_dispatch` only, with a single `request_id` input; **no schedules, push, PR triggers or Webhooks** that create website PRs.
+- The job runs inside GitHub Environment `seo-draft-pr-protected`.
+- It fails closed unless that environment explicitly defines secret
+  `SEO_DRAFT_PR_ENVIRONMENT_APPROVED=YES_OWNER_ENABLED`.
+- Configure GitHub Environment **required reviewers**, ideally owner-only, before
+  setting that activation secret. If the Environment is missing, the action
+  cannot be activated by accident.
+- Add environment secrets `AMPHON_SEO_SUPABASE_URL`,
+  `AMPHON_SEO_SERVICE_ROLE_KEY`, `AMPHON_SEO_GITHUB_APP_ID`,
+  `AMPHON_SEO_GITHUB_APP_PRIVATE_KEY`. Never store these in source files or
+  public GitHub Actions outputs.
+- The `seo-draft-pr-target.mjs` step checks OWNER approval and re-reads the
+  active site/Repo/keyword/GSC evidence in Supabase, then outputs **only** the
+  approved GitHub owner and repository name.
+- `actions/create-github-app-token@v2` issues a short-lived token for that
+  **one verified target repo**, limited to Contents write and Pull Requests
+  write.
+- The action runs **Dry Run first** using live Github SHA and then the explicit
+  Draft PR command. A final GitHub re-check inside the executor stops on drift.
+- Input is passed through a quoted environment variable, never interpolated
+  into a shell command. No deploy/merge action is defined anywhere in this job.
+
+The HUB Source Change Queue shows the approved Request ID and a link to the
+manual GitHub workflow. The workflow link will not be usable until this code
+is merged to the default branch and the protected environment is configured.
+
 ## Acceptance / remaining production work
 
 - [x] Pure engine and testable GitHub/Supabase adapters implemented
