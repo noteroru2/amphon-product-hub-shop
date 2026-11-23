@@ -116,9 +116,13 @@ test('collector makes only allowlisted authenticated GETs; secrets and raw provi
       if(url.includes('/git/ref/heads/'))return Response.json({object:{sha:BRANCH_SHA}})
       if(url.includes('/compare/'))return Response.json(compare)
       if(url.includes('api.cloudflare.com'))return Response.json(cloudflare())
-      if(url===SITE.origin+'/')return new Response('<!doctype html><title>AMPHON</title>',{
-        status:200,headers:{'Content-Type':'text/html'},
-      })
+      if(url===SITE.origin+'/'){
+        const resp=new Response('<!doctype html><title>AMPHON</title>',{
+          status:200,headers:{'Content-Type':'text/html'},
+        })
+        Object.defineProperty(resp,'url',{value:SITE.origin+'/'})
+        return resp
+      }
       throw Error('UNKNOWN_NETWORK_ROUTE')
     }
     const result=await collectEvidence(['--site-id','amphon','--expected-sha',SHA],env,new Date('2026-11-23T12:30:00Z'))
