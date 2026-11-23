@@ -32,7 +32,7 @@ export interface ReleaseEntry {
   release_proof?: ReleaseProof
   affected_urls?: string[]
 }
-export interface RawReleaseEntry extends Omit<ReleaseEntry, 'release_proof'> {
+export interface RawReleaseEntry extends Omit<ReleaseEntry, 'release_proof' | 'affected_urls'> {
   evidence?: unknown
   affected_urls?: unknown
 }
