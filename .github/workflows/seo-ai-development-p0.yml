@@ -8,6 +8,7 @@ on:
       - 'src/components/SeoPortfolioDashboard.tsx'
       - 'src/components/SeoControlTower.tsx'
       - 'scripts/verify-seo-portfolio-mcp.mjs'
+      - 'tests/seo-connector.test.mjs'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
   workflow_dispatch:
@@ -28,6 +29,8 @@ jobs:
         run: npm ci
       - name: Verify MCP authorization and no-mutation contract
         run: npm run verify:seo-portfolio-mcp
+      - name: Verify OAuth MCP transport regression tests
+        run: node --test tests/seo-connector.test.mjs
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
