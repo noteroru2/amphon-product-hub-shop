@@ -64,3 +64,63 @@ Use the evidence from `seo_portfolio`, `seo_gsc_query`,
 GitHub branches and PRs under owner-approved mappings. Add an explicit
 approval-gated source patch tool and SHA-based deploy verification separately.
 Do not expand OAuth scopes to production-write capabilities by default.
+
+
+## P1 — AI Development readiness + project completion dashboard
+
+Added to the **same PR #160**, still draft and not deployed:
+
+- **SEO Control Tower → AI Development · ความคืบหน้า**: shows 12 explicitly
+  defined workstreams with `COMPLETE / PARTIAL / PENDING_RELEASE / PLANNED`
+  results. There is no fabricated "90% finished" score. Data-driven steps
+  re-evaluate on every authenticated portfolio load.
+- Per-site readiness evaluates VERIFIED production Repo, approved Keyword
+  Ownership, matching final GSC window and successful complete 7/14-day
+  Query/Page ingestion receipt. Only then the next permitted stage is
+  **PAGE_EVIDENCE_REVIEW**, NOT source mutation.
+- **คัดลอก AI Work Order** creates a bounded context packet for ChatGPT and
+  the existing GitHub connector, including source mapping, GSC date, receipt,
+  ownership, evidence URLs and release data from the selected site.
+- The `seo_portfolio` OAuth tool returns `site_readiness`,
+  `project_milestones` and `project_completion` calculated from the same
+  pure advisory policy, with `connectorVerifiedLive=true` only when the
+  connector actually serves the request after deployment.
+- Development readiness policy is in
+  `supabase/functions/seo-connector/developmentStatus.ts`.
+  Tests require that a VERIFIED repo does not by itself authorize patching,
+  unapproved roles fail closed, missing/incomplete/stale GSC blocks review,
+  and a Commit does not equal a verified production release.
+- GSC 28-day **aggregate** exists, but current detail ingestion receipts are
+  only for 7/14 days. The readiness gate therefore checks recent 7/14-day
+  receipts for the selected site's latest GSC end date. This is deliberately
+  stricter than displaying a 28-day average position.
+- Site counts and review statuses are taken from the live portfolio, NOT
+  from hard-coded 13/14-site lists.
+
+### P1 verification
+
+```sh
+npm run verify:seo-portfolio-mcp
+npm run verify:seo-development-status
+node --test tests/seo-connector.test.mjs
+npm run typecheck
+npm run build
+```
+
+### Not yet complete (do not label as finished)
+
+1. Merge PR #160 and separately deploy HUB UI + `seo-connector` Edge Function.
+2. Verify live OAuth tools/list and an authorized `seo_portfolio` response
+   with no sensitive data.
+3. Approve primary keyword ownership and verify any still-candidate production
+   repo mappings.
+4. Check individual URL-level technical/content evidence and target SHA for
+   each real SEO code change.
+5. Build/approve narrow source patch → Draft PR → CI/SEO regression, with a
+   separate human gate for Merge/Deploy and SHA-aware rollback.
+6. Verify Production release/URL coverage and 7/14/28-day outcomes.
+7. Add a budgeted, independently verified Live SERP data provider if exact
+   current Google rankings are still required.
+
+The dashboard reports prerequisites as they exist, not authorization to act
+on them. `central_deploy_allowed` is never changed by this feature.
