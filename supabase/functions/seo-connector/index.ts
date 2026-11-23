@@ -1,6 +1,7 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0'
 import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,validateGsc,scopeGsc,TOOLS} from './core.ts'
 import {assessDevelopmentReadiness,buildDevelopmentMilestones} from './developmentStatus.ts'
+import {validateSourceProposalInput,assertSourceProposalEvidence} from './sourceChangeGuard.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -14,6 +15,58 @@ async function connectorActor(req:Request) {const token=req.headers.get('authori
 async function readBody(req:Request) {if(Number(req.headers.get('content-length')||0)>50000)throw new Error('Request too large');const text=await req.text();if(text.length>50000)throw new Error('Request too large');return req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')?Object.fromEntries(new URLSearchParams(text)):JSON.parse(text)}
 function pagination(a:any) {const offset=a.offset??0,limit=a.limit??100;if(!Number.isInteger(offset)||offset<0||offset>100000||!Number.isInteger(limit)||limit<1||limit>500)throw new Error('Invalid pagination');return {offset,limit}}
 async function execute(name:string,a:Record<string,any>,actor:string) {
+ if(name==='seo_source_requests') {
+  const limit=a.limit===undefined?25:a.limit
+  if(!Number.isInteger(limit)||limit<1||limit>50)throw Error('Invalid limit')
+  const enabled=await checked(db.from('commerce_seo_sites').select('id').eq('enabled',true))
+  const ids=enabled.map((row:any)=>row.id)
+  if(a.site_id!==undefined && !ids.includes(a.site_id))throw Error('Site disabled or not found')
+  const q=db.from('commerce_seo_source_change_requests')
+    .select('id,site_id,job_id,evidence_id,gsc_receipt_id,target_page,focus_query,target_repository,target_branch,expected_base_sha,requested_paths,change_kind,summary,rationale,proposed_change,status,created_at,reviewed_at,review_note')
+    .order('created_at',{ascending:false}).limit(limit)
+  const rows=await checked(a.site_id?q.eq('site_id',a.site_id):q.in('site_id',ids))
+  return {
+   rows,read_only:true,
+   notice:'Review decisions are owner-only in HUB. APPROVED_FOR_DRAFT_PR is not permission to merge or deploy. Re-verify GitHub base SHA and file contents before opening any PR.'
+  }
+ }
+ if(name==='seo_source_propose') {
+  const input=validateSourceProposalInput(a)
+  const job=await checked(db.from('commerce_seo_content_jobs')
+    .select('id,site_id,page,focus_query,status,evidence_id').eq('id',input.jobId).single())
+  const [site,project,evidence,receipt,keyword]=await Promise.all([
+   checked(db.from('commerce_seo_sites').select('id,origin,enabled').eq('id',job.site_id).single()),
+   checked(db.from('commerce_seo_portfolio_projects').select('site_id,mapping_status,production_repo,production_branch').eq('site_id',job.site_id).single()),
+   checked(db.from('commerce_seo_content_evidence').select('id,job_id,source_url,source_at').eq('id',input.evidenceId).single()),
+   checked(db.from('seo_connector_receipts').select('id,actor,site_id,query_request,created_at').eq('id',input.receiptId).single()),
+   checked(db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,approval_status,target_page').eq('site_id',job.site_id).eq('keyword',job.focus_query).eq('approval_status','APPROVED').maybeSingle()),
+  ])
+  if(!keyword)throw Error('SEO_SOURCE_KEYWORD_NOT_APPROVED')
+  const gate=assertSourceProposalEvidence({
+   site,project,job,evidence,receipt,keyword,actor,
+   jobId:input.jobId,evidenceId:input.evidenceId,
+  })
+  const row={
+   site_id:gate.siteId,job_id:input.jobId,evidence_id:input.evidenceId,
+   gsc_receipt_id:input.receiptId,target_page:gate.page,focus_query:gate.focusQuery,
+   target_repository:gate.repository,target_branch:gate.branch,
+   expected_base_sha:input.expectedBaseSha,requested_paths:input.targetPaths,
+   change_kind:input.changeKind,summary:input.summary,
+   rationale:input.rationale,proposed_change:input.proposedChange,
+   status:'REVIEW_REQUIRED',requested_by:actor,
+  }
+  const canonical=JSON.stringify({actor,row})
+  const bytes=new TextEncoder().encode(canonical)
+  const digest=await crypto.subtle.digest('SHA-256',bytes)
+  const request_fingerprint=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')
+  const saved=await checked(db.from('commerce_seo_source_change_requests')
+    .insert({...row,request_fingerprint})
+    .select('id,site_id,job_id,status,target_repository,target_branch,target_page,focus_query,created_at').single())
+  return {...saved,...gate.safety,
+   notice:'Proposal saved for OWNER review in HUB. GitHub was not modified; PR was not created and Production was not deployed.'
+  }
+ }
+
  if(name==='seo_sites')return {sites:await checked(db.from('commerce_seo_network_overview_v').select('*').eq('enabled',true).order('id')),notice:'GSC query samples may be truncated. Use seo_gsc_query dimensions [] for comparable property totals.'}
  // Read-only management context. All rows are from the Hub's existing portfolio
  // schema; no external Google query or GitHub mutation is performed here.
