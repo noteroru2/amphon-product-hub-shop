@@ -17,6 +17,15 @@ on:
       - 'tests/seo-connector.test.mjs'
       - 'tests/seo-development-status.test.mjs'
       - 'tests/seo-source-change.test.mjs'
+      - 'tests/seo-draft-pr-executor.test.mjs'
+      - 'tests/seo-draft-pr-adapters.test.mjs'
+      - 'scripts/seo-draft-pr-executor-core.mjs'
+      - 'scripts/seo-draft-pr-executor-adapters.mjs'
+      - 'scripts/seo-draft-pr-executor.mjs'
+      - 'scripts/seo-draft-pr-target.mjs'
+      - '.github/workflows/seo-draft-pr-execute.yml'
+      - 'supabase/migrations/20261123103000_seo_source_change_pr_runs.sql'
+      - 'tests/fixtures/seo_source_change_postgres_contract.sql'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
   workflow_dispatch:
@@ -43,7 +52,45 @@ jobs:
         run: npm run verify:seo-development-status
       - name: Verify source proposal data, path and approval security gates
         run: npm run verify:seo-source-change
+      - name: Verify owner-gated Draft PR executor and immutable GitHub workflow
+        run: npm run verify:seo-draft-pr-executor
+      - name: Verify GitHub and Supabase REST adapters with mocked network
+        run: npm run verify:seo-draft-pr-adapters
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
         run: npm run build
+
+  postgres-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: seo_contract
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d seo_contract"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client for isolated migration contract
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+      - name: Test migrations and OWNER / ADMIN / STAFF / ANON security
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: seo_contract
+          PGPASSWORD: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/seo_source_change_postgres_contract.sql
