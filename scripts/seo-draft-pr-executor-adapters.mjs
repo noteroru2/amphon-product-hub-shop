@@ -72,6 +72,36 @@ export function githubAdapter(token) {
       const commit=await github(repo,'/git/commits/'+sha)
       return commit?.tree?.sha
     },
+    // Commit review is read-only. If GitHub reports >100 changed files it
+    // cannot match the approved <=8 file allowlist, so fail closed in core.
+    async getCommitReview(repo,sha) {
+      if(!/^[a-f0-9]{40}$/i.test(sha))deny('INVALID_COMMIT_SHA')
+      const r=await github(repo,'/commits/'+sha+'?per_page=100')
+      if(!r||r.sha!==sha||!Array.isArray(r.parents)||!Array.isArray(r.files))
+        deny('INVALID_COMMIT_REVIEW')
+      return {
+        sha:r.sha,
+        parents:r.parents.map(p=>({sha:p.sha})),
+        changedFiles:r.files.map(f=>({filename:f.filename,status:f.status})),
+      }
+    },
+    async getPullsForHead(repo,branch,baseBranch) {
+      const [owner]=repo.split('/')
+      const params=new URLSearchParams({
+        state:'all',head:owner+':'+safeBranch(branch).replaceAll('%2F','/'),
+        base:safeBranch(baseBranch).replaceAll('%2F','/'),per_page:'100',
+      })
+      const pulls=await github(repo,'/pulls?'+params.toString())
+      if(!Array.isArray(pulls)||pulls.length>=100)deny('AMBIGUOUS_DRAFT_PR_RESULTS')
+      return pulls.map(p=>({
+        number:p.number,html_url:p.html_url,state:p.state,draft:p.draft,
+        merged_at:p.merged_at,body:p.body,
+        head:p.head?{ref:p.head.ref,sha:p.head.sha,
+          repo:p.head.repo?{full_name:p.head.repo.full_name}:null}:null,
+        base:p.base?{ref:p.base.ref,
+          repo:p.base.repo?{full_name:p.base.repo.full_name}:null}:null,
+      }))
+    },
     async createTree(repo,baseTree,files) {
       const r=await github(repo,'/git/trees',{
         method:'POST',body:{
