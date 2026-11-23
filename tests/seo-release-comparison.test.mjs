@@ -7,7 +7,7 @@ const source=readFileSync(new URL('../supabase/functions/seo-connector/releaseCo
 const script=ts.transpileModule(source,{compilerOptions:{
   module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,
 }}).outputText
-const {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc}=
+const {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc,sameCanonicalGscPage}=
   await import('data:text/javascript;base64,'+Buffer.from(script).toString('base64'))
 const page='https://amphon.co.th/services/notebook'
 const scope={
@@ -66,6 +66,24 @@ test('fail-closed for unverified deployment, foreign or unapproved URLs',()=>{
   ]) assert.throws(()=>buildGscReleaseComparison(
     {...scope,confirmed_affected_urls:[p]},'https://amphon.co.th',
     {...options,page:p},now),/PAGE_NOT_IN_VERIFIED_RELEASE_SCOPE/)
+})
+test('Thai URL canonical encoding is idempotent and cannot bypass verified affected-page scope',()=>{
+ const raw='https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค'
+ const encoded=new URL(raw).href
+ assert.equal(sameCanonicalGscPage(raw,encoded),true)
+ assert.equal(sameCanonicalGscPage(raw,'https://evil.test/บริการ/รับซื้อโน๊ตบุ๊ค'),false)
+ assert.equal(sameCanonicalGscPage(raw,raw+'?secret=1'),false)
+ for(const [input,allowed] of [[raw,encoded],[encoded,raw]]) {
+   const plan=buildGscReleaseComparison(
+     {...scope,confirmed_affected_urls:[allowed]},
+     'https://amphon.co.th',{...options,page:input},now)
+   assert.equal(plan.page,encoded)
+   assert.equal(plan.before.dimensionFilterGroups[0].filters[0].expression,encoded)
+   assert.equal(plan.after.dimensionFilterGroups[0].filters[0].expression,encoded)
+ }
+ assert.throws(()=>buildGscReleaseComparison(
+   {...scope,confirmed_affected_urls:['https://amphon.co.th/บริการ/รับซื้อคอมพิวเตอร์']},
+   'https://amphon.co.th',{...options,page:raw},now),/PAGE_NOT_IN_VERIFIED_RELEASE_SCOPE/)
 })
 test('future Google-final dates and >480-day baseline are rejected before API calls',()=>{
   assert.throws(()=>buildGscReleaseComparison(
