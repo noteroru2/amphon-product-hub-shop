@@ -21,6 +21,8 @@ on:
       - 'tests/seo-draft-pr-adapters.test.mjs'
       - 'tests/seo-draft-pr-reconcile.test.mjs'
       - 'tests/seo-release-verification.test.mjs'
+      - 'tests/seo-release-comparison.test.mjs'
+      - 'supabase/functions/seo-connector/releaseComparison.ts'
       - 'supabase/functions/seo-connector/releaseMeasurement.ts'
       - 'src/components/SeoReleaseVerificationPanel.tsx'
       - 'supabase/functions/seo-gsc/index.ts'
@@ -67,6 +69,8 @@ jobs:
         run: npm run verify:seo-draft-pr-reconcile
       - name: Verify release SHA proof and GSC post-deploy data completeness gates
         run: npm run verify:seo-release-verification
+      - name: Verify Google-Pacific FINAL GSC release compare guardrails
+        run: npm run verify:seo-release-comparison
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards

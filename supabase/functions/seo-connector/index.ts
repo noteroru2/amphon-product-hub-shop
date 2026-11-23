@@ -3,6 +3,7 @@ import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,valid
 import {assessDevelopmentReadiness,buildDevelopmentMilestones} from './developmentStatus.ts'
 import {validateSourceProposalInput,assertSourceProposalEvidence} from './sourceChangeGuard.ts'
 import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from './releaseMeasurement.ts'
+import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc} from './releaseComparison.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -182,6 +183,71 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
   const receipt=await checked(db.from('seo_connector_receipts').insert({actor,site_id:a.site_id,query_request:{kind:'URL_INSPECTION',site_id:a.site_id,page:a.page},result}).select('id').single())
   return {...result,receipt_id:receipt.id}
  }
+ if(name==='seo_release_compare') {
+  if(typeof a.site_id!=='string'||!/^[a-z0-9_-]{2,24}$/.test(a.site_id))
+   throw Error('Invalid site_id')
+  const [site,project,history]=await Promise.all([
+   checked(db.from('commerce_seo_sites').select('id,label,origin,enabled')
+    .eq('id',a.site_id).eq('enabled',true).single()),
+   checked(db.from('commerce_seo_portfolio_projects').select('site_id,mapping_status,production_repo')
+    .eq('site_id',a.site_id).maybeSingle()),
+   checked(db.from('commerce_seo_portfolio_release_events')
+    .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
+    .eq('site_id',a.site_id).order('event_at',{ascending:false}).limit(200)),
+  ])
+  if(!site||!project)throw Error('Verified Production site not found')
+  const releases=history.map((row:RawReleaseEntry)=>sanitizeRelease(row,site))
+  const gate=assessReleasePortfolio([site],[project],releases)[0]
+  const plan=buildGscReleaseComparison(gate,site.origin,{
+   site_id:a.site_id,days:a.days,page:a.page,
+   query:a.query,country:a.country,device:a.device,
+  })
+  if(a.query!==undefined) {
+   const keywords=await checked(db.from('commerce_seo_portfolio_keyword_roles')
+    .select('site_id,keyword,target_page').eq('site_id',a.site_id)
+    .eq('keyword',a.query).eq('approval_status','APPROVED').limit(30))
+   if(!keywords.some((row:any)=>!row.target_page||row.target_page===a.page))
+    throw Error('Requested query is not approved for this release page')
+  }
+  // Reuse the connector's existing read-only Google OAuth context.
+  // No changed DB rows, PRs, or external website actions result.
+  const context=await checked(db.rpc('seo_connector_gsc_context',{p_site:a.site_id}))
+  if(!context?.property||!context?.refresh_token)
+   throw Error('GSC site is not connected')
+  const config=await checked(db.rpc('commerce_gsc_internal',{p_action:'config'}))
+  const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{
+   method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+   body:new URLSearchParams({
+    client_id:config.client_id,client_secret:config.client_secret,
+    refresh_token:context.refresh_token,grant_type:'refresh_token',
+   }),signal:AbortSignal.timeout(15000),
+  })
+  if(!tokenResponse.ok)throw Error('Google authorization failed; reconnect GSC')
+  const token=await tokenResponse.json()
+  if(typeof token.access_token!=='string')throw Error('Missing Google access token')
+  const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+
+    encodeURIComponent(context.property)+'/searchAnalytics/query'
+  const fetchWindow=async(query:typeof plan.before)=>{
+   const response=await fetch(endpoint,{
+    method:'POST',headers:{
+     Authorization:'Bearer '+token.access_token,
+     'Content-Type':'application/json',
+    },body:JSON.stringify(query),signal:AbortSignal.timeout(20000),
+   })
+   if(!response.ok)throw Error('Google final GSC query failed ('+response.status+')')
+   return parseGscAggregate(await response.json())
+  }
+  const [before,after]=await Promise.all([
+   fetchWindow(plan.before),fetchWindow(plan.after),
+  ])
+  return {
+   ...compareVisibleGsc(plan,before,after),
+   source:'GOOGLE_SEARCH_CONSOLE_FINAL_DIRECT_OAUTH',
+   observed_at:new Date().toISOString(),
+   read_only:true,
+  }
+ }
+
  if(name==='seo_gsc_query') {
   const validated=validateGsc(a)
   const context=await checked(db.rpc('seo_connector_gsc_context',{p_site:a.site_id}));if(!context)throw new Error('GSC site is not connected')

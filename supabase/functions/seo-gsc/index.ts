@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0'
 import { READ_SCOPE, GscError, fetchJson, fetchSnapshot, fetchPortfolioPageQueries, mapProperties, type Site } from './core.ts'
 import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from '../seo-connector/releaseMeasurement.ts'
+import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc} from '../seo-connector/releaseComparison.ts'
 
 const projectUrl=Deno.env.get('SUPABASE_URL')!
 const hub='https://hub.amphon.co.th'
@@ -98,6 +99,73 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     queries:details.data||[],selectedSite:siteId,selectedWindow:windowDays}
 }
 
+/** Strict read-only pre/post comparison on the exact affected Production URL. */
+async function releaseCompareData(body:Record<string,unknown>) {
+  const siteId=body.site_id
+  if(typeof siteId!=='string'||!/^[a-z0-9_-]{2,24}$/.test(siteId))
+    throw Error('INVALID_SITE_ID')
+  const [siteResult,projectResult,eventsResult]=await Promise.all([
+    db.from('commerce_seo_sites').select('id,label,origin,enabled,gsc_property')
+      .eq('id',siteId).eq('enabled',true).single(),
+    db.from('commerce_seo_portfolio_projects')
+      .select('site_id,mapping_status,production_repo')
+      .eq('site_id',siteId).maybeSingle(),
+    db.from('commerce_seo_portfolio_release_events')
+      .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
+      .eq('site_id',siteId).order('event_at',{ascending:false}).limit(200),
+  ])
+  if(siteResult.error||!siteResult.data||projectResult.error||
+    !projectResult.data||eventsResult.error)throw Error('RELEASE_COMPARE_CONTEXT_UNAVAILABLE')
+  const site=siteResult.data
+  const releases=(eventsResult.data||[]).map(row=>
+    sanitizeRelease(row as RawReleaseEntry,site))
+  const gate=assessReleasePortfolio([site],[projectResult.data],releases)[0]
+  const plan=buildGscReleaseComparison(gate,site.origin,{
+    site_id:siteId,days:body.days as 7|14|28,page:body.page as string,
+    query:body.query as string|undefined,country:body.country as string|undefined,
+    device:body.device as 'DESKTOP'|'MOBILE'|'TABLET'|undefined,
+  })
+  if(body.query!==undefined){
+    const {data:roles,error}=await db.from('commerce_seo_portfolio_keyword_roles')
+      .select('keyword,target_page').eq('site_id',siteId)
+      .eq('keyword',body.query as string).eq('approval_status','APPROVED').limit(30)
+    if(error||!roles?.some(r=>!r.target_page||r.target_page===plan.page))
+      throw Error('RELEASE_COMPARE_KEYWORD_NOT_APPROVED')
+  }
+  const {data:context,error:contextError}=await db.rpc(
+    'seo_connector_gsc_context',{p_site:siteId})
+  if(contextError||!context?.property||!context?.refresh_token)
+    throw Error('RELEASE_COMPARE_GSC_NOT_CONNECTED')
+  const config=await rpc('config')
+  if(!config.client_id||!config.client_secret)
+    throw Error('RELEASE_COMPARE_GSC_NOT_CONNECTED')
+  const token=await tokenRequest({
+    client_id:config.client_id,client_secret:config.client_secret,
+    refresh_token:context.refresh_token,grant_type:'refresh_token',
+  })
+  if(typeof token.access_token!=='string')throw Error('RELEASE_COMPARE_GSC_AUTH_FAILED')
+  const endpoint='https://www.googleapis.com/webmasters/v3/sites/'+
+    encodeURIComponent(context.property)+'/searchAnalytics/query'
+  const fetchPeriod=async(query:typeof plan.before)=>{
+    const result=await fetchJson(endpoint,{
+      method:'POST',headers:{
+        Authorization:'Bearer '+token.access_token,
+        'Content-Type':'application/json',
+      },body:JSON.stringify(query),
+    })
+    return parseGscAggregate(result)
+  }
+  const [before,after]=await Promise.all([
+    fetchPeriod(plan.before),fetchPeriod(plan.after),
+  ])
+  return {
+    ...compareVisibleGsc(plan,before,after),
+    source:'GOOGLE_SEARCH_CONSOLE_FINAL_DIRECT_OAUTH',
+    observed_at:new Date().toISOString(),
+    read_only:true,
+  }
+}
+
 async function run() {
   const config=await rpc('config')
   if(!config.client_id || !config.client_secret) return {processed:0,configured:false}
@@ -171,6 +239,9 @@ Deno.serve(async(req:Request)=>{
       return json(await run())
     }
     const user=await actor(req)
+    if(body.action==='release_compare') {
+      return json(await releaseCompareData(body))
+    }
     if(body.action==='portfolio') {
       const siteId=String(body.site_id || 'amphon')
       const windowDays=Number(body.window_days || 28)

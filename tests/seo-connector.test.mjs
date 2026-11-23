@@ -8,6 +8,7 @@ const coreCode=compile(readFileSync(new URL('../supabase/functions/seo-connector
 const readinessCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/developmentStatus.ts',import.meta.url),'utf8'))
 const sourceGuardCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/sourceChangeGuard.ts',import.meta.url),'utf8'))
 const releaseProofCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/releaseMeasurement.ts',import.meta.url),'utf8'))
+const comparisonCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/releaseComparison.ts',import.meta.url),'utf8'))
 const core=await import(data(coreCode))
 test('OAuth redirect allowlist rejects lookalikes, credentials, fragments and unrelated hosts',()=>{
  for(const u of ['https://chatgpt.com/connector_platform/oauth_redirect','https://chat.openai.com/aip/plugin/oauth/callback'])assert.equal(core.redirectAllowed(u),true)
@@ -58,7 +59,7 @@ test('MCP transport enforces auth and scopes and refuses undeclared write argume
  let calls=[];const mock={rpc:async(name,args)=>{calls.push({name,args});return {data:args.p_action==='auth'?{actor:'owner-fixture',scopes:'seo:read'}:null,error:null}}}
  globalThis.__seoConnectorMock=mock
  const mockCode=data('export const createClient=()=>globalThis.__seoConnectorMock')
- const code=compile(readFileSync(new URL('../supabase/functions/seo-connector/index.ts',import.meta.url),'utf8')).replace(/from ['"]npm:@supabase\/supabase-js@2\.116\.0['"]/g,`from '${mockCode}'`).replace(/from ['"]\.\/core\.ts['"]/g,`from '${data(coreCode)}'`).replace(/from ['"]\.\/developmentStatus\.ts['"]/g,`from '${data(readinessCode)}'`).replace(/from ['"]\.\/sourceChangeGuard\.ts['"]/g,`from '${data(sourceGuardCode)}'`).replace(/from ['"]\.\/releaseMeasurement\.ts['"]/g,`from '${data(releaseProofCode)}'`)
+ const code=compile(readFileSync(new URL('../supabase/functions/seo-connector/index.ts',import.meta.url),'utf8')).replace(/from ['"]npm:@supabase\/supabase-js@2\.116\.0['"]/g,`from '${mockCode}'`).replace(/from ['"]\.\/core\.ts['"]/g,`from '${data(coreCode)}'`).replace(/from ['"]\.\/developmentStatus\.ts['"]/g,`from '${data(readinessCode)}'`).replace(/from ['"]\.\/sourceChangeGuard\.ts['"]/g,`from '${data(sourceGuardCode)}'`).replace(/from ['"]\.\/releaseMeasurement\.ts['"]/g,`from '${data(releaseProofCode)}'`).replace(/from ['"]\.\/releaseComparison\.ts['"]/g,`from '${data(comparisonCode)}'`)
  await import(data(code))
  const call=async(body,token)=>handler(new Request('https://example/seo-connector/mcp',{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}))
  const anon=await call({jsonrpc:'2.0',id:1,method:'tools/list'});assert.equal(anon.status,401);assert.match(anon.headers.get('www-authenticate'),/oauth-protected-resource/)
@@ -67,7 +68,7 @@ test('MCP transport enforces auth and scopes and refuses undeclared write argume
  const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token)
  const tools=(await list.json()).result.tools
  assert.deepEqual(tools.map(tool=>tool.name).sort(),[
-  'seo_sites','seo_portfolio','seo_source_requests','seo_source_propose','seo_gsc_query','seo_url_inspection',
+  'seo_sites','seo_portfolio','seo_source_requests','seo_source_propose','seo_release_compare','seo_gsc_query','seo_url_inspection',
   'seo_opportunities','seo_jobs','seo_job_evidence','seo_prepare_draft','seo_save_draft',
  ].sort())
  const sourcePropose=tools.find(tool=>tool.name==='seo_source_propose')

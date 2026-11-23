@@ -90,3 +90,13 @@
 .seo-dev-measure-table th,.seo-dev-measure-table td {text-align:left;vertical-align:top;padding:11px 12px;border-bottom:1px solid #e2e8f0;color:#334155;}
 .seo-dev-measure-table th {font-weight:700;background:#f8fafc;}
 .seo-dev-measure-table tr:last-child td,.seo-dev-measure-table tr:last-child th {border-bottom:0;}
+
+/* P6 owner-reviewed exact URL release comparison */
+.seo-dev-compare {display:grid;gap:12px;padding:14px;border:1px solid #dbeafe;background:#f8fafc;border-radius:12px;min-width:0}
+.seo-dev-compare h4{margin:0;color:#1e293b;font-size:.94rem}
+.seo-dev-compare-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
+.seo-dev-compare-controls label{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:#475569;font-weight:700;min-width:0}
+.seo-dev-compare-controls input,.seo-dev-compare-controls select{width:100%;max-width:100%;min-width:0;min-height:38px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155}
+.seo-dev-compare>button{width:fit-content;min-height:38px}
+.seo-dev-compare-result{display:grid;gap:10px;min-width:0}
+.seo-dev-compare-result>p{margin:0}
