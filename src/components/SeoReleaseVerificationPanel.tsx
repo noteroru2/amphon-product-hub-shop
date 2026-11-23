@@ -1,6 +1,36 @@
 import { useState } from 'react'
 import { ClipboardCopy, ShieldCheck } from 'lucide-react'
 import type { SiteReleaseGate, ReleaseLevel, MeasurementStatus } from '../../supabase/functions/seo-connector/releaseMeasurement'
+import { gscAction } from '../lib/seoGsc'
+
+
+type ReleaseCompareResult = {
+  site_id: string
+  page: string
+  query: string | null
+  country: string | null
+  device: string | null
+  days: number
+  release_gsc_day: string
+  status: 'VISIBLE_GSC_COMPARISON' | 'INSUFFICIENT_VISIBLE_DATA'
+  before_range: { start: string; end: string }
+  after_range: { start: string; end: string }
+  before_metrics: { clicks: number; impressions: number; ctr: number; position: number | null } | null
+  after_metrics: { clicks: number; impressions: number; ctr: number; position: number | null } | null
+  changes: {
+    clicks: number | null
+    impressions: number | null
+    clicks_pct: number | null
+    impressions_pct: number | null
+    ctr_percentage_points: number | null
+    average_position_improvement: number | null
+  } | null
+  causal_impact_proven: false
+  live_serp_position: false
+}
+const fmtMetric=(value:number|null|undefined,decimals=0)=>
+  value==null||!Number.isFinite(value)?'—':
+    value.toLocaleString('th-TH',{maximumFractionDigits:decimals})
 
 type Props = {
   siteId: string
@@ -38,7 +68,43 @@ const asDate=(raw:string|null)=>raw ? new Date(raw).toLocaleString(
 
 export function SeoReleaseVerificationPanel({siteId,gates,lastUpdated}:Props) {
   const [copyResult,setCopyResult]=useState('')
+  const [compareDays,setCompareDays]=useState<7|14|28>(7)
+  const [comparePage,setComparePage]=useState('')
+  const [compareQuery,setCompareQuery]=useState('')
+  const [compareCountry,setCompareCountry]=useState('')
+  const [compareDevice,setCompareDevice]=useState('')
+  const [compareBusy,setCompareBusy]=useState(false)
+  const [compareError,setCompareError]=useState('')
+  const [comparison,setComparison]=useState<{key:string;data:ReleaseCompareResult}|null>(null)
   const selected=gates?.find(row=>row.site_id===siteId)
+
+  const selectedPage=selected?.confirmed_affected_urls.includes(comparePage)
+    ? comparePage : selected?.confirmed_affected_urls[0]||''
+  const selectedWindow=selected?.measurement_windows.find(row=>row.days===compareDays)
+  const compareKey=[siteId,compareDays,selectedPage,compareQuery,compareCountry,compareDevice].join('|')
+  const currentComparison=comparison?.key===compareKey?comparison.data:null
+  const canCompare=selected?.level==='PRODUCTION_EVIDENCE_COMPLETE' &&
+    Boolean(selectedPage) &&
+    selectedWindow?.status==='DATE_SCOPED_GSC_REQUIRED'
+  async function runReleaseCompare(){
+    if(!canCompare||compareBusy)return
+    setCompareBusy(true)
+    setCompareError('')
+    setComparison(null)
+    try {
+      const result=await gscAction<ReleaseCompareResult>('release_compare',{
+        site_id:siteId,days:compareDays,page:selectedPage,
+        ...(compareQuery.trim()?{query:compareQuery.trim()}:{}),
+        ...(compareCountry.trim()?{country:compareCountry.trim().toLowerCase()}:{}),
+        ...(compareDevice?{device:compareDevice}:{}),
+      })
+      setComparison({key:compareKey,data:result})
+    } catch(err) {
+      setCompareError(err instanceof Error?err.message:String(err))
+    } finally {
+      setCompareBusy(false)
+    }
+  }
   const verified=(gates||[]).filter(row=>row.level==='PRODUCTION_EVIDENCE_COMPLETE').length
   const provider=(gates||[]).filter(row=>row.provider_deploy_count>0).length
   async function copyVerificationOrder(){
@@ -120,6 +186,81 @@ export function SeoReleaseVerificationPanel({siteId,gates,lastUpdated}:Props) {
             ไม่มีการคำนวณอันดับเพิ่ม/ลดจาก Rolling GSC Snapshot • ต้องมี GSC ที่กรอง URL, คำค้น และช่วงก่อน/หลังให้ตรงกันก่อน
             {lastUpdated?' • รอบข้อมูล GSC ล่าสุด '+lastUpdated:''}
           </p>
+
+          <div className="seo-dev-compare">
+            <h4>วัดผล GSC ก่อน/หลัง Release (Google Pacific Final)</h4>
+            <p className="seo-dev-footnote">เปรียบเทียบข้อมูลจาก Google โดยตรงแบบอ่านอย่างเดียว เฉพาะ URL ที่ยืนยันว่าเปลี่ยนจริง ไม่ใช่การวัดอันดับสดหรือข้อพิสูจน์ว่า Release ทำให้ตัวเลขเปลี่ยน</p>
+            <div className="seo-dev-compare-controls">
+              <label>รอบวัดผล
+                <select value={compareDays} onChange={e=>setCompareDays(Number(e.target.value) as 7|14|28)}>
+                  <option value={7}>7 วัน</option>
+                  <option value={14}>14 วัน</option>
+                  <option value={28}>28 วัน</option>
+                </select>
+              </label>
+              <label>URL ที่ได้รับการยืนยัน
+                <select value={selectedPage} onChange={e=>setComparePage(e.target.value)}
+                  disabled={!selected.confirmed_affected_urls.length}>
+                  {selected.confirmed_affected_urls.length===0?<option value="">ยังไม่มี URL ที่ยืนยัน</option>:
+                    selected.confirmed_affected_urls.map(url=><option key={url} value={url}>{url}</option>)}
+                </select>
+              </label>
+              <label>คำค้น (ไม่บังคับ • ต้องมี Keyword Ownership อนุมัติ)
+                <input type="text" maxLength={200} value={compareQuery}
+                  onChange={e=>setCompareQuery(e.target.value)} placeholder="เช่น รับซื้อโน๊ตบุ๊ค" />
+              </label>
+              <label>ประเทศ (ISO-3 • ไม่บังคับ)
+                <input type="text" maxLength={3} value={compareCountry}
+                  onChange={e=>setCompareCountry(e.target.value)} placeholder="tha" />
+              </label>
+              <label>อุปกรณ์
+                <select value={compareDevice} onChange={e=>setCompareDevice(e.target.value)}>
+                  <option value="">ทุกอุปกรณ์</option>
+                  <option value="MOBILE">มือถือ</option>
+                  <option value="DESKTOP">คอมพิวเตอร์</option>
+                  <option value="TABLET">แท็บเล็ต</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" onClick={()=>void runReleaseCompare()}
+              disabled={!canCompare||compareBusy}>
+              {compareBusy?'กำลังอ่านข้อมูล Google…':'ดึง GSC Final และเปรียบเทียบ'}
+            </button>
+            {!canCompare&&<p className="seo-dev-footnote">
+              {selected.level!=='PRODUCTION_EVIDENCE_COMPLETE'?
+                'ยังไม่เปิดการเปรียบเทียบ: รอหลักฐาน Production SHA และ HTTP ที่ตรวจผ่านจริง':
+                selectedWindow?.status==='WAITING_FINAL_GSC'?
+                'ข้อมูลหลัง Release ยังไม่ถึงรอบ Google Final':
+                'ยังไม่มี URL ที่ตรวจรับ หรือยังไม่ถึงรอบเก็บข้อมูล'}
+            </p>}
+            {compareError&&<p role="alert" className="seo-dev-warning">ดึงข้อมูลไม่ได้: {compareError}</p>}
+            {currentComparison&&<div className="seo-dev-compare-result" role="status">
+              <h4>{currentComparison.status==='VISIBLE_GSC_COMPARISON'?
+                'ข้อมูล GSC ที่ Google เปิดเผย':'ข้อมูล GSC ไม่เพียงพอสำหรับเปรียบเทียบ'}</h4>
+              <p>ก่อน: {currentComparison.before_range.start} ถึง {currentComparison.before_range.end}
+                {' '} • หลัง: {currentComparison.after_range.start} ถึง {currentComparison.after_range.end}</p>
+              <div className="seo-dev-measure-table-wrap"><table className="seo-dev-measure-table">
+                <thead><tr><th>ตัวชี้วัด</th><th>ก่อน</th><th>หลัง</th><th>เปลี่ยนแปลง</th></tr></thead>
+                <tbody>
+                  <tr><th>Clicks</th><td>{fmtMetric(currentComparison.before_metrics?.clicks)}</td>
+                    <td>{fmtMetric(currentComparison.after_metrics?.clicks)}</td>
+                    <td>{fmtMetric(currentComparison.changes?.clicks)} ({fmtMetric(currentComparison.changes?.clicks_pct,2)}%)</td></tr>
+                  <tr><th>Impressions</th><td>{fmtMetric(currentComparison.before_metrics?.impressions)}</td>
+                    <td>{fmtMetric(currentComparison.after_metrics?.impressions)}</td>
+                    <td>{fmtMetric(currentComparison.changes?.impressions)} ({fmtMetric(currentComparison.changes?.impressions_pct,2)}%)</td></tr>
+                  <tr><th>CTR</th><td>{fmtMetric((currentComparison.before_metrics?.ctr??0)*100,2)}%</td>
+                    <td>{fmtMetric((currentComparison.after_metrics?.ctr??0)*100,2)}%</td>
+                    <td>{fmtMetric(currentComparison.changes?.ctr_percentage_points,2)} จุด</td></tr>
+                  <tr><th>ตำแหน่งเฉลี่ย GSC</th>
+                    <td>{fmtMetric(currentComparison.before_metrics?.position,2)}</td>
+                    <td>{fmtMetric(currentComparison.after_metrics?.position,2)}</td>
+                    <td>{fmtMetric(currentComparison.changes?.average_position_improvement,2)} (ค่าบวก = ดีขึ้น)</td></tr>
+                </tbody>
+              </table></div>
+              <p className="seo-dev-footnote">Google อาจปกปิดคำค้นหรือข้อมูลบางส่วน และค่า Position เป็นค่าเฉลี่ย ไม่ใช่อันดับ Google แบบสด • ตัวเลขเปลี่ยนแปลงไม่ได้พิสูจน์เหตุและผลจาก Release</p>
+            </div>}
+          </div>
+
         </div>
       </>}
       <div className="seo-dev-site-list">
