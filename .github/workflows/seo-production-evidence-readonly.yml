@@ -59,6 +59,8 @@ jobs:
           AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
           AMPHON_CLOUDFLARE_API_TOKEN: ${{ secrets.AMPHON_CLOUDFLARE_API_TOKEN }}
           AMPHON_SEO_GITHUB_READ_TOKEN: ${{ secrets.AMPHON_SEO_GITHUB_READ_TOKEN }}
+          # Read-only repository-scoped GitHub Actions token avoids public API rate-limit 403.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [[ -n "$EXPECTED_SHA" ]]; then
             node scripts/seo-production-evidence.mjs --site-id "$SITE_ID" --expected-sha "$EXPECTED_SHA" > seo-production-evidence.json
