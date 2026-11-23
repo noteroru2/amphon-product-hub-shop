@@ -74,7 +74,19 @@ const pageMatches=(page:string,origin:string):boolean=>{
   try {
     const u=new URL(page),host=new URL(origin)
     return u.protocol==='https:'&&u.origin===host.origin &&
-      !u.username&&!u.password&&!u.search&&!u.hash && page===u.href
+      !u.username&&!u.password&&!u.search&&!u.hash
+  } catch {return false}
+}
+// Google's page dimension is an exact URL string and usually percent-encodes
+// Unicode paths. Equivalence is URL serialization, NOT loose path matching.
+export function sameCanonicalGscPage(a:unknown,b:unknown):boolean {
+  if(typeof a!=='string'||typeof b!=='string')return false
+  try {
+    const x=new URL(a),y=new URL(b)
+    return x.protocol==='https:'&&y.protocol==='https:' &&
+      !x.username&&!x.password&&!x.search&&!x.hash &&
+      !y.username&&!y.password&&!y.search&&!y.hash &&
+      x.href===y.href
   } catch {return false}
 }
 export function buildGscReleaseComparison(
@@ -90,8 +102,9 @@ export function buildGscReleaseComparison(
   if(typeof options.page!=='string'||options.page.length>2048||
     !pageMatches(options.page,origin) ||
     !Array.isArray(gate.confirmed_affected_urls) ||
-    !gate.confirmed_affected_urls.includes(options.page))
+    !gate.confirmed_affected_urls.some(page=>sameCanonicalGscPage(page,options.page)))
     fail('PAGE_NOT_IN_VERIFIED_RELEASE_SCOPE')
+  const canonicalPage=new URL(options.page).href
   if(options.query!==undefined && (typeof options.query!=='string'||
     options.query.length<2||options.query.length>200||
     !options.query.trim()||options.query!==options.query.trim()))
@@ -114,7 +127,7 @@ export function buildGscReleaseComparison(
   if(Date.parse(baselineStart+'T00:00:00Z') <
     now.getTime()-480*86_400_000)fail('GSC_HISTORY_EXPIRED')
   const filters=[
-    {dimension:'page',operator:'equals' as const,expression:options.page},
+    {dimension:'page',operator:'equals' as const,expression:canonicalPage},
     ...(options.query?[{dimension:'query',operator:'equals' as const,expression:options.query}]:[]),
     ...(options.country?[{dimension:'country',operator:'equals' as const,expression:options.country}]:[]),
     ...(options.device?[{dimension:'device',operator:'equals' as const,expression:options.device}]:[]),
@@ -127,7 +140,7 @@ export function buildGscReleaseComparison(
   return {
     schema:'amphon.seo.release-gsc-comparison.v1',site_id:gate.site_id,
     release_at:gate.verified_release_at!,release_gsc_day:releaseDay,
-    days:options.days,page:options.page,query:options.query??null,
+    days:options.days,page:canonicalPage,query:options.query??null,
     country:options.country??null,device:options.device??null,
     before:request(baselineStart,baselineEnd),
     after:request(afterStart,afterEnd),

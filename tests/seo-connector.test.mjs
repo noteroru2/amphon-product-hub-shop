@@ -26,6 +26,23 @@ test('GSC date filters preserve final Pacific windows, dimensions and exact matc
  assert.throws(()=>core.validateGsc({...a,end_date:'2026-10-10'},new Date('2026-10-13T01:00:00Z')))
  assert.throws(()=>core.validateGsc({...a,start_date:'2026-02-30'}));assert.throws(()=>core.validateGsc({...a,limit:1001}));assert.throws(()=>core.validateGsc({...a,dimensions:['query','query']}));assert.throws(()=>core.validateGsc({...a,country:'TH'}))
 })
+test('GSC Thai page filter is encoded once and stays exact with safe URL validation',()=>{
+ const raw='https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค'
+ const encoded=new URL(raw).href
+ const q={start_date:'2026-11-15',end_date:'2026-11-19',page:raw,dimensions:['date']}
+ const x=core.validateGsc(q,new Date('2026-11-23T16:00:00Z'))
+ const y=core.validateGsc({...q,page:encoded},new Date('2026-11-23T16:00:00Z'))
+ assert.notEqual(raw,encoded)
+ assert.equal(x.dimensionFilterGroups[0].filters[0].expression,encoded)
+ assert.equal(y.dimensionFilterGroups[0].filters[0].expression,encoded)
+ assert.equal(core.pageAllowed(raw,'https://amphon.co.th'),true)
+ for(const page of [
+   'https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค?secret=1',
+   'https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค#x',
+   'http://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค',
+   'https://user@amphon.co.th/x',
+ ])assert.throws(()=>core.validateGsc({...q,page},new Date('2026-11-23T16:00:00Z')),/Invalid page URL/)
+})
 test('page filters cannot request another site or leak query strings',()=>{
  assert.equal(core.pageAllowed('https://amphon.co.th/a','https://amphon.co.th'),true)
  for(const u of ['https://evil.test/a','https://amphon.co.th/a?phone=1','https://user@amphon.co.th/a','http://amphon.co.th/a'])assert.equal(core.pageAllowed(u,'https://amphon.co.th'),false)
