@@ -102,18 +102,18 @@ test('missing any production proof or mismatched repo blocks verification',()=>{
   assert.notEqual(assess([row()],project).level,'PRODUCTION_EVIDENCE_COMPLETE')
 })
 
-test('post-release calendar is Bangkok-local and never manufactures SEO uplift',()=>{
+test('post-release calendar uses Google Pacific timezone and never manufactures SEO uplift',()=>{
   const gate=assess([row()],PROJECT,now)
   const first=gate.measurement_windows[0]
   assert.equal(first.days,7)
-  assert.equal(first.baseline_start,'2026-11-08')
-  assert.equal(first.baseline_end,'2026-11-14')
-  assert.equal(first.after_start,'2026-11-16')
-  assert.equal(first.after_end,'2026-11-22')
-  assert.equal(first.eligible_after,'2026-11-25')
+  assert.equal(first.baseline_start,'2026-11-07')
+  assert.equal(first.baseline_end,'2026-11-13')
+  assert.equal(first.after_start,'2026-11-15')
+  assert.equal(first.after_end,'2026-11-21')
+  assert.equal(first.eligible_after,'2026-11-24')
   assert.equal(first.status,'WAITING_FINAL_GSC')
   assert.equal(first.uplift_measured,false)
-  const next=assess([row()],PROJECT,new Date('2026-11-26T12:00:00Z'))
+  const next=assess([row()],PROJECT,new Date('2026-11-28T12:00:00Z'))
   assert.equal(next.measurement_windows[0].status,'DATE_SCOPED_GSC_REQUIRED')
   assert.equal(next.measurement_windows[1].status,'WAITING_FINAL_GSC')
   assert.equal(next.measurement_windows[2].status,'WAITING_FINAL_GSC')
