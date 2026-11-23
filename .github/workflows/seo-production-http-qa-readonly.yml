@@ -1,0 +1,44 @@
+name: SEO P9 Production HTTP and TLS QA (manual, read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-p9-production-http-qa
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'noteroru2/amphon-product-hub-shop'
+    runs-on: ubuntu-latest
+    environment: seo-production-evidence-protected
+    steps:
+      - name: Fail closed unless owner enables protected read-only environment
+        env:
+          ACTIVATED: ${{ secrets.SEO_EVIDENCE_ENVIRONMENT_APPROVED }}
+        run: |
+          if [[ "$ACTIVATED" != "YES_OWNER_ENABLED" ]]; then
+            echo "Read-only protected environment is not owner-enabled"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test HTTP/TLS QA fail-closed contract (offline fixtures)
+        run: node --test tests/seo-production-http-qa.test.mjs
+      - name: Check exact HTTP statuses, Location, canonical, sitemap, LINE and TLS
+        run: |
+          node scripts/seo-production-http-qa.mjs > seo-production-http-qa.json
+          node -e 'const r=require("./seo-production-http-qa.json");if(r.production_verified!==false||r.can_write_ledger!==false||r.can_deploy!==false)throw Error("P9 no-write contract broken")'
+      - name: Save redacted public-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-p9-production-http-qa
+          path: seo-production-http-qa.json
+          if-no-files-found: warn
+          retention-days: 7
