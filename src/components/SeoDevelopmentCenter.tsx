@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardCopy, CheckCircle2, AlertTriangle, RefreshCw, ExternalLink, ShieldCheck } from 'lucide-react'
 import { gscAction } from '../lib/seoGsc'
+import { SeoSourceChangeQueue } from './SeoSourceChangeQueue'
 import {
   assessDevelopmentReadiness, buildDevelopmentMilestones,
   type DevelopmentPortfolio, type DevelopmentMilestoneState, type DevelopmentSiteStatus,
@@ -25,7 +26,7 @@ const readinessLabel: Record<DevelopmentSiteStatus, string> = {
 }
 const daysOptions: WindowDays[] = [7, 14, 28]
 
-export function SeoDevelopmentCenter({ refreshSignal = 0 }: { refreshSignal?: number }) {
+export function SeoDevelopmentCenter({ refreshSignal = 0, isOwner = false }: { refreshSignal?: number; isOwner?: boolean }) {
   const [siteId, setSiteId] = useState('amphon')
   const [days, setDays] = useState<WindowDays>(28)
   const [data, setData] = useState<PortfolioPayload | null>(null)
@@ -191,6 +192,7 @@ export function SeoDevelopmentCenter({ refreshSignal = 0 }: { refreshSignal?: nu
           </div>
         </>
       )}
+      <SeoSourceChangeQueue isOwner={isOwner} />
     </section>
   )
 }
