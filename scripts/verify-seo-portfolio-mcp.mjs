@@ -25,7 +25,7 @@ assert.match(handler, /code_write_and_deploy_not_authorized:true/)
 assert.match(handler, /keyword_ownership_requires_approved_status:true/)
 assert.match(handler, /require_verified_production_mapping_for_source_changes:true/)
 assert.match(handler, /commerce_seo_sites'\)\.select\('id,label,origin,gsc_property'\)/)
-const block = handler.split("if(name==='seo_portfolio')")[1].split("if(name==='seo_opportunities'")[0]
+const block = handler.split("if(name==='seo_portfolio')")[1].split("if(name==='seo_source_requests')")[0]
 assert.ok(!/\.insert\(|\.update\(|\.delete\(|db\.rpc\(/.test(block), 'tool must have no write or mutating RPC calls')
 assert.match(handler, /if\(!tool\.annotations\.readOnlyHint&&!authorization\.scopes/, 'existing OAuth write scope boundary must remain')
 console.log('SEO PORTFOLIO MCP PASS: bounded, read-only, source-aware, no deployment permissions')
