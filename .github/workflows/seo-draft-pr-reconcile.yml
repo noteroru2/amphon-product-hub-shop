@@ -1,0 +1,78 @@
+name: SEO Draft PR audit reconciliation (manual, no GitHub writes)
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Owner-approved Source Change Request UUID"
+        required: true
+        type: string
+      write_audit_receipt:
+        description: "Recover verified receipt in HUB (requires owner-protected review)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-owner-approved-draft-pr-${{ inputs.request_id }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: github.repository == 'noteroru2/amphon-product-hub-shop'
+    runs-on: ubuntu-latest
+    environment: seo-draft-pr-protected
+    steps:
+      - name: Require intentionally enabled owner-protected environment
+        env:
+          ENABLED: ${{ secrets.SEO_DRAFT_PR_ENVIRONMENT_APPROVED }}
+        run: |
+          if [[ "$ENABLED" != "YES_OWNER_ENABLED" ]]; then
+            echo "SEO Draft PR protected environment is not activated"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Resolve exact owner-approved repository
+        id: target
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/seo-draft-pr-target.mjs --request-id "$REQUEST_ID" --reconcile >> "$GITHUB_OUTPUT"
+      - name: Mint short-lived GitHub App READ-ONLY token scoped to one repo
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AMPHON_SEO_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AMPHON_SEO_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: ${{ steps.target.outputs.repository }}
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Dry-run independent PR/commit/path/content verification
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          npm run seo:draft-pr -- --request-id "$REQUEST_ID" --reconcile --dry-run
+      - name: Record independently verified original Draft PR receipt only
+        if: inputs.write_audit_receipt
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          npm run seo:draft-pr -- --request-id "$REQUEST_ID" --reconcile --execute --owner-authorized

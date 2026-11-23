@@ -118,3 +118,48 @@ test('Supabase receipt write includes only audited fields and requires one-row a
  assert.equal(payload.pr_url,record.pr_url)
  assert.equal(Object.keys(payload).length,11)
 })
+
+test('GitHub recovery adapter reads only commit files and Draft PR identity',async t=>{
+ const calls=[]
+ t.mock.method(globalThis,'fetch',async(url,options)=>{
+  calls.push({url:String(url),options})
+  const u=String(url)
+  if(u.includes('/commits/'+SHA+'?per_page=100')) return RESP({
+    sha:SHA,parents:[{sha:TREE}],files:[
+      {filename:'src/pages/notebook.astro',status:'modified'},
+    ],
+  })
+  if(u.includes('/pulls?'))return RESP([{
+    number:18,html_url:'https://github.com/noteroru2/amphon.co.th/pull/18',
+    state:'open',draft:true,merged_at:null,body:'Source Change Request: abc',
+    head:{ref:'seo/owner-reviewed-request',sha:SHA,repo:{full_name:REPO}},
+    base:{ref:'main',repo:{full_name:REPO}},
+  }])
+  throw Error('Unexpected recovery URL '+u)
+ })
+ const github=githubAdapter(TOKEN)
+ const commit=await github.getCommitReview(REPO,SHA)
+ assert.deepEqual(commit.parents,[{sha:TREE}])
+ assert.deepEqual(commit.changedFiles,[{
+   filename:'src/pages/notebook.astro',status:'modified',
+ }])
+ const pulls=await github.getPullsForHead(REPO,'seo/owner-reviewed-request','main')
+ assert.equal(pulls.length,1)
+ assert.equal(pulls[0].head.repo.full_name,REPO)
+ assert.equal(pulls[0].draft,true)
+ assert.equal(calls.length,2)
+ assert.ok(calls.every(x=>x.options.method==='GET'), 'reconciliation must issue GET requests only')
+ assert.ok(calls.every(x=>x.options.headers.Authorization==='Bearer '+TOKEN))
+ assert.match(calls[1].url,/state=all/)
+ assert.match(calls[1].url,/per_page=100/)
+ assert.match(calls[1].url,/head=noteroru2%3Aseo/)
+})
+test('GitHub recovery adapter fails closed on malformed commit and ambiguous PR list',async t=>{
+ t.mock.method(globalThis,'fetch',async(url)=>{
+  if(String(url).includes('/commits/'))return RESP({sha:SHA,parents:[],files:null})
+  return RESP(Array.from({length:100},(_,i)=>({number:i+1})))
+ })
+ const github=githubAdapter(TOKEN)
+ await assert.rejects(()=>github.getCommitReview(REPO,SHA),/INVALID_COMMIT_REVIEW/)
+ await assert.rejects(()=>github.getPullsForHead(REPO,'seo/test','main'),/AMBIGUOUS_DRAFT_PR_RESULTS/)
+})

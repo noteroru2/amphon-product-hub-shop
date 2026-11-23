@@ -153,7 +153,7 @@ test('duplicate receipt is idempotent: zero GitHub calls',async()=>{
   assert.deepEqual(h.calls,['snapshot'])
 })
 test('CLI explicitly requires owner-execute flag; defaults to dry-run',()=>{
-  assert.deepEqual(parseCli(['--request-id',UUID]),{requestId:UUID,dryRun:true,authorized:false})
+  assert.deepEqual(parseCli(['--request-id',UUID]),{requestId:UUID,dryRun:true,authorized:false,reconcile:false})
   assert.throws(()=>parseCli(['--request-id',UUID,'--execute']),/OWNER_EXECUTION_FLAG_REQUIRED/)
   assert.throws(()=>parseCli(['--request-id',UUID,'--deploy']),/INVALID_CLI_ARGUMENT/)
   const allow=parseCli(['--request-id',UUID,'--execute','--owner-authorized'])
