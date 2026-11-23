@@ -77,7 +77,7 @@ const make=(opts={},snapshot=fixture())=>{
        body:'Source Change Request: '+UUID+'\nBase Commit: '+SHA,
        head:{sha:opts.wrongHead?BLOB:COMMIT,ref:BRANCH,repo:{full_name:opts.otherRepo?'attacker/site':REPO}},
        base:{ref:'release/cloudflare-production',repo:{full_name:REPO}},
-     }],
+     }]
    },
    async createTree(){throw Error('GITHUB_MUTATION_FORBIDDEN')},
    async createCommit(){throw Error('GITHUB_MUTATION_FORBIDDEN')},
