@@ -6,6 +6,8 @@ CREATE SCHEMA IF NOT EXISTS auth;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE service_role NOLOGIN BYPASSRLS;
+-- Match real Supabase default grants in public.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 
 CREATE TABLE auth.users(id uuid PRIMARY KEY);
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
@@ -64,7 +66,9 @@ BEGIN
  OR has_table_privilege('authenticated','public.commerce_seo_source_change_requests','DELETE')
  OR has_table_privilege('service_role','public.commerce_seo_source_change_requests','UPDATE')
  OR has_table_privilege('service_role','public.commerce_seo_source_change_requests','DELETE')
+ OR has_table_privilege('service_role','public.commerce_seo_source_change_requests','DELETE')
  OR has_table_privilege('service_role','public.commerce_seo_source_change_pr_runs','UPDATE')
+ OR has_table_privilege('service_role','public.commerce_seo_source_change_pr_runs','DELETE')
  OR has_table_privilege('service_role','public.commerce_seo_source_change_pr_runs','DELETE')
  OR has_table_privilege('anon','public.commerce_seo_source_change_requests','SELECT')
  THEN RAISE EXCEPTION 'SQL privilege contract violated'; END IF;
