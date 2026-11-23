@@ -11,6 +11,9 @@ const PAGES=['/','/บริการ/รับซื้อโน๊ตบุ๊
 const LEGACY=['/บริการ/รับซื้อกล้องฟิลัม','/บริการ/รับซื้อกล้องฟีล์ม','/บริการ/รับซื้อกล้องฟิล์ล']
 const WWW='https://www.amphon.co.th/%E0%B8%97%E0%B8%94%E0%B8%AA%E0%B8%AD%E0%B8%9A?utm_source=readonly-preflight'
 const tidy=x=>{try{return decodeURI(new URL(x).href).replace(/\/$/,'')}catch{return null}}
+const destination=(location,source)=>{
+  try{return location?new URL(location,source).href:null}catch{return null}
+}
 const tag=(html,name,attribute,value)=>
   [...html.matchAll(new RegExp('<'+name+'\\b[^>]*>','gi'))].map(x=>x[0])
     .find(x=>new RegExp('\\b'+attribute+'=["\\x27]'+value+'["\\x27]','i').test(x))||''
@@ -37,8 +40,9 @@ async function get(url,fetcher){
     const r=await fetcher(url,{method:'GET',redirect:'manual',
       signal:AbortSignal.timeout(15000),headers:{Accept:'text/html,application/xml,text/plain,*/*'}})
     return {status:r.status,location:r.headers.get('location')||'',
-      body:r.status===200?await readBounded(r):''}
-  }catch{return {status:null,location:'',body:''}}
+      body:r.status===200?await readBounded(r):'',
+      x_robots:r.headers.get('x-robots-tag')||''}
+  }catch{return {status:null,location:'',body:'',x_robots:''}}
 }
 function pageValid(result,path){
   if(result.status!==200)return false
@@ -48,6 +52,7 @@ function pageValid(result,path){
   const description=attr(tag(html,'meta','name','description'),'content')
   return Boolean(tidy(canonical)===tidy(ORIGIN+path)
     && !/\bnoindex\b/i.test(robots)
+    && !/\bnoindex\b/i.test(result.x_robots||'')
     && /<title\b[^>]*>[^<]+<\/title>/i.test(html)
     && description && /line\.me\/ti\/p\/~@webuy/i.test(html))
 }
@@ -79,13 +84,13 @@ export async function runReadOnlyQa({fetcher=fetch,tlsChecker=checkTls,now=new D
       /09:00\s*[–-]\s*19:00/.test(r.body),r.status,false)
   }
   const www=await get(WWW,fetcher)
-  const redirect=www.location?new URL(www.location,WWW).href:null
+  const redirect=destination(www.location,WWW)
   const target=WWW.replace('https://www.','https://')
   add(report,'www exact 301 preserves encoded path and query',
     www.status===301&&tidy(redirect)===tidy(target),www.status)
   for(const path of LEGACY){
     const r=await get(ORIGIN+path,fetcher)
-    const dest=r.location?new URL(r.location,ORIGIN+path).href:null
+    const dest=destination(r.location,ORIGIN+path)
     add(report,'legacy redirect '+path,
       [301,308].includes(r.status)&&tidy(dest)===tidy(ORIGIN+'/บริการ/รับซื้อกล้องฟิล์ม'),r.status)
   }
