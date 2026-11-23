@@ -21,6 +21,8 @@ on:
       - 'scripts/seo-draft-pr-executor-core.mjs'
       - 'scripts/seo-draft-pr-executor-adapters.mjs'
       - 'scripts/seo-draft-pr-executor.mjs'
+      - 'scripts/seo-draft-pr-target.mjs'
+      - '.github/workflows/seo-draft-pr-execute.yml'
       - 'supabase/migrations/20261123103000_seo_source_change_pr_runs.sql'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
