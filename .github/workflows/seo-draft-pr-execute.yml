@@ -1,0 +1,74 @@
+name: SEO Owner-approved Draft PR (manual, never deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Owner-approved Source Change Request UUID from HUB"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-owner-approved-draft-pr-${{ inputs.request_id }}
+  cancel-in-progress: false
+
+jobs:
+  draft-pr:
+    if: github.repository == 'noteroru2/amphon-product-hub-shop'
+    runs-on: ubuntu-latest
+    # Set required reviewer(s) and SEO_DRAFT_PR_ENVIRONMENT_APPROVED secret in GitHub.
+    # This job fails closed if the environment is not deliberately configured.
+    environment: seo-draft-pr-protected
+    steps:
+      - name: Verify protected environment is explicitly activated
+        env:
+          ENABLED: ${{ secrets.SEO_DRAFT_PR_ENVIRONMENT_APPROVED }}
+        run: |
+          if [[ "$ENABLED" != "YES_OWNER_ENABLED" ]]; then
+            echo "SEO Draft PR protected environment is not activated"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Validate approved request and resolve its target repo
+        id: target
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/seo-draft-pr-target.mjs --request-id "$REQUEST_ID" >> "$GITHUB_OUTPUT"
+      - name: Create short-lived token scoped to one approved target repo
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AMPHON_SEO_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AMPHON_SEO_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: ${{ steps.target.outputs.repository }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Run exact GitHub SHA and owner approval dry-run
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          npm run seo:draft-pr -- --request-id "$REQUEST_ID" --dry-run
+      - name: Create Draft PR only and save audit receipt
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          npm run seo:draft-pr -- --request-id "$REQUEST_ID" --execute --owner-authorized
