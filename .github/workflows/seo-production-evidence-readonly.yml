@@ -1,0 +1,75 @@
+name: SEO Production Evidence Discovery (manual, read only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_id:
+        description: "Verified Cloudflare-backed site to inspect; no website changes"
+        required: true
+        type: choice
+        options:
+          - amphon
+          - amphontd
+          - notebook
+          - shop
+          - webuy
+          - werab
+          - winner
+      expected_sha:
+        description: "Optional FULL 40-character approved Git SHA; never use a short SHA"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-production-evidence-${{ inputs.site_id }}
+  cancel-in-progress: false
+
+jobs:
+  discovery:
+    if: github.repository == 'noteroru2/amphon-product-hub-shop'
+    runs-on: ubuntu-latest
+    environment: seo-production-evidence-protected
+    steps:
+      - name: Fail closed unless the owner intentionally enables this environment
+        env:
+          ACTIVATED: ${{ secrets.SEO_EVIDENCE_ENVIRONMENT_APPROVED }}
+        run: |
+          if [[ "$ACTIVATED" != "YES_OWNER_ENABLED" ]]; then
+            echo "Protected evidence-only environment is not activated"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run P8 read-only integrity/security tests
+        run: npm run verify:seo-production-evidence
+      - name: Collect GitHub + Cloudflare + public HTTP evidence
+        env:
+          SITE_ID: ${{ inputs.site_id }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
+          AMPHON_CLOUDFLARE_API_TOKEN: ${{ secrets.AMPHON_CLOUDFLARE_API_TOKEN }}
+          AMPHON_SEO_GITHUB_READ_TOKEN: ${{ secrets.AMPHON_SEO_GITHUB_READ_TOKEN }}
+        run: |
+          if [[ -n "$EXPECTED_SHA" ]]; then
+            node scripts/seo-production-evidence.mjs --site-id "$SITE_ID" --expected-sha "$EXPECTED_SHA" > seo-production-evidence.json
+          else
+            node scripts/seo-production-evidence.mjs --site-id "$SITE_ID" > seo-production-evidence.json
+          fi
+          node -e 'const f=require("./seo-production-evidence.json");if(f.production_verified!==false||f.can_deploy!==false||f.can_write_ledger!==false)throw Error("Evidence collector violated no-write contract");console.log("Evidence report generated; Production remains UNVERIFIED")'
+      - name: Preserve safe evidence packet for human source review
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-production-evidence-${{ inputs.site_id }}
+          path: seo-production-evidence.json
+          if-no-files-found: error
+          retention-days: 7
