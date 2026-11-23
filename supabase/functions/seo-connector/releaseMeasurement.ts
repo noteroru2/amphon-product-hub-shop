@@ -81,9 +81,9 @@ const validDate=(input:unknown):Date|null=>{
   const ms=Date.parse(input)
   return Number.isFinite(ms)?new Date(ms):null
 }
-const bangkokDate=(date:Date):string=>{
+const gscPacificDate=(date:Date):string=>{
   const parts=new Intl.DateTimeFormat('en-US',{
-    timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit',
+    timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',
   }).formatToParts(date)
   const values=Object.fromEntries(parts.map(part=>[part.type,part.value]))
   return `${values.year}-${values.month}-${values.day}`
@@ -154,14 +154,14 @@ function timeline(
         after_end:null,eligible_after:null,
         status:'PRODUCTION_NOT_VERIFIED' as const,uplift_measured:false as const}
     }
-    const day=bangkokDate(new Date(verified.event_at))
+    const day=gscPacificDate(new Date(verified.event_at))
     const baselineStart=shiftDay(day,-days)
     const baselineEnd=shiftDay(day,-1)
     const afterStart=shiftDay(day,1)
     const afterEnd=shiftDay(day,days)
-    // Conservative: wait three calendar days for Google finalized reporting.
+    // Use Google's Pacific calendar. Wait three calendar days for finalized reporting.
     const eligible=shiftDay(day,days+3)
-    const current=bangkokDate(now)
+    const current=gscPacificDate(now)
     const status:MeasurementStatus=scope.length===0?'URL_SCOPE_UNKNOWN':
       current<eligible?'WAITING_FINAL_GSC':'DATE_SCOPED_GSC_REQUIRED'
     return {
