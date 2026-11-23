@@ -148,7 +148,7 @@ test('GitHub recovery adapter reads only commit files and Draft PR identity',asy
  assert.equal(pulls[0].head.repo.full_name,REPO)
  assert.equal(pulls[0].draft,true)
  assert.equal(calls.length,2)
- assert.ok(calls.every(x=>x.options.method===undefined))
+ assert.ok(calls.every(x=>x.options.method==='GET'), 'reconciliation must issue GET requests only')
  assert.ok(calls.every(x=>x.options.headers.Authorization==='Bearer '+TOKEN))
  assert.match(calls[1].url,/state=all/)
  assert.match(calls[1].url,/per_page=100/)
