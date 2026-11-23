@@ -1,0 +1,50 @@
+/* Scoped styles: cannot affect inventory / sales screens. */
+.seo-dev-screen { display: grid; gap: 16px; padding: 16px 4px 24px; color: #17243a; }
+.seo-dev-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.seo-dev-heading h2, .seo-dev-heading h3 { margin: 0; font-size: 1.25rem; color: #14243b; font-weight: 800; }
+.seo-dev-heading p { color: #617080; font-size: .83rem; margin: 3px 0 0; line-height: 1.5; }
+.seo-dev-heading button, .seo-dev-tools button { min-height: 42px; border: 1px solid #cbd5e1; background: white; border-radius: 12px; padding: 8px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; color: #334155; }
+.seo-dev-tools button { background: #f97316; border-color: #ea580c; color: white; }
+.seo-dev-heading button:disabled, .seo-dev-tools button:disabled { opacity: .55; cursor: not-allowed; }
+.seo-dev-warning { display: flex; gap: 11px; align-items: flex-start; padding: 13px; border: 1px solid #cbd5e1; border-radius: 14px; background: #f8fafc; color: #334155; }
+.seo-dev-warning svg { flex-shrink: 0; color: #ea580c; }
+.seo-dev-warning strong { font-size: .89rem; }
+.seo-dev-warning p, .seo-dev-footnote { font-size: .78rem; color: #64748b; margin: 4px 0 0; line-height: 1.5; }
+.seo-dev-error { margin: 0; color: #991b1b; background: #fff1f2; padding: 10px; border-radius: 12px; }
+.seo-dev-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+.seo-dev-stats > div { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; display: grid; gap: 4px; }
+.seo-dev-stats small { color: #64748b; font-size: .73rem; }
+.seo-dev-stats strong { font-size: 1.7rem; font-weight: 800; color: #17243a; font-variant-numeric: tabular-nums; }
+.seo-dev-milestones { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.seo-dev-milestone { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 13px; min-width: 0; }
+.seo-dev-milestone-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seo-dev-milestone-head strong { font-size: .88rem; flex: 1 1 135px; }
+.seo-dev-number { font-size: .76rem; color: #64748b; font-variant-numeric: tabular-nums; }
+.seo-dev-status { display: inline-flex; gap: 4px; align-items: center; border-radius: 99px; background: #f1f5f9; padding: 4px 7px; color: #475569; font-size: .69rem; white-space: nowrap; }
+.seo-dev-milestone.status-complete .seo-dev-status { background: #e5f5e9; color: #136b40; }
+.seo-dev-milestone.status-partial .seo-dev-status { background: #ffedd5; color: #9a3412; }
+.seo-dev-milestone p { color: #64748b; font-size: .78rem; margin: 7px 0 0; line-height: 1.5; }
+.seo-dev-sites-title { margin-top: 8px; }
+.seo-dev-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; }
+.seo-dev-tools label { font-size: .8rem; color: #475569; display: grid; gap: 4px; }
+.seo-dev-tools select { min-height: 42px; min-width: 150px; max-width: 270px; border-radius: 10px; padding: 7px 9px; border: 1px solid #cbd5e1; background: white; color: #17243a; font-size: .86rem; }
+.seo-dev-selected { border-radius: 14px; border: 1px solid #e2e8f0; background: #fff; padding: 15px; display: grid; gap: 10px; }
+.seo-dev-selected-title { display: flex; align-items: center; gap: 9px; }
+.seo-dev-selected-title a { display: inline-flex; color: #ea580c; }
+.seo-dev-selected-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.seo-dev-selected-grid > div { display: grid; gap: 4px; background: #f8fafc; padding: 11px; border-radius: 11px; min-width: 0; }
+.seo-dev-selected-grid small { font-size: .72rem; color: #64748b; }
+.seo-dev-selected-grid strong { font-size: .8rem; word-break: break-word; }
+.seo-dev-next { color: #334155; font-size: .85rem; margin: 0; }
+.seo-dev-site-list { background: white; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.seo-dev-site-row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 13px; align-items: center; font-size: .84rem; border-bottom: 1px solid #f1f5f9; }
+.seo-dev-site-row:last-child { border-bottom: 0; }
+.seo-dev-site-state { color: #475569; font-size: .73rem; text-align: right; }
+@media(max-width: 680px) {
+  .seo-dev-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .seo-dev-milestones { grid-template-columns: minmax(0,1fr); }
+  .seo-dev-selected-grid { grid-template-columns: minmax(0,1fr); }
+  .seo-dev-tools select { width: 100%; max-width: none; }
+  .seo-dev-tools label { flex: 1 1 130px; }
+  .seo-dev-tools button { flex: 1 1 100%; }
+}
