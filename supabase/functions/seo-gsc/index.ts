@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0'
 import { READ_SCOPE, GscError, fetchJson, fetchSnapshot, fetchPortfolioPageQueries, mapProperties, type Site } from './core.ts'
 import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from '../seo-connector/releaseMeasurement.ts'
-import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc} from '../seo-connector/releaseComparison.ts'
+import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc,sameCanonicalGscPage} from '../seo-connector/releaseComparison.ts'
 
 const projectUrl=Deno.env.get('SUPABASE_URL')!
 const hub='https://hub.amphon.co.th'
@@ -129,7 +129,7 @@ async function releaseCompareData(body:Record<string,unknown>) {
     const {data:roles,error}=await db.from('commerce_seo_portfolio_keyword_roles')
       .select('keyword,target_page').eq('site_id',siteId)
       .eq('keyword',body.query as string).eq('approval_status','APPROVED').limit(30)
-    if(error||!roles?.some(r=>!r.target_page||r.target_page===plan.page))
+    if(error||!roles?.some(r=>!r.target_page||sameCanonicalGscPage(r.target_page,plan.page)))
       throw Error('RELEASE_COMPARE_KEYWORD_NOT_APPROVED')
   }
   const {data:context,error:contextError}=await db.rpc(
