@@ -40,15 +40,18 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
    setLoading(false)
    return
   }
-  void supabase.from('commerce_seo_source_change_requests')
-   .select('id,site_id,job_id,target_page,focus_query,target_repository,target_branch,expected_base_sha,requested_paths,change_kind,summary,rationale,proposed_change,status,created_at,reviewed_at,review_note')
-   .order('created_at',{ascending:false}).limit(50)
-   .then(({data,error:readError})=>{
+  void (async () => {
+   try {
+    const {data,error:readError}=await supabase.from('commerce_seo_source_change_requests')
+     .select('id,site_id,job_id,target_page,focus_query,target_repository,target_branch,expected_base_sha,requested_paths,change_kind,summary,rationale,proposed_change,status,created_at,reviewed_at,review_note')
+     .order('created_at',{ascending:false}).limit(50)
     if(!active)return
     if(readError) {setError('ยังอ่านคิว Source Change ไม่ได้: '+readError.message);setRows([])}
     else {setRows((data||[]) as SourceProposal[]);setError('')}
-   })
-   .finally(()=>{if(active)setLoading(false)})
+   } catch (err) {
+    if(active) setError(err instanceof Error ? err.message : 'อ่านคิวไม่สำเร็จ')
+   } finally {if(active)setLoading(false)}
+  })()
   return ()=>{active=false}
  },[refresh])
 
