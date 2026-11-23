@@ -10,9 +10,15 @@ export interface ReleaseProject {
   site_id: string
   mapping_status: string
   production_repo: string | null
+  production_branch?: string | null
 }
 export interface ReleaseProof {
   github_sha_verified: boolean
+  /** Verified GitHub source branch and exact Git object ancestry, not a tag in a deploy message. */
+  github_ref_verified: boolean
+  github_ref: string | null
+  /** Full provider Git SHA equality OR matching full GitHub/live asset SHA-256 digests. */
+  hosting_source_verified: boolean
   route_verified: boolean
   live_response_verified: boolean
   live_verified_at: string | null
@@ -105,6 +111,26 @@ export function sanitizeRelease(
 ):ReleaseEntry {
   const evidence=(row.evidence && typeof row.evidence==='object' &&
     !Array.isArray(row.evidence))?row.evidence as Record<string,unknown>:{}
+  const sourceRef=typeof evidence.github_ref==='string' &&
+    /^[A-Za-z0-9._/-]{1,120}$/.test(evidence.github_ref)
+    ?evidence.github_ref:null
+  // Cloudflare/hosting annotations containing an 8-character commit prefix
+  // NEVER prove the exact GitHub commit. Require a full 40-char SHA, or
+  // independent 64-character checksums of the built and LIVE assets.
+  const hostingSha=typeof evidence.hosting_commit_sha==='string'&&
+    SHA.test(evidence.hosting_commit_sha)?evidence.hosting_commit_sha.toLowerCase():null
+  const digest=/^[a-f0-9]{64}$/i
+  const built=typeof evidence.github_artifact_sha256==='string' &&
+    digest.test(evidence.github_artifact_sha256)?
+    evidence.github_artifact_sha256.toLowerCase():null
+  const live=typeof evidence.live_artifact_sha256==='string' &&
+    digest.test(evidence.live_artifact_sha256)?
+    evidence.live_artifact_sha256.toLowerCase():null
+  const providerSourceMatch=Boolean(
+    evidence.hosting_commit_verified===true&&hostingSha&&
+    SHA.test(row.commit_sha||'')&&hostingSha===row.commit_sha.toLowerCase())
+  const assetSourceMatch=Boolean(
+    evidence.artifact_checksum_verified===true&&built&&live&&built===live)
   const liveAt=validDate(evidence.live_verified_at)
   const urls=(Array.isArray(row.affected_urls)?row.affected_urls:[])
     .filter((url):url is string=>typeof url==='string'&&
@@ -117,6 +143,9 @@ export function sanitizeRelease(
     external_event_id:row.external_event_id ?? null,
     release_proof:{
       github_sha_verified:evidence.github_sha_verified===true,
+      github_ref_verified:evidence.github_ref_verified===true,
+      github_ref:sourceRef,
+      hosting_source_verified:providerSourceMatch||assetSourceMatch,
       route_verified:evidence.apex_route_verified===true ||
         evidence.domain_worker_mapping_verified===true,
       live_response_verified:evidence.live_response_verified===true,
@@ -131,13 +160,16 @@ function hasVerifiedEvidence(
   event:ReleaseEntry,project:ReleaseProject|undefined,now:Date,
 ):boolean {
   if(!project||project.mapping_status!=='VERIFIED'||
-    !project.production_repo||project.production_repo!==event.repository)return false
+    !project.production_repo||project.production_repo!==event.repository||
+    !project.production_branch)return false
   if(event.event_kind!=='PRODUCTION_VERIFIED'||
      event.environment!=='PRODUCTION'||event.qa_status!=='PASS'||
      !SHA.test(event.commit_sha||'')||!validDate(event.event_at))return false
   const p=event.release_proof
-  if(!p||!p.github_sha_verified||!p.route_verified||
-    !p.live_response_verified||!p.deployment_id_present)return false
+  if(!p||!p.github_sha_verified||!p.github_ref_verified||
+    p.github_ref!==project.production_branch||!p.hosting_source_verified||
+    !p.route_verified||!p.live_response_verified||
+    !p.deployment_id_present)return false
   const liveAt=validDate(p.live_verified_at)
   const released=validDate(event.event_at)
   if(!liveAt||!released)return false
@@ -199,7 +231,8 @@ export function assessReleasePortfolio(
     if(claims.length)level='LEDGER_CLAIM_INCOMPLETE'
     if(verified)level='PRODUCTION_EVIDENCE_COMPLETE'
     const missing:string[]=[]
-    if(!project||project.mapping_status!=='VERIFIED')missing.push('VERIFY_REPO_AND_HOSTING_MAPPING')
+    if(!project||project.mapping_status!=='VERIFIED'||!project.production_branch)
+      missing.push('VERIFY_REPO_AND_HOSTING_MAPPING')
     if(deploys.length===0 && !verified)missing.push('PROVIDER_PRODUCTION_DEPLOY_RECEIPT')
     if(!verified){
       const candidate=claims[0]??deploys[0]??latest
@@ -208,6 +241,12 @@ export function assessReleasePortfolio(
       if(candidate?.qa_status!=='PASS')missing.push('POST_DEPLOY_QA_PASS')
       if(!candidate?.release_proof?.github_sha_verified)
         missing.push('GITHUB_SHA_HOSTING_CORRELATION')
+      if(!candidate?.release_proof?.github_ref_verified ||
+         !project?.production_branch ||
+         candidate.release_proof.github_ref!==project.production_branch)
+        missing.push('GITHUB_PRODUCTION_BRANCH_PROOF')
+      if(!candidate?.release_proof?.hosting_source_verified)
+        missing.push('HOSTING_EXACT_SOURCE_PROOF')
       if(!candidate?.release_proof?.route_verified)
         missing.push('APEX_DOMAIN_HOSTING_ROUTE_PROOF')
       if(!candidate?.release_proof?.live_response_verified||
