@@ -227,7 +227,8 @@ export function assessReleasePortfolio(
       latest_sha:latest&&SHA.test(latest.commit_sha||'')?latest.commit_sha:null,
       provider_deploy_count:deploys.length,
       commit_event_count:commits.length,
-      confirmed_production_count:relevant.filter(row=>hasVerifiedEvidence(row,project,now)).length,
+      confirmed_production_count:relevant.filter(row=>hasVerifiedEvidence(row,project,now) &&
+        (validDate(row.event_at)?.getTime()??0)>=newestDeployAt).length,
       missing_evidence:missing,
       verified_release_at:verified?.event_at??null,
       confirmed_affected_urls:affected,
