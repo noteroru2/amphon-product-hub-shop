@@ -39,6 +39,9 @@ grant select on public.commerce_seo_source_change_requests to authenticated;
 -- Service-role OAuth connector may create and read an immutable proposal only.
 -- UPDATE/DELETE of source intent is never granted: owner review uses the
 -- audited SECURITY DEFINER transition function below.
+-- Supabase default ACL grants service_role ALL on new public tables.
+-- Revoke its inherited default ACL explicitly before reducing to READ + INSERT.
+revoke all on public.commerce_seo_source_change_requests from service_role;
 grant select, insert on public.commerce_seo_source_change_requests to service_role;
 
 drop policy if exists seo_source_change_owner_admin_read on public.commerce_seo_source_change_requests;
