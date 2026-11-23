@@ -203,7 +203,7 @@ export function SeoControlTower({
       </header>
 
       <nav className="seo-network-tabs seo-network-main-tabs" aria-label="SEO Control Tower">
-        <button aria-pressed={tab === 'portfolio'} onClick={() => setTab('portfolio')}>Portfolio · 14 เว็บไซต์</button>
+        <button aria-pressed={tab === 'portfolio'} onClick={() => setTab('portfolio')}>Portfolio · เว็บไซต์ในเครือ</button>
         <button aria-pressed={tab === 'network'} onClick={() => setTab('network')}>Network Health</button>
         <button aria-pressed={tab === 'experiments'} onClick={() => setTab('experiments')}>ผลหลังปรับปรุง · Experiments</button>
       </nav>
