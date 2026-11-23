@@ -80,7 +80,17 @@ test('production verified requires explicit event, environment, passed QA and 40
   data.releases[0].qa_status = 'UNKNOWN'
   assert.equal(assess(data).productionVerified, false)
   data.releases[0].qa_status = 'PASS'
+  // A bare PRODUCTION_VERIFIED label with PASS + SHA is still uncorroborated.
+  assert.equal(assess(data).productionVerified, false)
+  data.releases[0].repository = 'noteroru2/amphon.co.th'
+  data.releases[0].release_proof = {
+    github_sha_verified: true, route_verified: true,
+    live_response_verified: true, deployment_id_present: true,
+    live_verified_at: '2026-11-20T00:15:00Z',
+  }
   assert.equal(assess(data).productionVerified, true)
+  data.releases[0].release_proof.live_response_verified = false
+  assert.equal(assess(data).productionVerified, false)
   assert.equal(assess(data).automaticDeployAuthorized, false)
 })
 

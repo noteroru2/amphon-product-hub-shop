@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { ClipboardCopy, CheckCircle2, AlertTriangle, RefreshCw, ExternalLink, ShieldCheck } from 'lucide-react'
 import { gscAction } from '../lib/seoGsc'
 import { SeoSourceChangeQueue } from './SeoSourceChangeQueue'
+import { SeoReleaseVerificationPanel } from './SeoReleaseVerificationPanel'
+import type { SiteReleaseGate } from '../../supabase/functions/seo-connector/releaseMeasurement'
 import {
   assessDevelopmentReadiness, buildDevelopmentMilestones,
   type DevelopmentPortfolio, type DevelopmentMilestoneState, type DevelopmentSiteStatus,
@@ -10,6 +12,7 @@ import '../styles/seoDevelopmentCenter.css'
 
 type WindowDays = 7 | 14 | 28
 interface PortfolioPayload extends DevelopmentPortfolio {
+  release_gates?: SiteReleaseGate[]
   queries: Array<{ site_id: string; window_days: number; query: string; page: string; clicks: number; impressions: number; position: number | null; source: string; end_date: string }>
 }
 const milestoneState: Record<DevelopmentMilestoneState, string> = {
@@ -190,6 +193,12 @@ export function SeoDevelopmentCenter({ refreshSignal = 0, isOwner = false }: { r
               </div>
             ))}
           </div>
+          <SeoReleaseVerificationPanel
+            siteId={siteId}
+            gates={data.release_gates}
+            lastUpdated={data.windows.filter(row=>row.site_id===siteId&&row.window_days===days)
+              .sort((a,b)=>b.end_date.localeCompare(a.end_date))[0]?.end_date}
+          />
         </>
       )}
       <SeoSourceChangeQueue isOwner={isOwner} />

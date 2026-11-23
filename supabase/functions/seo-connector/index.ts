@@ -2,6 +2,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2.116.0'
 import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,validateGsc,scopeGsc,TOOLS} from './core.ts'
 import {assessDevelopmentReadiness,buildDevelopmentMilestones} from './developmentStatus.ts'
 import {validateSourceProposalInput,assertSourceProposalEvidence} from './sourceChangeGuard.ts'
+import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from './releaseMeasurement.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -88,15 +89,19 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_windows_v','site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance').eq('window_days',days).limit(100)),
    checked(scoped('commerce_seo_portfolio_keyword_roles','site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300)),
-   checked(scoped('commerce_seo_portfolio_release_events','id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(100)),
+   checked(scoped('commerce_seo_portfolio_release_events','id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(200)),
    checked(scoped('commerce_seo_portfolio_funnel_v','site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_ingest_runs','site_id,window_days,end_date,rows_written,data_complete,status,error_class').in('window_days',[7,14]).order('end_date',{ascending:false}).limit(150)),
   ])
+  const siteMap=new Map(sites.map((row:any)=>[row.id,row]))
+  const safeReleases=releases.map((row:RawReleaseEntry)=>
+    sanitizeRelease(row,siteMap.get(row.site_id) as any))
+  const releaseGates=assessReleasePortfolio(sites,projects,safeReleases)
   const readiness=assessDevelopmentReadiness(
-   {sites,projects,roles,windows,ingests,releases},days as 7|14|28,new Date()
+   {sites,projects,roles,windows,ingests,releases:safeReleases},days as 7|14|28,new Date()
   )
   const milestones=buildDevelopmentMilestones(
-   {sites,projects,roles,windows,ingests,releases},readiness,true
+   {sites,projects,roles,windows,ingests,releases:safeReleases},readiness,true
   )
   return {
    schema:'amphon.seo.portfolio.v1',
@@ -104,7 +109,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    selected_window_days:days,
    selected_site_id:siteId,
    sources:{sites:'HUB_ENABLED_SITE_REGISTRY',gsc:'HUB_FINAL_GSC_WAREHOUSE',repositories:'HUB_PORTFOLIO_PROJECTS',releases:'HUB_RELEASE_LEDGER',conversions:'HUB_AGGREGATED_ATTRIBUTION'},
-   sites,projects,windows,keyword_roles:roles,releases,conversions:funnel,ingest_runs:ingests,
+   sites,projects,windows,keyword_roles:roles,releases:safeReleases,release_gates:releaseGates,conversions:funnel,ingest_runs:ingests,
    site_readiness:readiness,
    project_milestones:milestones,
    project_completion:{

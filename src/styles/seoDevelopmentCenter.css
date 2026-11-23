@@ -79,3 +79,14 @@
 .seo-dev-pr-receipt {display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:9px 12px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;color:#166534;font-size:.8rem}
 .seo-dev-pr-receipt a{display:inline-flex;gap:4px;align-items:center;font-weight:700;color:#166534;text-decoration:underline}
 .seo-dev-pr-receipt small{color:#475569;font-size:.73rem}
+
+/* P5 release evidence and post-release GSC planning */
+.seo-release-panel { display:grid; gap:12px; padding-top:17px; border-top:1px solid #e2e8f0; min-width:0; }
+.seo-dev-release-state {margin-left:auto;font-size:.78rem; color:#475569; border:1px solid #cbd5e1; padding:5px 10px; border-radius:999px;}
+.seo-dev-release-subtitle {color:#334155;font-size:.86rem;margin-top:5px;}
+.seo-dev-proof-list {color:#475569;font-size:.8rem;line-height:1.6;margin:0;padding-left:20px;}
+.seo-dev-measure-table-wrap {width:100%;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;}
+.seo-dev-measure-table {border-collapse:collapse;width:100%;min-width:610px;background:#fff;font-size:.78rem;}
+.seo-dev-measure-table th,.seo-dev-measure-table td {text-align:left;vertical-align:top;padding:11px 12px;border-bottom:1px solid #e2e8f0;color:#334155;}
+.seo-dev-measure-table th {font-weight:700;background:#f8fafc;}
+.seo-dev-measure-table tr:last-child td,.seo-dev-measure-table tr:last-child th {border-bottom:0;}

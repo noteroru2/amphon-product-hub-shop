@@ -44,6 +44,14 @@ export interface DevelopmentRelease {
   qa_status: string
   event_at: string
   commit_sha: string
+  repository?: string
+  release_proof?: {
+    github_sha_verified: boolean
+    route_verified: boolean
+    live_response_verified: boolean
+    live_verified_at: string | null
+    deployment_id_present: boolean
+  }
 }
 export interface DevelopmentPortfolio {
   sites: DevelopmentSite[]
@@ -95,12 +103,26 @@ const freshEnough = (value: string | undefined | null, asOf: Date, maxDays: numb
   const age = (asOf.getTime() - timestamp) / 86_400_000
   return Number.isFinite(age) && age >= -1 && age <= maxDays
 }
-const productionVerified = (records: DevelopmentRelease[], siteId: string): boolean =>
-  records.some((row) => row.site_id === siteId &&
-    row.event_kind === 'PRODUCTION_VERIFIED' &&
-    row.environment.toUpperCase() === 'PRODUCTION' &&
-    row.qa_status.toUpperCase() === 'PASS' &&
-    /^[a-f0-9]{40}$/i.test(row.commit_sha))
+// Same fail-closed live-origin/hosting SHA conditions as releaseMeasurement.
+// An uncorroborated PRODUCTION_VERIFIED ledger label must never make this
+// project milestone appear "COMPLETE" on its own.
+const productionVerified = (
+  records: DevelopmentRelease[], siteId: string,
+  project: DevelopmentProject | undefined, now: Date,
+): boolean => Boolean(project?.mapping_status === 'VERIFIED' &&
+  project.production_repo && records.some(row => {
+    const p = row.release_proof
+    const deployedAt=Date.parse(row.event_at),checkedAt=Date.parse(p?.live_verified_at||'')
+    return row.site_id===siteId &&
+      row.repository===project.production_repo &&
+      row.event_kind==='PRODUCTION_VERIFIED' &&
+      row.environment==='PRODUCTION' && row.qa_status==='PASS' &&
+      /^[a-f0-9]{40}$/i.test(row.commit_sha) &&
+      p?.github_sha_verified===true && p?.route_verified===true &&
+      p?.live_response_verified===true && p?.deployment_id_present===true &&
+      Number.isFinite(deployedAt) && Number.isFinite(checkedAt) &&
+      checkedAt>=deployedAt && checkedAt<=now.getTime()
+  }))
 
 /**
  * A repo and final GSC observation allow starting an evidence review, NOT a patch.
@@ -162,7 +184,7 @@ export function assessDevelopmentReadiness(
       nextAction,
       sourcePatchAuthorized: false,
       automaticDeployAuthorized: false,
-      productionVerified: productionVerified(data.releases, site.id),
+      productionVerified: productionVerified(data.releases, site.id, project, asOf),
     }
   })
 }
