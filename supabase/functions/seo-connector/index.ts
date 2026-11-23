@@ -1,5 +1,6 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.116.0'
 import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,validateGsc,scopeGsc,TOOLS} from './core.ts'
+import {assessDevelopmentReadiness,buildDevelopmentMilestones} from './developmentStatus.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -14,6 +15,69 @@ async function readBody(req:Request) {if(Number(req.headers.get('content-length'
 function pagination(a:any) {const offset=a.offset??0,limit=a.limit??100;if(!Number.isInteger(offset)||offset<0||offset>100000||!Number.isInteger(limit)||limit<1||limit>500)throw new Error('Invalid pagination');return {offset,limit}}
 async function execute(name:string,a:Record<string,any>,actor:string) {
  if(name==='seo_sites')return {sites:await checked(db.from('commerce_seo_network_overview_v').select('*').eq('enabled',true).order('id')),notice:'GSC query samples may be truncated. Use seo_gsc_query dimensions [] for comparable property totals.'}
+ // Read-only management context. All rows are from the Hub's existing portfolio
+ // schema; no external Google query or GitHub mutation is performed here.
+ if(name==='seo_portfolio') {
+  const days=a.window_days===undefined?28:a.window_days
+  if(![7,14,28].includes(days))throw new Error('window_days must be 7, 14 or 28')
+  const siteId=a.site_id===undefined?null:a.site_id
+  if(siteId!==null&&(typeof siteId!=='string'||!/^[a-z0-9_-]{2,24}$/.test(siteId)))
+   throw new Error('Invalid site_id')
+  const allSites=await checked(db.from('commerce_seo_sites').select('id,label,origin,gsc_property').eq('enabled',true).order('id'))
+  const sites=siteId?allSites.filter((site:any)=>site.id===siteId):allSites
+  if(siteId&&!sites.length)throw new Error('Site disabled or not found')
+  const allowed=new Set(sites.map((site:any)=>site.id))
+  const scoped=(table:string,columns:string)=> {
+   const query=db.from(table).select(columns)
+   return siteId?query.eq('site_id',siteId):query.in('site_id',Array.from(allowed))
+  }
+  const [projects,windows,roles,releases,funnel,ingests]=await Promise.all([
+   checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
+   checked(scoped('commerce_seo_portfolio_gsc_windows_v','site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance').eq('window_days',days).limit(100)),
+   checked(scoped('commerce_seo_portfolio_keyword_roles','site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300)),
+   checked(scoped('commerce_seo_portfolio_release_events','id,site_id,repository,commit_sha,environment,event_kind,provider,event_at,qa_status').order('event_at',{ascending:false}).limit(100)),
+   checked(scoped('commerce_seo_portfolio_funnel_v','site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit').limit(100)),
+   checked(scoped('commerce_seo_portfolio_gsc_ingest_runs','site_id,window_days,end_date,rows_written,data_complete,status,error_class').in('window_days',[7,14]).order('end_date',{ascending:false}).limit(150)),
+  ])
+  const readiness=assessDevelopmentReadiness(
+   {sites,projects,roles,windows,ingests,releases},days as 7|14|28,new Date()
+  )
+  const milestones=buildDevelopmentMilestones(
+   {sites,projects,roles,windows,ingests,releases},readiness,true
+  )
+  return {
+   schema:'amphon.seo.portfolio.v1',
+   assembled_at:new Date().toISOString(),
+   selected_window_days:days,
+   selected_site_id:siteId,
+   sources:{sites:'HUB_ENABLED_SITE_REGISTRY',gsc:'HUB_FINAL_GSC_WAREHOUSE',repositories:'HUB_PORTFOLIO_PROJECTS',releases:'HUB_RELEASE_LEDGER',conversions:'HUB_AGGREGATED_ATTRIBUTION'},
+   sites,projects,windows,keyword_roles:roles,releases,conversions:funnel,ingest_runs:ingests,
+   site_readiness:readiness,
+   project_milestones:milestones,
+   project_completion:{
+    total:milestones.length,
+    complete:milestones.filter(m=>m.state==='COMPLETE').length,
+    partial:milestones.filter(m=>m.state==='PARTIAL').length,
+    pending_release:milestones.filter(m=>m.state==='PENDING_RELEASE').length,
+    planned:milestones.filter(m=>m.state==='PLANNED').length,
+    source_review_ready_sites:readiness.filter(s=>s.readyForPageEvidence).length,
+    source_patch_authorized_sites:0,
+    automatic_deploy_authorized_sites:0,
+   },
+   evidence_rules:{
+    gsc_position_is_average_not_live_rank:true,
+    require_verified_production_mapping_for_source_changes:true,
+    keyword_ownership_requires_approved_status:true,
+    commit_observed_is_not_production_deploy:true,
+    check_window_dates_and_ingest_completeness:true,
+    shop_requires_page_scope_when_comparing_gsc:true,
+    portfolio_tool_read_only:true,
+    code_write_and_deploy_not_authorized:true,
+   },
+   notice:'This is a bounded snapshot of recorded Hub facts, not real-time SERP. Missing rows do not prove zero traffic, no rank, or no conversions. Data is for evidence-backed planning, not autonomous publication.'
+  }
+ }
+
  if(name==='seo_opportunities'||name==='seo_jobs') {
   const {offset,limit}=pagination(a);let q=db.from(name==='seo_jobs'?'commerce_seo_content_jobs':'commerce_seo_growth_opportunities').select('*').order('id')
   if(name==='seo_opportunities')q=q.eq('status','OPEN').gte('source_at',new Date(Date.now()-4*86400000).toISOString())

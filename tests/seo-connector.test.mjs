@@ -5,6 +5,7 @@ import ts from 'typescript'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
 const data=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 const coreCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/core.ts',import.meta.url),'utf8'))
+const readinessCode=compile(readFileSync(new URL('../supabase/functions/seo-connector/developmentStatus.ts',import.meta.url),'utf8'))
 const core=await import(data(coreCode))
 test('OAuth redirect allowlist rejects lookalikes, credentials, fragments and unrelated hosts',()=>{
  for(const u of ['https://chatgpt.com/connector_platform/oauth_redirect','https://chat.openai.com/aip/plugin/oauth/callback'])assert.equal(core.redirectAllowed(u),true)
@@ -55,13 +56,21 @@ test('MCP transport enforces auth and scopes and refuses undeclared write argume
  let calls=[];const mock={rpc:async(name,args)=>{calls.push({name,args});return {data:args.p_action==='auth'?{actor:'owner-fixture',scopes:'seo:read'}:null,error:null}}}
  globalThis.__seoConnectorMock=mock
  const mockCode=data('export const createClient=()=>globalThis.__seoConnectorMock')
- const code=compile(readFileSync(new URL('../supabase/functions/seo-connector/index.ts',import.meta.url),'utf8')).replace(/from ['"]npm:@supabase\/supabase-js@2\.116\.0['"]/g,`from '${mockCode}'`).replace(/from ['"]\.\/core\.ts['"]/g,`from '${data(coreCode)}'`)
+ const code=compile(readFileSync(new URL('../supabase/functions/seo-connector/index.ts',import.meta.url),'utf8')).replace(/from ['"]npm:@supabase\/supabase-js@2\.116\.0['"]/g,`from '${mockCode}'`).replace(/from ['"]\.\/core\.ts['"]/g,`from '${data(coreCode)}'`).replace(/from ['"]\.\/developmentStatus\.ts['"]/g,`from '${data(readinessCode)}'`)
  await import(data(code))
  const call=async(body,token)=>handler(new Request('https://example/seo-connector/mcp',{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}))
  const anon=await call({jsonrpc:'2.0',id:1,method:'tools/list'});assert.equal(anon.status,401);assert.match(anon.headers.get('www-authenticate'),/oauth-protected-resource/)
  const token='a'.repeat(43),init=await call({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}},token);assert.equal((await init.json()).result.serverInfo.name,'AMPHON SEO Connector')
  const denied=await call({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'seo_prepare_draft',arguments:{opportunity_id:1}}},token);assert.equal((await denied.json()).result.isError,true);assert.equal(calls.some(x=>x.args.p_action==='prepare'),false)
- const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token);assert.equal((await list.json()).result.tools.length,8)
+ const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token)
+ const tools=(await list.json()).result.tools
+ assert.deepEqual(tools.map(tool=>tool.name).sort(),[
+  'seo_sites','seo_portfolio','seo_gsc_query','seo_url_inspection',
+  'seo_opportunities','seo_jobs','seo_job_evidence','seo_prepare_draft','seo_save_draft',
+ ].sort())
+ const portfolio=tools.find(tool=>tool.name==='seo_portfolio')
+ assert.equal(portfolio.annotations.readOnlyHint,true)
+ assert.deepEqual(portfolio.securitySchemes[0].scopes,['seo:read'])
  const extra=await call({jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'seo_sites',arguments:{table:'profiles'}}},token);assert.equal((await extra.json()).result.isError,true)
  const origin=await handler(new Request('https://example/seo-connector/resource-metadata',{headers:{origin:'https://evil.test'}}));assert.equal(origin.status,403)
  delete globalThis.Deno;delete globalThis.__seoConnectorMock
