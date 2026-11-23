@@ -61,7 +61,15 @@ test('MCP transport enforces auth and scopes and refuses undeclared write argume
  const anon=await call({jsonrpc:'2.0',id:1,method:'tools/list'});assert.equal(anon.status,401);assert.match(anon.headers.get('www-authenticate'),/oauth-protected-resource/)
  const token='a'.repeat(43),init=await call({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}},token);assert.equal((await init.json()).result.serverInfo.name,'AMPHON SEO Connector')
  const denied=await call({jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'seo_prepare_draft',arguments:{opportunity_id:1}}},token);assert.equal((await denied.json()).result.isError,true);assert.equal(calls.some(x=>x.args.p_action==='prepare'),false)
- const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token);assert.equal((await list.json()).result.tools.length,8)
+ const list=await call({jsonrpc:'2.0',id:3,method:'tools/list'},token)
+ const tools=(await list.json()).result.tools
+ assert.deepEqual(tools.map(tool=>tool.name).sort(),[
+  'seo_sites','seo_portfolio','seo_gsc_query','seo_url_inspection',
+  'seo_opportunities','seo_jobs','seo_job_evidence','seo_prepare_draft','seo_save_draft',
+ ].sort())
+ const portfolio=tools.find(tool=>tool.name==='seo_portfolio')
+ assert.equal(portfolio.annotations.readOnlyHint,true)
+ assert.deepEqual(portfolio.securitySchemes[0].scopes,['seo:read'])
  const extra=await call({jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'seo_sites',arguments:{table:'profiles'}}},token);assert.equal((await extra.json()).result.isError,true)
  const origin=await handler(new Request('https://example/seo-connector/resource-metadata',{headers:{origin:'https://evil.test'}}));assert.equal(origin.status,403)
  delete globalThis.Deno;delete globalThis.__seoConnectorMock
