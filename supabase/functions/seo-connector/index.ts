@@ -3,7 +3,7 @@ import {HUB,ISSUER,RESOURCE,SCOPES,random,hash,redirectAllowed,pageAllowed,valid
 import {assessDevelopmentReadiness,buildDevelopmentMilestones} from './developmentStatus.ts'
 import {validateSourceProposalInput,assertSourceProposalEvidence} from './sourceChangeGuard.ts'
 import {sanitizeRelease,assessReleasePortfolio,type RawReleaseEntry} from './releaseMeasurement.ts'
-import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc} from './releaseComparison.ts'
+import {buildGscReleaseComparison,parseGscAggregate,compareVisibleGsc,sameCanonicalGscPage} from './releaseComparison.ts'
 const url=Deno.env.get('SUPABASE_URL')!
 let key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 try {key=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}').default||key} catch {}
@@ -206,7 +206,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    const keywords=await checked(db.from('commerce_seo_portfolio_keyword_roles')
     .select('site_id,keyword,target_page').eq('site_id',a.site_id)
     .eq('keyword',a.query).eq('approval_status','APPROVED').limit(30))
-   if(!keywords.some((row:any)=>!row.target_page||row.target_page===a.page))
+   if(!keywords.some((row:any)=>!row.target_page||sameCanonicalGscPage(row.target_page,plan.page)))
     throw Error('Requested query is not approved for this release page')
   }
   // Reuse the connector's existing read-only Google OAuth context.
