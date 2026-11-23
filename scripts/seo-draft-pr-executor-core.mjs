@@ -32,7 +32,8 @@ export function validateApprovedPatch(request) {
     fail('STRUCTURED_PATCH_REQUIRED')
   const paths = request.requested_paths
   if (!Array.isArray(paths) || paths.length !== spec.edits.length ||
-      new Set(paths).size !== paths.length) fail('PATH_SET_MISMATCH')
+      new Set(paths).size !== paths.length ||
+      !paths.every((path,index)=>spec.edits[index]?.path===path)) fail('PATH_SET_MISMATCH')
   const edits = spec.edits.map(edit => {
     if (!edit || typeof edit !== 'object' || Array.isArray(edit) ||
         Object.keys(edit).sort().join(',') !== 'expected_blob_sha,find,path,replace')
@@ -57,6 +58,7 @@ export function verifyApprovedSourceSnapshot(data, now = new Date()) {
   if (!site?.enabled || r.site_id !== site.id || project?.site_id !== site.id ||
       project.mapping_status !== 'VERIFIED' || project.production_repo !== r.target_repository ||
       project.production_branch !== r.target_branch || !REPO.test(r.target_repository ?? '') ||
+      r.target_repository.split('/').some(part=>part==='.'||part==='..') ||
       !/^[a-zA-Z0-9._/-]{1,120}$/.test(r.target_branch ?? ''))
     fail('VERIFIED_REPO_MAPPING_REQUIRED')
   if (!SHA.test(r.expected_base_sha ?? '')) fail('INVALID_BASE_SHA')
@@ -180,7 +182,8 @@ export async function executeApprovedDraftPr(requestId, { store, github, dryRun=
     head:branch,base:r.target_branch,draft:true,
     body:draftPrBody(snapshot,validated.edits),
   })
-  if (!pr?.draft || !Number.isInteger(pr.number) || !pr.url?.startsWith('https://github.com/'))
+  if (!pr?.draft || !Number.isInteger(pr.number) ||
+      pr.url!==('https://github.com/'+r.target_repository+'/pull/'+pr.number))
     fail('DRAFT_PR_RECEIPT_INVALID_RECONCILE')
   // A database write failure after GitHub succeeds needs reconciliation: branch
   // existence prevents a second auto-create on retry.
