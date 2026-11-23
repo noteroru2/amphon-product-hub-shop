@@ -48,3 +48,28 @@
   .seo-dev-tools label { flex: 1 1 130px; }
   .seo-dev-tools button { flex: 1 1 100%; }
 }
+
+.seo-dev-requests { display: grid; gap: 12px; padding-top: 13px; border-top: 1px solid #e2e8f0; }
+.seo-dev-request-list { display: grid; gap: 10px; }
+.seo-dev-request { display: grid; gap: 9px; padding: 15px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; min-width: 0; }
+.seo-dev-request-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: start; }
+.seo-dev-request-head > div { display: grid; gap: 3px; }
+.seo-dev-request-head small, .seo-dev-request > small { color: #64748b; font-size: .72rem; }
+.seo-dev-request h4 { font-size: .91rem; margin: 0; }
+.seo-dev-request p { color: #475569; font-size: .81rem; margin: 0; line-height: 1.55; }
+.seo-dev-request a { display: inline-flex; align-items: center; gap: 4px; color: #c2410c; font-size: .79rem; word-break: break-word; }
+.seo-dev-request-status { background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 99px; font-size: .72rem; }
+.seo-dev-request-status.review_required { background: #fef3c7; color: #92400e; }
+.seo-dev-request-status.approved_for_draft_pr { background: #dcfce7; color: #166534; }
+.seo-dev-request-status.rejected { background: #f1f5f9; color: #64748b; }
+.seo-dev-request details { background: #f8fafc; padding: 10px; border-radius: 10px; min-width: 0; }
+.seo-dev-request summary { cursor: pointer; color: #334155; font-size: .8rem; font-weight: 700; }
+.seo-dev-request details p { margin: 7px 0; overflow-wrap: anywhere; }
+.seo-dev-proposal-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #e2e8f0; padding: 10px; margin: 7px 0; border-radius: 9px; color: #334155; max-height: 280px; overflow-y: auto; font-size: .79rem; }
+.seo-dev-review { display: grid; gap: 10px; }
+.seo-dev-review label { display: grid; gap: 4px; font-size: .77rem; color: #334155; }
+.seo-dev-review textarea { border-radius: 10px; border: 1px solid #cbd5e1; padding: 9px; background: white; color: #17243a; font: inherit; }
+.seo-dev-review > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.seo-dev-review button { display: inline-flex; align-items: center; gap: 6px; min-height: 39px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 10px; color: #334155; background: white; cursor: pointer; font-size: .78rem; }
+.seo-dev-review button:first-child { background: #ea580c; color: white; border-color: #ea580c; }
+.seo-dev-review button:disabled { cursor: not-allowed; opacity: .55; }
