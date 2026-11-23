@@ -6,13 +6,17 @@ on:
       - 'supabase/functions/seo-connector/core.ts'
       - 'supabase/functions/seo-connector/index.ts'
       - 'supabase/functions/seo-connector/developmentStatus.ts'
+      - 'supabase/functions/seo-connector/sourceChangeGuard.ts'
+      - 'supabase/migrations/20261123094500_seo_source_change_requests.sql'
       - 'src/components/SeoPortfolioDashboard.tsx'
       - 'src/components/SeoControlTower.tsx'
       - 'src/components/SeoDevelopmentCenter.tsx'
+      - 'src/components/SeoSourceChangeQueue.tsx'
       - 'src/styles/seoDevelopmentCenter.css'
       - 'scripts/verify-seo-portfolio-mcp.mjs'
       - 'tests/seo-connector.test.mjs'
       - 'tests/seo-development-status.test.mjs'
+      - 'tests/seo-source-change.test.mjs'
       - 'package.json'
       - '.github/workflows/seo-ai-development-p0.yml'
   workflow_dispatch:
@@ -37,6 +41,8 @@ jobs:
         run: node --test tests/seo-connector.test.mjs
       - name: Verify SEO project readiness and source safety gates
         run: npm run verify:seo-development-status
+      - name: Verify source proposal data, path and approval security gates
+        run: npm run verify:seo-source-change
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
