@@ -173,7 +173,18 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
     </p>
    )}
    {item.status==='APPROVED_FOR_DRAFT_PR'&&isOwner&&!prRuns[item.id]&&(
-    <button type="button" className="seo-dev-handoff" onClick={()=>void copyDraftPrHandoff(item)}>คัดลอกคำสั่งสร้าง Draft PR ผ่าน ChatGPT</button>
+    <div className="seo-dev-review">
+     <span className="seo-dev-footnote">Request ID: <code>{item.id}</code></span>
+     <div>
+      <button type="button" onClick={()=>void navigator.clipboard.writeText(item.id).then(
+       ()=>setNotice('คัดลอก Request ID แล้ว'),()=>setError('คัดลอก Request ID ไม่สำเร็จ')
+      )}>คัดลอก Request ID</button>
+      <a className="seo-dev-handoff" href="https://github.com/noteroru2/amphon-product-hub-shop/actions/workflows/seo-draft-pr-execute.yml" target="_blank" rel="noopener noreferrer">
+       เปิด GitHub Actions (เมื่อเปิดใช้งานแล้ว) <ExternalLink size={13} aria-hidden/>
+      </a>
+      <button type="button" className="seo-dev-handoff" onClick={()=>void copyDraftPrHandoff(item)}>ส่งต่อ ChatGPT</button>
+     </div>
+    </div>
    )}
    {item.status==='REVIEW_REQUIRED'&&isOwner&&<div className="seo-dev-review">
     {selectedId!==item.id?(
