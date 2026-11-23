@@ -100,9 +100,11 @@ export function SeoControlTower({
   onBack,
   onOpenActions,
   onAlertCountChange,
+  isOwner = false,
 }: {
   onBack: () => void
   onOpenActions: () => void
+  isOwner?: boolean
   onAlertCountChange?: (count: number) => void
 }) {
   const [tab, setTab] = useState<'portfolio' | 'network' | 'experiments' | 'development'>('portfolio')
@@ -210,7 +212,7 @@ export function SeoControlTower({
         <button aria-pressed={tab === 'network'} onClick={() => setTab('network')}>Network Health</button>
         <button aria-pressed={tab === 'experiments'} onClick={() => setTab('experiments')}>ผลหลังปรับปรุง · Experiments</button>
       </nav>
-      {tab === 'portfolio' ? <SeoPortfolioDashboard refreshSignal={portfolioRefresh} /> : tab === 'development' ? <SeoDevelopmentCenter refreshSignal={developmentRefresh} /> : tab === 'network' ? <SeoNetworkOverview refreshSignal={networkRefresh} /> : <>
+      {tab === 'portfolio' ? <SeoPortfolioDashboard refreshSignal={portfolioRefresh} /> : tab === 'development' ? <SeoDevelopmentCenter refreshSignal={developmentRefresh} isOwner={isOwner} /> : tab === 'network' ? <SeoNetworkOverview refreshSignal={networkRefresh} /> : <>
       <SeoEvidenceCenter experimentsOnly />
       {error && <p role="alert" className="seo-network-warning">โหลด Experiments ไม่ได้: {error}</p>}
       <div className={`seo-tower-health ${summary.criticalAlerts > 0 ? 'critical' : summary.openAlerts > 0 ? 'warning' : 'healthy'}`}>
