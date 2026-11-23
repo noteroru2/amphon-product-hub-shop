@@ -30,6 +30,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
   const [data,setData] = useState<PortfolioResponse|null>(null)
   const [loading,setLoading] = useState(true)
   const [error,setError] = useState('')
+  const [copyStatus,setCopyStatus] = useState('')
   const [tick,setTick] = useState(0)
   useEffect(()=>{
     let active = true
@@ -53,12 +54,52 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
   const selectedRoles = (data?.roles||[]).filter(v=>v.site_id===siteId)
   const selectedReleases = (data?.releases||[]).filter(v=>v.site_id===siteId).slice(0,12)
   const receipt = (data?.ingests||[]).find(v=>v.site_id===siteId && v.window_days===days)
+  async function copyAiPacket() {
+    if (!data || !selected) return
+    setCopyStatus('')
+    const packet = {
+      schema: 'amphon.seo.development-brief.v1',
+      assembled_at: new Date().toISOString(),
+      source: 'HUB_SEO_PORTFOLIO_READ_MODEL',
+      site: selected,
+      selected_window_days: days,
+      gsc_window: selectedMetric ?? null,
+      gsc_ingest: receipt ?? null,
+      keyword_ownership: selectedRoles,
+      production_mapping: selectedProject ?? null,
+      releases: selectedReleases,
+      aggregated_conversions: selectedFunnel ?? null,
+      query_page_samples: (data.queries || []).filter(v => v.site_id === siteId && v.window_days === days),
+      guardrails: {
+        gsc_average_position_not_live_rank: true,
+        source_repository_requires_verified_mapping: true,
+        keyword_ownership_requires_approval: true,
+        changes_require_new_branch_and_pr: true,
+        deployment_requires_explicit_owner_approval: true,
+        do_not_invent_missing_data: true,
+      },
+    }
+    try {
+      await navigator.clipboard.writeText(
+        'วิเคราะห์ SEO จากหลักฐาน HUB ต่อไปนี้ แล้วเตรียมแผนและ PR เท่านั้น ห้าม Merge หรือ Deploy โดยไม่ได้รับอนุมัติ\\n' +
+        JSON.stringify(packet, null, 2)
+      )
+      setCopyStatus('คัดลอกชุดข้อมูลพร้อมคำสั่งสำหรับ ChatGPT แล้ว')
+    } catch {
+      setCopyStatus('คัดลอกไม่ได้ กรุณาตรวจสิทธิ์ Clipboard ของเบราว์เซอร์')
+    }
+  }
+
   return <div className="seo-portfolio">
     <div className="seo-portfolio-head">
       <div><h2>AMPHON SEO Command Center</h2><p>Keyword Ownership · GSC Final · Release Evidence · Conversion • อ่านอย่างเดียว</p></div>
+      <div className="seo-portfolio-actions">
+        <button onClick={() => void copyAiPacket()} disabled={!data || loading}>คัดลอก AI Development Brief</button>
       <button onClick={()=>setTick(v=>v+1)} disabled={loading}><RefreshCw size={16}/> โหลดข้อมูล</button>
+      </div>
     </div>
     {error && <p role="alert" className="seo-network-warning">โหลด Portfolio ไม่สำเร็จ: {error}</p>}
+    {copyStatus && <p role="status" className="seo-network-note">{copyStatus}</p>}
     {loading && !data && <p role="status">กำลังโหลดข้อมูลจากศูนย์กลาง…</p>}
     {data && <>
       <div className="seo-portfolio-filters">
