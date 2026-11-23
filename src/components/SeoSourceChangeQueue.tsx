@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, ShieldAlert, ExternalLink, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
+type DraftPrReceipt={request_id:string;pr_url:string;pr_number:number;pr_head_sha:string;created_at:string}
+
 type SourceProposal={
  id: string
  site_id: string
@@ -24,6 +26,8 @@ type SourceProposal={
 
 export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
  const [rows,setRows]=useState<SourceProposal[]>([])
+ const [prRuns,setPrRuns]=useState<Record<string,DraftPrReceipt>>({})
+ const [prStatus,setPrStatus]=useState('')
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
@@ -47,7 +51,23 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
      .order('created_at',{ascending:false}).limit(50)
     if(!active)return
     if(readError) {setError('ยังอ่านคิว Source Change ไม่ได้: '+readError.message);setRows([])}
-    else {setRows((data||[]) as SourceProposal[]);setError('')}
+    else {
+      setRows((data||[]) as SourceProposal[])
+      setError('')
+      const {data:receipts,error:receiptError}=await supabase
+       .from('commerce_seo_source_change_pr_runs')
+       .select('request_id,pr_url,pr_number,pr_head_sha,created_at')
+       .order('created_at',{ascending:false}).limit(50)
+      if(!active)return
+      if(receiptError) {
+       setPrStatus('ยังไม่เปิดใช้งานทะเบียน Draft PR หรืออ่านสิทธิ์ไม่ได้: '+receiptError.message)
+       setPrRuns({})
+      } else {
+       setPrStatus('')
+       setPrRuns(Object.fromEntries(((receipts||[]) as DraftPrReceipt[])
+        .map(row=>[row.request_id,row])))
+      }
+    }
    } catch (err) {
     if(active) setError(err instanceof Error ? err.message : 'อ่านคิวไม่สำเร็จ')
    } finally {if(active)setLoading(false)}
@@ -123,6 +143,7 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
   {loading&&<p role="status">กำลังอ่านคิว Source Change…</p>}
   {error&&<p role="alert" className="seo-dev-error">{error}</p>}
   {notice&&<p role="status" className="seo-dev-footnote">{notice}</p>}
+  {prStatus&&<p role="status" className="seo-dev-footnote">{prStatus}</p>}
   {!loading&&!error&&rows.length===0&&<p className="seo-dev-footnote">ยังไม่มีคำขอแก้ Source Code ที่ผ่านการตรวจหลักฐานเบื้องต้น</p>}
   <div className="seo-dev-request-list">
   {rows.map(item=><article key={item.id} className="seo-dev-request">
@@ -142,7 +163,16 @@ export function SeoSourceChangeQueue({isOwner}:{isOwner:boolean}) {
     <div className="seo-dev-proposal-text">{item.proposed_change}</div>
     <small>ข้อความนี้เป็นคำเสนอแก้ไขจาก AI ไม่ใช่คำสั่งให้ระบบรันโค้ด</small>
    </details>
-   {item.status==='APPROVED_FOR_DRAFT_PR'&&isOwner&&(
+   {prRuns[item.id]&&(
+    <p className="seo-dev-pr-receipt">
+     <CheckCircle2 size={16} aria-hidden />
+     <a href={prRuns[item.id].pr_url} target="_blank" rel="noopener noreferrer">
+      Draft PR #{prRuns[item.id].pr_number} <ExternalLink size={13} aria-hidden/>
+     </a>
+     <small>Commit: {prRuns[item.id].pr_head_sha.slice(0,12)} · ยังไม่ได้ Merge/Deploy</small>
+    </p>
+   )}
+   {item.status==='APPROVED_FOR_DRAFT_PR'&&isOwner&&!prRuns[item.id]&&(
     <button type="button" className="seo-dev-handoff" onClick={()=>void copyDraftPrHandoff(item)}>คัดลอกคำสั่งสร้าง Draft PR ผ่าน ChatGPT</button>
    )}
    {item.status==='REVIEW_REQUIRED'&&isOwner&&<div className="seo-dev-review">
