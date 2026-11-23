@@ -36,7 +36,10 @@ create index if not exists commerce_seo_source_change_requests_site_created_idx
 alter table public.commerce_seo_source_change_requests enable row level security;
 revoke all on public.commerce_seo_source_change_requests from public, anon, authenticated;
 grant select on public.commerce_seo_source_change_requests to authenticated;
-grant select, insert, update, delete on public.commerce_seo_source_change_requests to service_role;
+-- Service-role OAuth connector may create and read an immutable proposal only.
+-- UPDATE/DELETE of source intent is never granted: owner review uses the
+-- audited SECURITY DEFINER transition function below.
+grant select, insert on public.commerce_seo_source_change_requests to service_role;
 
 drop policy if exists seo_source_change_owner_admin_read on public.commerce_seo_source_change_requests;
 create policy seo_source_change_owner_admin_read on public.commerce_seo_source_change_requests
