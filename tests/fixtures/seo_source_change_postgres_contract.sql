@@ -6,7 +6,7 @@ CREATE SCHEMA IF NOT EXISTS auth;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE service_role NOLOGIN BYPASSRLS;
--- Mirror Supabase default ACLs.
+-- Mirror Supabase public default grants: service_role starts with ALL DML.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 
 CREATE TABLE auth.users(id uuid PRIMARY KEY);
