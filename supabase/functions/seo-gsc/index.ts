@@ -85,8 +85,9 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
   const details=await query
   if(details.error) throw new Error('PORTFOLIO_QUERIES_READ_FAILED')
   const siteMap=new Map((sites.data||[]).map(site=>[site.id,site]))
-  const sanitizedReleases=(releases.data||[]).map(row=>
-    sanitizeRelease(row as RawReleaseEntry,siteMap.get(row.site_id)))
+  const sanitizedReleases=(releases.data||[])
+    .filter(row=>siteMap.has(row.site_id))
+    .map(row=>sanitizeRelease(row as RawReleaseEntry,siteMap.get(row.site_id)))
   const releaseGates=assessReleasePortfolio(
     sites.data||[],projects.data||[],sanitizedReleases)
   // Only sanitized evidence flags leave this Edge Function; raw hosting
