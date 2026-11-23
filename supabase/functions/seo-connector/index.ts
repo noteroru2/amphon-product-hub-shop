@@ -87,7 +87,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    return siteId?query.eq('site_id',siteId):query.in('site_id',Array.from(allowed))
   }
   const [projects,windows,roles,releases,funnel,ingests]=await Promise.all([
-   checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
+   checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_windows_v','site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance').eq('window_days',days).limit(100)),
    checked(scoped('commerce_seo_portfolio_keyword_roles','site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300)),
    checked(scoped('commerce_seo_portfolio_release_events','id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(200)),
@@ -189,7 +189,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
   const [site,project,history]=await Promise.all([
    checked(db.from('commerce_seo_sites').select('id,label,origin,enabled')
     .eq('id',a.site_id).eq('enabled',true).single()),
-   checked(db.from('commerce_seo_portfolio_projects').select('site_id,mapping_status,production_repo')
+   checked(db.from('commerce_seo_portfolio_projects').select('site_id,mapping_status,production_repo,production_branch')
     .eq('site_id',a.site_id).maybeSingle()),
    checked(db.from('commerce_seo_portfolio_release_events')
     .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
