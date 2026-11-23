@@ -14,11 +14,14 @@ import {digestBody,sha40,validateEvidenceTarget,
   assessProductionDiscovery} from './seo-production-evidence-core.mjs'
 
 const fail=x=>{throw Error('SEO_PRODUCTION_EVIDENCE_'+x)}
-const jsonGet=async(url,headers={})=>{
+const STAGES=new Set(['SUPABASE_SITES','SUPABASE_PROJECTS','GITHUB_BRANCH','GITHUB_COMPARE','CLOUDFLARE_DEPLOYMENTS'])
+const jsonGet=async(url,headers={},stage)=>{ 
+  if(!STAGES.has(stage))fail('INVALID_UPSTREAM_STAGE')
   const response=await fetch(url,{method:'GET',headers:{
     Accept:'application/json',...headers,
   },redirect:'error',signal:AbortSignal.timeout(15000)})
-  if(!response.ok)fail('UPSTREAM_READ_FAILED_'+response.status)
+  // Stage + numeric status only. Never log URL, response body, auth header, or secrets.
+  if(!response.ok)fail(stage+'_HTTP_'+response.status)
   return response.json()
 }
 const encodeRepo=repo=>repo.split('/').map(encodeURIComponent).join('/')
@@ -52,11 +55,11 @@ async function loadApprovedMapping(env,siteId){
   const [sites,projects]=await Promise.all([
     jsonGet(base+'/rest/v1/commerce_seo_sites?'+new URLSearchParams({
       select:'id,label,origin,enabled',id:'eq.'+siteId,limit:'1',
-    }),headers),
+    }),headers,'SUPABASE_SITES'),
     jsonGet(base+'/rest/v1/commerce_seo_portfolio_projects?'+new URLSearchParams({
       select:'site_id,production_repo,production_branch,hosting_provider,hosting_project_id,mapping_status,central_deploy_allowed',
       site_id:'eq.'+siteId,limit:'1',
-    }),headers)
+    }),headers,'SUPABASE_PROJECTS')
   ])
   if(!Array.isArray(sites)||sites.length!==1||
     !Array.isArray(projects)||projects.length!==1)fail('MAPPING_NOT_FOUND')
@@ -67,14 +70,14 @@ async function loadGithub(ref,sha,env) {
   const headers={
     'X-GitHub-Api-Version':'2022-11-28',
     'Accept':'application/vnd.github+json',
-    ...tokenHeader(env.AMPHON_SEO_GITHUB_READ_TOKEN),
+    ...tokenHeader(env.AMPHON_SEO_GITHUB_READ_TOKEN || env.GITHUB_TOKEN),
   }
-  const branch=await jsonGet(base+'/git/ref/heads/'+encodeBranch(ref.branch),headers)
+  const branch=await jsonGet(base+'/git/ref/heads/'+encodeBranch(ref.branch),headers,'GITHUB_BRANCH')
   const refSha=branch?.object?.sha
   let compare=null
   if(sha40(sha)&&sha40(refSha)&&sha.toLowerCase()!==refSha.toLowerCase()){
     const params=encodeURIComponent(sha)+'...'+encodeBranch(ref.branch)
-    compare=await jsonGet(base+'/compare/'+params,headers)
+    compare=await jsonGet(base+'/compare/'+params,headers,'GITHUB_COMPARE')
   }
   return {ref_sha:refSha,compare}
 }
@@ -86,7 +89,7 @@ async function loadCloudflare(ref,env) {
     fail('CLOUDFLARE_READ_CREDENTIALS_REQUIRED')
   const path='https://api.cloudflare.com/client/v4/accounts/'+account+
     '/workers/scripts/'+encodeURIComponent(ref.worker)+'/deployments'
-  const response=await jsonGet(path,tokenHeader(token))
+  const response=await jsonGet(path,tokenHeader(token),'CLOUDFLARE_DEPLOYMENTS')
   if(response?.success!==true)fail('INVALID_CLOUDFLARE_PROVIDER_RESPONSE')
   return response
 }

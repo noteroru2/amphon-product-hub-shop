@@ -147,3 +147,48 @@ test('manual workflow and code have no write actions to GitHub, Cloudflare, DNS 
   assert.doesNotMatch(cli,/method:'POST'|method:'PATCH'|method:'DELETE'|method:'PUT'/)
   assert.match(cli,/method:'GET'/)
 })
+
+test('403 diagnostics identify each upstream service without exposing keys or URLs',async()=>{
+  const env={
+    AMPHON_SEO_SUPABASE_URL:'https://mfpdtlxwdbxitgfzdape.supabase.co',
+    AMPHON_SEO_SERVICE_ROLE_KEY:'service_only_PRIVATE_SECRET_NEVER_PRINT',
+    AMPHON_CLOUDFLARE_ACCOUNT_ID:'2382f4589cd2452e9e3b7b83c25d4fc0',
+    AMPHON_CLOUDFLARE_API_TOKEN:'cf_PRIVATE_SECRET_NEVER_PRINT',
+    GITHUB_TOKEN:'github_action_PRIVATE_SECRET_NEVER_PRINT',
+  }
+  const original=globalThis.fetch
+  try {
+    for(const [stage,part] of [
+      ['SUPABASE_SITES','commerce_seo_sites?'],
+      ['SUPABASE_PROJECTS','commerce_seo_portfolio_projects?'],
+      ['GITHUB_BRANCH','/git/ref/heads/'],
+      ['GITHUB_COMPARE','/compare/'],
+      ['CLOUDFLARE_DEPLOYMENTS','api.cloudflare.com'],
+    ]) {
+      globalThis.fetch=async(input,options)=>{
+        const u=String(input)
+        if(u.includes(part))return new Response('SHOULD_NOT_BE_LOGGED_PRIVATE_RESPONSE',{
+          status:403,headers:{'content-type':'application/json'},
+        })
+        if(u.includes('commerce_seo_sites?'))return Response.json([SITE])
+        if(u.includes('commerce_seo_portfolio_projects?'))return Response.json([PROJECT])
+        if(u.includes('/git/ref/heads/')){
+          assert.equal(options.headers.Authorization,'Bearer '+env.GITHUB_TOKEN)
+          return Response.json({object:{sha:BRANCH_SHA}})
+        }
+        if(u.includes('/compare/'))return Response.json(compare)
+        if(u.includes('api.cloudflare.com'))return Response.json(cloudflare())
+        if(u===SITE.origin+'/')return new Response('',{status:503})
+        throw Error('UNKNOWN_TEST_ENDPOINT')
+      }
+      await assert.rejects(
+        collectEvidence(['--site-id','amphon','--expected-sha',SHA],env),
+        err=>{
+          assert.equal(err.message,'SEO_PRODUCTION_EVIDENCE_'+stage+'_HTTP_403')
+          assert.doesNotMatch(err.message,/PRIVATE_SECRET|SHOULD_NOT_BE_LOGGED|https?:\/\//)
+          return true
+        },
+      )
+    }
+  }finally {globalThis.fetch=original}
+})
