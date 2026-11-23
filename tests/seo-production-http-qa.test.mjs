@@ -23,7 +23,7 @@ function fakeFetch(overrides={}){
     headers:{location:www.replace('https://www.','https://')}})
   if(url.startsWith(O+'/บริการ/รับซื้อกล้องฟ'))
     return new Response(null,{status:308,
-      headers:{location:O+'/บริการ/รับซื้อกล้องฟิล์ม'}})
+      headers:{location:encodeURI(O+'/บริการ/รับซื้อกล้องฟิล์ม')}})
   if(url===O+'/robots.txt')
     return new Response('User-agent: Googlebot\nAllow: /\nSitemap: '+O+'/sitemap-index.xml')
   if(url===O+'/sitemap-index.xml')return new Response(O+'/sitemap-0.xml')
@@ -41,7 +41,7 @@ function fakeFetch(overrides={}){
 test('valid public-only HTTP status and TLS evidence never equals release verified',async()=>{
  const {fetcher,calls}=fakeFetch()
  const r=await runReadOnlyQa({fetcher,tlsChecker,now:new Date('2026-11-23T12:00:00Z')})
- assert.equal(r.passed,true)
+ assert.equal(r.passed,true,JSON.stringify(r.checks.filter(x=>!x.pass)))
  assert.equal(r.production_verified,false)
  assert.equal(r.can_write_ledger,false)
  assert.equal(r.can_deploy,false)
@@ -63,7 +63,7 @@ test('following a redirect is not enough: 302 instead of 301 fails',async()=>{
 test('off-domain redirect and noindex independently fail',async()=>{
  const {fetcher}=fakeFetch({
   [O+'/บริการ/รับซื้อกล้องฟิลัม']:new Response(null,{status:308,
-    headers:{location:'https://evil.example/บริการ/รับซื้อกล้องฟิล์ม'}}),
+    headers:{location:encodeURI('https://evil.example/บริการ/รับซื้อกล้องฟิล์ม')}}),
   [O+'/บริการ/รับซื้อโน๊ตบุ๊ค']:new Response(
     goodHtml('/บริการ/รับซื้อโน๊ตบุ๊ค').replace('index,follow','noindex,follow'))
  })
