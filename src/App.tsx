@@ -1007,6 +1007,7 @@ function App() {
               onBack={goBack}
               onOpenActions={() => setTab("seo-opportunities")}
               onAlertCountChange={setSeoAlertUnread}
+              isOwner={profile.role === 'owner'}
             />
           )}
         {tab === "merchant-diagnostics" &&
