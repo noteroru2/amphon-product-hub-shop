@@ -185,7 +185,13 @@ export function assessReleasePortfolio(
       row.environment==='PRODUCTION')
     const commits=relevant.filter(row=>row.event_kind==='COMMIT_OBSERVED')
     const claims=relevant.filter(row=>row.event_kind==='PRODUCTION_VERIFIED')
-    const verified=claims.filter(row=>hasVerifiedEvidence(row,project,now))[0]
+    // A newer unverified provider deployment supersedes an older verified SHA.
+    // Never compare GSC to an old release while the active Production code may
+    // have changed. The new release must be verified independently first.
+    const latestProviderDeploy=deploys[0]
+    const newestDeployAt=validDate(latestProviderDeploy?.event_at)?.getTime()??0
+    const verified=claims.filter(row=>hasVerifiedEvidence(row,project,now) &&
+      (validDate(row.event_at)?.getTime()??0)>=newestDeployAt)[0]
     const latest=relevant[0]
     let level:ReleaseLevel='NO_LEDGER_EVENT'
     if(commits.length)level='COMMIT_ONLY'
