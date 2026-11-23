@@ -33,6 +33,22 @@ Both the API and SQL review enforce fail-closed guards. Untrusted proposed chang
 - Merge the prerequisite #160 first after approval; follow project migration procedure and deploy `seo-connector` Edge Function separately. Run production OAuth and RLS checks. Deploy Cloudflare HUB frontend after QA and approval. Never deploy just because a PR was opened.
 - New MCP tools do **not** extend OAuth scopes. Existing owner consent remains `seo:read` or `seo:draft`.
 
+## Owner-approved ChatGPT Draft PR handoff
+
+An OWNER reviewing an `APPROVED_FOR_DRAFT_PR` request in the HUB can now copy
+an AI GitHub handoff packet. This contains request ID, approved scope, repo,
+branch, recorded SHA and allowed content-file paths. The handoff explicitly
+instructs ChatGPT to re-check the request's status through `seo_source_requests`,
+read the current `seo_portfolio` mapping, independently verify HEAD SHA on
+GitHub, and refuse changes on mismatch. It may then create a branch and
+**Draft PR** using the user's connected GitHub tool and report the QA result.
+The copied packet itself is **not** an authorization credential. No merge or
+deploy action is included, and the HUB retains no GitHub credentials.
+
+This is a manual/ChatGPT-assisted bridge, not an autonomous GitHub executor.
+A fully automatic executor with provider-validated SHA and audited PR links
+remains a separate milestone.
+
 ## Acceptance checklist
 
 - [ ] New migration applies and rolls back cleanly on staging database.
