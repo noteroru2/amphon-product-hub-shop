@@ -18,6 +18,7 @@ on:
       - 'tests/seo-development-status.test.mjs'
       - 'tests/seo-source-change.test.mjs'
       - 'tests/seo-draft-pr-executor.test.mjs'
+      - 'tests/seo-draft-pr-adapters.test.mjs'
       - 'scripts/seo-draft-pr-executor-core.mjs'
       - 'scripts/seo-draft-pr-executor-adapters.mjs'
       - 'scripts/seo-draft-pr-executor.mjs'
@@ -53,6 +54,8 @@ jobs:
         run: npm run verify:seo-source-change
       - name: Verify owner-gated Draft PR executor and immutable GitHub workflow
         run: npm run verify:seo-draft-pr-executor
+      - name: Verify GitHub and Supabase REST adapters with mocked network
+        run: npm run verify:seo-draft-pr-adapters
       - name: Type-check HUB
         run: npm run typecheck
       - name: Build HUB with existing regression guards
