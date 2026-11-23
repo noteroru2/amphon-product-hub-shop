@@ -21,6 +21,9 @@ create index if not exists commerce_seo_source_change_pr_runs_site_idx
 alter table public.commerce_seo_source_change_pr_runs enable row level security;
 revoke all on public.commerce_seo_source_change_pr_runs from public, anon, authenticated;
 grant select on public.commerce_seo_source_change_pr_runs to authenticated;
+-- Supabase default ACL grants service_role ALL on new public tables.
+-- Revoke its inherited default ACL explicitly before reducing to READ + INSERT.
+revoke all on public.commerce_seo_source_change_pr_runs from service_role;
 grant select, insert on public.commerce_seo_source_change_pr_runs to service_role;
 
 drop policy if exists seo_source_change_pr_owner_admin_read on public.commerce_seo_source_change_pr_runs;
