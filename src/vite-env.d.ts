@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_FACEBOOK_MARKETPLACE_URL?: string
   readonly VITE_ONE2C_ENRICHMENT_ENABLED?: string
   readonly VITE_AI_BUYER_API?: string
+  readonly VITE_EVIDENCE_PUBLISHER_API?: string
 }
 
 interface ImportMeta {
