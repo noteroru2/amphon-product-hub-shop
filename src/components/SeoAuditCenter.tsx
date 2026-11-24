@@ -21,7 +21,7 @@ function prettyDate(raw:string|null|undefined){
 const format=(num:number|null|undefined)=>Number.isFinite(Number(num))?Number(num).toLocaleString('th-TH'):'—'
 const SOURCE_ISSUE='https://github.com/noteroru2/amphon-product-hub-shop/issues/177'
 
-export function SeoAuditCenter({onOpenDevelopment}:{onOpenDevelopment:()=>void}){
+export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelopment:()=>void;refreshSignal?:number}){
   const [data,setData]=useState<AuditCenterData|null>(null)
   const [selectedId,setSelectedId]=useState<string|null>(null)
   const [tasks,setTasks]=useState<AuditTask[]>([])
@@ -56,6 +56,7 @@ export function SeoAuditCenter({onOpenDevelopment}:{onOpenDevelopment:()=>void})
       .catch(e=>{if(mounted)setError(e instanceof Error?e.message:String(e))})
     return ()=>{mounted=false}
   },[selectedId])
+  useEffect(()=>{if(refreshSignal>0)void reload().catch(e=>setError(e instanceof Error?e.message:String(e)))},[refreshSignal,reload])
   const validSiteIds=useMemo(()=>new Set(data?.sites.map(s=>s.id)||[]),[data])
   const preview=useMemo(()=>
     matchingAuditCatalog(data?.catalog||[],site,category,priority,validSiteIds),
