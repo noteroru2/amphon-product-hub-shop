@@ -102,6 +102,8 @@ export async function executeEvidenceDraftPr(id,{store,github,dryRun=true}) {
    fail('BASE_MOVED_REVIEW_REQUIRED')
  const name=draftBranch(id)
  if(await github.getBranchRef(cfg.repo,name))fail('EXISTING_BRANCH_RECONCILE_REQUIRED')
+ const overlapping=await github.getOverlappingOpenPrs(cfg.repo,cfg.sourcePath)
+ if(!Array.isArray(overlapping)||overlapping.length)fail('OVERLAPPING_OPEN_PR_REQUIRES_REVIEW')
  const file=await github.getFile(cfg.repo,cfg.sourcePath,head)
  if(!file||file.type!=='file'||file.size>250000||!SHA.test(file.blob_sha||''))
    fail('SOURCE_MISSING')
