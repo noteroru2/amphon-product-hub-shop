@@ -14,6 +14,7 @@
     }
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "https://hub.amphon.co.th"
+    "ALLOWED_ORIGINS": "https://hub.amphon.co.th",
+    "EVIDENCE_PR_DISPATCH_ENABLED": "false"
   }
 }
