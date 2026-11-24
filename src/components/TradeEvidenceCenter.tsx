@@ -3,8 +3,9 @@ import { ArrowLeft, BadgeCheck, Camera, ClipboardCopy, FileText, ImagePlus, Load
 import {
   addTradeEvidenceImages, approvedEvidenceForAi, changeTradeEvidenceStatus, downloadReviewedEvidenceImage, generateFacebookDraft,
   generateWebsiteDraft, getTradeEvidenceImageUrls, listTradeEvidence, removeTradeEvidenceImage,
-  saveTradeEvidence, setTradeEvidenceImageReview,
+  saveTradeEvidence, setTradeEvidenceImageReview, listTradeEvidenceEconomics, verifyTradeTransaction,
   type EvidenceKind, type TradeEvidence, type TradeEvidenceImage, type TradeEvidenceInput,
+  type TradeEvidenceEconomics,
 } from '../lib/tradeEvidence'
 
 function today() {
@@ -15,7 +16,10 @@ function empty(kind: EvidenceKind): TradeEvidenceInput {
   return { kind, occurred_on: today(), title: '', category: 'notebook', brand: '', model: '',
     specs_text: '', condition_text: '', story: '', service_details: '', city: '',
     related_sku: '', internal_reference: '', website_text: '', facebook_text: '',
-    show_price: false, public_price: null, permission_confirmed: false, privacy_reviewed: false }
+    show_price: false, public_price: null, permission_confirmed: false, privacy_reviewed: false,
+    deal_code: '', quantity: 1, transaction_amount: null, repair_cost: 0, shipping_cost: 0,
+    platform_fee: 0, other_direct_cost: 0, customer_channel: 'UNKNOWN',
+    channel_evidence: 'UNKNOWN', channel_evidence_ref: '', verification_reference: '' }
 }
 function fill(row: TradeEvidence): TradeEvidenceInput {
   return { kind: row.kind, occurred_on: row.occurred_on, title: row.title, category: row.category,
@@ -24,15 +28,29 @@ function fill(row: TradeEvidence): TradeEvidenceInput {
     city: row.city || '', related_sku: row.related_sku || '', internal_reference: row.internal_reference || '',
     website_text: row.website_text || '', facebook_text: row.facebook_text || '',
     show_price: row.show_price, public_price: row.public_price,
-    permission_confirmed: row.permission_confirmed, privacy_reviewed: row.privacy_reviewed }
+    permission_confirmed: row.permission_confirmed, privacy_reviewed: row.privacy_reviewed,
+    deal_code: row.deal_code || '', quantity: row.quantity ?? 1,
+    transaction_amount: row.transaction_amount, repair_cost: row.repair_cost ?? 0,
+    shipping_cost: row.shipping_cost ?? 0, platform_fee: row.platform_fee ?? 0,
+    other_direct_cost: row.other_direct_cost ?? 0, customer_channel: row.customer_channel || 'UNKNOWN',
+    channel_evidence: row.channel_evidence || 'UNKNOWN',
+    channel_evidence_ref: row.channel_evidence_ref || '',
+    verification_reference: row.verification_reference || '' }
 }
 const categories = [['notebook','โน๊ตบุ๊ค / MacBook'],['pc','คอมพิวเตอร์'],['iphone','iPhone'],
   ['tablet','iPad / Tablet'],['camera','กล้อง'],['lens','เลนส์'],['component','อะไหล่ IT'],
   ['monitor','จอ'],['gaming','เครื่องเกม'],['other','อื่น ๆ']]
 const labels = { DRAFT: 'รอตรวจ', APPROVED: 'อนุมัติแล้ว', ARCHIVED: 'เก็บเข้าคลัง' }
+const channels = [
+  ['UNKNOWN','ไม่ทราบช่องทาง'],['GOOGLE','Google (ลูกค้าแจ้ง)'],
+  ['FACEBOOK','Facebook'],['WALK_IN','หน้าร้าน'],['REPEAT','ลูกค้าเก่า'],
+  ['REFERRAL','คนรู้จักแนะนำ'],['OTHER','ช่องทางอื่น'],
+] as const
+const money = (n: number) => n.toLocaleString('th-TH',{minimumFractionDigits:0,maximumFractionDigits:2}) + ' ฿'
 
 export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
   const [rows, setRows] = useState<TradeEvidence[]>([])
+  const [economics, setEconomics] = useState<TradeEvidenceEconomics[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [form, setForm] = useState<TradeEvidenceInput>(empty('purchase'))
   const [files, setFiles] = useState<File[]>([])
@@ -46,6 +64,9 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
   const current = rows.find(row => row.id === selected)
   const locked = Boolean(current && current.status !== 'DRAFT')
   const images = (current?.trade_evidence_images || []).slice().sort((a,b) => a.sort_order-b.sort_order)
+  const verifiedPurchaseCount = rows.filter(r => r.kind === 'purchase' && r.transaction_verified).length
+  const verifiedSaleCount = rows.filter(r => r.kind === 'sale' && r.transaction_verified).length
+  const realizedTotal = economics.reduce((sum,row) => sum+Number(row.realized_gross_profit_after_direct_costs),0)
 
   function change<K extends keyof TradeEvidenceInput>(key: K, value: TradeEvidenceInput[K]) {
     setForm(old => ({ ...old, [key]: value }))
@@ -56,6 +77,8 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
     try {
       const next = await listTradeEvidence()
       setRows(next)
+      const completed = await listTradeEvidenceEconomics()
+      setEconomics(completed)
       if (id) {
         const found = next.find(row => row.id === id)
         if (found) { setSelected(id); setForm(fill(found)); setDirty(false) }
@@ -92,6 +115,14 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
       setFiles([])
       await load(id)
     }, 'บันทึกหลักฐานและรูปแล้ว')
+  }
+  function verifyTransaction(next: boolean) {
+    if (!selected || dirty || files.length) { setError('บันทึกข้อมูลและรูปให้เสร็จก่อนยืนยันธุรกรรม'); return }
+    if (next && !window.confirm('ยืนยันว่าตรวจราคาจริง ต้นทุน เลขอ้างอิง และรูปหลักฐานแล้ว? การยืนยันการเงินนี้ทำได้เฉพาะเจ้าของร้าน')) return
+    void perform(async () => {
+      await verifyTradeTransaction(selected,next)
+      await load(selected)
+    },next ? 'ยืนยันหลักฐานธุรกรรมแล้ว หากมีฝั่งซื้อและขายครบจะแสดงกำไร' : 'ถอนการยืนยันธุรกรรมแล้ว')
   }
   function status(next: 'APPROVED' | 'DRAFT' | 'ARCHIVED') {
     if (!selected || dirty || files.length) { setError('กรุณาบันทึกก่อนเปลี่ยนสถานะ'); return }
@@ -132,6 +163,15 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
       <button onClick={() => start('purchase')}><Plus size={18}/> เพิ่มหลักฐานรับซื้อ</button>
       <button onClick={() => start('sale')}><Plus size={18}/> เพิ่มหลักฐานขาย</button>
     </div>
+    <div className="evidence-finance-summary">
+      <div><small>รับซื้อที่เจ้าของยืนยัน (รายการที่โหลด)</small><strong>{verifiedPurchaseCount}</strong></div>
+      <div><small>ขายออกที่เจ้าของยืนยัน (รายการที่โหลด)</small><strong>{verifiedSaleCount}</strong></div>
+      <div><small>กำไรขั้นต้นหลังต้นทุนตรงของดีลที่จับคู่และยืนยันครบ</small>
+        <strong>{money(realizedTotal)}</strong></div>
+      <p>นับกำไรเฉพาะดีลซื้อ–ขายที่มีรหัสตรงกัน จำนวนตรงกัน และเจ้าของยืนยันทั้งสองฝั่ง •
+         ไม่ใช่กำไรสุทธิหลังค่าใช้จ่ายประจำร้าน และยังไม่ใช่กำไรที่ยืนยันว่ามาจาก Google
+         {economics.length === 2000 ? ' • แสดงเพียง 2,000 ดีลล่าสุด' : ''}</p>
+    </div>
     <div className="evidence-layout">
       <aside className="evidence-list">
         <div className="evidence-list-header"><strong>รายการ ({rows.length})</strong>
@@ -144,7 +184,9 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
           <button className={row.id === selected ? 'evidence-row active' : 'evidence-row'}
             onClick={() => open(row)} key={row.id}>
             <small>{row.kind === 'purchase' ? 'รับซื้อ' : 'ขาย'} · {row.occurred_on}</small>
-            <strong>{row.title}</strong><span>{labels[row.status]} · {row.trade_evidence_images?.length || 0} ภาพ</span>
+            <strong>{row.title}</strong><span>{labels[row.status]} · {row.trade_evidence_images?.length || 0} ภาพ
+              {row.deal_code ? ' · '+row.deal_code : ''}
+              {row.transaction_verified ? ' · ยืนยันธุรกรรมแล้ว' : ''}</span>
           </button>)}
         {!loading && rows.length === 0 && <p>ยังไม่มีหลักฐานการซื้อขาย</p>}
       </aside>
@@ -194,6 +236,77 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
             <input disabled={locked} value={form.internal_reference || ''} onChange={e => change('internal_reference',e.target.value)}/>
           </label>
         </div>
+        <h3 className="evidence-subhead"><FileText size={18}/> ข้อมูลดีลและต้นทุนจริง (ภายในร้านเท่านั้น)</h3>
+        <p className="evidence-note">เลขดีลต้องตรงกันระหว่างหลักฐานซื้อและขาย • ไม่ต้องเชื่อม LINE •
+          ยังไม่คิดเป็นกำไรจนเจ้าของยืนยันข้อมูลสองฝั่ง • ดีลเหมาหรือแบ่งขายต้องแยกรหัสให้จำนวนตรงกัน</p>
+        <div className="evidence-fields evidence-money-fields">
+          <label>รหัสจับคู่ซื้อ–ขาย (ไม่ใส่ชื่อ/เบอร์ลูกค้า)
+            <input disabled={locked} maxLength={80} list={form.kind === 'sale' ? 'evidence-buy-codes' : undefined}
+              placeholder="เช่น AMP-2026-001" value={form.deal_code || ''}
+              onChange={e => change('deal_code',e.target.value)}/>
+            <datalist id="evidence-buy-codes">
+              {rows.filter(row => row.kind === 'purchase' && row.deal_code)
+                .map(row => <option key={row.id} value={row.deal_code || ''}/>)}
+            </datalist>
+          </label>
+          <label>จำนวนเครื่อง / จำนวนชุดในดีล
+            <input disabled={locked} type="number" min={1} max={100000} step={1} value={form.quantity}
+              onChange={e => change('quantity',Number(e.target.value))}/>
+          </label>
+          <label>{form.kind === 'purchase' ? 'ยอดรับซื้อจริงทั้งดีล (บาท)' : 'ยอดขายออกจริงทั้งดีล (บาท)'}
+            <input disabled={locked} type="number" min={0} step="0.01"
+              value={form.transaction_amount ?? ''} placeholder="ยังไม่กรอก"
+              onChange={e => change('transaction_amount',e.target.value === '' ? null : Number(e.target.value))}/>
+          </label>
+          {form.kind === 'purchase' && <label>ค่าซ่อม / ทดสอบ / อะไหล่ (บาท)
+            <input disabled={locked} type="number" min={0} step="0.01" value={form.repair_cost}
+              onChange={e => change('repair_cost',Number(e.target.value))}/>
+          </label>}
+          <label>{form.kind === 'purchase' ? 'ค่าขนส่งรับเข้า (บาท)' : 'ค่าขนส่งส่งออก (บาท)'}
+            <input disabled={locked} type="number" min={0} step="0.01" value={form.shipping_cost}
+              onChange={e => change('shipping_cost',Number(e.target.value))}/>
+          </label>
+          {form.kind === 'sale' && <label>ค่าธรรมเนียมแพลตฟอร์ม / Payment (บาท)
+            <input disabled={locked} type="number" min={0} step="0.01" value={form.platform_fee}
+              onChange={e => change('platform_fee',Number(e.target.value))}/>
+          </label>}
+          <label>ต้นทุนตรงอื่น ๆ (บาท)
+            <input disabled={locked} type="number" min={0} step="0.01" value={form.other_direct_cost}
+              onChange={e => change('other_direct_cost',Number(e.target.value))}/>
+          </label>
+          <label>{form.kind === 'purchase' ? 'ลูกค้ารู้จักร้านจากไหน' : 'ช่องทางขายออก'}
+            <select disabled={locked} value={form.customer_channel}
+              onChange={e => change('customer_channel',e.target.value as TradeEvidenceInput['customer_channel'])}>
+              {channels.map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>ความน่าเชื่อถือของช่องทาง
+            <select disabled={locked} value={form.channel_evidence}
+              onChange={e => change('channel_evidence',e.target.value as TradeEvidenceInput['channel_evidence'])}>
+              <option value="UNKNOWN">ยังไม่ได้ยืนยัน</option>
+              <option value="CUSTOMER_STATED">ลูกค้าแจ้งด้วยตนเอง</option>
+              <option value="DOCUMENTED">มีหลักฐานระบุช่องทาง</option>
+            </select>
+          </label>
+          {form.channel_evidence === 'DOCUMENTED' && <label className="wide">เลขอ้างอิงหลักฐานช่องทาง (ไม่ใส่ PII)
+            <input disabled={locked} maxLength={240} value={form.channel_evidence_ref || ''}
+              placeholder="รหัสคลิก/รายงาน/หลักฐานภายใน" onChange={e => change('channel_evidence_ref',e.target.value)}/>
+          </label>}
+          <label className="wide">เลขอ้างอิงใบรับซื้อ / ใบขาย / ธุรกรรมจริง
+            <input disabled={locked} maxLength={240} placeholder="เช่น ใบรับซื้อ 2026-001 (ห้ามใส่เลขบัญชีหรือข้อมูลลูกค้า)"
+              value={form.verification_reference || ''}
+              onChange={e => change('verification_reference',e.target.value)}/>
+          </label>
+        </div>
+        <p className="evidence-note">หมายเหตุ: ช่องทาง Google แบบลูกค้าแจ้ง เป็นเพียง Self-reported ไม่ใช่ข้อมูล GSC
+          ราคาจริงและกำไรเก็บเป็นข้อมูลส่วนตัว ไม่รวมในข้อความเว็บไซต์/AI/Facebook หรือราคาเปิดเผยต่อสาธารณะ</p>
+        {current && <div className="evidence-transaction-status">
+          <span>{current.transaction_verified ? '✓ เจ้าของยืนยันธุรกรรมแล้ว' : 'ยังไม่ยืนยันตัวเลขธุรกรรม'}</span>
+          <button disabled={busy || dirty || files.length > 0}
+            onClick={() => verifyTransaction(!current.transaction_verified)}>
+            {current.transaction_verified ? 'ถอนการยืนยัน (Owner)' : 'ยืนยันยอดจริงและหลักฐาน (Owner)'}
+          </button>
+        </div>}
         <h3 className="evidence-subhead"><Camera size={18}/> รูปหลักฐานจริง</h3>
         <div className="evidence-photos">
           {images.map(image => <div className="evidence-photo" key={image.id}>
