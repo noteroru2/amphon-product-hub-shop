@@ -1,148 +1,165 @@
 import {assertPublicationEligible, publicMediaKey, validatePublicationTargets} from '../../src/lib/evidencePublisherPolicy.ts'
 
-const json=(value,status=200,extra={})=>new Response(JSON.stringify(value),{
-  status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...extra}
+// Evidence Publisher stages ONLY private objects. No GET media route and no public URL.
+// A separate future owner-approved release is required before any image may be public.
+const json=(value,status=200)=>new Response(JSON.stringify(value),{
+  status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}
 })
 const uuid=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
-
-function originHeader(request,env) {
+function allowedOrigin(request,env) {
   const origin=request.headers.get('origin')||''
-  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean)
-  return allowed.includes(origin) ? origin : null
+  return (env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean).includes(origin)?origin:null
 }
-function addCors(response,origin) {
-  if(!origin)return response
+function cors(response,origin) {
   const headers=new Headers(response.headers)
   headers.set('access-control-allow-origin',origin)
-  headers.set('vary','Origin')
-  headers.set('access-control-allow-headers','Authorization, Content-Type')
   headers.set('access-control-allow-methods','POST, OPTIONS')
+  headers.set('access-control-allow-headers','Authorization, Content-Type')
+  headers.set('vary','Origin')
   return new Response(response.body,{status:response.status,headers})
 }
-async function supabase(env,path,{method='GET',body,auth}={}) {
-  const endpoint=new URL(path,env.SUPABASE_URL)
-  const res=await fetch(endpoint,{method,headers:{
-    'apikey':env.SUPABASE_SECRET_KEY,
-    'authorization':'Bearer '+(auth||env.SUPABASE_SECRET_KEY),
-    ...(body?{'content-type':'application/json','prefer':'return=representation'}:{})
-  },body:body?JSON.stringify(body):undefined,redirect:'error'})
-  if(!res.ok)throw Error('DATABASE_REQUEST_FAILED')
-  return res.json()
+function configuration(env) {
+  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY||!env.STAGED_IMAGES||!env.IMAGES)
+    throw Error('WORKER_NOT_CONFIGURED')
+  const endpoint=new URL(env.SUPABASE_URL)
+  if(endpoint.protocol!=='https:'||endpoint.username||endpoint.password||endpoint.search||endpoint.hash)
+    throw Error('WORKER_NOT_CONFIGURED')
 }
-async function owner(env,request) {
-  const authorization=request.headers.get('authorization')||''
-  if(!/^Bearer\s+[^\s]+$/.test(authorization))throw Error('UNAUTHORIZED')
-  const identity=await fetch(new URL('/auth/v1/user',env.SUPABASE_URL),{
-    headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization},redirect:'error'
+async function body(request) {
+  if(Number(request.headers.get('content-length')||0)>12000)throw Error('BODY_TOO_LARGE')
+  const data=await request.text()
+  if(data.length>12000)throw Error('BODY_TOO_LARGE')
+  const parsed=JSON.parse(data)
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('BODY_INVALID')
+  return parsed
+}
+async function db(env,path,{method='GET',body:payload}={}) {
+  const res=await fetch(new URL(path,env.SUPABASE_URL),{
+    method,headers:{
+      apikey:env.SUPABASE_SECRET_KEY,authorization:'Bearer '+env.SUPABASE_SECRET_KEY,
+      ...(payload?{'content-type':'application/json','prefer':'return=representation'}:{})
+    },body:payload?JSON.stringify(payload):undefined,redirect:'error'
   })
-  if(!identity.ok)throw Error('UNAUTHORIZED')
-  const user=await identity.json()
+  if(!res.ok)throw Error(res.status===409?'QUEUE_CONFLICT':'DATABASE_REQUEST_FAILED')
+  return res.status===204?[]:res.json()
+}
+async function requireOwner(request,env) {
+  const bearer=request.headers.get('authorization')||''
+  if(!/^Bearer\s+[^\s]+$/.test(bearer))throw Error('UNAUTHORIZED')
+  const res=await fetch(new URL('/auth/v1/user',env.SUPABASE_URL),{
+    headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:bearer},redirect:'error'
+  })
+  if(!res.ok)throw Error('UNAUTHORIZED')
+  const user=await res.json()
   if(!uuid.test(user.id||''))throw Error('UNAUTHORIZED')
-  const rows=await supabase(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(user.id)+'&select=id,role,active')
+  const rows=await db(env,'/rest/v1/profiles?id=eq.'+user.id+'&select=role,active')
   if(rows.length!==1||rows[0].role!=='owner'||rows[0].active!==true)throw Error('FORBIDDEN')
   return user.id
 }
-function validEnv(env) {
-  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY||
-     !env.PUBLIC_ORIGIN||!env.ASSETS||!env.IMAGES)throw Error('WORKER_NOT_CONFIGURED')
-  const privateUrl=new URL(env.SUPABASE_URL),publicUrl=new URL(env.PUBLIC_ORIGIN)
-  if(privateUrl.protocol!=='https:'||publicUrl.protocol!=='https:'||privateUrl.username||publicUrl.username||
-     privateUrl.search||publicUrl.search||privateUrl.hash||publicUrl.hash)throw Error('INVALID_WORKER_CONFIG')
-}
-async function publish(request,env) {
-  const actor=await owner(env,request)
-  const text=await request.text()
-  if(text.length>12000)throw Error('PAYLOAD_TOO_LARGE')
-  const input=JSON.parse(text)
-  if(!input||typeof input!=='object'||!uuid.test(input.evidence_id||'')||!uuid.test(input.image_id||''))
-    throw Error('INVALID_ID')
-  const evidenceId=input.evidence_id,imageId=input.image_id
-  const targets=validatePublicationTargets(input.targets)
-  const [evidenceRows,imageRows,siteRows]=await Promise.all([
-    supabase(env,'/rest/v1/trade_evidence?id=eq.'+evidenceId+
+async function recheck(env,evidenceId,imageId) {
+  const [records,images,projects]=await Promise.all([
+    db(env,'/rest/v1/trade_evidence?id=eq.'+evidenceId+
       '&select=id,kind,status,permission_confirmed,privacy_reviewed,approved_at,transaction_verified'),
-    supabase(env,'/rest/v1/trade_evidence_images?id=eq.'+imageId+
+    db(env,'/rest/v1/trade_evidence_images?id=eq.'+imageId+
       '&select=id,evidence_id,storage_path,approved_for_public'),
-    supabase(env,'/rest/v1/commerce_seo_sites?enabled=eq.true&select=id,origin')
+    db(env,'/rest/v1/commerce_seo_portfolio_projects?mapping_status=eq.VERIFIED&select=site_id,production_repo,production_branch,central_deploy_allowed')
   ])
-  if(evidenceRows.length!==1||imageRows.length!==1)throw Error('EVIDENCE_NOT_FOUND')
-  const evidence=evidenceRows[0],image=imageRows[0]
-  const {claim_kind}=assertPublicationEligible(evidence,image,evidenceId)
-  const allowed=new Set(siteRows.map(site=>site.id))
-  if(targets.some(t=>!allowed.has(t.site_id)))throw Error('SITE_NOT_ENABLED')
-  const imageKey=publicMediaKey(evidenceId,imageId)
-  let saved=await env.ASSETS.head(imageKey)
-  if(!saved) {
-    // Private storage fetched only with server key; never expose source or a signed URL.
-    const privatePath='/storage/v1/object/trade-evidence-private/'+
-      image.storage_path.split('/').map(encodeURIComponent).join('/')
-    const original=await fetch(new URL(privatePath,env.SUPABASE_URL),{
-      headers:{apikey:env.SUPABASE_SECRET_KEY,authorization:'Bearer '+env.SUPABASE_SECRET_KEY},
-      redirect:'error'
-    })
-    const size=Number(original.headers.get('content-length')||0)
-    if(!original.ok||size>8_388_608)throw Error('PRIVATE_IMAGE_READ_FAILED')
-    if(!/^image\/(jpeg|png|webp)$/i.test(original.headers.get('content-type')||''))
-      throw Error('UNSUPPORTED_IMAGE')
-    // Decoding and re-encoding discards the original file's EXIF/GPS blocks.
-    const transformed=(await env.IMAGES.input(original.body)
-      .transform({width:1400,fit:'scale-down'})
-      .output({format:'image/webp',quality:82})).response()
-    if(!transformed.ok)throw Error('TRANSFORM_FAILED')
-    const bytes=await transformed.arrayBuffer()
-    if(bytes.byteLength>8_388_608||bytes.byteLength<12)throw Error('OUTPUT_TOO_LARGE')
-    const header=new Uint8Array(bytes.slice(0,12))
-    const ascii=String.fromCharCode(...header)
-    if(!ascii.startsWith('RIFF')||ascii.slice(8,12)!=='WEBP')throw Error('INVALID_WEBP_OUTPUT')
-    await env.ASSETS.put(imageKey,bytes,{
-      httpMetadata:{contentType:'image/webp',cacheControl:'public, max-age=31536000, immutable'},
-      customMetadata:{evidenceId,imageId,reviewed:'true'}
-    })
-    saved=await env.ASSETS.head(imageKey)
-  }
-  if(!saved)throw Error('MEDIA_WRITE_FAILED')
-  const mediaUrl=new URL('/media/'+imageKey,env.PUBLIC_ORIGIN).href
-  // A server-controlled queue, never a live website release.
-  const receipts=await supabase(env,'/rest/v1/commerce_evidence_publication_requests',{
-    method:'POST',body:targets.map(t=>({
-      evidence_id:evidenceId,image_id:imageId,site_id:t.site_id,page_path:t.page_path,
-      public_media_key:imageKey,public_media_url:mediaUrl,claim_kind,
-      requested_by:actor,status:'PENDING_SOURCE_PR'
-    }))
+  if(records.length!==1||images.length!==1)throw Error('EVIDENCE_NOT_FOUND')
+  const claim=assertPublicationEligible(records[0],images[0],evidenceId)
+  const eligible=projects.filter(x=>x.production_repo&&x.production_branch&&x.central_deploy_allowed===false)
+  const sites=await db(env,'/rest/v1/commerce_seo_sites?enabled=eq.true&select=id')
+  return {claim, image:images[0], sites:new Set(sites.map(x=>x.id).filter(id=>eligible.some(p=>p.site_id===id)))}
+}
+async function stageBytes(env,storagePath,key) {
+  if(await env.STAGED_IMAGES.head(key))return
+  const privatePath='/storage/v1/object/trade-evidence-private/'+
+    storagePath.split('/').map(encodeURIComponent).join('/')
+  const res=await fetch(new URL(privatePath,env.SUPABASE_URL),{
+    headers:{apikey:env.SUPABASE_SECRET_KEY,authorization:'Bearer '+env.SUPABASE_SECRET_KEY},redirect:'error'
   })
-  return json({status:'PENDING_SOURCE_PR',claim_kind,media_url:mediaUrl,
-    requests:receipts.map(x=>({id:x.id,site_id:x.site_id,page_path:x.page_path,status:x.status})),
-    notice:'Queued for a separately reviewed source Draft PR. No website change, merge, or deploy was performed.'},201)
+  const statedSize=Number(res.headers.get('content-length')||0)
+  if(!res.ok||statedSize>8*1024*1024)throw Error('PRIVATE_IMAGE_READ_FAILED')
+  if(!/^image\/(jpeg|png|webp)$/i.test(res.headers.get('content-type')||''))
+    throw Error('IMAGE_TYPE_INVALID')
+  // Re-encode into a staging-only R2 bucket; no route can read this bucket publicly.
+  const out=(await env.IMAGES.input(res.body).transform({width:1400,fit:'scale-down'})
+    .output({format:'image/webp',quality:82})).response()
+  if(!out.ok)throw Error('IMAGE_TRANSFORM_FAILED')
+  const bytes=await out.arrayBuffer()
+  if(bytes.byteLength>8*1024*1024||bytes.byteLength<12)throw Error('IMAGE_SIZE_INVALID')
+  const header=String.fromCharCode(...new Uint8Array(bytes.slice(0,12)))
+  if(!header.startsWith('RIFF')||header.slice(8)!=='WEBP')throw Error('IMAGE_FORMAT_INVALID')
+  await env.STAGED_IMAGES.put(key,bytes,{httpMetadata:{contentType:'image/webp'},
+    customMetadata:{stage:'PRIVATE_REVIEW_ONLY'}})
+}
+async function stage(request,env,actor) {
+  const input=await body(request)
+  if(!uuid.test(input.evidence_id||'')||!uuid.test(input.image_id||''))
+    throw Error('INVALID_ID')
+  const targets=validatePublicationTargets(input.targets)
+  const {claim,image,sites}=await recheck(env,input.evidence_id,input.image_id)
+  if(targets.some(x=>!sites.has(x.site_id)))throw Error('SITE_NOT_VERIFIED')
+  const key=publicMediaKey(input.evidence_id,input.image_id)
+  await stageBytes(env,image.storage_path,key)
+  const receipts=[]
+  for(const target of targets) {
+    const query='/rest/v1/commerce_evidence_publication_requests?evidence_id=eq.'+input.evidence_id+
+      '&image_id=eq.'+input.image_id+'&site_id=eq.'+target.site_id+
+      '&page_path=eq.'+encodeURIComponent(target.page_path)+
+      '&select=id,site_id,page_path,status'
+    const existing=await db(env,query)
+    if(existing.length) {
+      if(existing[0].status==='CANCELLED')throw Error('CANCELLED_REQUEST_REQUIRES_NEW_REVIEW')
+      receipts.push(existing[0]);continue
+    }
+    const created=await db(env,'/rest/v1/commerce_evidence_publication_requests',{method:'POST',body:{
+      evidence_id:input.evidence_id,image_id:input.image_id,
+      site_id:target.site_id,page_path:target.page_path,private_media_key:key,
+      claim_kind:claim.claim_kind,requested_by:actor,status:'PENDING_SOURCE_PR'
+    }})
+    if(created.length!==1)throw Error('QUEUE_INSERT_FAILED')
+    receipts.push(created[0])
+  }
+  return json({status:'PRIVATE_STAGED',claim_kind:claim.claim_kind,requests:receipts,
+    media_public:false,site_source_modified:false,draft_pr_created:false,production_deployed:false},201)
+}
+async function cancel(request,env) {
+  const input=await body(request)
+  if(!uuid.test(input.request_id||''))throw Error('INVALID_ID')
+  const path='/rest/v1/commerce_evidence_publication_requests?id=eq.'+input.request_id+
+    '&select=id,status,private_media_key'
+  const records=await db(env,path)
+  if(records.length!==1)throw Error('QUEUE_NOT_FOUND')
+  if(records[0].status!=='PENDING_SOURCE_PR')throw Error('DRAFT_PR_REQUIRES_REVIEW')
+  const updated=await db(env,'/rest/v1/commerce_evidence_publication_requests?id=eq.'+
+    input.request_id+'&status=eq.PENDING_SOURCE_PR',{method:'PATCH',body:{status:'CANCELLED'}})
+  if(updated.length!==1)throw Error('QUEUE_STATE_CHANGED')
+  const other=await db(env,'/rest/v1/commerce_evidence_publication_requests?private_media_key=eq.'+
+    encodeURIComponent(records[0].private_media_key)+'&status=in.(PENDING_SOURCE_PR,DRAFT_PR_OPEN)&select=id')
+  if(other.length===0)await env.STAGED_IMAGES.delete(records[0].private_media_key)
+  return json({status:'CANCELLED',media_public:false})
 }
 export default {
-  async fetch(request,env) {
-    const url=new URL(request.url)
-    if(request.method==='GET'&&url.pathname.startsWith('/media/evidence/')) {
-      const match=/^\/media\/evidence\/([a-f\d-]{36})\/([a-f\d-]{36})\.webp$/i.exec(url.pathname)
-      if(!match||!uuid.test(match[1])||!uuid.test(match[2]))return new Response('Not found',{status:404})
-      if(!env.ASSETS)return new Response('Unavailable',{status:503})
-      const obj=await env.ASSETS.get(publicMediaKey(match[1],match[2]))
-      if(!obj)return new Response('Not found',{status:404})
-      return new Response(obj.body,{headers:{
-        'content-type':'image/webp','cache-control':'public,max-age=3600',
-        'x-content-type-options':'nosniff','content-security-policy':"default-src 'none'"
-      }})
-    }
-    if(url.pathname!=='/api/publish')return new Response('Not found',{status:404})
-    const origin=originHeader(request,env)
-    if(!origin)return json({error:'ORIGIN_FORBIDDEN'},403)
-    if(request.method==='OPTIONS')return addCors(new Response(null,{status:204}),origin)
-    if(request.method!=='POST')return addCors(json({error:'METHOD_NOT_ALLOWED'},405),origin)
-    try {
-      validEnv(env)
-      return addCors(await publish(request,env),origin)
-    } catch(error) {
-      const code=error instanceof Error?error.message:'UNKNOWN'
-      const clientCodes=new Set(['UNAUTHORIZED','FORBIDDEN','INVALID_ID','TARGET_COUNT_INVALID',
-        'TARGET_INVALID','SITE_INVALID','PAGE_PATH_INVALID','DUPLICATE_TARGET',
-        'EVIDENCE_APPROVAL_REQUIRED','IMAGE_NOT_APPROVED','EVIDENCE_NOT_FOUND','SITE_NOT_ENABLED'])
-      const status=code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:clientCodes.has(code)?422:500
-      return addCors(json({error:status===500?'PUBLISHER_FAILED':code},status),origin)
-    }
+ async fetch(request,env) {
+  const url=new URL(request.url)
+  if(url.pathname!=='/api/stage'&&url.pathname!=='/api/cancel')return new Response('Not found',{status:404})
+  const origin=allowedOrigin(request,env)
+  if(!origin)return json({error:'ORIGIN_FORBIDDEN'},403)
+  if(request.method==='OPTIONS')return cors(new Response(null,{status:204}),origin)
+  if(request.method!=='POST')return cors(json({error:'METHOD_NOT_ALLOWED'},405),origin)
+  try {
+    configuration(env)
+    const actor=await requireOwner(request,env)
+    const response=url.pathname==='/api/stage'?await stage(request,env,actor):await cancel(request,env)
+    return cors(response,origin)
+  } catch(err) {
+    const code=err instanceof Error?err.message:'UNKNOWN'
+    const client=new Set(['UNAUTHORIZED','FORBIDDEN','INVALID_ID','BODY_TOO_LARGE','BODY_INVALID',
+      'TARGET_COUNT_INVALID','TARGET_INVALID','SITE_INVALID','PAGE_PATH_INVALID','DUPLICATE_TARGET',
+      'EVIDENCE_NOT_FOUND','EVIDENCE_APPROVAL_REQUIRED','IMAGE_NOT_APPROVED','SITE_NOT_VERIFIED',
+      'CANCELLED_REQUEST_REQUIRES_NEW_REVIEW','QUEUE_NOT_FOUND','DRAFT_PR_REQUIRES_REVIEW','QUEUE_STATE_CHANGED'])
+    const status=code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:client.has(code)?422:500
+    return cors(json({error:status===500?'PUBLISHER_FAILED':code},status),origin)
   }
+ }
 }
