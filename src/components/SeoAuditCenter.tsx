@@ -4,6 +4,7 @@ import {
   buildAuditWorkOrder,createContentJobFromAudit,loadAuditCenter,loadAuditTasks,matchingAuditCatalog,setAuditTaskStatus,startAuditRun,
   type AuditCategory,type AuditCenterData,type AuditPriority,type AuditRun,type AuditTask,
 } from '../lib/seoAuditCenter'
+import { countVerifiedPageTrades } from '../lib/tradeEvidence'
 import '../styles/seoAuditCenter.css'
 
 const categoryNames:Record<AuditCategory,string>={
@@ -20,6 +21,23 @@ function prettyDate(raw:string|null|undefined){
 }
 const format=(num:number|null|undefined)=>Number.isFinite(Number(num))?Number(num).toLocaleString('th-TH'):'—'
 const SOURCE_ISSUE='https://github.com/noteroru2/amphon-product-hub-shop/issues/177'
+
+function PageTradeCounts({site,path}:{site:string;path:string}) {
+  const [result,setResult]=useState('')
+  const [busy,setBusy]=useState(false)
+  async function read(){
+    setBusy(true)
+    try {
+      const pathname=new URL(path).pathname
+      const [bought,sold]=await Promise.all([
+        countVerifiedPageTrades(site,pathname,'purchase'),countVerifiedPageTrades(site,pathname,'sale'),
+      ])
+      setResult('สะสมทุกช่วงเวลา · รับซื้อ '+bought+' ดีล · ขาย '+sold+' ดีล')
+    } catch { setResult('อ่านข้อมูลดีลไม่ได้ กรุณาลองอีกครั้ง') }
+    finally { setBusy(false) }
+  }
+  return <div><button type="button" disabled={busy} onClick={()=>void read()}>ดูดีลยืนยันที่ระบุหน้านี้</button> <span role="status">{busy?'กำลังอ่าน…':result}</span></div>
+}
 
 export function SeoAuditCenter({onOpenDevelopment,onOpenNetwork,refreshSignal=0}:{onOpenDevelopment:()=>void;onOpenNetwork:()=>void;refreshSignal?:number}){
   const [data,setData]=useState<AuditCenterData|null>(null)
@@ -216,6 +234,8 @@ export function SeoAuditCenter({onOpenDevelopment,onOpenNetwork,refreshSignal=0}
             <p><b>แนวทาง:</b> {t.recommendation}</p><p><b>เกณฑ์ผ่าน:</b> {t.acceptance}</p>
             {t.focus_query&&<p><b>คำค้น:</b> {t.focus_query}</p>}
             {t.target_page&&<a href={t.target_page} target="_blank" rel="noopener noreferrer">เปิดหน้าที่เกี่ยวข้อง <ExternalLink size={13}/></a>}
+            {t.site_id && t.target_page && data.sites.some(s=>s.id===t.site_id && t.target_page?.startsWith(s.origin.replace(/\/$/,'')+'/')) &&
+              <PageTradeCounts key={t.site_id+t.target_page} site={t.site_id} path={t.target_page}/>}
             <p><small>หลักฐาน: {t.evidence_kind} · ยังไม่ได้ตรวจทุกราย URL</small></p>
           </details>
           <div className="seo-audit-task-actions">
