@@ -98,6 +98,11 @@ begin
       end if;
       new.transaction_verified_at := now();
       new.transaction_verified_by := auth.uid();
+    else
+      -- Metadata are server-owned even when an admin edits a verified record.
+      -- No one can forge when/who verified an already-confirmed transaction.
+      new.transaction_verified_at := old.transaction_verified_at;
+      new.transaction_verified_by := old.transaction_verified_by;
     end if;
   else
     new.transaction_verified_at := null;
