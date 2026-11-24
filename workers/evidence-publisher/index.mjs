@@ -92,6 +92,37 @@ async function stageBytes(env,storagePath,key) {
   await env.STAGED_IMAGES.put(key,bytes,{httpMetadata:{contentType:'image/webp'},
     customMetadata:{stage:'PRIVATE_REVIEW_ONLY'}})
 }
+// Workflow dispatch is scoped to the CENTRAL Hub repository's Actions:write permission only.
+// The workflow has a protected owner-reviewed environment and independently checks
+// the VERIFIED target repo before creating any Draft PR. No site repo write credentials here.
+async function dispatchOwnerApprovedDraftJobs(env,receipts) {
+  if(env.EVIDENCE_PR_DISPATCH_ENABLED!=='true')
+    return receipts.map(r=>({request_id:r.id,dispatch:'PENDING_PROTECTED_WORKFLOW'}))
+  if(!env.GITHUB_DISPATCH_TOKEN||env.GITHUB_DISPATCH_TOKEN.length<20)
+    throw Error('DISPATCH_NOT_CONFIGURED')
+  const results=[]
+  for(const receipt of receipts) {
+    if(receipt.status!=='PENDING_SOURCE_PR') {
+      results.push({request_id:receipt.id,dispatch:'ALREADY_REVIEWED'});continue
+    }
+    try {
+      const response=await fetch('https://api.github.com/repos/noteroru2/amphon-product-hub-shop/actions/workflows/evidence-draft-pr-execute.yml/dispatches',{
+        method:'POST',headers:{
+          authorization:'Bearer '+env.GITHUB_DISPATCH_TOKEN,
+          accept:'application/vnd.github+json',
+          'x-github-api-version':'2022-11-28',
+          'content-type':'application/json',
+          'user-agent':'amphon-evidence-publisher'
+        },body:JSON.stringify({ref:'main',inputs:{request_id:receipt.id}}),
+        redirect:'error',signal:AbortSignal.timeout(12000)
+      })
+      results.push({request_id:receipt.id,dispatch:response.status===204?'PROTECTED_REVIEW_REQUESTED':'DISPATCH_FAILED'})
+    }catch{
+      results.push({request_id:receipt.id,dispatch:'DISPATCH_FAILED'})
+    }
+  }
+  return results
+}
 async function stage(request,env,actor) {
   const input=await body(request)
   if(!uuid.test(input.evidence_id||'')||!uuid.test(input.image_id||''))
@@ -120,8 +151,9 @@ async function stage(request,env,actor) {
     if(created.length!==1)throw Error('QUEUE_INSERT_FAILED')
     receipts.push(created[0])
   }
+  const dispatch=await dispatchOwnerApprovedDraftJobs(env,receipts)
   return json({status:'PRIVATE_STAGED',claim_kind:claim.claim_kind,requests:receipts,
-    media_public:false,site_source_modified:false,draft_pr_created:false,production_deployed:false},201)
+    dispatch,media_public:false,site_source_modified:false,draft_pr_created:false,production_deployed:false},201)
 }
 async function cancel(request,env) {
   const input=await body(request)
