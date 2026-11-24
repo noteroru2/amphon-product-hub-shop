@@ -38,6 +38,7 @@ function harness(s=snapshot(),opts={}) {
  const github={
    async getBranchHead(){calls.push('head');return opts.moved?'f'.repeat(40):SHA},
    async getBranchRef(){calls.push('ref');return opts.existingBranch?NEW:null},
+   async getOverlappingOpenPrs(){calls.push('overlap');return opts.overlap?[{number:82,url:'https://github.com/noteroru2/amphon.co.th/pull/82'}]:[]},
    async getFile(){calls.push('file');return {type:'file',size:SOURCE.length,
      blob_sha:'d'.repeat(40),content:opts.duplicate?SOURCE.replace(ANCHOR,'<!-- AMPHON_EVIDENCE_CASE:'+ID+' -->\n'+ANCHOR):SOURCE}},
    async getCommitTree(){calls.push('tree');return TREE},
@@ -72,14 +73,14 @@ test('two verified sites yield independent site-specific drafts without leaking 
   assert.equal(r.repository,s.project.production_repo)
   assert.equal(r.production_deploy_authorized,false)
   assert.equal(r.media_public,false)
-  assert.deepEqual(h.calls,['load','head','ref','file','tree','create-tree','create-commit','head','create-branch','create-pr','record'])
+  assert.deepEqual(h.calls,['load','head','ref','overlap','file','tree','create-tree','create-commit','head','create-branch','create-pr','record'])
  }
 })
 test('dry-run touches no GitHub mutation or DB mutation',async()=>{
  const h=harness()
  const r=await executeEvidenceDraftPr(ID,{...h,dryRun:true})
  assert.equal(r.outcome,'DRY_RUN_VALIDATED')
- assert.deepEqual(h.calls,['load','head','ref','file'])
+ assert.deepEqual(h.calls,['load','head','ref','overlap','file'])
 })
 test('fail closed on missing image, owner approval, mapping, site, and unauthorized transaction changes',async()=>{
  for(const fn of [
@@ -103,7 +104,7 @@ test('fail closed on missing image, owner approval, mapping, site, and unauthori
  }
 })
 test('moving base SHA or existing branch or duplicated evidence marker aborts before PR',async()=>{
- for(const config of [{moved:true},{existingBranch:true},{duplicate:true}]){
+ for(const config of [{moved:true},{existingBranch:true},{duplicate:true},{overlap:true}]){
   const h=harness(snapshot(),config)
   await assert.rejects(()=>executeEvidenceDraftPr(ID,{...h,dryRun:false}))
   assert.equal(h.calls.includes('create-pr'),false)
