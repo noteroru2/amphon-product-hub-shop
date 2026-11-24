@@ -1,0 +1,63 @@
+name: AMPHON Trade Evidence Economics P1 (NO DEPLOY)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/TradeEvidenceCenter.tsx'
+      - 'src/lib/tradeEvidence*.ts'
+      - 'src/styles/tradeEvidence.css'
+      - 'supabase/migrations/*trade_evidence_real_deal_economics.sql'
+      - 'tests/trade-evidence-economics.test.mjs'
+      - 'tests/fixtures/trade_evidence_real_deal_economics_contract.sql'
+      - '.github/workflows/trade-evidence-economics-qa.yml'
+permissions:
+  contents: read
+jobs:
+  web-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+          cache: npm
+      - name: npm clean install
+        run: npm ci --no-fund
+      - name: Transaction accounting and public data isolation tests
+        run: node --experimental-strip-types --test tests/trade-evidence-economics.test.mjs
+      - name: Full Hub TypeScript/Build regression (NO DEPLOY)
+        run: npm run build
+  postgres-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      pg:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: trade_ci
+          POSTGRES_DB: trade_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trade_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: trade_ci
+      PGDATABASE: trade_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run real migrations with synthetic receipts in disposable PostgreSQL 16
+        run: psql -v ON_ERROR_STOP=1 -f tests/fixtures/trade_evidence_real_deal_economics_contract.sql
+      - name: Verify no accidental grants to anonymous role
+        run: |
+          psql -Atqc "select (not has_table_privilege('anon','public.trade_evidence_economics_v','SELECT'))::text" | grep -x t
