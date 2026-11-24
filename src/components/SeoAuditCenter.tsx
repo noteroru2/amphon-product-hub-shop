@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BookOpen, CheckCircle2, ClipboardCopy, ExternalLink, FileSearch, Filter, ListChecks, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
 import {
-  buildAuditWorkOrder,loadAuditCenter,loadAuditTasks,matchingAuditCatalog,setAuditTaskStatus,startAuditRun,
+  buildAuditWorkOrder,createContentJobFromAudit,loadAuditCenter,loadAuditTasks,matchingAuditCatalog,setAuditTaskStatus,startAuditRun,
   type AuditCategory,type AuditCenterData,type AuditPriority,type AuditRun,type AuditTask,
 } from '../lib/seoAuditCenter'
 import '../styles/seoAuditCenter.css'
@@ -21,7 +21,7 @@ function prettyDate(raw:string|null|undefined){
 const format=(num:number|null|undefined)=>Number.isFinite(Number(num))?Number(num).toLocaleString('th-TH'):'—'
 const SOURCE_ISSUE='https://github.com/noteroru2/amphon-product-hub-shop/issues/177'
 
-export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelopment:()=>void;refreshSignal?:number}){
+export function SeoAuditCenter({onOpenDevelopment,onOpenNetwork,refreshSignal=0}:{onOpenDevelopment:()=>void;onOpenNetwork:()=>void;refreshSignal?:number}){
   const [data,setData]=useState<AuditCenterData|null>(null)
   const [selectedId,setSelectedId]=useState<string|null>(null)
   const [tasks,setTasks]=useState<AuditTask[]>([])
@@ -35,6 +35,7 @@ export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelo
   const [selectedTaskId,setSelectedTaskId]=useState<number|null>(null)
   const [brief,setBrief]=useState('')
   const [taskNote,setTaskNote]=useState('')
+  const [contentJobs,setContentJobs]=useState<Record<number,number>>({})
   const reload=useCallback(async()=>{
     const next=await loadAuditCenter()
     setData(next)
@@ -86,6 +87,18 @@ export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelo
       await setAuditTaskStatus(t.id,status,taskNote.trim())
       if(activeRun)setTasks(await loadAuditTasks(activeRun.id))
       setNotice('บันทึกสถานะ '+t.template_code+' เป็น '+statusNames[status]+' แล้ว โดยยังไม่เปลี่ยนเว็บไซต์')
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setBusy(false)}
+  }
+  async function createContent(t:AuditTask){
+    setBusy(true);setError('');setNotice('')
+    try{
+      const job=await createContentJobFromAudit(t)
+      await setAuditTaskStatus(t.id,'BRIEF_READY','Content Job #'+job+' จาก GSC Opportunity ที่ตรวจตรงกัน')
+      if(activeRun)setTasks(await loadAuditTasks(activeRun.id))
+      setContentJobs(prev=>({...prev,[t.id]:job}))
+      setSelectedTaskId(t.id);setBrief('')
+      setNotice('สร้าง Content Job #'+job+' ใน Hub แล้ว · ยังไม่อนุมัติหรือเผยแพร่ เลือก Network Health → เนื้อหา/อนุมัติเพื่อจัดทำร่าง')
     }catch(e){setError(e instanceof Error?e.message:String(e))}
     finally{setBusy(false)}
   }
@@ -207,6 +220,7 @@ export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelo
           </details>
           <div className="seo-audit-task-actions">
             <button type="button" disabled={busy} className="seo-audit-action-primary" onClick={()=>void queueAndCopy(t)}><ClipboardCopy size={15}/> เตรียม AI Work Order</button>
+            {t.category==='CONTENT'&&t.site_id&&t.target_page&&t.focus_query&&<button type="button" disabled={busy} onClick={()=>void createContent(t)}>สร้าง Content Job จริง</button>}
             {t.status==='DISMISSED'?
               <button type="button" disabled={busy} onClick={()=>void taskAction(t,'OPEN')}>เปิดงานอีกครั้ง</button>:
               <button type="button" disabled={busy} onClick={()=>void taskAction(t,'DISMISSED')}>พักงาน</button>}
@@ -217,6 +231,7 @@ export function SeoAuditCenter({onOpenDevelopment,refreshSignal=0}:{onOpenDevelo
               <textarea rows={2} maxLength={1200} value={taskNote} onChange={e=>setTaskNote(e.target.value)} placeholder="ข้อจำกัด หลักฐานเพิ่มเติม หรือสิ่งที่ต้องตรวจ"/>
             </label>
             <button type="button" disabled={busy} onClick={()=>void taskAction(t,t.status)}>บันทึกหมายเหตุ</button>
+            {contentJobs[t.id]&&<p>สร้าง Content Job #{contentJobs[t.id]} แล้ว <button type="button" onClick={onOpenNetwork}>เปิด Content Center</button></p>}
             {brief&&<><label>AI Work Order — คัดลอกไป ChatGPT เพื่อเตรียม Diff
               <textarea readOnly rows={12} value={brief} onFocus={e=>e.currentTarget.select()}/></label>
               <button type="button" onClick={onOpenDevelopment}>เปิด AI Development / Source Change Review</button>
