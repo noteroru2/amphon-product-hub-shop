@@ -65,7 +65,7 @@ async function savePortfolioWindows(site: Site, property: string, accessToken: s
   }
 }
 async function portfolioData(siteId:string,windowDays:7|14|28) {
-  const [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness]=await Promise.all([
+  const [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness,rankSnapshots]=await Promise.all([
     db.from('commerce_seo_sites').select('id,label,origin').eq('enabled',true).order('id'),
     db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
@@ -74,9 +74,13 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
     db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150),
     db.from('commerce_seo_release_branch_exceptions').select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100),
-    db.from('commerce_seo_portfolio_attribution_readiness_v').select('site_id,site_enabled,contact_click_events,organic_search_labeled_clicks,unknown_channel_clicks,owner_confirmed_leads,evidence_verified_purchases,evidence_verified_units,evidence_verified_sales,evidence_verified_realized_gross_profit,cross_site_contact_link_warnings,evidence_stage,measurement_warning').limit(100)
+    db.from('commerce_seo_portfolio_attribution_readiness_v').select('site_id,site_enabled,contact_click_events,organic_search_labeled_clicks,unknown_channel_clicks,owner_confirmed_leads,evidence_verified_purchases,evidence_verified_units,evidence_verified_sales,evidence_verified_realized_gross_profit,cross_site_contact_link_warnings,evidence_stage,measurement_warning').limit(100),
+    // SERP ranking is separately sourced from Ubersuggest, never imputed from GSC average position.
+    db.from('commerce_seo_portfolio_rank_snapshots')
+      .select('site_id,keyword,location_id,language_code,device,checked_on,checked_at,serp_date,status,position,ranking_url,source')
+      .eq('site_id',siteId).order('checked_on',{ascending:false}).limit(500)
   ])
-  for(const result of [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
+  for(const result of [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness,rankSnapshots]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
   const enabled=(sites.data||[]) as {id:string}[]
   if(!enabled.some(row=>row.id===siteId)) throw new Error('SITE_NOT_FOUND')
   const receipts=(ingests.data||[]).filter(row=>row.site_id===siteId && row.window_days===windowDays)
@@ -98,6 +102,7 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
   return {sites:sites.data,projects:projects.data,windows:windows.data,roles:roles.data,
     releases:sanitizedReleases,release_gates:releaseGates,
     funnel:funnel.data,attribution_readiness:attributionReadiness.data,ingests:ingests.data,
+    rank_snapshots:rankSnapshots.data||[],rank_source:'UBERSUGGEST_SERP_NOT_GSC_AVERAGE',
     queries:details.data||[],selectedSite:siteId,selectedWindow:windowDays}
 }
 
