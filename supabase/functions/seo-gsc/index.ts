@@ -65,16 +65,17 @@ async function savePortfolioWindows(site: Site, property: string, accessToken: s
   }
 }
 async function portfolioData(siteId:string,windowDays:7|14|28) {
-  const [sites,projects,windows,roles,releases,funnel,ingests]=await Promise.all([
+  const [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions]=await Promise.all([
     db.from('commerce_seo_sites').select('id,label,origin').eq('enabled',true).order('id'),
     db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
     db.from('commerce_seo_portfolio_keyword_roles').select('site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300),
     db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(300),
     db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
-    db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150)
+    db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150),
+    db.from('commerce_seo_release_branch_exceptions').select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100)
   ])
-  for(const result of [sites,projects,windows,roles,releases,funnel,ingests]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
+  for(const result of [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
   const enabled=(sites.data||[]) as {id:string}[]
   if(!enabled.some(row=>row.id===siteId)) throw new Error('SITE_NOT_FOUND')
   const receipts=(ingests.data||[]).filter(row=>row.site_id===siteId && row.window_days===windowDays)
@@ -90,7 +91,7 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     .filter(row=>siteMap.has(row.site_id))
     .map(row=>sanitizeRelease(row as RawReleaseEntry,siteMap.get(row.site_id)))
   const releaseGates=assessReleasePortfolio(
-    sites.data||[],projects.data||[],sanitizedReleases)
+    sites.data||[],projects.data||[],sanitizedReleases,new Date(),branchExceptions.data||[])
   // Only sanitized evidence flags leave this Edge Function; raw hosting
   // evidence (including possible future provider secrets) stays server-side.
   return {sites:sites.data,projects:projects.data,windows:windows.data,roles:roles.data,
@@ -104,7 +105,7 @@ async function releaseCompareData(body:Record<string,unknown>) {
   const siteId=body.site_id
   if(typeof siteId!=='string'||!/^[a-z0-9_-]{2,24}$/.test(siteId))
     throw Error('INVALID_SITE_ID')
-  const [siteResult,projectResult,eventsResult]=await Promise.all([
+  const [siteResult,projectResult,eventsResult,exceptionResult]=await Promise.all([
     db.from('commerce_seo_sites').select('id,label,origin,enabled,gsc_property')
       .eq('id',siteId).eq('enabled',true).single(),
     db.from('commerce_seo_portfolio_projects')
@@ -113,13 +114,14 @@ async function releaseCompareData(body:Record<string,unknown>) {
     db.from('commerce_seo_portfolio_release_events')
       .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
       .eq('site_id',siteId).order('event_at',{ascending:false}).limit(200),
+    db.from('commerce_seo_release_branch_exceptions').select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').eq('site_id',siteId).limit(20),
   ])
   if(siteResult.error||!siteResult.data||projectResult.error||
-    !projectResult.data||eventsResult.error)throw Error('RELEASE_COMPARE_CONTEXT_UNAVAILABLE')
+    !projectResult.data||eventsResult.error||exceptionResult.error)throw Error('RELEASE_COMPARE_CONTEXT_UNAVAILABLE')
   const site=siteResult.data
   const releases=(eventsResult.data||[]).map(row=>
     sanitizeRelease(row as RawReleaseEntry,site))
-  const gate=assessReleasePortfolio([site],[projectResult.data],releases)[0]
+  const gate=assessReleasePortfolio([site],[projectResult.data],releases,new Date(),exceptionResult.data||[])[0]
   const plan=buildGscReleaseComparison(gate,site.origin,{
     site_id:siteId,days:body.days as 7|14|28,page:body.page as string,
     query:body.query as string|undefined,country:body.country as string|undefined,
