@@ -92,7 +92,7 @@ values
 'Title/Meta ตรงเนื้อหา, ไม่อ้างลบข้อมูลถาวรเกินจริง, ผ่าน QA canonical/โครงสร้าง/CTA และเทียบ GSC Final',
 'GSC_AND_EDITORIAL_SAMPLE'),
 ('P0-03','amphon','CONTENT','เชื่อมบทความดูรุ่น iPad ไปหน้ารับซื้อ',
-'https://amphon.co.th/blog/วิธีเช็กรุ่น-ipad-ว่าเป็น-gen-ไหน','วิธีดูรุ่นไอแพด',
+'https://amphon.co.th/blog/วิธีเช็กรุ่น-ipad-ว่าเป็น-gen-ไหน','ดูรุ่น ipad',
 'บทความ iPad เป็นหนึ่งในหน้าที่ได้ Impressions/Clicks สูงที่สุด; มีลิงก์ติดต่ออยู่แล้วแต่ยังไม่ผ่าน UX CTA test',
 'รักษา URL และตารางเลข Axxxx เพิ่ม CTA แบบไม่รบกวนการอ่านไปหน้า iPad buyback ตรวจความถูกต้องโมเดลและลิงก์',
 'ไม่เปลี่ยน URL หรือ schema โดยไม่จำเป็น, ผ่าน regression และตรวจ CTA จากบทความถึงหน้าเป้าหมายจริง',
