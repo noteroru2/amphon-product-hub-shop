@@ -77,6 +77,31 @@ export async function setAuditTaskStatus(taskId:number,status:AuditStatus,note='
   if(data?.task_id!==taskId||data?.status!==status||data?.production_deployed!==false)throw new Error('ระบบยืนยันสถานะไม่ตรงกัน')
   return data
 }
+/** A real Content Job uses the existing, owner/admin-guarded, fresh GSC opportunity pipeline.
+ * Audit #177 alone cannot approve or create a draft without a matching opportunity. */
+export async function createContentJobFromAudit(task:AuditTask):Promise<number>{
+  if(task.category!=='CONTENT'||!task.site_id||!task.focus_query||!task.target_page)
+    throw new Error('งานนี้ไม่มีคู่คำค้น–หน้าที่พร้อมสร้าง Content Job ใช้ AI Work Order เพื่อตรวจหลักฐานเพิ่ม')
+  const cutoff=new Date(Date.now()-4*86400_000).toISOString()
+  const {data:opportunities,error:searchError}=await client().from('commerce_seo_growth_opportunities')
+    .select('id,page,source_at').eq('site_id',task.site_id)
+    .eq('query',task.focus_query).eq('status','OPEN')
+    .gte('source_at',cutoff).order('priority',{ascending:false}).limit(20)
+  if(searchError)throw new Error(searchError.message)
+  let target:string
+  try{target=new URL(task.target_page).href}catch{throw new Error('Audit target URL ไม่ถูกต้อง')}
+  const found=(opportunities||[]).find(row=>{
+    try{return new URL(String(row.page)).href===target}catch{return false}
+  })
+  if(!found)throw new Error('ยังไม่มี GSC Opportunity ล่าสุดที่ตรง Site + Query + URL 100% กรุณาใช้ Work Order แล้วตรวจผ่าน SEO Growth Center ก่อน')
+  const {data,error}=await client().rpc('seo_lab_manage',{
+    p_action:'create',p_data:{opportunity_id:found.id}
+  })
+  if(error)throw new Error(error.message)
+  const id=Number(data?.id)
+  if(!Number.isSafeInteger(id)||id<=0)throw new Error('สร้าง Content Job แล้วแต่ไม่พบหลักฐาน Job ID ต้องตรวจ Content Center')
+  return id
+}
 export function buildAuditWorkOrder(task:AuditTask,run:AuditRun,site?:AuditSite):string {
   const scope=task.site_id ? site?.label||task.site_id : 'เว็บไซต์ที่เลือกในรายงาน / ตรวจแยกตามเว็บก่อนแก้'
   const relevant=run.gsc_snapshot.filter(r=>!task.site_id||r.site_id===task.site_id)
