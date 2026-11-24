@@ -61,3 +61,32 @@
   .evidence-photos {grid-template-columns:repeat(2,minmax(0,1fr))}
   .evidence-footer button {width:100%;justify-content:center}
 }
+/* Private deal economics; separate from the public proof publishing controls. */
+.evidence-finance-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
+  padding:16px;background:#fff;border:1px solid #e5e7eb;border-radius:16px;margin:0 0 18px}
+.evidence-finance-summary>div{display:flex;flex-direction:column;gap:8px;min-width:0;padding:10px;border-radius:10px;background:#fafafa}
+.evidence-finance-summary small{font-size:12px;color:#475569;line-height:1.5}
+.evidence-finance-summary strong{font-size:20px;font-weight:800;color:#17212b;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.evidence-finance-summary>div:last-of-type strong{color:#b45309}
+.evidence-finance-summary p{grid-column:1/-1;color:#64748b;font-size:12px;line-height:1.6;margin:0}
+.evidence-note{color:#64748b;font-size:13px;line-height:1.7;margin:8px 0 16px}
+.evidence-money-fields{padding:14px;border-radius:14px;background:#fffaf3;border:1px solid #fed7aa}
+.evidence-transaction-status{display:flex;gap:12px;justify-content:space-between;align-items:center;
+  padding:12px 14px;margin:18px 0;border:1px solid #fed7aa;border-radius:12px;background:#fffaf3;
+  font-size:13px;font-weight:600;color:#92400e}
+.evidence-transaction-status button{border:0;border-radius:10px;padding:10px 14px;background:#242424;color:#fff;
+  cursor:pointer;font-weight:700}
+.evidence-transaction-status button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:680px){
+  .evidence-finance-summary{grid-template-columns:1fr}
+  .evidence-transaction-status{align-items:stretch;flex-direction:column}
+}
+
+.evidence-channel-summary{background:#fff;border:1px solid #e5e7eb;border-radius:15px;padding:16px;margin-bottom:18px}
+.evidence-channel-summary h2{font-size:17px;margin:0 0 6px;color:#111827}
+.evidence-channel-summary p{font-size:12px;color:#64748b;line-height:1.6;margin:0 0 12px}
+.evidence-channel-table-wrapper{overflow-x:auto}
+.evidence-channel-summary table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}
+.evidence-channel-summary th,.evidence-channel-summary td{text-align:left;padding:9px 12px;border-bottom:1px solid #f1f5f9}
+.evidence-channel-summary th{color:#475569;font-weight:700;background:#fff7ed;white-space:nowrap}
+.evidence-channel-summary td:last-child{font-weight:750;font-variant-numeric:tabular-nums}

@@ -32,6 +32,20 @@ export interface TradeEvidence {
   facebook_text: string | null
   show_price: boolean
   public_price: number | null
+  deal_code: string | null
+  quantity: number
+  transaction_amount: number | null
+  repair_cost: number
+  shipping_cost: number
+  platform_fee: number
+  other_direct_cost: number
+  customer_channel: 'UNKNOWN' | 'GOOGLE' | 'FACEBOOK' | 'WALK_IN' | 'REPEAT' | 'REFERRAL' | 'OTHER'
+  channel_evidence: 'UNKNOWN' | 'CUSTOMER_STATED' | 'DOCUMENTED'
+  channel_evidence_ref: string | null
+  verification_reference: string | null
+  transaction_verified: boolean
+  transaction_verified_at: string | null
+  transaction_verified_by: string | null
   permission_confirmed: boolean
   privacy_reviewed: boolean
   status: EvidenceStatus
@@ -45,7 +59,33 @@ export type TradeEvidenceInput = Pick<TradeEvidence,
   'kind' | 'occurred_on' | 'title' | 'category' | 'brand' | 'model' |
   'specs_text' | 'condition_text' | 'story' | 'service_details' |
   'city' | 'related_sku' | 'internal_reference' | 'website_text' |
-  'facebook_text' | 'show_price' | 'public_price' | 'permission_confirmed' | 'privacy_reviewed'>
+  'facebook_text' | 'show_price' | 'public_price' | 'permission_confirmed' | 'privacy_reviewed' |
+  'deal_code' | 'quantity' | 'transaction_amount' | 'repair_cost' | 'shipping_cost' |
+  'platform_fee' | 'other_direct_cost' | 'customer_channel' | 'channel_evidence' |
+  'channel_evidence_ref' | 'verification_reference'>
+
+export interface TradeEvidenceEconomics {
+  purchase_evidence_id: string
+  sale_evidence_id: string
+  deal_code: string
+  title: string
+  category: string
+  quantity: number
+  purchased_on: string
+  sold_on: string
+  buyer_acquisition_channel: TradeEvidence['customer_channel']
+  buyer_channel_evidence: TradeEvidence['channel_evidence']
+  acquisition_amount: number
+  repair_cost: number
+  inbound_shipping_cost: number
+  other_acquisition_cost: number
+  sale_amount: number
+  outbound_shipping_cost: number
+  sale_platform_fee: number
+  other_selling_cost: number
+  realized_gross_profit_after_direct_costs: number
+  seo_attribution_proven: false
+}
 
 function client() {
   if (!supabase) throw new Error('ไม่ได้เชื่อมต่อ Supabase')
@@ -55,7 +95,23 @@ function client() {
 function ensureSafe(input: TradeEvidenceInput) {
   if (input.title.trim().length < 3) throw new Error('กรอกชื่อรุ่นหรือชื่อสินค้าอย่างน้อย 3 ตัวอักษร')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.occurred_on)) throw new Error('วันที่ไม่ถูกต้อง')
-  if (input.show_price && (input.public_price == null || input.public_price < 0)) {
+  if (input.deal_code && !/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/.test(input.deal_code.trim())) {
+    throw new Error('รหัสดีลต้องยาว 3–80 ตัวอักษร และใช้เฉพาะ A–Z, 0–9, จุด, ขีด หรือขีดล่าง')
+  }
+  if (!Number.isSafeInteger(input.quantity) || input.quantity < 1 || input.quantity > 100000)
+    throw new Error('จำนวนสินค้าต้องเป็นจำนวนเต็มบวก')
+  if ([input.transaction_amount,input.repair_cost,input.shipping_cost,input.platform_fee,
+    input.other_direct_cost].some(x => x != null && (!Number.isFinite(x) || x < 0))) {
+    throw new Error('จำนวนเงินต้องไม่ติดลบและเป็นตัวเลขที่ถูกต้อง')
+  }
+  if (input.channel_evidence === 'DOCUMENTED' && (!input.channel_evidence_ref?.trim()
+      || input.channel_evidence_ref.trim().length < 4)) {
+    throw new Error('หากเลือกมีหลักฐานช่องทาง ต้องใส่รหัสหลักฐานอ้างอิงอย่างน้อย 4 ตัวอักษร')
+  }
+  if (input.channel_evidence === 'DOCUMENTED' && input.customer_channel === 'UNKNOWN') {
+    throw new Error('เลือกช่องทางที่มีหลักฐานก่อน')
+  }
+  if (input.show_price && (input.public_price == null || !Number.isFinite(input.public_price) || input.public_price < 0)) {
     throw new Error('กรอกราคาที่อนุญาตให้เปิดเผย หรือยกเลิกการแสดงราคา')
   }
 }
@@ -73,13 +129,33 @@ export async function listTradeEvidence(): Promise<TradeEvidence[]> {
 export async function saveTradeEvidence(input: TradeEvidenceInput, id?: string): Promise<string> {
   ensureSafe(input)
   // Every edit creates a new draft; approval is always a separate, deliberate action.
-  const payload = { ...input, title: input.title.trim(), story: input.story.trim(), status: 'DRAFT' }
+  const payload = { ...input, title: input.title.trim(), story: input.story.trim(),
+    deal_code: input.deal_code?.trim().toUpperCase() || null,
+    verification_reference: input.verification_reference?.trim() || null,
+    channel_evidence_ref: input.channel_evidence_ref?.trim() || null,
+    status: 'DRAFT' }
   const query = id
     ? client().from('trade_evidence').update(payload).eq('id', id)
     : client().from('trade_evidence').insert(payload)
   const { data, error } = await query.select('id').single()
   if (error) throw error
   return data.id as string
+}
+
+// Owner-only DB guard validates receipt/reference and at least one private image.
+export async function verifyTradeTransaction(id: string, verified: boolean): Promise<void> {
+  const { error } = await client().from('trade_evidence')
+    .update({ transaction_verified: verified }).eq('id', id)
+  if (error) throw error
+}
+
+// This view only returns whole-quantity purchase+sale matches verified by owner.
+// It is not a ranking or Google acquisition report; do not expose in public copy.
+export async function listTradeEvidenceEconomics(): Promise<TradeEvidenceEconomics[]> {
+  const { data, error } = await client().from('trade_evidence_economics_v')
+    .select('*').order('sold_on', { ascending: false }).limit(2000)
+  if (error) throw error
+  return (data || []) as TradeEvidenceEconomics[]
 }
 
 export async function changeTradeEvidenceStatus(id: string, status: EvidenceStatus): Promise<void> {
