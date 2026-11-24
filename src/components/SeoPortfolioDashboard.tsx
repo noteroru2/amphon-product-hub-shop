@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { gscAction } from '../lib/seoGsc'
+import { latestRankSnapshots, rankStatusText, type SeoRankSnapshot } from '../lib/seoRankLedger'
 import '../styles/seo-portfolio.css'
 
 type WindowDays = 7 | 14 | 28
@@ -20,7 +21,7 @@ interface AttributionReadiness {
 }
 interface Ingest { site_id: string; window_days: WindowDays; end_date: string; rows_written: number; data_complete: boolean; status: string; error_class: string | null }
 interface Query { site_id: string; window_days: WindowDays; query: string; page: string; clicks: number; impressions: number; position: number | null; partial_window: boolean; source: string; end_date: string }
-interface PortfolioResponse { sites: Site[]; projects: Project[]; windows: Metric[]; roles: Keyword[]; releases: Release[]; funnel: Funnel[]; attribution_readiness?: AttributionReadiness[]; ingests: Ingest[]; queries: Query[]; selectedSite: string; selectedWindow: WindowDays }
+interface PortfolioResponse { sites: Site[]; projects: Project[]; windows: Metric[]; roles: Keyword[]; releases: Release[]; funnel: Funnel[]; attribution_readiness?: AttributionReadiness[]; ingests: Ingest[]; queries: Query[]; rank_snapshots?: SeoRankSnapshot[]; rank_source?: string; selectedSite: string; selectedWindow: WindowDays }
 const n = (value: number | null | undefined, digits = 0) => value == null || !Number.isFinite(Number(value))
   ? '—' : Number(value).toLocaleString('th-TH',{maximumFractionDigits:digits})
 const pct = (v: number | null | undefined) => v == null ? '—' : n(Number(v)*100,2) + '%'
@@ -64,6 +65,10 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
   const selectedRoles = (data?.roles||[]).filter(v=>v.site_id===siteId)
   const selectedReleases = (data?.releases||[]).filter(v=>v.site_id===siteId).slice(0,12)
   const receipt = (data?.ingests||[]).find(v=>v.site_id===siteId && v.window_days===days)
+  const latestRanks = useMemo(()=>latestRankSnapshots(data?.rank_snapshots||[],siteId),[data,siteId])
+  const rankCollected = latestRanks.filter(v=>v.status!=='PENDING').length
+  const rankPending = latestRanks.filter(v=>v.status==='PENDING').length
+  const rankDate = latestRanks.reduce((day,v)=>v.checked_on>day?v.checked_on:day,'')
   async function copyAiPacket() {
     if (!data || !selected) return
     setCopyStatus('')
@@ -80,6 +85,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
       releases: selectedReleases,
       aggregated_conversions: selectedFunnel ?? null,
       evidence_verified_conversion_readiness: selectedAttribution ?? null,
+      rank_tracking: {source:'UBERSUGGEST_SERP_NOT_GSC',location_id:2764,language:'th',device:'DESKTOP',observations:latestRanks},
       query_page_samples: (data.queries || []).filter(v => v.site_id === siteId && v.window_days === days),
       guardrails: {
         gsc_average_position_not_live_rank: true,
@@ -128,6 +134,29 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
         <div><span>Repo Mapping ยืนยันจาก Provider</span><strong>{data.projects.filter(x=>x.mapping_status==='VERIFIED').length}/{data.projects.length}</strong></div>
       </div>
       <p className="seo-network-note">ยอดรวมเป็นผลบวกของโฮสต์ที่ติดตาม ไม่ใช่ลูกค้าที่ไม่ซ้ำกัน • Query/Page อาจถูก Google ปกปิดหรือจำกัดจำนวนแถว • ข้อมูล GSC Final ไม่ใช่ข้อมูลสด • ไม่มีสิทธิ์ Deploy เว็บไซต์จากหน้านี้</p>
+      {siteId==='amphon' && <section className="seo-portfolio-detail" aria-label="Ubersuggest Rank Checker">
+        <h3>Google Rank Checker · Ubersuggest SERP</h3>
+        <p className="seo-network-note">
+          ตำแหน่ง: ประเทศไทย · ภาษาไทย · Desktop · ตรวจล่าสุด {rankDate||'ยังไม่มีข้อมูล'}
+          {' '}· มีหลักฐาน {rankCollected}/{latestRanks.length} คำ · รอผล {rankPending} คำ
+        </p>
+        <p className="seo-network-note">
+          อันดับ SERP มาจากการเก็บผลของ Ubersuggest ไม่ใช่อันดับเฉลี่ย GSC
+          {' '}· PENDING หมายถึงยังไม่ได้ผล ไม่ได้หมายถึงอันดับ 0 หรือไม่ติด Google
+          {' '}· ตรวจสอบเป็นรอบตามผู้ให้บริการ ไม่ใช่ตำแหน่งสดทุกวินาที
+        </p>
+        {latestRanks.length===0 ? <p>ยังไม่มีบันทึกอันดับ Ubersuggest ใน Rank Ledger — ไม่ใช่ผลว่าไม่ติดอันดับ</p> :
+        <div className="seo-network-table-wrap"><table className="seo-network-table">
+          <caption>ประวัติอันดับล่าสุดของแต่ละคำ · จากข้อมูล Ubersuggest ที่ตรวจสอบแหล่งที่มาแล้ว</caption>
+          <thead><tr><th>Keyword</th><th>สถานะอันดับ</th><th>SERP เก็บวันที่</th><th>ตรวจระบบเมื่อ</th></tr></thead>
+          <tbody>{latestRanks.map(r=><tr key={r.keyword}>
+            <th>{r.keyword}</th>
+            <td>{rankStatusText(r)}</td>
+            <td>{r.serp_date||'ยังไม่มี'}</td>
+            <td>{r.checked_on}</td>
+          </tr>)}</tbody>
+        </table></div>}
+      </section>}
       <div className="seo-network-table-wrap"><table className="seo-network-table">
         <caption>ภาพรวม {days} วัน · กดชื่อเว็บเพื่อเจาะรายละเอียด</caption>
         <thead><tr><th>เว็บไซต์</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Position</th><th>ช่วงข้อมูล</th><th>Deploy Mapping</th><th>CTA events</th></tr></thead>
