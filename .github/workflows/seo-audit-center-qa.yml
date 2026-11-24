@@ -1,0 +1,33 @@
+name: SEO Audit AI Improvement Center (no website deploy)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/SeoAuditCenter.tsx'
+      - 'src/components/SeoControlTower.tsx'
+      - 'src/lib/seoAuditCenter.ts'
+      - 'src/styles/seoAuditCenter.css'
+      - 'supabase/migrations/20261124181500_seo_audit_improvement_center.sql'
+      - 'tests/seo-audit-center.test.mjs'
+      - '.github/workflows/seo-audit-center-qa.yml'
+permissions:
+  contents: read
+jobs:
+  integration-and-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-fund
+      - name: Guarded Audit queue contracts
+        run: node --test tests/seo-audit-center.test.mjs tests/seo-rank-ledger.test.mjs
+      - name: TypeScript type-check
+        run: npm run typecheck
+      - name: Full Hub build
+        run: npm run build

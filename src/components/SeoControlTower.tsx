@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SeoNetworkOverview } from './SeoNetworkOverview'
 import { SeoPortfolioDashboard } from './SeoPortfolioDashboard'
+import { SeoAuditCenter } from './SeoAuditCenter'
 import { SeoDevelopmentCenter } from './SeoDevelopmentCenter'
 import { SeoEvidenceCenter } from './SeoEvidenceCenter'
 import {
@@ -107,10 +108,11 @@ export function SeoControlTower({
   isOwner?: boolean
   onAlertCountChange?: (count: number) => void
 }) {
-  const [tab, setTab] = useState<'portfolio' | 'network' | 'experiments' | 'development'>('portfolio')
+  const [tab, setTab] = useState<'portfolio' | 'network' | 'experiments' | 'development' | 'audit'>('portfolio')
   const [networkRefresh, setNetworkRefresh] = useState(0)
   const [portfolioRefresh, setPortfolioRefresh] = useState(0)
   const [developmentRefresh, setDevelopmentRefresh] = useState(0)
+  const [auditRefresh, setAuditRefresh] = useState(0)
   const [summary, setSummary] = useState<SeoControlTowerSummary>(EMPTY_SUMMARY)
   const [experiments, setExperiments] = useState<SeoControlTowerExperiment[]>([])
   const [alerts, setAlerts] = useState<SeoControlTowerAlert[]>([])
@@ -201,18 +203,19 @@ export function SeoControlTower({
           <p className="eyebrow">SEO OPERATIONS</p>
           <h1>Control Tower</h1>
         </div>
-        <button className="refresh-button" onClick={() => tab === 'portfolio' ? setPortfolioRefresh(value => value + 1) : tab === 'development' ? setDevelopmentRefresh(value => value + 1) : tab === 'network' ? setNetworkRefresh(value => value + 1) : void load()} aria-label="รีเฟรช">
+        <button className="refresh-button" onClick={() => tab === 'portfolio' ? setPortfolioRefresh(value => value + 1) : tab === 'development' ? setDevelopmentRefresh(value => value + 1) : tab === 'network' ? setNetworkRefresh(value => value + 1) : tab === 'audit' ? setAuditRefresh(value=>value+1) : void load()} aria-label="รีเฟรช">
           <RefreshCw className={loading ? 'spin' : ''} />
         </button>
       </header>
 
       <nav className="seo-network-tabs seo-network-main-tabs" aria-label="SEO Control Tower">
         <button aria-pressed={tab === 'portfolio'} onClick={() => setTab('portfolio')}>Portfolio · เว็บไซต์ในเครือ</button>
+        <button aria-pressed={tab === 'audit'} onClick={() => setTab('audit')}>SEO Audit · สั่งงาน AI</button>
         <button aria-pressed={tab === 'development'} onClick={() => setTab('development')}>AI Development · ความคืบหน้า</button>
         <button aria-pressed={tab === 'network'} onClick={() => setTab('network')}>Network Health</button>
         <button aria-pressed={tab === 'experiments'} onClick={() => setTab('experiments')}>ผลหลังปรับปรุง · Experiments</button>
       </nav>
-      {tab === 'portfolio' ? <SeoPortfolioDashboard refreshSignal={portfolioRefresh} /> : tab === 'development' ? <SeoDevelopmentCenter refreshSignal={developmentRefresh} isOwner={isOwner} /> : tab === 'network' ? <SeoNetworkOverview refreshSignal={networkRefresh} /> : <>
+      {tab === 'portfolio' ? <SeoPortfolioDashboard refreshSignal={portfolioRefresh} /> : tab === 'audit' ? <SeoAuditCenter refreshSignal={auditRefresh} onOpenDevelopment={()=>setTab('development')} onOpenNetwork={()=>setTab('network')} /> : tab === 'development' ? <SeoDevelopmentCenter refreshSignal={developmentRefresh} isOwner={isOwner} /> : tab === 'network' ? <SeoNetworkOverview refreshSignal={networkRefresh} /> : <>
       <SeoEvidenceCenter experimentsOnly />
       {error && <p role="alert" className="seo-network-warning">โหลด Experiments ไม่ได้: {error}</p>}
       <div className={`seo-tower-health ${summary.criticalAlerts > 0 ? 'critical' : summary.openAlerts > 0 ? 'warning' : 'healthy'}`}>
