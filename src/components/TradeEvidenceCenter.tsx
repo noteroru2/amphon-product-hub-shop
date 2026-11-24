@@ -3,7 +3,7 @@ import { ArrowLeft, BadgeCheck, Camera, ClipboardCopy, FileText, ImagePlus, Load
 import {
   addTradeEvidenceImages, approvedEvidenceForAi, changeTradeEvidenceStatus, downloadReviewedEvidenceImage, generateFacebookDraft,
   generateWebsiteDraft, getTradeEvidenceImageUrls, listTradeEvidence, removeTradeEvidenceImage,
-  saveTradeEvidence, setTradeEvidenceImageReview, listTradeEvidenceEconomics, verifyTradeTransaction,
+  listSourceSites, saveTradeEvidence, setTradeEvidenceImageReview, listTradeEvidenceEconomics, verifyTradeTransaction,
   type EvidenceKind, type TradeEvidence, type TradeEvidenceImage, type TradeEvidenceInput,
   type TradeEvidenceEconomics,
 } from '../lib/tradeEvidence'
@@ -33,6 +33,7 @@ function fill(row: TradeEvidence): TradeEvidenceInput {
     transaction_amount: row.transaction_amount, repair_cost: row.repair_cost ?? 0,
     shipping_cost: row.shipping_cost ?? 0, platform_fee: row.platform_fee ?? 0,
     other_direct_cost: row.other_direct_cost ?? 0, customer_channel: row.customer_channel || 'UNKNOWN',
+    source_site_id: row.source_site_id || null, source_page_path: row.source_page_path || null,
     channel_evidence: row.channel_evidence || 'UNKNOWN',
     channel_evidence_ref: row.channel_evidence_ref || '',
     verification_reference: row.verification_reference || '' }
@@ -61,6 +62,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [sourceSites,setSourceSites] = useState<{id:string; origin:string}[]>([])
   const current = rows.find(row => row.id === selected)
   const locked = Boolean(current && current.status !== 'DRAFT')
   const images = (current?.trade_evidence_images || []).slice().sort((a,b) => a.sort_order-b.sort_order)
@@ -94,6 +96,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
     finally { setLoading(false) }
   }
   useEffect(() => { void load(null) }, [])
+  useEffect(() => { void listSourceSites().then(setSourceSites).catch(() => setError('โหลดรายชื่อเว็บต้นทางไม่ได้')) }, [])
   useEffect(() => {
     let alive = true
     void getTradeEvidenceImageUrls(images.map(x => x.storage_path))
@@ -179,6 +182,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
          ไม่ใช่กำไรสุทธิหลังค่าใช้จ่ายประจำร้าน และยังไม่ใช่กำไรที่ยืนยันว่ามาจาก Google
          {economics.length === 2000 ? ' • แสดงเพียง 2,000 ดีลล่าสุด' : ''}</p>
     </div>
+    <p>ดีลยืนยันที่ยังไม่ทราบเว็บไซต์ต้นทางในรายการที่โหลด {rows.filter(r=>r.transaction_verified && !r.source_site_id).length} รายการ · ทราบเฉพาะเว็บไซต์ {rows.filter(r=>r.transaction_verified && r.source_site_id && !r.source_page_path).length} รายการ</p>
     {channelSummary.length > 0 && <section className="evidence-channel-summary">
       <h2>กำไรตามช่องทางที่บันทึกไว้ (ไม่ยืนยันว่าเกิดจาก SEO)</h2>
       <p>แยกตามคำบอกเล่าหรือหลักฐานที่ร้านเก็บไว้ตอนซื้อเข้า ไม่ใช่การจับคู่ Google Search Console กับลูกค้า</p>
@@ -306,6 +310,19 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
               <option value="DOCUMENTED">มีหลักฐานระบุช่องทาง</option>
             </select>
           </label>
+          <label>เว็บไซต์ต้นทางตามข้อมูลที่ได้รับ
+            <select disabled={locked || current?.transaction_verified} value={form.source_site_id || ''} onChange={e=>{
+              setForm(previous=>({...previous,source_site_id:e.target.value || null,source_page_path:null}))
+              setDirty(true)
+            }}>
+              <option value="">ไม่ทราบเว็บไซต์</option>
+              {sourceSites.map(s=><option key={s.id} value={s.id}>{s.origin}</option>)}
+            </select>
+          </label>
+          {form.source_site_id && <label>หน้าต้นทาง (เว้นว่างเมื่อทราบเฉพาะเว็บ)
+            <input disabled={locked || current?.transaction_verified} placeholder="/หน้าที่ลูกค้าแจ้ง/" value={form.source_page_path || ''}
+              onChange={e=>change('source_page_path',e.target.value)}/>
+          </label>}
           {form.channel_evidence === 'DOCUMENTED' && <label className="wide">เลขอ้างอิงหลักฐานช่องทาง (ไม่ใส่ PII)
             <input disabled={locked} maxLength={240} value={form.channel_evidence_ref || ''}
               placeholder="รหัสคลิก/รายงาน/หลักฐานภายใน" onChange={e => change('channel_evidence_ref',e.target.value)}/>
