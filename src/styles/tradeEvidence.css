@@ -81,3 +81,12 @@
   .evidence-finance-summary{grid-template-columns:1fr}
   .evidence-transaction-status{align-items:stretch;flex-direction:column}
 }
+
+.evidence-channel-summary{background:#fff;border:1px solid #e5e7eb;border-radius:15px;padding:16px;margin-bottom:18px}
+.evidence-channel-summary h2{font-size:17px;margin:0 0 6px;color:#111827}
+.evidence-channel-summary p{font-size:12px;color:#64748b;line-height:1.6;margin:0 0 12px}
+.evidence-channel-table-wrapper{overflow-x:auto}
+.evidence-channel-summary table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}
+.evidence-channel-summary th,.evidence-channel-summary td{text-align:left;padding:9px 12px;border-bottom:1px solid #f1f5f9}
+.evidence-channel-summary th{color:#475569;font-weight:700;background:#fff7ed;white-space:nowrap}
+.evidence-channel-summary td:last-child{font-weight:750;font-variant-numeric:tabular-nums}
