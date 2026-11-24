@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "amphon-evidence-publisher",
+  "main": "index.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "images": { "binding": "IMAGES" },
+  "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "amphon-evidence-public-derivatives" }],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://hub.amphon.co.th",
+    "PUBLIC_ORIGIN": "https://evidence.amphon.co.th"
+  }
+}
