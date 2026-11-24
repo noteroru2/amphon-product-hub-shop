@@ -9,6 +9,9 @@ on:
       - 'tests/evidence-publisher.test.mjs'
       - 'supabase/migrations/20261124_evidence_publisher.sql'
       - 'src/vite-env.d.ts'
+      - 'scripts/evidence-draft-pr*.mjs'
+      - 'tests/evidence-draft-pr.test.mjs'
+      - '.github/workflows/evidence-draft-pr-execute.yml'
       - 'package.json'
       - '.github/workflows/evidence-publisher-qa.yml'
   workflow_dispatch:
@@ -26,6 +29,8 @@ jobs:
       - run: npm ci
       - name: Security and policy tests
         run: npm run verify:evidence-publisher
+      - name: Multi-site Draft PR E2E tests
+        run: npm run verify:evidence-draft-pr
       - name: Hub typecheck
         run: npm run typecheck
       - name: Hub build with existing regression suite
