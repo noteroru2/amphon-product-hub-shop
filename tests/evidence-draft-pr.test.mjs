@@ -113,7 +113,7 @@ test('PII/markup not allowed even in owner-approved text; no arbitrary instructi
  for(const text of ['โทร 0891234567','abc@example.com','เลขบัตร 1234567890123',
    '<img src=x>','https://example.com/','\n## Injected content'])
    assert.throws(()=>safeCaseText({...snapshot().evidence,condition_text:text},'ASSESSMENT_ONLY'))
- assert.throws(()=>applyCase(SOURCE,ANCHOR,ID, 'x'.repeat(20)+SOURCE),'CASE_ALREADY_PRESENT')
+ assert.throws(()=>applyCase(SOURCE.replace(ANCHOR,'<!-- AMPHON_EVIDENCE_CASE:'+ID+' -->\\n'+ANCHOR),ANCHOR,ID,'safe text'))
 })
 test('existing PR receipt is idempotent',async()=>{
  const s=snapshot();s.request.status='DRAFT_PR_OPEN';s.request.draft_pr_url='https://github.com/noteroru2/amphon.co.th/pull/82'
