@@ -1,0 +1,30 @@
+name: SEO rank ledger QA (no deploy)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/seoRankLedger.ts'
+      - 'src/components/SeoPortfolioDashboard.tsx'
+      - 'supabase/functions/seo-gsc/**'
+      - 'supabase/migrations/20261124143000_seo_portfolio_rank_ledger.sql'
+      - 'tests/seo-rank-ledger.test.mjs'
+      - '.github/workflows/seo-rank-ledger-qa.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Rank semantic and security contracts
+        run: node --test tests/seo-rank-ledger.test.mjs tests/seo-gsc.test.mjs
+      - name: Hub build, TypeScript and integration regression
+        run: npm run build
