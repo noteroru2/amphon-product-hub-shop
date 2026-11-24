@@ -41,6 +41,8 @@ export interface TradeEvidence {
   other_direct_cost: number
   customer_channel: 'UNKNOWN' | 'GOOGLE' | 'FACEBOOK' | 'WALK_IN' | 'REPEAT' | 'REFERRAL' | 'OTHER'
   channel_evidence: 'UNKNOWN' | 'CUSTOMER_STATED' | 'DOCUMENTED'
+  source_site_id?: string | null
+  source_page_path?: string | null
   channel_evidence_ref: string | null
   verification_reference: string | null
   transaction_verified: boolean
@@ -62,7 +64,7 @@ export type TradeEvidenceInput = Pick<TradeEvidence,
   'facebook_text' | 'show_price' | 'public_price' | 'permission_confirmed' | 'privacy_reviewed' |
   'deal_code' | 'quantity' | 'transaction_amount' | 'repair_cost' | 'shipping_cost' |
   'platform_fee' | 'other_direct_cost' | 'customer_channel' | 'channel_evidence' |
-  'channel_evidence_ref' | 'verification_reference'>
+  'channel_evidence_ref' | 'verification_reference' | 'source_site_id' | 'source_page_path'>
 
 export interface TradeEvidenceEconomics {
   purchase_evidence_id: string
@@ -90,6 +92,28 @@ export interface TradeEvidenceEconomics {
 function client() {
   if (!supabase) throw new Error('ไม่ได้เชื่อมต่อ Supabase')
   return supabase
+}
+
+export function normalizedSourcePath(value: string) {
+  const path = value.trim()
+  if (!path.startsWith('/') || path.startsWith('//') || /[?#\\\s]/.test(path))
+    throw new Error('กรอกเฉพาะพาธที่ขึ้นต้นด้วย / โดยตัดข้อความหลัง ? และ # ออก')
+  const normalized = new URL(path, 'https://example.com').pathname.replace(/\/+$/, '') || '/'
+  if (normalized.length > 2048) throw new Error('พาธยาวเกิน 2048 ตัวอักษร')
+  return normalized
+}
+
+export async function listSourceSites() {
+  const { data, error } = await client().from('commerce_seo_sites').select('id,origin').eq('enabled',true).order('origin')
+  if (error) throw error
+  return (data || []) as {id:string; origin:string}[]
+}
+
+export async function countVerifiedPageTrades(site: string, path: string, kind: EvidenceKind) {
+  const {count,error} = await client().from('trade_evidence').select('id',{head:true,count:'exact'})
+    .eq('transaction_verified',true).eq('source_site_id',site).eq('source_page_path',normalizedSourcePath(path)).eq('kind',kind)
+  if (error || count == null) throw new Error(error?.message || 'อ่านยอดดีลไม่ได้')
+  return count
 }
 
 function ensureSafe(input: TradeEvidenceInput) {
@@ -133,6 +157,8 @@ export async function saveTradeEvidence(input: TradeEvidenceInput, id?: string):
     deal_code: input.deal_code?.trim().toUpperCase() || null,
     verification_reference: input.verification_reference?.trim() || null,
     channel_evidence_ref: input.channel_evidence_ref?.trim() || null,
+    source_site_id: input.source_site_id || null,
+    source_page_path: input.source_page_path?.trim() ? normalizedSourcePath(input.source_page_path) : null,
     status: 'DRAFT' }
   const query = id
     ? client().from('trade_evidence').update(payload).eq('id', id)
