@@ -121,10 +121,20 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
     void perform(async () => {
       const id = await saveTradeEvidence(form, selected || undefined)
       setSelected(id)
-      if (files.length) await addTradeEvidenceImages(id, files)
-      setFiles([])
-      await load(id)
-    }, 'บันทึกหลักฐานและรูปแล้ว')
+      try {
+        for (const file of files) {
+          try {
+            await addTradeEvidenceImages(id, [file])
+          } catch (err) {
+            const detail = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err)
+            throw new Error('บันทึกดีลแล้ว แต่แนบรูป ' + file.name + ' ไม่สำเร็จ: ' + detail)
+          }
+          setFiles(pending => pending.slice(1))
+        }
+      } finally {
+        await load(id)
+      }
+    }, files.length ? 'บันทึกรูปแล้ว ' + files.length + ' ภาพ' : 'บันทึกข้อมูลดีลแล้ว')
   }
   function verifyTransaction(next: boolean) {
     if (!selected || dirty || files.length) { setError('บันทึกข้อมูลและรูปให้เสร็จก่อนยืนยันธุรกรรม'); return }
@@ -170,8 +180,8 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
     {error && <p className="evidence-error" role="alert">{error}</p>}
     {notice && <p className="evidence-success" role="status">{notice}</p>}
     <div className="evidence-new-actions">
-      <button onClick={() => start('purchase')}><Plus size={18}/> เพิ่มหลักฐานรับซื้อ</button>
-      <button onClick={() => start('sale')}><Plus size={18}/> เพิ่มหลักฐานขาย</button>
+      <button disabled={busy} onClick={() => start('purchase')}><Plus size={18}/> เพิ่มหลักฐานรับซื้อ</button>
+      <button disabled={busy} onClick={() => start('sale')}><Plus size={18}/> เพิ่มหลักฐานขาย</button>
     </div>
     <div className="evidence-finance-summary">
       <div><small>รับซื้อที่เจ้าของยืนยัน (รายการที่โหลด)</small><strong>{verifiedPurchaseCount}</strong></div>
@@ -204,7 +214,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
         {loading && <p><LoaderCircle className="spin" size={17} /> กำลังโหลด</p>}
         {rows.filter(r => filter === 'all' || r.kind === filter).map(row =>
           <button className={row.id === selected ? 'evidence-row active' : 'evidence-row'}
-            onClick={() => open(row)} key={row.id}>
+            disabled={busy} onClick={() => open(row)} key={row.id}>
             <small>{row.kind === 'purchase' ? 'รับซื้อ' : 'ขาย'} · {row.occurred_on}</small>
             <strong>{row.title}</strong><span>{labels[row.status]} · {row.trade_evidence_images?.length || 0} ภาพ
               {row.deal_code ? ' · '+row.deal_code : ''}
@@ -359,12 +369,14 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
           </div>)}
         </div>
         {!locked && <label className="evidence-upload"><ImagePlus size={20}/> เลือกหรือถ่ายภาพเพิ่ม
-          <input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
-            setFiles(old => [...old,...Array.from(e.target.files || [])]); e.target.value = ''
+          <input type="file" disabled={busy} multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
+            const picked = Array.from(e.currentTarget.files || [])
+            e.currentTarget.value = ''
+            setFiles(old => [...old, ...picked])
           }}/>
           {files.length > 0 && <span>รออัปโหลด {files.length} ภาพ</span>}
         </label>}
-        {files.length > 0 && <button className="evidence-text-button" onClick={() => setFiles([])}>ล้างรูปที่รออัปโหลด</button>}
+        {files.length > 0 && <button disabled={busy} className="evidence-text-button" onClick={() => setFiles([])}>ล้างรูปที่รออัปโหลด</button>}
         <h3 className="evidence-subhead"><FileText size={18}/> ข้อความพร้อมใช้</h3>
         <label className="evidence-block">ข้อความเว็บไซต์ / SEO / AI
           <textarea rows={6} disabled={locked} value={form.website_text || ''} onChange={e => change('website_text',e.target.value)}/>
