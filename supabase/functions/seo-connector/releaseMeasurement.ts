@@ -12,6 +12,20 @@ export interface ReleaseProject {
   production_repo: string | null
   production_branch?: string | null
 }
+export interface ReleaseBranchException {
+  site_id: string
+  repository: string
+  registered_branch: string
+  approved_branch: string
+  commit_sha: string
+  hosting_provider: string
+  worker_script: string
+  worker_version: string
+  deployment_id: string
+  build_id: string
+  approved_at: string
+  approval_receipt_url: string
+}
 export interface ReleaseProof {
   github_sha_verified: boolean
   /** Verified GitHub source branch and exact Git object ancestry, not a tag in a deploy message. */
@@ -23,6 +37,9 @@ export interface ReleaseProof {
   live_response_verified: boolean
   live_verified_at: string | null
   deployment_id_present: boolean
+  worker_script: string | null
+  worker_version: string | null
+  build_id: string | null
 }
 export interface ReleaseEntry {
   id: string
@@ -152,22 +169,57 @@ export function sanitizeRelease(
       live_verified_at:liveAt?liveAt.toISOString():null,
       deployment_id_present:typeof row.external_event_id==='string'&&
         row.external_event_id.trim().length>0,
+      worker_script:typeof evidence.worker_script==='string'&&
+        /^[A-Za-z0-9_-]{1,100}$/.test(evidence.worker_script)?evidence.worker_script:null,
+      worker_version:typeof evidence.worker_version==='string'&&
+        /^[a-f0-9-]{36}$/i.test(evidence.worker_version)?evidence.worker_version.toLowerCase():null,
+      build_id:typeof evidence.build_id==='string'&&
+        /^[a-f0-9-]{36}$/i.test(evidence.build_id)?evidence.build_id.toLowerCase():null,
     },
-    affected_urls:Array.from(new Set(urls)).slice(0,25),
+    affected_urls:Array.from(new Set(urls)).slice(0,100),
   }
+}
+function approvedExactBranchException(
+  event:ReleaseEntry,project:ReleaseProject,
+  now:Date,exceptions:ReleaseBranchException[],
+):boolean {
+  const proof=event.release_proof
+  if(!proof||!proof.github_ref||!proof.worker_version||
+    !proof.build_id||!proof.worker_script)return false
+  const UUID=/^[a-f0-9-]{36}$/i
+  return exceptions.some(x=>
+    x.site_id===event.site_id &&
+    x.repository===event.repository &&
+    x.repository===project.production_repo &&
+    x.registered_branch===project.production_branch &&
+    x.approved_branch===proof.github_ref &&
+    x.approved_branch!==x.registered_branch &&
+    x.commit_sha===event.commit_sha.toLowerCase() &&
+    x.hosting_provider===event.provider &&
+    x.worker_script===proof.worker_script &&
+    UUID.test(x.worker_version) && x.worker_version===proof.worker_version &&
+    UUID.test(x.build_id) && x.build_id===proof.build_id &&
+    UUID.test(x.deployment_id) && x.deployment_id===event.external_event_id &&
+    /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/\d+#issuecomment-\d+$/.test(x.approval_receipt_url) &&
+    Boolean(validDate(x.approved_at)) &&
+    validDate(x.approved_at)!.getTime()<=now.getTime()
+  )
 }
 function hasVerifiedEvidence(
   event:ReleaseEntry,project:ReleaseProject|undefined,now:Date,
+  exceptions:ReleaseBranchException[],
 ):boolean {
   if(!project||project.mapping_status!=='VERIFIED'||
     !project.production_repo||project.production_repo!==event.repository||
     !project.production_branch)return false
   if(event.event_kind!=='PRODUCTION_VERIFIED'||
-     event.environment!=='PRODUCTION'||event.qa_status!=='PASS'||
+     event.environment!=='PRODUCTION'||event.qa_status!=='PASSED'||
      !SHA.test(event.commit_sha||'')||!validDate(event.event_at))return false
   const p=event.release_proof
   if(!p||!p.github_sha_verified||!p.github_ref_verified||
-    p.github_ref!==project.production_branch||!p.hosting_source_verified||
+    !(p.github_ref===project.production_branch ||
+      approvedExactBranchException(event,project,now,exceptions))||
+    !p.hosting_source_verified||
     !p.route_verified||!p.live_response_verified||
     !p.deployment_id_present)return false
   const liveAt=validDate(p.live_verified_at)
@@ -205,7 +257,7 @@ function timeline(
 }
 export function assessReleasePortfolio(
   sites:ReleaseSite[],projects:ReleaseProject[],events:ReleaseEntry[],
-  now=new Date(),
+  now=new Date(),exceptions:ReleaseBranchException[]=[],
 ):SiteReleaseGate[] {
   return sites.map(site=>{
     const relevant=events
@@ -222,7 +274,7 @@ export function assessReleasePortfolio(
     // have changed. The new release must be verified independently first.
     const latestProviderDeploy=deploys[0]
     const newestDeployAt=validDate(latestProviderDeploy?.event_at)?.getTime()??0
-    const verified=claims.filter(row=>hasVerifiedEvidence(row,project,now) &&
+    const verified=claims.filter(row=>hasVerifiedEvidence(row,project,now,exceptions) &&
       (validDate(row.event_at)?.getTime()??0)>=newestDeployAt)[0]
     const latest=relevant[0]
     let level:ReleaseLevel='NO_LEDGER_EVENT'
@@ -238,12 +290,13 @@ export function assessReleasePortfolio(
       const candidate=claims[0]??deploys[0]??latest
       if(!candidate||!SHA.test(candidate.commit_sha||''))
         missing.push('PRODUCTION_COMMIT_SHA_40_HEX')
-      if(candidate?.qa_status!=='PASS')missing.push('POST_DEPLOY_QA_PASS')
+      if(candidate?.qa_status!=='PASSED')missing.push('POST_DEPLOY_QA_PASS')
       if(!candidate?.release_proof?.github_sha_verified)
         missing.push('GITHUB_SHA_HOSTING_CORRELATION')
       if(!candidate?.release_proof?.github_ref_verified ||
          !project?.production_branch ||
-         candidate.release_proof.github_ref!==project.production_branch)
+         !(candidate.release_proof.github_ref===project.production_branch ||
+           (project && approvedExactBranchException(candidate,project,now,exceptions))))
         missing.push('GITHUB_PRODUCTION_BRANCH_PROOF')
       if(!candidate?.release_proof?.hosting_source_verified)
         missing.push('HOSTING_EXACT_SOURCE_PROOF')
@@ -266,7 +319,7 @@ export function assessReleasePortfolio(
       latest_sha:latest&&SHA.test(latest.commit_sha||'')?latest.commit_sha:null,
       provider_deploy_count:deploys.length,
       commit_event_count:commits.length,
-      confirmed_production_count:relevant.filter(row=>hasVerifiedEvidence(row,project,now) &&
+      confirmed_production_count:relevant.filter(row=>hasVerifiedEvidence(row,project,now,exceptions) &&
         (validDate(row.event_at)?.getTime()??0)>=newestDeployAt).length,
       missing_evidence:missing,
       verified_release_at:verified?.event_at??null,

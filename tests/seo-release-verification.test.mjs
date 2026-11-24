@@ -19,7 +19,7 @@ const row=(patch={})=>({
   site_id:SITE.id,repository:PROJECT.production_repo,commit_sha:SHA,
   environment:'PRODUCTION',event_kind:'PRODUCTION_VERIFIED',
   provider:'CLOUDFLARE',external_event_id:'deployment-verified-1',
-  event_at:'2026-11-15T03:00:00Z',qa_status:'PASS',
+  event_at:'2026-11-15T03:00:00Z',qa_status:'PASSED',
   affected_urls:['https://amphon.co.th/services/notebook'],
   evidence:{
     github_sha_verified:true,github_ref_verified:true,github_ref:'main',
@@ -28,9 +28,9 @@ const row=(patch={})=>({
     live_response_verified:true,live_verified_at:'2026-11-15T03:15:00Z',
   },...patch,
 })
-const assess=(rows,project=PROJECT,time=now)=>
+const assess=(rows,project=PROJECT,time=now,exceptions=[])=>
   assessReleasePortfolio([SITE],[project],
-    rows.map(r=>sanitizeRelease(r,SITE)),time)[0]
+    rows.map(r=>sanitizeRelease(r,SITE)),time,exceptions)[0]
 
 test('commit observed and provider successful are not production verification',()=>{
   const onlyCommit=assess([row({event_kind:'COMMIT_OBSERVED',environment:'UNKNOWN',
@@ -212,4 +212,54 @@ test('only sanitized provenance booleans and branch leave the server, not raw pr
   assert.equal(safe.release_proof.github_ref_verified,true)
   assert.ok(!JSON.stringify(safe).includes('private-do-not-expose'))
   assert.ok(!JSON.stringify(safe).includes('fake SHA cb55117d'))
+})
+
+
+test('DB QA PASSED is accepted; UI PASS is rejected to match CHECK constraint',()=>{
+  assert.equal(assess([row({qa_status:'PASSED'})]).level,'PRODUCTION_EVIDENCE_COMPLETE')
+  assert.equal(assess([row({qa_status:'PASS'})]).level,'LEDGER_CLAIM_INCOMPLETE')
+})
+test('one SHA+Worker+Build+Deployment owner exception; any drift is rejected',()=>{
+ const releaseBranch='release/cloudflare-unified-astro7-20261118'
+ const version='0f1bcef1-a1b7-44d4-bc50-8196cae41e02'
+ const build='da846848-ad1c-47ff-8bdf-ea6051bcf528'
+ const deploy='cc175707-9e96-427f-9569-591254f4524b'
+ const event=row({
+   external_event_id:deploy,
+   evidence:{...row().evidence,github_ref:releaseBranch,
+     worker_script:'amphon-co-th-production',worker_version:version,build_id:build}
+ })
+ const approved={
+   site_id:'amphon',repository:PROJECT.production_repo,
+   registered_branch:PROJECT.production_branch,approved_branch:releaseBranch,
+   commit_sha:SHA,hosting_provider:'CLOUDFLARE',
+   worker_script:'amphon-co-th-production',worker_version:version,
+   build_id:build,deployment_id:deploy,
+   approved_at:'2026-11-22T16:00:00Z',
+   approval_receipt_url:'https://github.com/noteroru2/amphon-product-hub-shop/issues/163#issuecomment-7120512017',
+ }
+ assert.equal(assess([event]).level,'LEDGER_CLAIM_INCOMPLETE')
+ const allowed=assess([event],PROJECT,now,[approved])
+ assert.equal(allowed.level,'PRODUCTION_EVIDENCE_COMPLETE')
+ assert.equal(allowed.auto_deploy_allowed,false)
+ for(const delta of [
+  {commit_sha:'a'.repeat(40)}, {worker_version:'1'.repeat(36)},
+  {deployment_id:'2'.repeat(36)}, {build_id:'3'.repeat(36)},
+  {approved_branch:'release/evil'}, {registered_branch:'legacy'},
+  {worker_script:'other-worker'}, {repository:'other/repo'},
+  {site_id:'different'}, {hosting_provider:'GITHUB'},
+  {approved_at:'2027-01-01T00:00:00Z'},
+  {approval_receipt_url:'https://evil.test/malicious'},
+ ]){
+  const blocked=assess([event],PROJECT,now,[{...approved,...delta}])
+  assert.equal(blocked.level,'LEDGER_CLAIM_INCOMPLETE',JSON.stringify(delta))
+ }
+ assert.equal(assess([event],{...PROJECT,production_branch:'another-default'},now,[approved]).level,'LEDGER_CLAIM_INCOMPLETE')
+ assert.equal(assess([event],{...PROJECT,mapping_status:'CANDIDATE'},now,[approved]).level,'LEDGER_CLAIM_INCOMPLETE')
+})
+test('validated release URL scope retains all 42 original URLs without foreign hosts',()=>{
+ const urls=Array.from({length:42},(_,i)=>'https://amphon.co.th/บริการ/รับซื้อโน๊ตบุ๊ค-'+i)
+ const sanitized=sanitizeRelease(row({affected_urls:[...urls,'https://evil.test/foo']}),SITE)
+ assert.equal(sanitized.affected_urls?.length,42)
+ assert.equal(sanitized.affected_urls?.includes('https://evil.test/foo'),false)
 })
