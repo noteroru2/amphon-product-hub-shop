@@ -21,7 +21,11 @@ create table if not exists public.commerce_seo_audit_catalog (
 create table if not exists public.commerce_seo_audit_runs (
   id uuid primary key default gen_random_uuid(),
   request_key uuid not null unique,
-  requested_by uuid not null references auth.users(id),
+  requested_by uuid references auth.users(id),
+  constraint seo_audit_run_actor_provenance check(
+    (requested_by is not null and evidence_label='AUDIT_01_20261124')
+    or (requested_by is null and evidence_label='AUDIT_01_IMPORTED')
+  ),
   site_filter text not null default 'ALL',
   category_filter text not null default 'ALL'
     check(category_filter in ('ALL','CONTENT','UX_UI','TECHNICAL','AEO_GEO','MEASUREMENT')),
@@ -201,6 +205,51 @@ on conflict(code) do update set
   title=excluded.title, target_page=excluded.target_page, focus_query=excluded.focus_query,
   finding=excluded.finding, recommendation=excluded.recommendation,
   acceptance=excluded.acceptance, evidence_kind=excluded.evidence_kind;
+
+-- Seed the owner-requested first audit as a SYSTEM import; never impersonate an arbitrary owner account.
+-- GSC baseline is snapshot only and may include different Final end dates per enabled property.
+with imported as (
+  insert into public.commerce_seo_audit_runs
+  (request_key,requested_by,site_filter,category_filter,priority_filter,evidence_label,gsc_snapshot)
+  values (
+    'df5dd7cd-8ca6-49d9-b9ed-cb6fa293a7b1'::uuid,
+    null,'ALL','ALL','ALL','AUDIT_01_IMPORTED',
+    (select coalesce(jsonb_agg(jsonb_build_object(
+       'site_id',w.site_id,'window_days',w.window_days,
+       'start_date',w.start_date,'end_date',w.end_date,
+       'clicks',w.clicks,'impressions',w.impressions,
+       'ctr',w.ctr,'position',w.position,'dates_present',w.dates_present
+     ) order by w.site_id),'[]'::jsonb)
+     from public.commerce_seo_portfolio_gsc_windows_v w
+     join public.commerce_seo_sites site on site.id=w.site_id and site.enabled
+     where w.window_days=28)
+  )
+  on conflict (request_key) do nothing returning id
+), run_id as (
+  select id from imported
+  union all
+  select id from public.commerce_seo_audit_runs
+    where request_key='df5dd7cd-8ca6-49d9-b9ed-cb6fa293a7b1'::uuid
+      and not exists(select 1 from imported)
+)
+insert into public.commerce_seo_audit_tasks
+(run_id,template_code,site_id,category,priority,title,target_page,focus_query,finding,recommendation,acceptance,evidence_kind)
+select r.id,c.code,c.site_id,c.category,c.priority,c.title,c.target_page,c.focus_query,c.finding,c.recommendation,c.acceptance,c.evidence_kind
+from run_id r cross join public.commerce_seo_audit_catalog c
+join public.commerce_seo_sites s on s.id=c.site_id and s.enabled
+on conflict(run_id,template_code) do nothing;
+
+-- Add network-wide entries (NULL site_id) separately; they are not a physical website.
+with source_run as (
+  select id from public.commerce_seo_audit_runs
+  where request_key='df5dd7cd-8ca6-49d9-b9ed-cb6fa293a7b1'::uuid
+)
+insert into public.commerce_seo_audit_tasks
+(run_id,template_code,site_id,category,priority,title,target_page,focus_query,finding,recommendation,acceptance,evidence_kind)
+select r.id,c.code,c.site_id,c.category,c.priority,c.title,c.target_page,c.focus_query,c.finding,c.recommendation,c.acceptance,c.evidence_kind
+from source_run r cross join public.commerce_seo_audit_catalog c
+where c.site_id is null
+on conflict(run_id,template_code) do nothing;
 
 create or replace function public.seo_audit_center_manage(
   p_action text,
