@@ -8,6 +8,7 @@ on:
       - 'workers/evidence-publisher/**'
       - 'tests/evidence-publisher.test.mjs'
       - 'supabase/migrations/20261124_evidence_publisher.sql'
+      - 'tests/sql/evidence-*.sql'
       - 'src/vite-env.d.ts'
       - 'scripts/evidence-draft-pr*.mjs'
       - 'tests/evidence-draft-pr.test.mjs'
@@ -37,3 +38,27 @@ jobs:
         run: npm run build
       - name: Worker bundle dry run only (NEVER DEPLOY)
         run: npx wrangler deploy --config workers/evidence-publisher/wrangler.jsonc --dry-run
+
+  ephemeral-sql:
+    name: Ephemeral Postgres 17 staging schema (NO SUPABASE PRODUCTION)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ephemeral-ci-only
+          POSTGRES_DB: evidence_qa
+        options: >-
+          --health-cmd "pg_isready -U postgres -d evidence_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create synthetic Supabase-compatible fixtures
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-fixture.sql
+      - name: Apply proposed schema to disposable Postgres only
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < supabase/migrations/20261124_evidence_publisher.sql
+      - name: Test RLS grants, duplicate requests and release constraints
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-staging-assert.sql
