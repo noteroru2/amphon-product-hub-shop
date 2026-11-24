@@ -1,61 +1,55 @@
--- DRAFT only. Must be separately approved and staged before any Production database change.
--- Private media staging; NO PUBLIC URL, and no client grants.
-create table if not exists public.commerce_evidence_publication_requests (
- id uuid primary key default gen_random_uuid(),
- evidence_id uuid not null references public.trade_evidence(id) on delete restrict,
- image_id uuid not null references public.trade_evidence_images(id) on delete restrict,
- site_id text not null references public.commerce_seo_sites(id),
- page_path text not null,
- private_media_key text not null,
- claim_kind text not null check (claim_kind in ('ASSESSMENT_ONLY','VERIFIED_TRANSACTION')),
- status text not null default 'PENDING_SOURCE_PR'
-   check (status in ('PENDING_SOURCE_PR','DRAFT_PR_OPEN','RELEASED','CANCELLED')),
- requested_by uuid not null references auth.users(id),
- requested_at timestamptz not null default now(),
- draft_pr_number integer,
- draft_pr_url text,
- draft_commit_sha text,
- release_commit_sha text,
- released_at timestamptz,
- unique (evidence_id,image_id,site_id,page_path),
- check (left(page_path,1)='/' and left(page_path,2)<>'//' and length(page_path)<=2048),
- check (private_media_key ~ '^evidence/[0-9a-f-]{36}/[0-9a-f-]{36}[.]webp$'),
- check ((status <> 'DRAFT_PR_OPEN') or (draft_pr_number > 0 and draft_pr_url is not null)),
- check ((status <> 'RELEASED') or (release_commit_sha is not null and released_at is not null))
+-- AMPHON Evidence Publisher V1: staging-only schema, NOT applied to Production.
+-- Owner activation and nonzero Supabase Branch cost require separate explicit approval.
+-- Queue and page mapping are private; all browser-accessible roles are denied.
+CREATE TABLE IF NOT EXISTS public.commerce_evidence_publication_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  evidence_id uuid NOT NULL REFERENCES public.trade_evidence(id) ON DELETE RESTRICT,
+  image_id uuid NOT NULL REFERENCES public.trade_evidence_images(id) ON DELETE RESTRICT,
+  site_id text NOT NULL REFERENCES public.commerce_seo_sites(id),
+  page_path text NOT NULL,
+  private_media_key text NOT NULL,
+  claim_kind text NOT NULL CHECK (claim_kind IN ('ASSESSMENT_ONLY','VERIFIED_TRANSACTION')),
+  status text NOT NULL DEFAULT 'PENDING_SOURCE_PR'
+    CHECK (status IN ('PENDING_SOURCE_PR','DRAFT_PR_OPEN','RELEASED','CANCELLED')),
+  requested_by uuid NOT NULL REFERENCES auth.users(id),
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  draft_pr_number integer,
+  draft_pr_url text,
+  draft_commit_sha text,
+  release_commit_sha text,
+  released_at timestamptz,
+  UNIQUE (evidence_id,image_id,site_id,page_path),
+  CHECK (left(page_path,1)='/' AND left(page_path,2)<>'//' AND length(page_path)<=2048),
+  CHECK (private_media_key ~ '^evidence/[0-9a-f-]{36}/[0-9a-f-]{36}[.]webp$'),
+  CHECK (status <> 'DRAFT_PR_OPEN' OR (draft_pr_number > 0 AND draft_pr_url IS NOT NULL)),
+  CHECK (status <> 'RELEASED' OR (release_commit_sha IS NOT NULL AND released_at IS NOT NULL))
 );
-alter table public.commerce_evidence_publication_requests enable row level security;
-revoke all on public.commerce_evidence_publication_requests from PUBLIC, anon, authenticated;
-create index if not exists evidence_publication_pending_by_site
- on public.commerce_evidence_publication_requests(site_id,status,requested_at desc);
+ALTER TABLE public.commerce_evidence_publication_requests ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.commerce_evidence_publication_requests FROM PUBLIC, anon, authenticated;
+CREATE INDEX IF NOT EXISTS evidence_publication_pending_by_site
+  ON public.commerce_evidence_publication_requests (site_id,status,requested_at DESC);
 
--- Explicit site-page -> source file mapping. No user-supplied arbitrary repository or source file.
--- Privileged operators must independently verify every mapping against the live repo.
-create table if not exists public.commerce_evidence_page_source_mappings (
- site_id text not null references public.commerce_seo_sites(id),
- page_path text not null,
- source_path text not null,
- insert_before text not null,
- expected_base_sha text not null,
- enabled boolean not null default false,
- reviewed_by uuid references auth.users(id),
- reviewed_at timestamptz,
- primary key(site_id,page_path),
- check (page_path like '/%' and length(page_path)<=2048),
- check (length(source_path) between 10 and 220),
- check (length(insert_before) between 10 and 300),
- check (expected_base_sha ~ '^[0-9a-f]{40}
- check (not enabled or (reviewed_by is not null and reviewed_at is not null))
+-- Destination URL -> reviewed, exact content source file. Disabled by default.
+-- Does NOT use trade_evidence's customer-acquisition attribution as destination.
+CREATE TABLE IF NOT EXISTS public.commerce_evidence_page_source_mappings (
+  site_id text NOT NULL REFERENCES public.commerce_seo_sites(id),
+  page_path text NOT NULL,
+  source_path text NOT NULL,
+  insert_before text NOT NULL,
+  expected_base_sha text NOT NULL,
+  enabled boolean NOT NULL DEFAULT false,
+  reviewed_by uuid REFERENCES auth.users(id),
+  reviewed_at timestamptz,
+  PRIMARY KEY (site_id,page_path),
+  CHECK (page_path LIKE '/%' AND left(page_path,2)<>'//' AND length(page_path)<=2048),
+  CHECK (length(source_path) BETWEEN 10 AND 220),
+  CHECK (length(insert_before) BETWEEN 10 AND 300),
+  CHECK (expected_base_sha ~ '^[0-9a-f]{40}$'),
+  CHECK (NOT enabled OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL))
 );
-alter table public.commerce_evidence_page_source_mappings enable row level security;
-revoke all on public.commerce_evidence_page_source_mappings from PUBLIC, anon, authenticated;
+ALTER TABLE public.commerce_evidence_page_source_mappings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.commerce_evidence_page_source_mappings FROM PUBLIC, anon, authenticated;
 
--- NOTE: No mappings auto-enabled. Job #22 requires explicit review of target source
--- and registered production branch before any GitHub Draft PR automation.
-),
- check (not enabled or (reviewed_by is not null and reviewed_at is not null))
-);
-alter table public.commerce_evidence_page_source_mappings enable row level security;
-revoke all on public.commerce_evidence_page_source_mappings from PUBLIC, anon, authenticated;
-
--- NOTE: No mappings auto-enabled. Job #22 requires explicit review of target source
--- and registered production branch before any GitHub Draft PR automation.
+-- No page mappings are enabled, no queue rows are inserted and no image is made
+-- public merely by running this migration. Never merge migration into Production
+-- without separate owner authorization.
