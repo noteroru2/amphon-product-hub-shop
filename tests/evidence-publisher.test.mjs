@@ -23,7 +23,7 @@ test('rejects missing approval, wrong image, and forged path',()=>{
 })
 test('targets are bounded, normalized, unique, cannot leave site',()=>{
  assert.deepEqual(policy.validatePublicationTargets([{site_id:'amphon',page_path:'/บริการ/รับซื้อโน๊ตบุ๊ค/'}]),[
-   {site_id:'amphon',page_path:'/บริการ/รับซื้อโน๊ตบุ๊ค'}])
+   {site_id:'amphon',page_path:new URL('/บริการ/รับซื้อโน๊ตบุ๊ค','https://example.invalid').pathname}])
  for(const path of ['https://evil.example/','//evil.example','/../secrets','/x?token=1','/x#private','/bad\\path','/a b'])
    assert.throws(()=>policy.validatePublicationTargets([{site_id:'amphon',page_path:path}]),path)
  assert.throws(()=>policy.validatePublicationTargets([{site_id:'amphon',page_path:'/a'}, {site_id:'amphon',page_path:'/a/'}]))
