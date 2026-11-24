@@ -35,6 +35,7 @@ create table if not exists public.commerce_evidence_page_source_mappings (
  page_path text not null,
  source_path text not null,
  insert_before text not null,
+ expected_base_sha text not null,
  enabled boolean not null default false,
  reviewed_by uuid references auth.users(id),
  reviewed_at timestamptz,
@@ -42,6 +43,15 @@ create table if not exists public.commerce_evidence_page_source_mappings (
  check (page_path like '/%' and length(page_path)<=2048),
  check (length(source_path) between 10 and 220),
  check (length(insert_before) between 10 and 300),
+ check (expected_base_sha ~ '^[0-9a-f]{40}
+ check (not enabled or (reviewed_by is not null and reviewed_at is not null))
+);
+alter table public.commerce_evidence_page_source_mappings enable row level security;
+revoke all on public.commerce_evidence_page_source_mappings from PUBLIC, anon, authenticated;
+
+-- NOTE: No mappings auto-enabled. Job #22 requires explicit review of target source
+-- and registered production branch before any GitHub Draft PR automation.
+),
  check (not enabled or (reviewed_by is not null and reviewed_at is not null))
 );
 alter table public.commerce_evidence_page_source_mappings enable row level security;
