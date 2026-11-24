@@ -11,7 +11,7 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
   const [targets,setTargets]=useState<PublicationTarget[]>([])
   const [working,setWorking]=useState(false)
   const [error,setError]=useState('')
-  const [receipt,setReceipt]=useState<{media_url:string;claim_kind:string;requests:Receipt[]}|null>(null)
+  const [receipt,setReceipt]=useState<{claim_kind:string;requests:Receipt[];status:string;media_public:boolean}|null>(null)
   const images=(evidence.trade_evidence_images || []).filter((im:TradeEvidenceImage)=>im.approved_for_public)
   function toggle(site_id:string,checked:boolean) {
     setReceipt(null)
@@ -28,13 +28,13 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
     let safeTargets:PublicationTarget[]
     try {safeTargets=validatePublicationTargets(targets)}
     catch {setError('กรุณาเลือกเว็บไซต์และกรอกพาธหน้าที่ถูกต้อง เช่น /บริการ/รับซื้อโน๊ตบุ๊ค');return}
-    if(!window.confirm('ยืนยันส่งภาพที่ผ่านการตรวจและสร้างคิว Source Draft PR ตามหน้าที่เลือก? ไม่มีการ Merge หรือ Deploy เว็บไซต์'))return
+    if(!window.confirm('ยืนยันให้สร้างไฟล์ WebP ในคลังส่วนตัวและส่งคิว Draft PR ตามหน้าที่เลือก? ภาพจะไม่เผยแพร่สาธารณะ และไม่มีการ Merge หรือ Deploy'))return
     setWorking(true)
     try {
       if(!supabase)throw Error('ยังไม่เชื่อมต่อ Supabase')
       const {data,error:authError}=await supabase.auth.getSession()
       if(authError||!data.session?.access_token)throw Error('กรุณาเข้าสู่ระบบใหม่')
-      const res=await fetch(workerUrl+'/api/publish',{
+      const res=await fetch(workerUrl+'/api/stage',{
         method:'POST',headers:{'authorization':'Bearer '+data.session.access_token,
           'content-type':'application/json'},
         body:JSON.stringify({evidence_id:evidence.id,image_id:imageId,targets:safeTargets})
@@ -47,9 +47,8 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
   }
   if(evidence.status!=='APPROVED')return null
   return <section className="evidence-share" aria-label="Evidence Publisher">
-    <h3>เผยแพร่หลักฐานเข้าสู่คลังภาพและคิว SEO (Owner)</h3>
-    <p>ขั้นตอนนี้สร้างภาพ WebP สาธารณะจากต้นฉบับส่วนตัว และเข้าคิวแก้หน้า SEO เท่านั้น
-      จะไม่แก้หน้าเว็บ ไม่ Merge หรือ Deploy อัตโนมัติ</p>
+    <h3>เตรียมหลักฐานส่วนตัวเข้าสู่คิว Draft PR (Owner)</h3>
+    <p>ขั้นตอนนี้สร้าง WebP ในคลังส่วนตัวและเข้าคิวเตรียม Draft PR เท่านั้น ไม่เปิดเผยรูปจริง ไม่แก้หน้าเว็บ ไม่ Merge หรือ Deploy</p>
     <p>สถานะธุรกรรม: <strong>{evidence.transaction_verified?'เจ้าของยืนยันซื้อ/ขายจริง':'เคสประเมินเท่านั้น ยังไม่ยืนยันซื้อ/ขายจริง'}</strong></p>
     {!evidence.permission_confirmed||!evidence.privacy_reviewed
       ? <p role="alert">ต้องอนุมัติสิทธิ์และตรวจความเป็นส่วนตัวก่อน</p>
@@ -73,14 +72,13 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
         })}
         {error&&<p className="evidence-error" role="alert">{error}</p>}
         {receipt&&<div role="status">
-          <p>สร้างภาพสาธารณะและคิว Source PR แล้ว ({receipt.claim_kind}). ยังไม่ได้เผยแพร่หน้า SEO</p>
-          <a href={receipt.media_url} target="_blank" rel="noreferrer">ตรวจภาพ WebP ที่เผยแพร่</a>
+          <p>จัดเก็บภาพในคลังส่วนตัวและส่งคิวแล้ว ({receipt.claim_kind}) — ไม่มี URL ภาพสาธารณะ ไม่ได้สร้าง PR หรือเผยแพร่เว็บไซต์</p>
           {receipt.requests.map(r=><p key={r.id}>{r.site_id} {r.page_path} — {r.status} · {r.id}</p>)}
         </div>}
         <button className="evidence-approve" disabled={working||!images.length||!targets.length} onClick={()=>void submit()}>
-          {working?'กำลังสร้างคิว...':'อนุมัติภาพและส่งคิวแก้หน้า SEO'}
+          {working?'กำลังสร้างคิว...':'ส่งคิวเตรียม Draft PR (ภาพยังเป็นส่วนตัว)'}
         </button>
       </>}
-    <p>การลบหรือแก้ภาพหลังเผยแพร่ต้องถอนภาพสาธารณะและล้าง Cache ด้วย ห้ามลงภาพที่ยังมีเลขซีเรียล ข้อมูลลูกค้า หรือเอกสารส่วนตัว</p>
+    <p>ห้ามใส่ URL ของภาพส่วนตัวหรือ Signed URL ลงใน Draft PR ภาพสาธารณะต้องได้รับอนุมัติอีกครั้งแยกต่างหาก</p>
   </section>
 }
