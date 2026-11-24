@@ -60,4 +60,4 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/fixtures/trade_evidence_real_deal_economics_contract.sql
       - name: Verify no accidental grants to anonymous role
         run: |
-          psql -Atqc "select (not has_table_privilege('anon','public.trade_evidence_economics_v','SELECT'))::text" | grep -x t
+          psql -Atqc "select (not has_table_privilege('anon','public.trade_evidence_economics_v','SELECT'))::text" | grep -x true
