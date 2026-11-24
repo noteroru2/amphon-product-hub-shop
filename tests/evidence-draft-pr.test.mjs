@@ -57,7 +57,7 @@ test('Lenovo Job #22: only approved private evidence, no false purchase claim',(
  assert.equal(result.base,'release/cloudflare-production')
  assert.equal(result.claim,'ASSESSMENT_ONLY')
  assert.match(result.draftText,/ประเมินเบื้องต้น/)
- assert.doesNotMatch(result.draftText,/รับซื้อเข้าเรียบร้อย|ภาพ/)
+ assert.doesNotMatch(result.draftText,/รับซื้อเข้าเรียบร้อย|\\.webp|trade-evidence-private/)
  const next=applyCase(SOURCE,ANCHOR,ID,result.draftText)
  assert.ok(next.startsWith(SOURCE.slice(0,SOURCE.indexOf(ANCHOR))))
  assert.match(next,/AMPHON_EVIDENCE_CASE/)
