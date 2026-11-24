@@ -43,6 +43,8 @@ on:
       - '.github/workflows/seo-draft-pr-execute.yml'
       - 'supabase/migrations/20261123103000_seo_source_change_pr_runs.sql'
       - 'supabase/migrations/20261124030000_seo_release_branch_exceptions.sql'
+      - 'supabase/migrations/20261124035800_seo_portfolio_attribution_readiness.sql'
+      - 'tests/fixtures/seo_portfolio_attribution_readiness_contract.sql'
       - 'tests/fixtures/seo_release_branch_exception_contract.sql'
       - 'tests/fixtures/seo_source_change_postgres_contract.sql'
       - 'package.json'
@@ -124,3 +126,4 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/seo_source_change_postgres_contract.sql
           psql -v ON_ERROR_STOP=1 -f tests/fixtures/seo_release_branch_exception_contract.sql
+          psql -v ON_ERROR_STOP=1 -f tests/fixtures/seo_portfolio_attribution_readiness_contract.sql
