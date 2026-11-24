@@ -67,6 +67,13 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
   const verifiedPurchaseCount = rows.filter(r => r.kind === 'purchase' && r.transaction_verified).length
   const verifiedSaleCount = rows.filter(r => r.kind === 'sale' && r.transaction_verified).length
   const realizedTotal = economics.reduce((sum,row) => sum+Number(row.realized_gross_profit_after_direct_costs),0)
+  const channelSummary = channels.map(([code,label]) => {
+    const deals = economics.filter(d => d.buyer_acquisition_channel === code)
+    return { code, label, deals: deals.length, gross: deals.reduce((sum,d) =>
+      sum+Number(d.realized_gross_profit_after_direct_costs),0),
+      selfReported: deals.filter(d => d.buyer_channel_evidence === 'CUSTOMER_STATED').length,
+      documented: deals.filter(d => d.buyer_channel_evidence === 'DOCUMENTED').length }
+  }).filter(x => x.deals > 0)
 
   function change<K extends keyof TradeEvidenceInput>(key: K, value: TradeEvidenceInput[K]) {
     setForm(old => ({ ...old, [key]: value }))
@@ -172,6 +179,17 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
          ไม่ใช่กำไรสุทธิหลังค่าใช้จ่ายประจำร้าน และยังไม่ใช่กำไรที่ยืนยันว่ามาจาก Google
          {economics.length === 2000 ? ' • แสดงเพียง 2,000 ดีลล่าสุด' : ''}</p>
     </div>
+    {channelSummary.length > 0 && <section className="evidence-channel-summary">
+      <h2>กำไรตามช่องทางที่บันทึกไว้ (ไม่ยืนยันว่าเกิดจาก SEO)</h2>
+      <p>แยกตามคำบอกเล่าหรือหลักฐานที่ร้านเก็บไว้ตอนซื้อเข้า ไม่ใช่การจับคู่ Google Search Console กับลูกค้า</p>
+      <div className="evidence-channel-table-wrapper"><table>
+        <thead><tr><th>ช่องทางรับซื้อ</th><th>ดีลที่ขายแล้ว</th><th>ลูกค้าแจ้ง</th><th>มีหลักฐานช่องทาง</th><th>กำไรหลังต้นทุนตรง</th></tr></thead>
+        <tbody>{channelSummary.map(item => <tr key={item.code}>
+          <td>{item.label}</td><td>{item.deals}</td><td>{item.selfReported}</td><td>{item.documented}</td>
+          <td>{money(item.gross)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </section>}
     <div className="evidence-layout">
       <aside className="evidence-list">
         <div className="evidence-list-header"><strong>รายการ ({rows.length})</strong>
