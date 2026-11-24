@@ -10,9 +10,17 @@ interface Metric { site_id: string; window_days: WindowDays; start_date: string;
 interface Keyword { site_id: string; keyword: string; role: string; approval_status: string; distinct_value: string; target_page: string | null }
 interface Release { id: string; site_id: string; repository: string; commit_sha: string; environment: string; event_kind: string; provider: string; event_at: string; qa_status: string }
 interface Funnel { site_id: string; contact_events: number; confirmed_contact_events: number; verified_purchases: number; verified_units: number; verified_sales: number; realized_gross_profit: number }
+interface AttributionReadiness {
+  site_id: string; site_enabled: boolean; contact_click_events: number;
+  organic_search_labeled_clicks: number; unknown_channel_clicks: number;
+  owner_confirmed_leads: number; evidence_verified_purchases: number;
+  evidence_verified_units: number; evidence_verified_sales: number;
+  evidence_verified_realized_gross_profit: number;
+  cross_site_contact_link_warnings: number; evidence_stage: string; measurement_warning: string
+}
 interface Ingest { site_id: string; window_days: WindowDays; end_date: string; rows_written: number; data_complete: boolean; status: string; error_class: string | null }
 interface Query { site_id: string; window_days: WindowDays; query: string; page: string; clicks: number; impressions: number; position: number | null; partial_window: boolean; source: string; end_date: string }
-interface PortfolioResponse { sites: Site[]; projects: Project[]; windows: Metric[]; roles: Keyword[]; releases: Release[]; funnel: Funnel[]; ingests: Ingest[]; queries: Query[]; selectedSite: string; selectedWindow: WindowDays }
+interface PortfolioResponse { sites: Site[]; projects: Project[]; windows: Metric[]; roles: Keyword[]; releases: Release[]; funnel: Funnel[]; attribution_readiness?: AttributionReadiness[]; ingests: Ingest[]; queries: Query[]; selectedSite: string; selectedWindow: WindowDays }
 const n = (value: number | null | undefined, digits = 0) => value == null || !Number.isFinite(Number(value))
   ? '—' : Number(value).toLocaleString('th-TH',{maximumFractionDigits:digits})
 const pct = (v: number | null | undefined) => v == null ? '—' : n(Number(v)*100,2) + '%'
@@ -44,6 +52,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
   const metrics = useMemo(()=>new Map((data?.windows||[]).filter(v=>v.window_days===days).map(v=>[v.site_id,v])),[data,days])
   const projects = useMemo(()=>new Map((data?.projects||[]).map(v=>[v.site_id,v])),[data])
   const funnels = useMemo(()=>new Map((data?.funnel||[]).map(v=>[v.site_id,v])),[data])
+  const attributionReadiness = useMemo(()=>new Map((data?.attribution_readiness||[]).map(v=>[v.site_id,v])),[data])
   const sites = useMemo(()=>[...(data?.sites||[])].sort((a,b)=>Number(metrics.get(b.id)?.clicks||0)-Number(metrics.get(a.id)?.clicks||0)),[data,metrics])
   const selected = data?.sites.find(v=>v.id===siteId)
   const totalClicks = sites.reduce((sum,v)=>sum+Number(metrics.get(v.id)?.clicks||0),0)
@@ -51,6 +60,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
   const selectedMetric = metrics.get(siteId)
   const selectedProject = projects.get(siteId)
   const selectedFunnel = funnels.get(siteId)
+  const selectedAttribution = attributionReadiness.get(siteId)
   const selectedRoles = (data?.roles||[]).filter(v=>v.site_id===siteId)
   const selectedReleases = (data?.releases||[]).filter(v=>v.site_id===siteId).slice(0,12)
   const receipt = (data?.ingests||[]).find(v=>v.site_id===siteId && v.window_days===days)
@@ -69,6 +79,7 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
       production_mapping: selectedProject ?? null,
       releases: selectedReleases,
       aggregated_conversions: selectedFunnel ?? null,
+      evidence_verified_conversion_readiness: selectedAttribution ?? null,
       query_page_samples: (data.queries || []).filter(v => v.site_id === siteId && v.window_days === days),
       guardrails: {
         gsc_average_position_not_live_rank: true,
@@ -156,12 +167,18 @@ export function SeoPortfolioDashboard({refreshSignal=0}:{refreshSignal?:number})
           </article>
           <article>
             <h4>Conversion (ต้องยืนยันธุรกรรม)</h4>
-            <p>CTA Events: <strong>{n(selectedFunnel?.contact_events)}</strong></p>
-            <p>Lead ยืนยัน: <strong>{n(selectedFunnel?.confirmed_contact_events)}</strong></p>
-            <p>ดีลซื้อที่ผูกหลักฐาน: <strong>{n(selectedFunnel?.verified_purchases)}</strong></p>
-            <p>เครื่องซื้อเข้า: <strong>{n(selectedFunnel?.verified_units)}</strong></p>
-            <p>กำไรขั้นต้นหลังขายที่ผูกหลักฐาน: <strong>{n(selectedFunnel?.realized_gross_profit,2)} บาท</strong></p>
-            <small>ศูนย์หมายถึงไม่มีรายการที่ยืนยันใน Attribution Ledger ไม่ได้หมายความว่าร้านไม่มีการขายจริง</small>
+            <p>คลิกปุ่มติดต่อ (ไม่ใช่จำนวนลูกค้า): <strong>{n(selectedAttribution?.contact_click_events)}</strong></p>
+            <p>คลิกที่ถูกจัดหมวด Organic: <strong>{n(selectedAttribution?.organic_search_labeled_clicks)}</strong></p>
+            <p>คลิกที่ยังไม่ทราบแหล่งที่มา: <strong>{n(selectedAttribution?.unknown_channel_clicks)}</strong></p>
+            <p>ลูกค้าที่มีหลักฐานยืนยัน: <strong>{n(selectedAttribution?.owner_confirmed_leads)}</strong></p>
+            <p>ดีลซื้อที่ตรวจหลักฐานแล้ว: <strong>{n(selectedAttribution?.evidence_verified_purchases)}</strong></p>
+            <p>จำนวนเครื่องที่ซื้อเข้าและตรวจหลักฐาน: <strong>{n(selectedAttribution?.evidence_verified_units)}</strong></p>
+            <p>รายการขายที่ตรวจหลักฐานแล้ว: <strong>{n(selectedAttribution?.evidence_verified_sales)}</strong></p>
+            <p>กำไรขั้นต้นหลังขายที่ตรวจหลักฐาน: <strong>{selectedAttribution ? n(selectedAttribution.evidence_verified_realized_gross_profit,2)+' บาท' : '—'}</strong></p>
+            {selectedAttribution && <p>สถานะหลักฐาน: <strong>{selectedAttribution.evidence_stage}</strong></p>}
+            {Number(selectedAttribution?.cross_site_contact_link_warnings||0)>0 &&
+              <p role="alert">พบการจับคู่คลิกข้ามเว็บไซต์ผิดพลาด {n(selectedAttribution?.cross_site_contact_link_warnings)} รายการ ต้องตรวจหลักฐาน</p>}
+            <small>คลิกไม่เท่ากับการสนทนา LINE หรือการซื้อขายจริง คำว่า Organic เป็นการจัดหมวดจากแหล่งที่มา ไม่ยืนยันว่าเป็น Google Search คลิก กำไรแสดงเฉพาะรายการที่ผูกหลักฐาน และ 0 ไม่ได้แปลว่าร้านไม่มีการขาย</small>
           </article>
         </div>
         <h4>Top Query + Page ({days} วัน)</h4>

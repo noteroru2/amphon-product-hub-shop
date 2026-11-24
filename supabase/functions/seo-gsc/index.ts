@@ -65,7 +65,7 @@ async function savePortfolioWindows(site: Site, property: string, accessToken: s
   }
 }
 async function portfolioData(siteId:string,windowDays:7|14|28) {
-  const [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions]=await Promise.all([
+  const [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness]=await Promise.all([
     db.from('commerce_seo_sites').select('id,label,origin').eq('enabled',true).order('id'),
     db.from('commerce_seo_portfolio_projects').select('site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed'),
     db.from('commerce_seo_portfolio_gsc_windows_v').select('site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance'),
@@ -73,9 +73,10 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
     db.from('commerce_seo_portfolio_release_events').select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(300),
     db.from('commerce_seo_portfolio_funnel_v').select('site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit'),
     db.from('commerce_seo_portfolio_gsc_ingest_runs').select('site_id,window_days,end_date,rows_written,data_complete,status,error_class').order('end_date',{ascending:false}).limit(150),
-    db.from('commerce_seo_release_branch_exceptions').select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100)
+    db.from('commerce_seo_release_branch_exceptions').select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100),
+    db.from('commerce_seo_portfolio_attribution_readiness_v').select('site_id,site_enabled,contact_click_events,organic_search_labeled_clicks,unknown_channel_clicks,owner_confirmed_leads,evidence_verified_purchases,evidence_verified_units,evidence_verified_sales,evidence_verified_realized_gross_profit,cross_site_contact_link_warnings,evidence_stage,measurement_warning').limit(100)
   ])
-  for(const result of [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
+  for(const result of [sites,projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness]) if(result.error) throw new Error('PORTFOLIO_READ_FAILED')
   const enabled=(sites.data||[]) as {id:string}[]
   if(!enabled.some(row=>row.id===siteId)) throw new Error('SITE_NOT_FOUND')
   const receipts=(ingests.data||[]).filter(row=>row.site_id===siteId && row.window_days===windowDays)
@@ -96,7 +97,7 @@ async function portfolioData(siteId:string,windowDays:7|14|28) {
   // evidence (including possible future provider secrets) stays server-side.
   return {sites:sites.data,projects:projects.data,windows:windows.data,roles:roles.data,
     releases:sanitizedReleases,release_gates:releaseGates,
-    funnel:funnel.data,ingests:ingests.data,
+    funnel:funnel.data,attribution_readiness:attributionReadiness.data,ingests:ingests.data,
     queries:details.data||[],selectedSite:siteId,selectedWindow:windowDays}
 }
 

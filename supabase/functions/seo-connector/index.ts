@@ -86,7 +86,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    const query=db.from(table).select(columns)
    return siteId?query.eq('site_id',siteId):query.in('site_id',Array.from(allowed))
   }
-  const [projects,windows,roles,releases,funnel,ingests,branchExceptions]=await Promise.all([
+  const [projects,windows,roles,releases,funnel,ingests,branchExceptions,attributionReadiness]=await Promise.all([
    checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_windows_v','site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance').eq('window_days',days).limit(100)),
    checked(scoped('commerce_seo_portfolio_keyword_roles','site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300)),
@@ -94,6 +94,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    checked(scoped('commerce_seo_portfolio_funnel_v','site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_ingest_runs','site_id,window_days,end_date,rows_written,data_complete,status,error_class').in('window_days',[7,14]).order('end_date',{ascending:false}).limit(150)),
    checked(scoped('commerce_seo_release_branch_exceptions','site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100)),
+   checked(scoped('commerce_seo_portfolio_attribution_readiness_v','site_id,site_enabled,contact_click_events,organic_search_labeled_clicks,unknown_channel_clicks,owner_confirmed_leads,evidence_verified_purchases,evidence_verified_units,evidence_verified_sales,evidence_verified_realized_gross_profit,cross_site_contact_link_warnings,evidence_stage,measurement_warning').limit(100)),
   ])
   const siteMap=new Map(sites.map((row:any)=>[row.id,row]))
   const safeReleases=releases.map((row:RawReleaseEntry)=>
@@ -111,7 +112,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    selected_window_days:days,
    selected_site_id:siteId,
    sources:{sites:'HUB_ENABLED_SITE_REGISTRY',gsc:'HUB_FINAL_GSC_WAREHOUSE',repositories:'HUB_PORTFOLIO_PROJECTS',releases:'HUB_RELEASE_LEDGER',conversions:'HUB_AGGREGATED_ATTRIBUTION'},
-   sites,projects,windows,keyword_roles:roles,releases:safeReleases,release_gates:releaseGates,conversions:funnel,ingest_runs:ingests,
+   sites,projects,windows,keyword_roles:roles,releases:safeReleases,release_gates:releaseGates,conversions:funnel,conversion_readiness:attributionReadiness,ingest_runs:ingests,
    site_readiness:readiness,
    project_milestones:milestones,
    project_completion:{
