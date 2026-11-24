@@ -86,18 +86,19 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    const query=db.from(table).select(columns)
    return siteId?query.eq('site_id',siteId):query.in('site_id',Array.from(allowed))
   }
-  const [projects,windows,roles,releases,funnel,ingests]=await Promise.all([
+  const [projects,windows,roles,releases,funnel,ingests,branchExceptions]=await Promise.all([
    checked(scoped('commerce_seo_portfolio_projects','site_id,repo_candidates,production_repo,production_branch,hosting_provider,mapping_status,central_deploy_allowed').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_windows_v','site_id,window_days,start_date,end_date,clicks,impressions,ctr,position,dates_present,provenance').eq('window_days',days).limit(100)),
    checked(scoped('commerce_seo_portfolio_keyword_roles','site_id,keyword,role,approval_status,distinct_value,target_page').order('keyword').limit(300)),
    checked(scoped('commerce_seo_portfolio_release_events','id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence').order('event_at',{ascending:false}).limit(200)),
    checked(scoped('commerce_seo_portfolio_funnel_v','site_id,contact_events,confirmed_contact_events,verified_purchases,verified_units,verified_sales,realized_gross_profit').limit(100)),
    checked(scoped('commerce_seo_portfolio_gsc_ingest_runs','site_id,window_days,end_date,rows_written,data_complete,status,error_class').in('window_days',[7,14]).order('end_date',{ascending:false}).limit(150)),
+   checked(scoped('commerce_seo_release_branch_exceptions','site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url').limit(100)),
   ])
   const siteMap=new Map(sites.map((row:any)=>[row.id,row]))
   const safeReleases=releases.map((row:RawReleaseEntry)=>
     sanitizeRelease(row,siteMap.get(row.site_id) as any))
-  const releaseGates=assessReleasePortfolio(sites,projects,safeReleases)
+  const releaseGates=assessReleasePortfolio(sites,projects,safeReleases,new Date(),branchExceptions)
   const readiness=assessDevelopmentReadiness(
    {sites,projects,roles,windows,ingests,releases:safeReleases},days as 7|14|28,new Date()
   )
@@ -186,7 +187,7 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
  if(name==='seo_release_compare') {
   if(typeof a.site_id!=='string'||!/^[a-z0-9_-]{2,24}$/.test(a.site_id))
    throw Error('Invalid site_id')
-  const [site,project,history]=await Promise.all([
+  const [site,project,history,branchExceptions]=await Promise.all([
    checked(db.from('commerce_seo_sites').select('id,label,origin,enabled')
     .eq('id',a.site_id).eq('enabled',true).single()),
    checked(db.from('commerce_seo_portfolio_projects').select('site_id,mapping_status,production_repo,production_branch')
@@ -194,10 +195,13 @@ async function execute(name:string,a:Record<string,any>,actor:string) {
    checked(db.from('commerce_seo_portfolio_release_events')
     .select('id,site_id,repository,commit_sha,environment,event_kind,provider,external_event_id,event_at,qa_status,affected_urls,evidence')
     .eq('site_id',a.site_id).order('event_at',{ascending:false}).limit(200)),
+   checked(db.from('commerce_seo_release_branch_exceptions')
+    .select('site_id,repository,registered_branch,approved_branch,commit_sha,hosting_provider,worker_script,worker_version,deployment_id,build_id,approved_at,approval_receipt_url')
+    .eq('site_id',a.site_id).limit(20)),
   ])
   if(!site||!project)throw Error('Verified Production site not found')
   const releases=history.map((row:RawReleaseEntry)=>sanitizeRelease(row,site))
-  const gate=assessReleasePortfolio([site],[project],releases)[0]
+  const gate=assessReleasePortfolio([site],[project],releases,new Date(),branchExceptions)[0]
   const plan=buildGscReleaseComparison(gate,site.origin,{
    site_id:a.site_id,days:a.days,page:a.page,
    query:a.query,country:a.country,device:a.device,
