@@ -25,7 +25,7 @@ export function validRankSnapshot(raw: SeoRankSnapshot): boolean {
 /** One latest observation per exact keyword; never turn PENDING into rank zero. */
 export function latestRankSnapshots(rows: SeoRankSnapshot[], expectedSite: string) {
   const latest = new Map<string, SeoRankSnapshot>()
-  for (const row of [...rows].filter(v => v.site_id === expectedSite && validRankSnapshot(v))
+  for (const row of [...rows].filter(v => v.site_id === expectedSite && v.device === 'DESKTOP' && validRankSnapshot(v))
     .sort((a,b) => b.checked_on.localeCompare(a.checked_on) || b.checked_at.localeCompare(a.checked_at))) {
     if (!latest.has(row.keyword)) latest.set(row.keyword,row)
   }
