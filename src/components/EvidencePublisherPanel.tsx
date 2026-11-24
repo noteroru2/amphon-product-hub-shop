@@ -11,7 +11,7 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
   const [targets,setTargets]=useState<PublicationTarget[]>([])
   const [working,setWorking]=useState(false)
   const [error,setError]=useState('')
-  const [receipt,setReceipt]=useState<{claim_kind:string;requests:Receipt[];status:string;media_public:boolean}|null>(null)
+  const [receipt,setReceipt]=useState<{claim_kind:string;requests:Receipt[];status:string;media_public:boolean;dispatch?:{request_id:string;dispatch:string}[]}|null>(null)
   const images=(evidence.trade_evidence_images || []).filter((im:TradeEvidenceImage)=>im.approved_for_public)
   function toggle(site_id:string,checked:boolean) {
     setReceipt(null)
@@ -73,7 +73,7 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
         {error&&<p className="evidence-error" role="alert">{error}</p>}
         {receipt&&<div role="status">
           <p>จัดเก็บภาพในคลังส่วนตัวและส่งคิวแล้ว ({receipt.claim_kind}) — ไม่มี URL ภาพสาธารณะ ไม่ได้สร้าง PR หรือเผยแพร่เว็บไซต์</p>
-          {receipt.requests.map(r=><p key={r.id}>{r.site_id} {r.page_path} — {r.status} · {r.id}</p>)}
+          {receipt.requests.map(r=><p key={r.id}>{r.site_id} {r.page_path} — {r.status} / {receipt.dispatch?.find(d=>d.request_id===r.id)?.dispatch||'PENDING_PROTECTED_WORKFLOW'} · {r.id}</p>)}
         </div>}
         <button className="evidence-approve" disabled={working||!images.length||!targets.length} onClick={()=>void submit()}>
           {working?'กำลังสร้างคิว...':'ส่งคิวเตรียม Draft PR (ภาพยังเป็นส่วนตัว)'}
