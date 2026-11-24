@@ -19,7 +19,7 @@ create table if not exists public.commerce_evidence_publication_requests (
  released_at timestamptz,
  unique (evidence_id,image_id,site_id,page_path),
  check (left(page_path,1)='/' and left(page_path,2)<>'//' and length(page_path)<=2048),
- check (private_media_key ~ '^evidence/[0-9a-f-]{36}/[0-9a-f-]{36}\\.webp$'),
+ check (private_media_key ~ '^evidence/[0-9a-f-]{36}/[0-9a-f-]{36}[.]webp$'),
  check ((status <> 'DRAFT_PR_OPEN') or (draft_pr_number > 0 and draft_pr_url is not null)),
  check ((status <> 'RELEASED') or (release_commit_sha is not null and released_at is not null))
 );
