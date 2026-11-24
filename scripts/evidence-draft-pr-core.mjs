@@ -3,7 +3,14 @@
  * batch of IDs, creating individual, separately reviewed Draft PRs.
  */
 import {createHash} from 'node:crypto'
-import {isAllowedContentPath} from './seo-draft-pr-executor-core.mjs'
+function allowedInternationalContentPath(path) {
+ if(typeof path!=='string'||path.length>220||path.includes('\\')||path.includes('//')||path!==path.normalize('NFC'))return false
+ if(!/^(?:src\/(?:pages|content|components|layouts)\/|(?:content|pages)\/)/.test(path))return false
+ if(!/\.(?:md|mdx|astro)$/.test(path))return false
+ if(!/^[\p{L}\p{M}\p{N}_.\/-]+$/u.test(path))return false
+ return path.split('/').every(x=>x.length>0&&x!=='.'&&x!=='..'&&!x.startsWith('.')&&!x.startsWith('-'))
+}
+
 import {assertPublicationEligible} from '../src/lib/evidencePublisherPolicy.ts'
 const UUID=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
 const SHA=/^[a-f0-9]{40}$/i
@@ -58,12 +65,12 @@ export function inspectSnapshot(s) {
    !UUID.test(mapping.reviewed_by||'')||!mapping.reviewed_at)fail('PAGE_MAPPING_NOT_REVIEWED')
  const date=Date.parse(mapping.reviewed_at)
  if(!Number.isFinite(date))fail('PAGE_MAPPING_REVIEW_INVALID')
- if(!isAllowedContentPath(mapping.source_path)||!/\.(md|mdx|astro)$/.test(mapping.source_path))
+ if(!allowedInternationalContentPath(mapping.source_path)||!/\.(md|mdx|astro)$/.test(mapping.source_path))
    fail('SOURCE_FILE_NOT_ALLOWED')
  if(typeof mapping.insert_before!=='string'||mapping.insert_before.length<10||
     mapping.insert_before.length>300||/\0/.test(mapping.insert_before))fail('INSERT_ANCHOR_INVALID')
- if(r.page_path!==new URL(r.page_path,'https://example.invalid').pathname.replace(/\/+$/,'')||
-   !r.page_path.startsWith('/')||r.page_path.startsWith('//'))fail('PAGE_PATH_INVALID')
+ if(typeof r.page_path!=='string'||!r.page_path.startsWith('/')||r.page_path.startsWith('//')||
+    /[?#\\\s<>]/.test(r.page_path)||r.page_path.split('/').some(x=>x==='.'||x==='..'))fail('PAGE_PATH_INVALID')
  if(!/^evidence\/[\da-f-]{36}\/[\da-f-]{36}\.webp$/i.test(r.private_media_key||''))
    fail('STAGED_IMAGE_INVALID')
  if(typeof site.origin!=='string'||!site.origin.startsWith('https://'))fail('SITE_ORIGIN_INVALID')
