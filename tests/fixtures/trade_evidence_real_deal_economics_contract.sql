@@ -89,7 +89,7 @@ SELECT set_config('app.user_role','admin',false);
 UPDATE public.trade_evidence SET transaction_verified_at='2000-01-01T00:00:00Z',
  transaction_verified_by='bbbbbbbb-0000-4000-8000-000000000099'
 WHERE id='bbbbbbbb-0000-4000-8000-000000000001';
-DO $
+DO $$
 DECLARE r record;
 BEGIN
  SELECT transaction_verified,transaction_verified_at,transaction_verified_by INTO r
@@ -97,7 +97,7 @@ BEGIN
  IF NOT r.transaction_verified OR r.transaction_verified_at<'2026-11-01'
    OR r.transaction_verified_by<>'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
  THEN RAISE EXCEPTION 'VERIFICATION_METADATA_TAMPERED'; END IF;
-END $;
+END $$;
 SELECT set_config('app.user_role','owner',false);
 
 -- Real 14k sale matched to purchase; shipping 80 + platform 420.
