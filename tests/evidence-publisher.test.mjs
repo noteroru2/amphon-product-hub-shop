@@ -37,7 +37,9 @@ test('public key generated only for verified uuid pairs',()=>{
 test('worker never includes site merge or deployment actions',()=>{
  const worker=readFileSync(new URL('../workers/evidence-publisher/index.mjs',import.meta.url),'utf8')
  assert.match(worker,/PENDING_SOURCE_PR/)
- assert.doesNotMatch(worker,/github\.com\/repos|\/deployments|wrangler deploy|merge_pull_request/)
+ assert.doesNotMatch(worker,/\/pulls\b|\/git\/refs|\/merges\b|\/deployments|wrangler deploy|merge_pull_request/)
+ assert.match(worker,/actions\/workflows\/evidence-draft-pr-execute\.yml\/dispatches/)
+ assert.match(worker,/EVIDENCE_PR_DISPATCH_ENABLED/)
  assert.match(worker,/IMAGES\.input/)
  assert.match(worker,/profiles\?id=eq/)
 })
