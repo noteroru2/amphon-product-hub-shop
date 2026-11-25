@@ -1,6 +1,7 @@
 -- Ephemeral PostgreSQL 17 CI ONLY. Synthetic schema; NO production connection or PII.
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
+CREATE ROLE service_role NOLOGIN;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users(id uuid PRIMARY KEY);
 CREATE TABLE public.trade_evidence(id uuid PRIMARY KEY);
