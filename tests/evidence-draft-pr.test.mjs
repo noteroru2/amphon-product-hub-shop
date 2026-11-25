@@ -132,7 +132,8 @@ test('private-only image stage has no public GET or media URLs; SQL RLS never ex
  const worker=readFileSync(new URL('../workers/evidence-publisher/index.mjs',import.meta.url),'utf8')
  const sql=readFileSync(new URL('../supabase/migrations/20261124_evidence_publisher.sql',import.meta.url),'utf8')
  const workflow=readFileSync(new URL('../.github/workflows/evidence-draft-pr-execute.yml',import.meta.url),'utf8')
- assert.match(worker,/STAGED_IMAGES/)
+ // Queue-only Worker has no image read/write/delete binding or staging permissions.
+ assert.doesNotMatch(worker,/STAGED_IMAGES|\.put\(|\.delete\(/)
  assert.match(worker,/\/api\/stage/)
  assert.doesNotMatch(worker,/\/media\/evidence|public_media_url|response.*\.webp|env\.ASSETS\.get\(/)
  assert.match(sql,/enable row level security/i)
