@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import sharp from 'sharp'
 import worker from '../workers/evidence-publisher/index.mjs'
-import {stagePrivateEvidenceImage,toPrivateWebp,privateImageRemote,parseImageArgs} from '../scripts/evidence-image-sharp.mjs'
+import {stagePrivateEvidenceImage,toPrivateWebp,privateImageRemote,signedPrivateR2Put,parseImageArgs} from '../scripts/evidence-image-sharp.mjs'
 
 const ID='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const E='dd8cbc49-1caf-477c-b579-955007517b61'
@@ -106,24 +106,29 @@ test('approval revoked, wrong image, invalid key, non-owner prevent any download
 })
 test('private remote constrains both source Supabase and R2 upload to fixed secret-only endpoints',async()=>{
  const jpeg=await syntheticJpeg(),uploads=[]
- const token='secure-token-placeholder-for-mock-only'
+ const r2Key='r2-test-access-key-only'
+ const r2Secret='r2-test-secret-key-only-do-not-use-in-production'
  const env={
   AMPHON_SEO_SUPABASE_URL:'https://synthetic.supabase.co',
   AMPHON_SEO_SERVICE_ROLE_KEY:'synthetic-service-key-mock'.padEnd(48,'x'),
   AMPHON_CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),
-  AMPHON_CLOUDFLARE_R2_API_TOKEN:token.repeat(2)
+  AMPHON_R2_ACCESS_KEY_ID:r2Key,
+  AMPHON_R2_SECRET_ACCESS_KEY:r2Secret
  }
  const remote=privateImageRemote(env,async(url,opts)=>{
   const str=String(url)
   if(str.includes('storage/v1')) {
    assert.match(str,/trade-evidence-private/)
    assert.ok(!str.includes(env.AMPHON_SEO_SERVICE_ROLE_KEY))
-   assert.ok(!str.includes(env.AMPHON_CLOUDFLARE_R2_API_TOKEN))
+   assert.ok(!str.includes(env.AMPHON_R2_SECRET_ACCESS_KEY))
    return new Response(jpeg,{status:200,headers:{'content-type':'image/jpeg'}})
   }
-  assert.match(str,/r2\/buckets\/amphon-evidence-staged-private\/objects\/evidence\//)
+  assert.match(str,/^[a-z]+:\/\/a{32}\.r2\.cloudflarestorage\.com\/amphon-evidence-staged-private\/evidence\//)
   assert.equal(opts.method,'PUT')
-  assert.equal(opts.headers['content-type'],'application/octet-stream')
+  assert.equal(opts.headers['content-type'],'image/webp')
+  assert.match(opts.headers.authorization,/^AWS4-HMAC-SHA256 Credential=/)
+  assert.equal(opts.headers['x-amz-content-sha256'].length,64)
+  assert.match(opts.headers['x-amz-date'],/^\d{8}T\d{6}Z$/)
   uploads.push(opts.body)
   return new Response(null,{status:200})
  })
@@ -131,6 +136,27 @@ test('private remote constrains both source Supabase and R2 upload to fixed secr
  await remote.putPrivate(key,await toPrivateWebp(response))
  assert.equal(uploads.length,1)
  assert.equal((await sharp(uploads[0]).metadata()).format,'webp')
+})
+test('R2 SigV4 signs only private S3 PutObject with deterministic signature and scoped path',()=>{
+ const bytes=Buffer.from('RIFF0000WEBPsynthetic-bytes')
+ const opts={accountId:'A'.repeat(32),accessKeyId:'synthetic-r2-access-id',
+  secretAccessKey:'synthetic-r2-secret-value-which-is-not-real',
+  objectKey:key,bytes,now:new Date('2026-11-25T09:00:00Z')}
+ const first=signedPrivateR2Put(opts),second=signedPrivateR2Put(opts)
+ assert.equal(first.endpoint,second.endpoint)
+ assert.equal(first.request.headers.authorization,second.request.headers.authorization)
+ assert.match(first.endpoint,/^https:\/\/a{32}\.r2\.cloudflarestorage\.com\/amphon-evidence-staged-private\/evidence\//)
+ assert.match(first.request.headers.authorization,/Credential=synthetic-r2-access-id\/20261125\/auto\/s3\/aws4_request/)
+ assert.match(first.request.headers.authorization,/SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date/)
+ assert.equal(first.request.headers['x-amz-date'],'20261125T090000Z')
+ assert.equal(first.request.headers['content-type'],'image/webp')
+ assert.ok(!first.endpoint.includes('api.cloudflare.com'))
+ assert.ok(!first.endpoint.includes(opts.secretAccessKey))
+ assert.notEqual(signedPrivateR2Put({...opts,bytes:Buffer.from('RIFF0000WEBPchanged')}).request.headers.authorization,
+    first.request.headers.authorization)
+ for(const wrongKey of ['https://evil.example/image.webp','../secret.webp','other-bucket/x.webp']) {
+  assert.throws(()=>signedPrivateR2Put({...opts,objectKey:wrongKey}))
+ }
 })
 test('revoke approval while Sharp is running: never write a private image',async()=>{
  const input=await syntheticJpeg()
