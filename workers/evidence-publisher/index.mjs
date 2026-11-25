@@ -1,4 +1,5 @@
 import {assertPublicationEligible, publicMediaKey, validatePublicationTargets} from '../../src/lib/evidencePublisherPolicy.ts'
+import {evidenceServiceHeaders} from '../../src/lib/evidenceSupabaseServerAuth.mjs'
 
 // Evidence Publisher queues approved metadata ONLY. Source images are never handled
 // in this Cloudflare Worker. Owner-protected Node GitHub Actions runs Sharp later.
@@ -37,7 +38,7 @@ async function body(request) {
 async function db(env,path,{method='GET',body:payload}={}) {
   const res=await fetch(new URL(path,env.SUPABASE_URL),{
     method,headers:{
-      apikey:env.SUPABASE_SECRET_KEY,authorization:'Bearer '+env.SUPABASE_SECRET_KEY,
+      ...evidenceServiceHeaders(env.SUPABASE_SECRET_KEY),
       ...(payload?{'content-type':'application/json','prefer':'return=representation'}:{})
     },body:payload?JSON.stringify(payload):undefined,redirect:'error'
   })
