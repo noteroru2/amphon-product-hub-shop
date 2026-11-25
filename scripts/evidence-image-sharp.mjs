@@ -11,6 +11,7 @@ import {createHash,createHmac} from 'node:crypto'
 import {pathToFileURL} from 'node:url'
 import {storeAdapter} from './evidence-draft-pr.mjs'
 import {inspectSnapshot} from './evidence-draft-pr-core.mjs'
+import {evidenceServiceHeaders} from '../src/lib/evidenceSupabaseServerAuth.mjs'
 
 const UUID=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
 const MAX_BYTES=8*1024*1024
@@ -141,7 +142,7 @@ export function privateImageRemote(env,fetchImpl=fetch) {
     const path='/storage/v1/object/trade-evidence-private/'+
       storagePath.split('/').map(encodeURIComponent).join('/')
     const response=await fetchImpl(new URL(path,supabase),{
-      headers:{apikey:key,authorization:'Bearer '+key},
+      headers:evidenceServiceHeaders(key),
       redirect:'error',signal:AbortSignal.timeout(30000)
     })
     return boundedRead(response)
