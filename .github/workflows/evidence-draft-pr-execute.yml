@@ -77,7 +77,8 @@ jobs:
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
           AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
           AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
-          AMPHON_CLOUDFLARE_R2_API_TOKEN: ${{ secrets.AMPHON_CLOUDFLARE_R2_API_TOKEN }}
+          AMPHON_R2_ACCESS_KEY_ID: ${{ secrets.AMPHON_R2_ACCESS_KEY_ID }}
+          AMPHON_R2_SECRET_ACCESS_KEY: ${{ secrets.AMPHON_R2_SECRET_ACCESS_KEY }}
         run: |
           node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --execute --owner-authorized
       - name: Create DRAFT PR only — never merge or deploy
