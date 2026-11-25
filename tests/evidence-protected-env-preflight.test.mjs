@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import {assertProtectedEvidenceEnvironment,checkEvidenceEnvironment} from '../scripts/evidence-protected-env-preflight.mjs'
 const good={name:'evidence-draft-pr-protected',
  protection_rules:[{type:'required_reviewers',reviewers:[{type:'User',reviewer:{login:'synthetic-reviewer'}}]}]}
@@ -29,4 +30,12 @@ test('read-only preflight checks exact repo/environment and fails if GitHub deni
    token:'synthetic-read-only-token',fetchImpl:mock}))
  await assert.rejects(checkEvidenceEnvironment({repo:'noteroru2/amphon-product-hub-shop',
    token:'synthetic-read-only-token',fetchImpl:()=>new Response(null,{status:403})}))
+})
+
+test('protected workflow can GET required-reviewers metadata with Actions read but cannot deploy',()=>{
+ const yaml=readFileSync(new URL('../.github/workflows/evidence-draft-pr-execute.yml',import.meta.url),'utf8')
+ assert.match(yaml,/permissions:\s*\n\s*contents: read\s*\n\s*actions: read\b/)
+ assert.match(yaml,/environment: evidence-draft-pr-protected/)
+ assert.doesNotMatch(yaml,/^\s*deployments: (?:read|write)\s*$/m)
+ assert.doesNotMatch(yaml,/^\s*actions: write\s*$/m)
 })
