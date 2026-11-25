@@ -7,6 +7,9 @@ BEGIN
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.commerce_evidence_publication_requests'::regclass)
      OR NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.commerce_evidence_page_source_mappings'::regclass)
   THEN RAISE EXCEPTION 'RLS_MISSING'; END IF;
+  IF NOT has_table_privilege('service_role','public.commerce_evidence_publication_requests','INSERT') OR
+     NOT has_table_privilege('service_role','public.commerce_evidence_page_source_mappings','SELECT')
+  THEN RAISE EXCEPTION 'SERVICE_ROLE_PERMISSION_MISSING'; END IF;
   IF has_table_privilege('anon','public.commerce_evidence_publication_requests','SELECT') OR
      has_table_privilege('authenticated','public.commerce_evidence_publication_requests','INSERT') OR
      has_table_privilege('anon','public.commerce_evidence_page_source_mappings','SELECT') OR
