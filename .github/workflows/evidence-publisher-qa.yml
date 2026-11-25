@@ -11,6 +11,8 @@ on:
       - 'tests/sql/evidence-*.sql'
       - 'tests/evidence-local-supabase/**'
       - 'scripts/verify-evidence-supabase-local.mjs'
+      - 'scripts/evidence-protected-env-preflight.mjs'
+      - 'tests/evidence-protected-env-preflight.test.mjs'
       - 'src/vite-env.d.ts'
       - 'scripts/evidence-draft-pr*.mjs'
       - 'scripts/evidence-image-sharp.mjs'
@@ -34,6 +36,8 @@ jobs:
       - run: npm ci
       - name: Security and policy tests
         run: npm run verify:evidence-publisher
+      - name: GitHub Environment required reviewer preflight unit tests
+        run: npm run verify:evidence-protected-env
       - name: Multi-site Draft PR E2E tests
         run: npm run verify:evidence-draft-pr
       - name: Synthetic Sharp image pipeline + private R2 E2E (no live data)
