@@ -1,5 +1,16 @@
 name: Evidence Publisher Draft QA (NO DEPLOY)
 on:
+  push:
+    branches:
+      - feature/evidence-publisher-gated-v1-20261124
+    paths:
+      - '.github/workflows/evidence-publisher-qa.yml'
+      - 'tests/evidence-local-supabase/**'
+      - 'scripts/verify-evidence-supabase-local.mjs'
+      - 'scripts/evidence-protected-env-preflight.mjs'
+      - 'tests/evidence-protected-env-preflight.test.mjs'
+      - 'supabase/migrations/20261124_evidence_publisher.sql'
+      - 'tests/sql/evidence-*.sql'
   pull_request:
     paths:
       - 'src/lib/evidencePublisherPolicy.ts'
@@ -24,6 +35,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: evidence-publisher-qa-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   dry-run:
     runs-on: ubuntu-latest
