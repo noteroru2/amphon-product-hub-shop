@@ -110,11 +110,12 @@ const toLocal=(requestURL)=>{
 }
 globalThis.fetch=async function sandboxFetch(url,init) {
  const u=new URL(String(url))
- if(u.hostname==='api.cloudflare.com') {
+ if(u.hostname==='a'.repeat(32)+'.r2.cloudflarestorage.com') {
    attemptedExternal.push({hostname:u.hostname,method:init?.method})
-   if(!u.pathname.startsWith('/client/v4/accounts/')||
-      !u.pathname.includes('/r2/buckets/amphon-evidence-staged-private/objects/'))throw Error('UNSAFE_R2_PATH')
+   if(!u.pathname.startsWith('/amphon-evidence-staged-private/evidence/'))throw Error('UNSAFE_R2_PATH')
    assert.equal(init?.method,'PUT')
+   assert.match(init.headers.authorization,/^AWS4-HMAC-SHA256 Credential=/)
+   assert.equal(init.headers['content-type'],'image/webp')
    const meta=await sharp(init.body).metadata()
    assert.equal(meta.format,'webp')
    assert.equal(meta.exif,undefined)
@@ -168,7 +169,8 @@ try {
   AMPHON_SEO_SUPABASE_URL:fakeOrigin,
   AMPHON_SEO_SERVICE_ROLE_KEY:serviceKey,
   AMPHON_CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),
-  AMPHON_CLOUDFLARE_R2_API_TOKEN:'synthetic-not-a-real-r2-api-token-00000000000'
+  AMPHON_R2_ACCESS_KEY_ID:'synthetic-only-r2-id',
+  AMPHON_R2_SECRET_ACCESS_KEY:'synthetic-only-r2-secret-value-placeholder'
  },globalThis.fetch)
  for(const row of queued) {
   const outcome=await stagePrivateEvidenceImage(row.id,{
@@ -218,7 +220,7 @@ try {
  // Ensure original data never became public in Storage.
  const buckets=unwrap(await service.storage.listBuckets(),'LIST_BUCKETS')
  assert.equal(buckets.find(b=>b.name==='trade-evidence-private')?.public,false)
- assert.ok(attemptedExternal.every(x=>x.hostname==='api.cloudflare.com'&&x.method==='PUT'))
+ assert.ok(attemptedExternal.every(x=>x.hostname==='a'.repeat(32)+'.r2.cloudflarestorage.com'&&x.method==='PUT'))
  // R2 public GET path is unavailable even in mocked worker.
  const response=await worker.fetch(new Request('https://evidence-worker.invalid/media/evidence/x.webp'),workerEnv)
  assert.equal(response.status,404)
