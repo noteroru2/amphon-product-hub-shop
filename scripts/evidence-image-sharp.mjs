@@ -123,6 +123,11 @@ export async function stagePrivateEvidenceImage(id,{store,remote,dryRun=true}) {
  if(dryRun)return result
  const original=await remote.downloadPrivate(gate.privatePath)
  const cleaned=await toPrivateWebp(original)
+ // Recheck current owner/consent/individual-image approval immediately before
+ // writing R2; revoke during conversion must fail closed, not publish stale data.
+ const current=validateStagingImage(await store.loadSnapshot(id))
+ if(current.key!==gate.key||current.privatePath!==gate.privatePath||current.claim!==gate.claim)
+   fail('APPROVAL_CHANGED_DURING_CONVERSION')
  await remote.putPrivate(gate.key,cleaned)
  return {...result,outcome:'PRIVATE_WEBP_STAGED',performed_write:true,
    output_bytes:cleaned.length,output_sha256:createHash('sha256').update(cleaned).digest('hex')}
