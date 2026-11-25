@@ -182,7 +182,7 @@ try {
  // Complete the chain through a simulated GitHub DRAFT PR against a fake API.
  // Draft receipts are written ONLY to the disposable LOCAL Supabase database.
  const {executeEvidenceDraftPr}=await import('./evidence-draft-pr-core.mjs')
- const source='---\\ntitle: "รับซื้อโน๊ตบุ๊ค"\\n---\\n# รับซื้อโน๊ตบุ๊ค\\n\\n## ส่งรูปเช็กราคาโน๊ตบุ๊คก่อนตัดสินใจ\\n'
+ const source='---\ntitle: "รับซื้อโน๊ตบุ๊ค"\n---\n# รับซื้อโน๊ตบุ๊ค\n\n## ส่งรูปเช็กราคาโน๊ตบุ๊คก่อนตัดสินใจ\n'
  const commits=[]
  const github={
   async getBranchHead(){return 'a'.repeat(40)},
@@ -193,7 +193,7 @@ try {
   async createTree(repo,base,files){
    assert.equal(files.length,1)
    assert.match(files[0].content,/ประเมินเบื้องต้น/)
-   assert.doesNotMatch(files[0].content,/\\.webp|trade-evidence-private|storage\\/v1/)
+   assert.doesNotMatch(files[0].content,/\.webp|trade-evidence-private|storage\/v1/)
    return 'c'.repeat(40)
   },
   async createCommit(){return 'd'.repeat(40)},
