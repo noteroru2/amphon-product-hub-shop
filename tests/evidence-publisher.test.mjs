@@ -40,8 +40,18 @@ test('worker never includes site merge or deployment actions',()=>{
  assert.doesNotMatch(worker,/\/pulls\b|\/git\/refs|\/merges\b|\/deployments|wrangler deploy|merge_pull_request/)
  assert.match(worker,/actions\/workflows\/evidence-draft-pr-execute\.yml\/dispatches/)
  assert.match(worker,/EVIDENCE_PR_DISPATCH_ENABLED/)
- assert.doesNotMatch(worker,/env\.IMAGES|stageBytes\(/)
+ assert.doesNotMatch(worker,/env\.IMAGES|env\.STAGED_IMAGES|stageBytes\(/)
  assert.match(worker,/QUEUED_PRIVATE_ONLY/)
  assert.match(worker,/media_staged:false/)
  assert.match(worker,/profiles\?id=eq/)
+})
+
+
+test('queue cancellation is metadata-only and Worker cannot delete private R2 bytes',()=>{
+ const worker=readFileSync(new URL('../workers/evidence-publisher/index.mjs',import.meta.url),'utf8')
+ const wrangler=readFileSync(new URL('../workers/evidence-publisher/wrangler.jsonc',import.meta.url),'utf8')
+ assert.doesNotMatch(worker,/STAGED_IMAGES|\.delete\(records\[0\]\.private_media_key\)/)
+ assert.doesNotMatch(wrangler,/"r2_buckets"|"STAGED_IMAGES"/)
+ assert.match(worker,/private_media_cleanup:'DEFERRED_LOCKED_REVIEW'/)
+ assert.match(worker,/status:'CANCELLED'/)
 })
