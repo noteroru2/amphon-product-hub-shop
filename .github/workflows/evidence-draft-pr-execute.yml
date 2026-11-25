@@ -32,6 +32,10 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Block if GitHub Environment lacks actual required reviewers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/evidence-protected-env-preflight.mjs
       - name: Validate policy and tests before any access to GitHub write token
         run: npm run verify:evidence-draft-pr
       - name: Resolve VERIFIED target from registered site mapping (read only)
