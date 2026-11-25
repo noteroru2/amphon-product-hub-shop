@@ -95,7 +95,7 @@ jobs:
       contents: read
     env:
       SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
-      EVIDENCE_LOCAL_ENV_FILE: ${{ runner.temp }}/amphon-evidence-local-env
+      EVIDENCE_LOCAL_ENV_FILE: /tmp/amphon-evidence-local-env
       DO_NOT_USE_HOSTED_SUPABASE: 'true'
     steps:
       - uses: actions/checkout@v4
@@ -117,6 +117,7 @@ jobs:
           cp supabase/migrations/20261124_evidence_publisher.sql \
             "$SUPABASE_WORKDIR/supabase/migrations/20261125000200_evidence_publisher.sql"
       - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
+        working-directory: tests/evidence-local-supabase
         run: |
           supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
           supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
@@ -125,4 +126,5 @@ jobs:
         run: node scripts/verify-evidence-supabase-local.mjs
       - name: Tear down and delete isolated local database
         if: always()
+        working-directory: tests/evidence-local-supabase
         run: supabase stop --no-backup || true
