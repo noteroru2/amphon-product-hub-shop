@@ -15,6 +15,10 @@ on:
       - 'tests/evidence-image-sharp.test.mjs'
       - '.github/workflows/evidence-draft-pr-execute.yml'
       - 'docs/EVIDENCE_PUBLISHER_V1.md'
+      - 'src/lib/evidenceSupabaseServerAuth.mjs'
+      - 'tests/evidence-supabase-server-auth.test.mjs'
+      - 'scripts/evidence-draft-pr.mjs'
+      - 'workers/evidence-publisher/**'
   pull_request:
     paths:
       - 'src/lib/evidencePublisherPolicy.ts'
@@ -31,6 +35,8 @@ on:
       - 'src/vite-env.d.ts'
       - 'scripts/evidence-draft-pr*.mjs'
       - 'scripts/evidence-image-sharp.mjs'
+      - 'src/lib/evidenceSupabaseServerAuth.mjs'
+      - 'tests/evidence-supabase-server-auth.test.mjs'
       - 'tests/evidence-draft-pr.test.mjs'
       - 'tests/evidence-image-sharp.test.mjs'
       - '.github/workflows/evidence-draft-pr-execute.yml'
@@ -54,6 +60,8 @@ jobs:
       - run: npm ci
       - name: Security and policy tests
         run: npm run verify:evidence-publisher
+      - name: Supabase backend new sb_secret vs legacy JWT key compatibility
+        run: npm run verify:evidence-supabase-auth
       - name: GitHub Environment required reviewer preflight unit tests
         run: npm run verify:evidence-protected-env
       - name: Multi-site Draft PR E2E tests
