@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS public.commerce_evidence_publication_requests (
 );
 ALTER TABLE public.commerce_evidence_publication_requests ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.commerce_evidence_publication_requests FROM PUBLIC, anon, authenticated;
+-- Service role API key is server-only; explicit grants are needed when the
+-- Data API defaults to denying new objects to all roles.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.commerce_evidence_publication_requests TO service_role;
 CREATE INDEX IF NOT EXISTS evidence_publication_pending_by_site
   ON public.commerce_evidence_publication_requests (site_id,status,requested_at DESC);
 
@@ -49,6 +52,7 @@ CREATE TABLE IF NOT EXISTS public.commerce_evidence_page_source_mappings (
 );
 ALTER TABLE public.commerce_evidence_page_source_mappings ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.commerce_evidence_page_source_mappings FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.commerce_evidence_page_source_mappings TO service_role;
 
 -- No page mappings are enabled, no queue rows are inserted and no image is made
 -- public merely by running this migration. Never merge migration into Production
