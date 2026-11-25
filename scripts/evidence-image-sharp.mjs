@@ -7,7 +7,7 @@
  * No public URLs, GitHub PR publishing, merged commits, or deployment.
  */
 import sharp from 'sharp'
-import {createHash} from 'node:crypto'
+import {createHash,createHmac} from 'node:crypto'
 import {pathToFileURL} from 'node:url'
 import {storeAdapter} from './evidence-draft-pr.mjs'
 import {inspectSnapshot} from './evidence-draft-pr-core.mjs'
@@ -77,17 +77,67 @@ async function boundedRead(response) {
   let offset=0;for(const part of parts){joined.set(part,offset);offset+=part.length}
   return joined
 }
+// R2 S3-compatible, bucket-restricted credentials. Cloudflare's narrow
+// Object Read & Write permission is NOT supported by the R2 REST API.
+// Sign an exact path-style S3 PutObject with AWS Signature V4 and region "auto".
+// No AWS SDK, paid product, public URL, or browser credentials are needed.
+const sha256=data=>createHash('sha256').update(data).digest('hex')
+const hmac=(key,data)=>createHmac('sha256',key).update(data).digest()
+export function signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,objectKey,bytes,now=new Date()}) {
+ if(!/^[a-f0-9]{32}$/i.test(accountId||''))fail('R2_ACCOUNT_INVALID')
+ if(typeof accessKeyId!=='string'||accessKeyId.length<10||
+    typeof secretAccessKey!=='string'||secretAccessKey.length<20)fail('R2_CREDENTIALS_INVALID')
+ if(!/^evidence\/[\da-f-]{36}\/[\da-f-]{36}[.]webp$/i.test(objectKey||''))
+   fail('R2_KEY_INVALID')
+ if(!(bytes instanceof Uint8Array)||bytes.length<12||bytes.length>MAX_BYTES)
+   fail('R2_BYTES_INVALID')
+ if(Number.isNaN(now.getTime()))fail('SIGNING_TIME_INVALID')
+ const host=accountId.toLowerCase()+'.r2.cloudflarestorage.com'
+ const path='/'+BUCKET+'/'+objectKey.split('/').map(encodeURIComponent).join('/')
+ const amzDate=now.toISOString().replace(/[:-]|\.\d{3}/g,'')
+ const date=amzDate.slice(0,8)
+ const scope=date+'/auto/s3/aws4_request'
+ const payloadHash=sha256(bytes)
+ const signedHeaders='content-type;host;x-amz-content-sha256;x-amz-date'
+ const canonicalHeaders='content-type:image/webp\nhost:'+host+
+   '\nx-amz-content-sha256:'+payloadHash+'\nx-amz-date:'+amzDate+'\n'
+ const canonicalRequest=['PUT',path,'',canonicalHeaders,signedHeaders,payloadHash].join('\n')
+ const stringToSign=['AWS4-HMAC-SHA256',amzDate,scope,sha256(canonicalRequest)].join('\n')
+ const signingKey=hmac(hmac(hmac(hmac('AWS4'+secretAccessKey,date),'auto'),'s3'),'aws4_request')
+ const signature=hmac(signingKey,stringToSign).toString('hex')
+ return {
+   endpoint:'https://'+host+path,
+   request:{
+     method:'PUT',
+     headers:{
+       authorization:'AWS4-HMAC-SHA256 Credential='+accessKeyId+'/'+scope+
+         ', SignedHeaders='+signedHeaders+', Signature='+signature,
+       'content-type':'image/webp',
+       'x-amz-content-sha256':payloadHash,
+       'x-amz-date':amzDate
+     },
+     body:bytes,
+     redirect:'error',
+     signal:AbortSignal.timeout(30000)
+   }
+ }
+}
 export function privateImageRemote(env,fetchImpl=fetch) {
  const supabase=env.AMPHON_SEO_SUPABASE_URL
  const key=env.AMPHON_SEO_SERVICE_ROLE_KEY
- const cfAccount=env.AMPHON_CLOUDFLARE_ACCOUNT_ID
- const cfToken=env.AMPHON_CLOUDFLARE_R2_API_TOKEN
+ const accountId=env.AMPHON_CLOUDFLARE_ACCOUNT_ID
+ const accessKeyId=env.AMPHON_R2_ACCESS_KEY_ID
+ const secretAccessKey=env.AMPHON_R2_SECRET_ACCESS_KEY
  if(!/^https:\/\/[a-z0-9-]+[.]supabase[.]co\/?$/.test(supabase||'') ||
     typeof key!=='string'||key.length<30)fail('SUPABASE_NOT_CONFIGURED')
- if(!/^[a-f0-9]{32}$/.test(cfAccount||'') ||
-    typeof cfToken!=='string'||cfToken.length<20)fail('PRIVATE_R2_NOT_CONFIGURED')
+ if(!/^[a-f0-9]{32}$/i.test(accountId||'') ||
+    typeof accessKeyId!=='string'||accessKeyId.length<10 ||
+    typeof secretAccessKey!=='string'||secretAccessKey.length<20)
+    fail('PRIVATE_R2_NOT_CONFIGURED')
  return {
   async downloadPrivate(storagePath) {
+    if(typeof storagePath!=='string'||!/^[-a-z0-9/_.]+$/i.test(storagePath)||
+       storagePath.includes('..')||storagePath.startsWith('/'))fail('STORAGE_PATH_INVALID')
     const path='/storage/v1/object/trade-evidence-private/'+
       storagePath.split('/').map(encodeURIComponent).join('/')
     const response=await fetchImpl(new URL(path,supabase),{
@@ -97,17 +147,8 @@ export function privateImageRemote(env,fetchImpl=fetch) {
     return boundedRead(response)
   },
   async putPrivate(objectKey,bytes) {
-    if(!/^evidence\/[\da-f-]{36}\/[\da-f-]{36}[.]webp$/.test(objectKey))
-      fail('R2_KEY_INVALID')
-    if(!(bytes instanceof Uint8Array)||bytes.length>MAX_BYTES)fail('R2_BYTES_INVALID')
-    const path=objectKey.split('/').map(encodeURIComponent).join('/')
-    const endpoint='https://api.cloudflare.com/client/v4/accounts/'+cfAccount+
-      '/r2/buckets/'+BUCKET+'/objects/'+path
-    const response=await fetchImpl(endpoint,{
-      method:'PUT',headers:{
-        authorization:'Bearer '+cfToken,'content-type':'application/octet-stream'
-      },body:bytes,redirect:'error',signal:AbortSignal.timeout(30000)
-    })
+    const signed=signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,objectKey,bytes})
+    const response=await fetchImpl(signed.endpoint,signed.request)
     if(!response.ok)fail('R2_PRIVATE_UPLOAD_FAILED')
     return true
   }
