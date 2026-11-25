@@ -142,7 +142,7 @@ async function cancel(request,env) {
   const input=await body(request)
   if(!uuid.test(input.request_id||''))throw Error('INVALID_ID')
   const path='/rest/v1/commerce_evidence_publication_requests?id=eq.'+input.request_id+
-    '&select=id,status,private_media_key'
+    '&select=id,status'
   const records=await db(env,path)
   if(records.length!==1)throw Error('QUEUE_NOT_FOUND')
   if(records[0].status!=='PENDING_SOURCE_PR')throw Error('DRAFT_PR_REQUIRES_REVIEW')
