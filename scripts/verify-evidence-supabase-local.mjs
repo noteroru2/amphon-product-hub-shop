@@ -179,6 +179,42 @@ try {
   assert.equal(outcome.claim_kind,'ASSESSMENT_ONLY')
  }
  assert.equal(uploads,2)
+ // Complete the chain through a simulated GitHub DRAFT PR against a fake API.
+ // Draft receipts are written ONLY to the disposable LOCAL Supabase database.
+ const {executeEvidenceDraftPr}=await import('./evidence-draft-pr-core.mjs')
+ const source='---\\ntitle: "รับซื้อโน๊ตบุ๊ค"\\n---\\n# รับซื้อโน๊ตบุ๊ค\\n\\n## ส่งรูปเช็กราคาโน๊ตบุ๊คก่อนตัดสินใจ\\n'
+ const commits=[]
+ const github={
+  async getBranchHead(){return 'a'.repeat(40)},
+  async getBranchRef(){return null},
+  async getOverlappingOpenPrs(){return []},
+  async getFile(){return {type:'file',size:source.length,blob_sha:'b'.repeat(40),content:source}},
+  async getCommitTree(){return 'c'.repeat(40)},
+  async createTree(repo,base,files){
+   assert.equal(files.length,1)
+   assert.match(files[0].content,/ประเมินเบื้องต้น/)
+   assert.doesNotMatch(files[0].content,/\\.webp|trade-evidence-private|storage\\/v1/)
+   return 'c'.repeat(40)
+  },
+  async createCommit(){return 'd'.repeat(40)},
+  async createBranch(repo,branch){commits.push({repo,branch})},
+  async createDraftPr(repo,body){
+    assert.equal(body.draft,true)
+    return {draft:true,number:999,url:'https://github.com/'+repo+'/pull/999'}
+  }
+ }
+ for(const row of queued) {
+   const response=await executeEvidenceDraftPr(row.id,{
+     store:storeAdapter(fakeOrigin,serviceKey),github,dryRun:false
+   })
+   assert.equal(response.outcome,'DRAFT_PR_CREATED')
+   assert.equal(response.media_public,false)
+ }
+ assert.equal(commits.length,2)
+ const after=unwrap(await service.from('commerce_evidence_publication_requests')
+   .select('status,draft_pr_url'),'LOCAL_DRAFT_RECEIPTS')
+ assert.equal(after.length,2)
+ assert.ok(after.every(r=>r.status==='DRAFT_PR_OPEN'))
  // Ensure original data never became public in Storage.
  const buckets=unwrap(await service.storage.listBuckets(),'LIST_BUCKETS')
  assert.equal(buckets.find(b=>b.name==='trade-evidence-private')?.public,false)
