@@ -9,6 +9,8 @@ on:
       - 'tests/evidence-publisher.test.mjs'
       - 'supabase/migrations/20261124_evidence_publisher.sql'
       - 'tests/sql/evidence-*.sql'
+      - 'tests/evidence-local-supabase/**'
+      - 'scripts/verify-evidence-supabase-local.mjs'
       - 'src/vite-env.d.ts'
       - 'scripts/evidence-draft-pr*.mjs'
       - 'scripts/evidence-image-sharp.mjs'
@@ -66,3 +68,43 @@ jobs:
         run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < supabase/migrations/20261124_evidence_publisher.sql
       - name: Test RLS grants, duplicate requests and release constraints
         run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-staging-assert.sql
+
+  local-supabase:
+    name: Isolated Supabase Local Auth + Storage + Sharp E2E (NO CLOUD WRITES)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
+      EVIDENCE_LOCAL_ENV_FILE: ${{ runner.temp }}/amphon-evidence-local-env
+      DO_NOT_USE_HOSTED_SUPABASE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Prepare isolated migrations without any production credentials
+        run: |
+          test "${DO_NOT_USE_HOSTED_SUPABASE}" = "true"
+          test -f "$SUPABASE_WORKDIR/supabase/config.toml"
+          test ! -f "$SUPABASE_WORKDIR/supabase/.branches/_current_branch"
+          cp supabase/migrations/20261124_evidence_publisher.sql \
+            "$SUPABASE_WORKDIR/supabase/migrations/20261125000200_evidence_publisher.sql"
+      - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
+        run: |
+          supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
+          chmod 600 "$EVIDENCE_LOCAL_ENV_FILE"
+      - name: E2E real LOCAL authentication and private image storage, mocked R2
+        run: node scripts/verify-evidence-supabase-local.mjs
+      - name: Tear down and delete isolated local database
+        if: always()
+        run: supabase stop --no-backup || true
