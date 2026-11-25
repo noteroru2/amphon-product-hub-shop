@@ -21,7 +21,7 @@
 ## Security conditions
 
 - Worker checks Owner server-side; non-Owners denied. GitHub protected Environment `evidence-draft-pr-protected` must have owner required reviewers.
-- Workflow needs `AMPHON_SEO_SUPABASE_URL`, `AMPHON_SEO_SERVICE_ROLE_KEY`, `AMPHON_CLOUDFLARE_ACCOUNT_ID`, `AMPHON_R2_ACCESS_KEY_ID`, `AMPHON_R2_SECRET_ACCESS_KEY` **as protected secrets** (never in Vite or Git). R2 token MUST be restricted to **Object Read & Write** for the single bucket `amphon-evidence-staged-private`; do not use an account-wide REST API token or deploy/zone/DNS permissions.
+- Workflow needs `AMPHON_SEO_SUPABASE_URL`, `AMPHON_EVIDENCE_SUPABASE_SECRET_KEY`, `AMPHON_CLOUDFLARE_ACCOUNT_ID`, `AMPHON_R2_ACCESS_KEY_ID`, `AMPHON_R2_SECRET_ACCESS_KEY` **as protected secrets** (never in Vite or Git). R2 token MUST be restricted to **Object Read & Write** for the single bucket `amphon-evidence-staged-private`; do not use an account-wide REST API token or deploy/zone/DNS permissions.
 - GitHub App credentials are separate protected secrets, scoped at execution to only one verified repository. Worker optional Actions dispatch defaults **OFF** via `EVIDENCE_PR_DISPATCH_ENABLED=false`.
 - A cancelled queue item cannot be newly staged/PR-created. Rechecking approval/Owner/mapping and exact production branch SHA happens at action execution, not trusting initial UI or queued fields.
 - Sharp rejects SVG, input greater than 8 MiB, images above 25 megapixels, unsupported formats and malformed pixels. It removes EXIF/GPS/ICC/XMP metadata on re-encode; **not** face, labels, payments slips, serials or other visible PII. These require separate human visual inspection.
@@ -83,3 +83,11 @@ Older `AMPHON_CLOUDFLARE_R2_API_TOKEN` is NOT USED by this architecture and shou
 GitHub Environment secrets alone do NOT start the workflow. `workflow_dispatch` is unavailable until an explicit later owner-approved merge of the workflow file into the default branch. A subsequent protected job still requires the Environment reviewer and correct config. Do not initiate it now.
 
 Cloudflare official docs: https://developers.cloudflare.com/r2/api/tokens/ ; https://developers.cloudflare.com/r2/get-started/s3/ .
+
+## New Supabase secret keys security (added 2026-11-25)
+
+Supabase now recommends project-scoped `sb_secret_...` backend keys instead of legacy JWT `service_role` keys. **Do not create or put any live secret in GitHub yet.** A new secret key still authorizes the elevated `service_role` with BYPASSRLS and must be treated as full-project access, not an evidence-table-only credential.
+
+The protected Evidence-only workflow reads `AMPHON_EVIDENCE_SUPABASE_SECRET_KEY` (a future dedicated named key) and passes it to the Node backend as `AMPHON_SEO_SERVICE_ROLE_KEY` for compatibility. Never reuse an unrelated SEO or Hub secret unnecessarily. Server adapters `scripts/evidence-draft-pr.mjs`, `scripts/evidence-image-sharp.mjs` and Worker `workers/evidence-publisher/index.mjs` now use `apikey` **without** `Authorization: Bearer sb_secret_...` for new secret keys; they preserve legacy JWT headers for local regression tests. Publishable keys are rejected as privileged credentials.
+
+No new secret is needed until all remaining release gates and a **separate owner approval** to configure live credentials. Supabase reference: https://supabase.com/docs/guides/getting-started/api-keys ; https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys .
