@@ -43,7 +43,7 @@ jobs:
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
-          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
         run: |
           node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --resolve-target >> "$GITHUB_OUTPUT"
       - name: Short-lived GitHub App token scoped to ONE verified repository
@@ -60,7 +60,7 @@ jobs:
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
-          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
           AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --dry-run
@@ -68,14 +68,14 @@ jobs:
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
-          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
         run: |
           node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --dry-run
       - name: Sharp re-encode into PRIVATE R2 only after owner environment approval
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
-          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
           AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
           AMPHON_R2_ACCESS_KEY_ID: ${{ secrets.AMPHON_R2_ACCESS_KEY_ID }}
           AMPHON_R2_SECRET_ACCESS_KEY: ${{ secrets.AMPHON_R2_SECRET_ACCESS_KEY }}
@@ -85,7 +85,7 @@ jobs:
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
-          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
           AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --execute --owner-authorized
