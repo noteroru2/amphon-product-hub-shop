@@ -19,7 +19,7 @@ function cors(response,origin) {
   return new Response(response.body,{status:response.status,headers})
 }
 function configuration(env) {
-  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY||!env.STAGED_IMAGES||!env.IMAGES)
+  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY||!env.STAGED_IMAGES)
     throw Error('WORKER_NOT_CONFIGURED')
   const endpoint=new URL(env.SUPABASE_URL)
   if(endpoint.protocol!=='https:'||endpoint.username||endpoint.password||endpoint.search||endpoint.hash)
@@ -68,30 +68,11 @@ async function recheck(env,evidenceId,imageId) {
   const claim=assertPublicationEligible(records[0],images[0],evidenceId)
   const eligible=projects.filter(x=>x.production_repo&&x.production_branch&&x.central_deploy_allowed===false)
   const sites=await db(env,'/rest/v1/commerce_seo_sites?enabled=eq.true&select=id')
-  return {claim, image:images[0], sites:new Set(sites.map(x=>x.id).filter(id=>eligible.some(p=>p.site_id===id)))}
+  return {claim, sites:new Set(sites.map(x=>x.id).filter(id=>eligible.some(p=>p.site_id===id)))}
 }
-async function stageBytes(env,storagePath,key) {
-  if(await env.STAGED_IMAGES.head(key))return
-  const privatePath='/storage/v1/object/trade-evidence-private/'+
-    storagePath.split('/').map(encodeURIComponent).join('/')
-  const res=await fetch(new URL(privatePath,env.SUPABASE_URL),{
-    headers:{apikey:env.SUPABASE_SECRET_KEY,authorization:'Bearer '+env.SUPABASE_SECRET_KEY},redirect:'error'
-  })
-  const statedSize=Number(res.headers.get('content-length')||0)
-  if(!res.ok||statedSize>8*1024*1024)throw Error('PRIVATE_IMAGE_READ_FAILED')
-  if(!/^image\/(jpeg|png|webp)$/i.test(res.headers.get('content-type')||''))
-    throw Error('IMAGE_TYPE_INVALID')
-  // Re-encode into a staging-only R2 bucket; no route can read this bucket publicly.
-  const out=(await env.IMAGES.input(res.body).transform({width:1400,fit:'scale-down'})
-    .output({format:'image/webp',quality:82})).response()
-  if(!out.ok)throw Error('IMAGE_TRANSFORM_FAILED')
-  const bytes=await out.arrayBuffer()
-  if(bytes.byteLength>8*1024*1024||bytes.byteLength<12)throw Error('IMAGE_SIZE_INVALID')
-  const header=String.fromCharCode(...new Uint8Array(bytes.slice(0,12)))
-  if(!header.startsWith('RIFF')||header.slice(8)!=='WEBP')throw Error('IMAGE_FORMAT_INVALID')
-  await env.STAGED_IMAGES.put(key,bytes,{httpMetadata:{contentType:'image/webp'},
-    customMetadata:{stage:'PRIVATE_REVIEW_ONLY'}})
-}
+// The Cloudflare Worker never downloads or re-encodes private customer photos.
+// This route only queues approved metadata. Sharp runs in an owner-protected
+// GitHub Actions Node.js runner AFTER a separate authorization gate.
 // Workflow dispatch is scoped to the CENTRAL Hub repository's Actions:write permission only.
 // The workflow has a protected owner-reviewed environment and independently checks
 // the VERIFIED target repo before creating any Draft PR. No site repo write credentials here.
@@ -128,10 +109,9 @@ async function stage(request,env,actor) {
   if(!uuid.test(input.evidence_id||'')||!uuid.test(input.image_id||''))
     throw Error('INVALID_ID')
   const targets=validatePublicationTargets(input.targets)
-  const {claim,image,sites}=await recheck(env,input.evidence_id,input.image_id)
+  const {claim,sites}=await recheck(env,input.evidence_id,input.image_id)
   if(targets.some(x=>!sites.has(x.site_id)))throw Error('SITE_NOT_VERIFIED')
   const key=publicMediaKey(input.evidence_id,input.image_id)
-  await stageBytes(env,image.storage_path,key)
   const receipts=[]
   for(const target of targets) {
     const query='/rest/v1/commerce_evidence_publication_requests?evidence_id=eq.'+input.evidence_id+
@@ -152,7 +132,8 @@ async function stage(request,env,actor) {
     receipts.push(created[0])
   }
   const dispatch=await dispatchOwnerApprovedDraftJobs(env,receipts)
-  return json({status:'PRIVATE_STAGED',claim_kind:claim.claim_kind,requests:receipts,
+  return json({status:'QUEUED_PRIVATE_ONLY',claim_kind:claim.claim_kind,requests:receipts,
+    media_staged:false,
     dispatch,media_public:false,site_source_modified:false,draft_pr_created:false,production_deployed:false},201)
 }
 async function cancel(request,env) {
