@@ -2,6 +2,7 @@
 /** Protected, on-demand queue -> DRAFT PR only. NEVER merge or deploy. */
 import {pathToFileURL} from 'node:url'
 import {githubAdapter} from './seo-draft-pr-executor-adapters.mjs'
+import {evidenceServiceHeaders} from '../src/lib/evidenceSupabaseServerAuth.mjs'
 import {executeEvidenceDraftPr,inspectSnapshot} from './evidence-draft-pr-core.mjs'
 const uuid=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
 const die=msg=>{throw Error('EVIDENCE_PR_'+msg)}
@@ -17,7 +18,7 @@ export function storeAdapter(url,key) {
    const params=new URLSearchParams({select})
    for(const [k,v] of Object.entries(filter))params.set(k, 'eq.'+String(v))
    const res=await fetch(base+table+'?'+params.toString(),{
-     method,headers:{'apikey':key,'authorization':'Bearer '+key,
+     method,headers:{...evidenceServiceHeaders(key),
        ...(payload?{'content-type':'application/json','prefer':'return=representation'}:{})},
      ...(payload?{body:JSON.stringify(payload)}:{}),
      redirect:'error',signal:AbortSignal.timeout(16000)
