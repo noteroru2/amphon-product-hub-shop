@@ -51,3 +51,20 @@
 2. Apply reviewed SQL to an isolated independently authorized database or staged Supabase Local Docker, **not live Supabase**.
 3. Run owner-gated private image E2E only with a synthetic noncustomer object in isolated environment. Real image requires explicit separate privacy and media-stage approval.
 4. Further public image publication requires an independent, auditable publish/revoke/CDN cache purge workflow.
+
+
+## Free local Auth/Storage integration test (2026-11-25)
+
+- The main `supabase/config.toml` and Production SQL are **never used as a development target**. The isolated test project is under `tests/evidence-local-supabase/supabase`, listening on 127.0.0.1 port 55321 with database port 55322. It is disposable and has no link to the live Supabase project.
+- `.github/workflows/evidence-publisher-qa.yml` has a dedicated `local-supabase` job using `supabase/setup-cli@v1`. It copies the exact proposed Evidence Publisher migration into the isolated fixture migrations, starts **real Supabase Local Auth, PostgREST, Storage and Postgres** on Docker, creates synthetic Owner and Admin users, uploads a synthetic image to the local private Storage bucket, and tests the real Worker API against loopback HTTP through an explicit test-only URL proxy.
+- The integration verifies Admin rejection, two registered site queues, no anon/authenticated access to private queue tables, actual local private Storage download via service role, Sharp metadata-stripped WebP, fake R2 upload, and **simulated** GitHub text-only Draft PRs whose receipts are recorded **only in disposable local Postgres**.
+- No real Cloudflare R2 API, GitHub PR endpoint, live Supabase host, live photograph, or Production URL can be accessed by that job. The test script refuses any Supabase URL that is not local loopback and intercepts every would-be Cloudflare call.
+- CI's existing `ephemeral-sql` job separately tests service_role explicit grants against revoked anon/authenticated privileges and release constraints. The local Supabase test is additional E2E evidence, not a substitute for release gates.
+
+## Protected Environment safety and hard stop
+
+- The production-use workflow includes a read-only GitHub Environment verification step `scripts/evidence-protected-env-preflight.mjs` before any image processing or PR write. It **rejects** an Environment with no `required_reviewers` rule or zero reviewers. If GitHub denies the environment metadata read (403/404), it fails closed. Unit tests exercise those denials.
+- **GitHub limitation:** `workflow_dispatch` cannot be triggered while its workflow file exists only in Draft PR #181. GitHub requires the workflow file to exist on the default branch. Do not try to bypass this by merging without owner authorization. The code and synthetic tests can pass while the execution workflow remains inactive.
+- The connected GitHub app in this chat does not expose an Environment/Secrets management API. Required reviewers and protected credentials therefore **cannot be asserted to be configured** until read back in a user-approved GitHub setup step. Never paste secrets into a chat or commit them to Git.
+- On the GitHub public repository, navigate Settings → Environments → `evidence-draft-pr-protected`, enable Required Reviewers, then add only the narrowly-scoped secrets to that Environment. Environment activation must be tested before any real protected job; **do not run it as part of this no-deploy PR**.
+- No fees from Supabase Preview Branch are incurred. GitHub Actions and Cloudflare R2 must remain within their actual free allocations; do not assume usage is always unlimited/free.
