@@ -1,7 +1,8 @@
 import {assertPublicationEligible, publicMediaKey, validatePublicationTargets} from '../../src/lib/evidencePublisherPolicy.ts'
 
-// Evidence Publisher stages ONLY private objects. No GET media route and no public URL.
-// A separate future owner-approved release is required before any image may be public.
+// Evidence Publisher queues approved metadata ONLY. Source images are never handled
+// in this Cloudflare Worker. Owner-protected Node GitHub Actions runs Sharp later.
+// No public GET media route, public image URL, merge, or deployment here.
 const json=(value,status=200)=>new Response(JSON.stringify(value),{
   status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}
 })
