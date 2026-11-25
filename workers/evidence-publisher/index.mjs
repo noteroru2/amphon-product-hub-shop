@@ -21,7 +21,7 @@ function cors(response,origin) {
   return new Response(response.body,{status:response.status,headers})
 }
 function configuration(env) {
-  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY||!env.STAGED_IMAGES)
+  if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY||!env.SUPABASE_PUBLISHABLE_KEY)
     throw Error('WORKER_NOT_CONFIGURED')
   const endpoint=new URL(env.SUPABASE_URL)
   if(endpoint.protocol!=='https:'||endpoint.username||endpoint.password||endpoint.search||endpoint.hash)
@@ -149,10 +149,10 @@ async function cancel(request,env) {
   const updated=await db(env,'/rest/v1/commerce_evidence_publication_requests?id=eq.'+
     input.request_id+'&status=eq.PENDING_SOURCE_PR',{method:'PATCH',body:{status:'CANCELLED'}})
   if(updated.length!==1)throw Error('QUEUE_STATE_CHANGED')
-  const other=await db(env,'/rest/v1/commerce_evidence_publication_requests?private_media_key=eq.'+
-    encodeURIComponent(records[0].private_media_key)+'&status=in.(PENDING_SOURCE_PR,DRAFT_PR_OPEN)&select=id')
-  if(other.length===0)await env.STAGED_IMAGES.delete(records[0].private_media_key)
-  return json({status:'CANCELLED',media_public:false})
+  // Cancellation is metadata-only. Never delete a shared private R2 key here:
+  // another request can be queued between a last-reference read and deletion.
+  // Image retention/cleanup must use a separately approved, locked janitor.
+  return json({status:'CANCELLED',media_public:false,private_media_cleanup:'DEFERRED_LOCKED_REVIEW'})
 }
 export default {
  async fetch(request,env) {
