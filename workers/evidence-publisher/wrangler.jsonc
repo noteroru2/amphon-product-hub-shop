@@ -4,12 +4,6 @@
   "main": "index.mjs",
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
-  "r2_buckets": [
-    {
-      "binding": "STAGED_IMAGES",
-      "bucket_name": "amphon-evidence-staged-private"
-    }
-  ],
   "vars": {
     "ALLOWED_ORIGINS": "https://hub.amphon.co.th",
     "EVIDENCE_PR_DISPATCH_ENABLED": "false"
