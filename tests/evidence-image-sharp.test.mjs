@@ -132,6 +132,21 @@ test('private remote constrains both source Supabase and R2 upload to fixed secr
  assert.equal(uploads.length,1)
  assert.equal((await sharp(uploads[0]).metadata()).format,'webp')
 })
+test('revoke approval while Sharp is running: never write a private image',async()=>{
+ const input=await syntheticJpeg()
+ let reads=0,uploads=0
+ await assert.rejects(stagePrivateEvidenceImage(ID,{
+   store:{async loadSnapshot(){
+     reads++;const s=syntheticSnapshot()
+     if(reads===2)s.evidence.privacy_reviewed=false
+     return s
+   }},
+   remote:{async downloadPrivate(){return input},async putPrivate(){uploads++}},
+   dryRun:false
+ }))
+ assert.equal(reads,2)
+ assert.equal(uploads,0)
+})
 test('CLI execution is never allowed without explicit owner flag',()=>{
  assert.equal(parseImageArgs(['--request-id',ID]).dryRun,true)
  assert.throws(()=>parseImageArgs(['--request-id',ID,'--execute']))
