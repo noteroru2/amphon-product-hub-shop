@@ -6,7 +6,7 @@
 
 1. **Hub UI** (Owner only): choose individually approved evidence image and 1–14 enabled target site/page paths. No secrets in browser.
 2. **Cloudflare Worker** (metadata-only): `POST /api/stage` authenticates Owner using Supabase Auth and server-side profile; rechecks evidence APPROVED, consent/privacy flags, individual image approval, VERIFIED site mapping. Stores one private **queue** row per target URL; responds `QUEUED_PRIVATE_ONLY, media_staged:false, media_public:false`. The Worker **never downloads, re-encodes, reads, serves or uploads customer image bytes**. Its private R2 binding is for cancellation cleanup only. Public media GET remains 404. There is no Cloudflare Images binding.
-3. **GitHub Actions, Node 22 + Sharp 0.35.4** (after owner protected Environment approval only): `.github/workflows/evidence-draft-pr-execute.yml` runs read-only queue/target dry-run and image dry-run, then downloads the APPROVED original from **Supabase private Storage using server-only secret**, performs a bounded Sharp WebP re-encode (metadata removed; no visible-content redaction), uploads to private **Cloudflare R2** `amphon-evidence-staged-private` through the authenticated Cloudflare R2 Objects REST API, then creates a text-only Draft PR using a scoped short-lived GitHub App token. Never inserts image URLs into PRs. One workflow job per queue item / site-page (batch up to 14 queued).
+3. **GitHub Actions, Node 22 + Sharp 0.35.4** (after owner protected Environment approval only): `.github/workflows/evidence-draft-pr-execute.yml` runs read-only queue/target dry-run and image dry-run, then downloads the APPROVED original from **Supabase private Storage using server-only secret**, performs a bounded Sharp WebP re-encode (metadata removed; no visible-content redaction), uploads to private **Cloudflare R2** `amphon-evidence-staged-private` through the S3-compatible PutObject API authenticated by AWS Signature V4 and a token restricted to that private R2 bucket, then creates a text-only Draft PR using a scoped short-lived GitHub App token. Never inserts image URLs into PRs. One workflow job per queue item / site-page (batch up to 14 queued).
 4. **Database**, only when separately approved: migration `supabase/migrations/20261124_evidence_publisher.sql` creates private queue and reviewed page mappings, RLS enabled and no anon/authenticated grants. All destinations require verified mapping and full production SHA; disabled by default.
 5. **Future owner review:** Review Draft PR, image visual privacy, copyright/consent, site SEO metadata, links and release checks. Public media production publisher with separate consent/revocation/CDN purge mechanism is **not part of this PR**.
 
@@ -21,7 +21,7 @@
 ## Security conditions
 
 - Worker checks Owner server-side; non-Owners denied. GitHub protected Environment `evidence-draft-pr-protected` must have owner required reviewers.
-- Workflow needs `AMPHON_SEO_SUPABASE_URL`, `AMPHON_SEO_SERVICE_ROLE_KEY`, `AMPHON_CLOUDFLARE_ACCOUNT_ID`, `AMPHON_CLOUDFLARE_R2_API_TOKEN` **as protected secrets** (never in Vite or Git). API token must be narrowly scoped to private R2 object access where possible.
+- Workflow needs `AMPHON_SEO_SUPABASE_URL`, `AMPHON_SEO_SERVICE_ROLE_KEY`, `AMPHON_CLOUDFLARE_ACCOUNT_ID`, `AMPHON_R2_ACCESS_KEY_ID`, `AMPHON_R2_SECRET_ACCESS_KEY` **as protected secrets** (never in Vite or Git). R2 token MUST be restricted to **Object Read & Write** for the single bucket `amphon-evidence-staged-private`; do not use an account-wide REST API token or deploy/zone/DNS permissions.
 - GitHub App credentials are separate protected secrets, scoped at execution to only one verified repository. Worker optional Actions dispatch defaults **OFF** via `EVIDENCE_PR_DISPATCH_ENABLED=false`.
 - A cancelled queue item cannot be newly staged/PR-created. Rechecking approval/Owner/mapping and exact production branch SHA happens at action execution, not trusting initial UI or queued fields.
 - Sharp rejects SVG, input greater than 8 MiB, images above 25 megapixels, unsupported formats and malformed pixels. It removes EXIF/GPS/ICC/XMP metadata on re-encode; **not** face, labels, payments slips, serials or other visible PII. These require separate human visual inspection.
@@ -68,3 +68,18 @@
 - The connected GitHub app in this chat does not expose an Environment/Secrets management API. Required reviewers and protected credentials therefore **cannot be asserted to be configured** until read back in a user-approved GitHub setup step. Never paste secrets into a chat or commit them to Git.
 - On the GitHub public repository, navigate Settings → Environments → `evidence-draft-pr-protected`, enable Required Reviewers, then add only the narrowly-scoped secrets to that Environment. Environment activation must be tested before any real protected job; **do not run it as part of this no-deploy PR**.
 - No fees from Supabase Preview Branch are incurred. GitHub Actions and Cloudflare R2 must remain within their actual free allocations; do not assume usage is always unlimited/free.
+
+## Owner action, protected credentials (NO ACTIVATE)
+
+After CI verification, user may add only the following GitHub Environment secrets to `evidence-draft-pr-protected`:
+- `EVIDENCE_DRAFT_PR_ENVIRONMENT_APPROVED`: **DISABLED** (leave unchanged, never enter `YES_OWNER_ENABLED` at this stage)
+- `AMPHON_SEO_SUPABASE_URL`: existing API URL (not a private key)
+- `AMPHON_CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID (account-scoped identifier, not a secret)
+- `AMPHON_R2_ACCESS_KEY_ID` and `AMPHON_R2_SECRET_ACCESS_KEY`: S3-compatible credentials **generated for a token with Object Read & Write permission and Apply to specific bucket only → `amphon-evidence-staged-private`**; store as Environment secrets, never in chat, browser frontend or source files
+- `AMPHON_SEO_SERVICE_ROLE_KEY` and GitHub App ID/private key: only after independent review of permissions and necessity; service role bypasses RLS and must not be put in public client.
+
+Older `AMPHON_CLOUDFLARE_R2_API_TOKEN` is NOT USED by this architecture and should not be created. The Cloudflare REST API does not accept the narrowly bucket-scoped S3 Object Read & Write credentials; code uses AWS4-HMAC-SHA256 signing against `https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>`. The signed request is server-only and sends no image to GitHub artifacts.
+
+GitHub Environment secrets alone do NOT start the workflow. `workflow_dispatch` is unavailable until an explicit later owner-approved merge of the workflow file into the default branch. A subsequent protected job still requires the Environment reviewer and correct config. Do not initiate it now.
+
+Cloudflare official docs: https://developers.cloudflare.com/r2/api/tokens/ ; https://developers.cloudflare.com/r2/get-started/s3/ .
