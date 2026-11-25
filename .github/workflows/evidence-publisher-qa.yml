@@ -11,7 +11,9 @@ on:
       - 'tests/sql/evidence-*.sql'
       - 'src/vite-env.d.ts'
       - 'scripts/evidence-draft-pr*.mjs'
+      - 'scripts/evidence-image-sharp.mjs'
       - 'tests/evidence-draft-pr.test.mjs'
+      - 'tests/evidence-image-sharp.test.mjs'
       - '.github/workflows/evidence-draft-pr-execute.yml'
       - 'package.json'
       - '.github/workflows/evidence-publisher-qa.yml'
@@ -32,6 +34,8 @@ jobs:
         run: npm run verify:evidence-publisher
       - name: Multi-site Draft PR E2E tests
         run: npm run verify:evidence-draft-pr
+      - name: Synthetic Sharp image pipeline + private R2 E2E (no live data)
+        run: npm run verify:evidence-image-sharp
       - name: Hub typecheck
         run: npm run typecheck
       - name: Hub build with existing regression suite
