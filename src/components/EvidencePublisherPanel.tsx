@@ -28,7 +28,7 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
     let safeTargets:PublicationTarget[]
     try {safeTargets=validatePublicationTargets(targets)}
     catch {setError('กรุณาเลือกเว็บไซต์และกรอกพาธหน้าที่ถูกต้อง เช่น /บริการ/รับซื้อโน๊ตบุ๊ค');return}
-    if(!window.confirm('ยืนยันให้สร้างไฟล์ WebP ในคลังส่วนตัวและส่งคิว Draft PR ตามหน้าที่เลือก? ภาพจะไม่เผยแพร่สาธารณะ และไม่มีการ Merge หรือ Deploy'))return
+    if(!window.confirm('ยืนยันส่งคิวตรวจหลักฐานสำหรับ Draft PR ตามหน้าที่เลือก? ภาพจะยังคงส่วนตัว Sharp จะทำงานหลังอนุมัติ GitHub Actions เท่านั้น'))return
     setWorking(true)
     try {
       if(!supabase)throw Error('ยังไม่เชื่อมต่อ Supabase')
@@ -48,7 +48,7 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
   if(evidence.status!=='APPROVED')return null
   return <section className="evidence-share" aria-label="Evidence Publisher">
     <h3>เตรียมหลักฐานส่วนตัวเข้าสู่คิว Draft PR (Owner)</h3>
-    <p>ขั้นตอนนี้สร้าง WebP ในคลังส่วนตัวและเข้าคิวเตรียม Draft PR เท่านั้น ไม่เปิดเผยรูปจริง ไม่แก้หน้าเว็บ ไม่ Merge หรือ Deploy</p>
+    <p>ขั้นตอนนี้สร้างคิวจากหลักฐานที่อนุมัติแล้ว แต่ยังไม่แปลงภาพหรือเปิดเผยรูปจริง Sharp จะแปลงเป็น WebP ใน GitHub Actions ที่ต้องได้รับอนุมัติแยกต่างหาก ไม่มีการ Merge หรือ Deploy</p>
     <p>สถานะธุรกรรม: <strong>{evidence.transaction_verified?'เจ้าของยืนยันซื้อ/ขายจริง':'เคสประเมินเท่านั้น ยังไม่ยืนยันซื้อ/ขายจริง'}</strong></p>
     {!evidence.permission_confirmed||!evidence.privacy_reviewed
       ? <p role="alert">ต้องอนุมัติสิทธิ์และตรวจความเป็นส่วนตัวก่อน</p>
@@ -72,11 +72,11 @@ export function EvidencePublisherPanel({evidence,sites}:{evidence:TradeEvidence;
         })}
         {error&&<p className="evidence-error" role="alert">{error}</p>}
         {receipt&&<div role="status">
-          <p>จัดเก็บภาพในคลังส่วนตัวและส่งคิวแล้ว ({receipt.claim_kind}) — ไม่มี URL ภาพสาธารณะ ไม่ได้สร้าง PR หรือเผยแพร่เว็บไซต์</p>
+          <p>ส่งคิวตรวจสอบแล้ว (ต้นฉบับยังอยู่ใน Supabase Private Storage) ({receipt.claim_kind}) — ไม่มี URL ภาพสาธารณะ ไม่ได้สร้าง PR หรือเผยแพร่เว็บไซต์</p>
           {receipt.requests.map(r=><p key={r.id}>{r.site_id} {r.page_path} — {r.status} / {receipt.dispatch?.find(d=>d.request_id===r.id)?.dispatch||'PENDING_PROTECTED_WORKFLOW'} · {r.id}</p>)}
         </div>}
         <button className="evidence-approve" disabled={working||!images.length||!targets.length} onClick={()=>void submit()}>
-          {working?'กำลังสร้างคิว...':'ส่งคิวเตรียม Draft PR (ภาพยังเป็นส่วนตัว)'}
+          {working?'กำลังสร้างคิว...':'สร้างคิวตรวจหลักฐาน (ยังไม่แปลง/เผยแพร่รูป)'}
         </button>
       </>}
     <p>ห้ามใส่ URL ของภาพส่วนตัวหรือ Signed URL ลงใน Draft PR ภาพสาธารณะต้องได้รับอนุมัติอีกครั้งแยกต่างหาก</p>
