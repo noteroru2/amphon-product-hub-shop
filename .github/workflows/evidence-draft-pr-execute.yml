@@ -60,6 +60,22 @@ jobs:
           AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --dry-run
+      - name: Validate source approval for private Sharp image step (no downloads)
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --dry-run
+      - name: Sharp re-encode into PRIVATE R2 only after owner environment approval
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_SEO_SERVICE_ROLE_KEY }}
+          AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
+          AMPHON_CLOUDFLARE_R2_API_TOKEN: ${{ secrets.AMPHON_CLOUDFLARE_R2_API_TOKEN }}
+        run: |
+          node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --execute --owner-authorized
       - name: Create DRAFT PR only — never merge or deploy
         env:
           REQUEST_ID: ${{ inputs.request_id }}
