@@ -94,8 +94,71 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create synthetic Supabase-compatible fixtures
         run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-fixture.sql
+      - name: Save synthetic pre-migration Postgres 17 backup on runner only
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" pg_dump -U postgres -d evidence_qa --format=custom --no-owner --no-privileges > "$RUNNER_TEMP/evidence-qa-before.dump"
+          test -s "$RUNNER_TEMP/evidence-qa-before.dump"
+          sha256sum "$RUNNER_TEMP/evidence-qa-before.dump" | cut -d ' ' -f 1 | grep -Eq '^[0-9a-f]{64}
+      - name: Test RLS grants, duplicate requests and release constraints
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-staging-assert.sql
+
+  local-supabase:
+    name: Isolated Supabase Local Auth + Storage + Sharp E2E (NO CLOUD WRITES)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
+      EVIDENCE_LOCAL_ENV_FILE: /tmp/amphon-evidence-local-env
+      DO_NOT_USE_HOSTED_SUPABASE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Prepare isolated migrations without any production credentials
+        run: |
+          test "${DO_NOT_USE_HOSTED_SUPABASE}" = "true"
+          test -f "$SUPABASE_WORKDIR/supabase/config.toml"
+          test ! -f "$SUPABASE_WORKDIR/supabase/.branches/_current_branch"
+          cp supabase/migrations/20261124_evidence_publisher.sql \
+            "$SUPABASE_WORKDIR/supabase/migrations/20261125000200_evidence_publisher.sql"
+      - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
+        working-directory: tests/evidence-local-supabase
+        run: |
+          supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
+          chmod 600 "$EVIDENCE_LOCAL_ENV_FILE"
+      - name: E2E real LOCAL authentication and private image storage, mocked R2
+        run: node scripts/verify-evidence-supabase-local.mjs
+      - name: Tear down and delete isolated local database
+        if: always()
+        working-directory: tests/evidence-local-supabase
+        run: supabase stop --no-backup || true
+
       - name: Apply proposed schema to disposable Postgres only
         run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < supabase/migrations/20261124_evidence_publisher.sql
+      - name: Restore synthetic backup to SECOND disposable DB and verify baseline
+        run: |
+          docker exec -i "${{ job.services.postgres.id }}" createdb -U postgres evidence_restore_qa
+          docker exec -i "${{ job.services.postgres.id }}" pg_restore -U postgres -d evidence_restore_qa --no-owner --no-privileges --exit-on-error < "$RUNNER_TEMP/evidence-qa-before.dump"
+          RESTORED=$(docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_restore_qa -tAc "SELECT
+            (SELECT count(*) FROM public.trade_evidence)=1
+            AND (SELECT count(*) FROM public.trade_evidence_images)=1
+            AND (SELECT count(*) FROM auth.users)=1
+            AND (SELECT count(*) FROM public.commerce_seo_sites)=1
+            AND to_regclass('public.commerce_evidence_publication_requests') IS NULL
+            AND to_regclass('public.commerce_evidence_page_source_mappings') IS NULL")
+          test "$(echo "$RESTORED" | tr -d '[:space:]')" = "t"
+          echo "PASS: synthetic pre-migration restore on second disposable Postgres 17; NO live backup/Production access"
       - name: Test RLS grants, duplicate requests and release constraints
         run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-staging-assert.sql
 
