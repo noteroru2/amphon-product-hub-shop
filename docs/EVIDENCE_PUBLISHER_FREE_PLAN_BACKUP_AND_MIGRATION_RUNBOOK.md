@@ -78,3 +78,7 @@ The GitHub QA job uses a **synthetic PostgreSQL 17 database with fake UUIDs and 
 - GitHub App not installed on real target website repositories.
 - No live Supabase change, no live Backup export performed by ChatGPT, no photo processing, no merge, no deploy, and no paid branch.
 - The owner must report **backup restore rehearsal passed** before asking for migration approval.
+
+## Privacy erasure foreign-key invariant (Draft PR safety fix)
+
+The proposed queue's `evidence_id` and `image_id` foreign keys now use `ON DELETE CASCADE` **inside the unmerged migration**. `ON DELETE RESTRICT` would otherwise prevent deleting a customer's original evidence or image even after cancellation. Deleting original evidence or an image removes its queue metadata and prevents future queue execution. The synthetic PostgreSQL test explicitly deletes an image and checks that its queue row disappears. **This does not delete any already-staged private R2 copy**, so a future separately reviewed consent-revocation/locked media-retention workflow remains a hard release gate.
