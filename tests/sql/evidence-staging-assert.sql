@@ -53,5 +53,11 @@ BEGIN
     UPDATE public.commerce_evidence_page_source_mappings SET enabled=true WHERE site_id='amphon';
     RAISE EXCEPTION 'UNREVIEWED_MAPPING_ENABLED';
   EXCEPTION WHEN check_violation THEN NULL; END;
-  RAISE NOTICE 'PASS: private queue, no client grants, idempotence, release gates, reviewed mappings';
+  -- Synthetic privacy erasure: deleting the source image automatically removes
+  -- its queue rows (all sites), rather than preventing customer-data deletion.
+  DELETE FROM public.trade_evidence_images
+    WHERE id='8ebfb3f2-1d13-404f-9cfa-93ef40672f16';
+  IF EXISTS (SELECT 1 FROM public.commerce_evidence_publication_requests WHERE id=rec)
+  THEN RAISE EXCEPTION 'PRIVACY_ERASURE_BLOCKED_BY_QUEUE'; END IF;
+  RAISE NOTICE 'PASS: private queue, no client grants, idempotence, release gates, reviewed mappings, privacy erasure cascade';
 END $$;
