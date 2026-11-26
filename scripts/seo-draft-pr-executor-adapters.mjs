@@ -102,6 +102,20 @@ export function githubAdapter(token) {
           repo:p.base.repo?{full_name:p.base.repo.full_name}:null}:null,
       }))
     },
+    async getOverlappingOpenPrs(repo, contentPath) {
+      const pulls = await github(repo,'/pulls?state=open&per_page=100')
+      if (!Array.isArray(pulls) || pulls.length >= 100) deny('OPEN_PR_SCAN_INCOMPLETE')
+      const overlaps=[]
+      for (const pull of pulls) {
+        if (!Number.isInteger(pull.number)) deny('OPEN_PR_INVALID')
+        const files = await github(repo,'/pulls/'+pull.number+'/files?per_page=100')
+        if (!Array.isArray(files) || files.length >= 100) deny('OPEN_PR_FILES_INCOMPLETE')
+        if (files.some(item=>item.filename===contentPath)) overlaps.push({
+          number:pull.number,url:pull.html_url,base:pull.base?.ref??null
+        })
+      }
+      return overlaps
+    },
     async createTree(repo,baseTree,files) {
       const r=await github(repo,'/git/trees',{
         method:'POST',body:{

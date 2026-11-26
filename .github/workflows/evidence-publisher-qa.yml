@@ -1,0 +1,168 @@
+name: Evidence Publisher Draft QA (NO DEPLOY)
+on:
+  push:
+    branches:
+      - feature/evidence-publisher-gated-v1-20261124
+    paths:
+      - '.github/workflows/evidence-publisher-qa.yml'
+      - 'tests/evidence-local-supabase/**'
+      - 'scripts/verify-evidence-supabase-local.mjs'
+      - 'scripts/evidence-protected-env-preflight.mjs'
+      - 'tests/evidence-protected-env-preflight.test.mjs'
+      - 'supabase/migrations/20261124_evidence_publisher.sql'
+      - 'tests/sql/evidence-*.sql'
+      - 'scripts/evidence-image-sharp.mjs'
+      - 'tests/evidence-image-sharp.test.mjs'
+      - '.github/workflows/evidence-draft-pr-execute.yml'
+      - 'docs/EVIDENCE_PUBLISHER_V1.md'
+      - 'docs/EVIDENCE_PUBLISHER_FREE_PLAN_BACKUP_AND_MIGRATION_RUNBOOK.md'
+      - 'scripts/evidence-production-readonly-preflight.sql'
+      - 'src/lib/evidenceSupabaseServerAuth.mjs'
+      - 'tests/evidence-supabase-server-auth.test.mjs'
+      - 'scripts/evidence-draft-pr.mjs'
+      - 'workers/evidence-publisher/**'
+  pull_request:
+    paths:
+      - 'src/lib/evidencePublisherPolicy.ts'
+      - 'src/components/EvidencePublisherPanel.tsx'
+      - 'src/components/TradeEvidenceCenter.tsx'
+      - 'workers/evidence-publisher/**'
+      - 'tests/evidence-publisher.test.mjs'
+      - 'supabase/migrations/20261124_evidence_publisher.sql'
+      - 'tests/sql/evidence-*.sql'
+      - 'tests/evidence-local-supabase/**'
+      - 'scripts/verify-evidence-supabase-local.mjs'
+      - 'scripts/evidence-protected-env-preflight.mjs'
+      - 'tests/evidence-protected-env-preflight.test.mjs'
+      - 'src/vite-env.d.ts'
+      - 'scripts/evidence-draft-pr*.mjs'
+      - 'scripts/evidence-image-sharp.mjs'
+      - 'src/lib/evidenceSupabaseServerAuth.mjs'
+      - 'tests/evidence-supabase-server-auth.test.mjs'
+      - 'tests/evidence-draft-pr.test.mjs'
+      - 'tests/evidence-image-sharp.test.mjs'
+      - '.github/workflows/evidence-draft-pr-execute.yml'
+      - 'package.json'
+      - '.github/workflows/evidence-publisher-qa.yml'
+      - 'docs/EVIDENCE_PUBLISHER_FREE_PLAN_BACKUP_AND_MIGRATION_RUNBOOK.md'
+      - 'scripts/evidence-production-readonly-preflight.sql'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: evidence-publisher-qa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Security and policy tests
+        run: npm run verify:evidence-publisher
+      - name: Supabase backend new sb_secret vs legacy JWT key compatibility
+        run: npm run verify:evidence-supabase-auth
+      - name: GitHub Environment required reviewer preflight unit tests
+        run: npm run verify:evidence-protected-env
+      - name: Multi-site Draft PR E2E tests
+        run: npm run verify:evidence-draft-pr
+      - name: Synthetic Sharp image pipeline + private R2 E2E (no live data)
+        run: npm run verify:evidence-image-sharp
+      - name: Hub typecheck
+        run: npm run typecheck
+      - name: Hub build with existing regression suite
+        run: npm run build
+      - name: Worker bundle dry run only (NEVER DEPLOY)
+        run: npx wrangler deploy --config workers/evidence-publisher/wrangler.jsonc --dry-run
+
+
+  ephemeral-sql:
+    name: Ephemeral Postgres 17 staging schema (NO SUPABASE PRODUCTION)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ephemeral-ci-only
+          POSTGRES_DB: evidence_qa
+        options: >-
+          --health-cmd "pg_isready -U postgres -d evidence_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Create synthetic Supabase-compatible fixtures
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-fixture.sql
+      - name: Save synthetic pre-migration Postgres 17 backup on runner only
+        run: |
+          set -euo pipefail
+          docker exec -i "${{ job.services.postgres.id }}" pg_dump -U postgres -d evidence_qa --format=custom --no-owner --no-privileges > "$RUNNER_TEMP/evidence-qa-before.dump"
+          test -s "$RUNNER_TEMP/evidence-qa-before.dump"
+          sha256sum "$RUNNER_TEMP/evidence-qa-before.dump" | cut -d ' ' -f 1 | grep -Eq '^[0-9a-f]{64}$'
+      - name: Apply proposed schema to disposable Postgres only
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < supabase/migrations/20261124_evidence_publisher.sql
+      - name: Test RLS grants, duplicate requests, privacy erasure and release constraints
+        run: docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_qa -v ON_ERROR_STOP=1 < tests/sql/evidence-staging-assert.sql
+      - name: Restore synthetic backup to second disposable DB and verify baseline
+        run: |
+          set -euo pipefail
+          docker exec -i "${{ job.services.postgres.id }}" createdb -U postgres evidence_restore_qa
+          docker exec -i "${{ job.services.postgres.id }}" pg_restore -U postgres -d evidence_restore_qa --no-owner --no-privileges --exit-on-error < "$RUNNER_TEMP/evidence-qa-before.dump"
+          RESTORED=$(docker exec -i "${{ job.services.postgres.id }}" psql -U postgres -d evidence_restore_qa -tAc "SELECT
+            (SELECT count(*) FROM public.trade_evidence)=1
+            AND (SELECT count(*) FROM public.trade_evidence_images)=1
+            AND (SELECT count(*) FROM auth.users)=1
+            AND (SELECT count(*) FROM public.commerce_seo_sites)=1
+            AND to_regclass('public.commerce_evidence_publication_requests') IS NULL
+            AND to_regclass('public.commerce_evidence_page_source_mappings') IS NULL")
+          test "$(echo "$RESTORED" | tr -d '[:space:]')" = "t"
+          echo "PASS: synthetic backup restored into isolated second Postgres 17 database; zero Production access"
+  local-supabase:
+    name: Isolated Supabase Local Auth + Storage + Sharp E2E (NO CLOUD WRITES)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
+      EVIDENCE_LOCAL_ENV_FILE: /tmp/amphon-evidence-local-env
+      DO_NOT_USE_HOSTED_SUPABASE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Prepare isolated migrations without any production credentials
+        run: |
+          test "${DO_NOT_USE_HOSTED_SUPABASE}" = "true"
+          test -f "$SUPABASE_WORKDIR/supabase/config.toml"
+          test ! -f "$SUPABASE_WORKDIR/supabase/.branches/_current_branch"
+          cp supabase/migrations/20261124_evidence_publisher.sql \
+            "$SUPABASE_WORKDIR/supabase/migrations/20261125000200_evidence_publisher.sql"
+      - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
+        working-directory: tests/evidence-local-supabase
+        run: |
+          supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
+          chmod 600 "$EVIDENCE_LOCAL_ENV_FILE"
+      - name: E2E real LOCAL authentication and private image storage, mocked R2
+        run: node scripts/verify-evidence-supabase-local.mjs
+      - name: Tear down and delete isolated local database
+        if: always()
+        working-directory: tests/evidence-local-supabase
+        run: supabase stop --no-backup || true

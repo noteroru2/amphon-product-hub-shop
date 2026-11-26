@@ -1,0 +1,92 @@
+name: Evidence Publisher — owner-protected Draft PR ONLY
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "One approved publication queue UUID (one site/page)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: evidence-draft-${{ inputs.request_id }}
+  cancel-in-progress: false
+
+jobs:
+  create-draft:
+    if: github.repository == 'noteroru2/amphon-product-hub-shop'
+    runs-on: ubuntu-latest
+    environment: evidence-draft-pr-protected
+    steps:
+      - name: Owner-controlled environment activation required
+        env:
+          ENABLED: ${{ secrets.EVIDENCE_DRAFT_PR_ENVIRONMENT_APPROVED }}
+        run: |
+          test "$ENABLED" = "YES_OWNER_ENABLED"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Block if GitHub Environment lacks actual required reviewers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/evidence-protected-env-preflight.mjs
+      - name: Validate policy and tests before any access to GitHub write token
+        run: npm run verify:evidence-draft-pr
+      - name: Resolve VERIFIED target from registered site mapping (read only)
+        id: target
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
+        run: |
+          node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --resolve-target >> "$GITHUB_OUTPUT"
+      - name: Short-lived GitHub App token scoped to ONE verified repository
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.AMPHON_SEO_GITHUB_APP_ID }}
+          private-key: ${{ secrets.AMPHON_SEO_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target.outputs.owner }}
+          repositories: ${{ steps.target.outputs.repository }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Exact source SHA and owner-approval dry-run
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --dry-run
+      - name: Validate source approval for private Sharp image step (no downloads)
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
+        run: |
+          node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --dry-run
+      - name: Sharp re-encode into PRIVATE R2 only after owner environment approval
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
+          AMPHON_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.AMPHON_CLOUDFLARE_ACCOUNT_ID }}
+          AMPHON_R2_ACCESS_KEY_ID: ${{ secrets.AMPHON_R2_ACCESS_KEY_ID }}
+          AMPHON_R2_SECRET_ACCESS_KEY: ${{ secrets.AMPHON_R2_SECRET_ACCESS_KEY }}
+        run: |
+          node scripts/evidence-image-sharp.mjs --request-id "$REQUEST_ID" --execute --owner-authorized
+      - name: Create DRAFT PR only — never merge or deploy
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          AMPHON_SEO_SUPABASE_URL: ${{ secrets.AMPHON_SEO_SUPABASE_URL }}
+          AMPHON_SEO_SERVICE_ROLE_KEY: ${{ secrets.AMPHON_EVIDENCE_SUPABASE_SECRET_KEY }}
+          AMPHON_SEO_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/evidence-draft-pr.mjs --request-id "$REQUEST_ID" --execute --owner-authorized

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { EvidencePublisherPanel } from './EvidencePublisherPanel'
 import { ArrowLeft, BadgeCheck, Camera, ClipboardCopy, FileText, ImagePlus, LoaderCircle, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import {
   addTradeEvidenceImages, approvedEvidenceForAi, changeTradeEvidenceStatus, downloadReviewedEvidenceImage, generateFacebookDraft,
@@ -49,7 +50,7 @@ const channels = [
 ] as const
 const money = (n: number) => n.toLocaleString('th-TH',{minimumFractionDigits:0,maximumFractionDigits:2}) + ' ฿'
 
-export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
+export function TradeEvidenceCenter({ onBack, isOwner = false }: { onBack: () => void; isOwner?: boolean }) {
   const [rows, setRows] = useState<TradeEvidence[]>([])
   const [economics, setEconomics] = useState<TradeEvidenceEconomics[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -404,6 +405,7 @@ export function TradeEvidenceCenter({ onBack }: { onBack: () => void }) {
           {current && locked && <button disabled={busy} onClick={() => status('DRAFT')}>กลับเป็นร่างเพื่อแก้ไข</button>}
           {current?.status === 'DRAFT' && <button disabled={busy || dirty} onClick={() => status('ARCHIVED')}>เก็บเข้าคลัง</button>}
         </div>
+        {isOwner && current?.status === 'APPROVED' && <EvidencePublisherPanel key={current.id} evidence={current} sites={sourceSites} />}
         {current?.status === 'APPROVED' && <div className="evidence-share">
           <strong>ข้อมูลที่อนุมัติแล้ว พร้อมส่งต่อทีมงาน</strong>
           <p>คัดลอกข้อความและข้อมูลที่ตรวจแล้วได้ รูปยังเป็นส่วนตัว และยังไม่โพสต์หรือเผยแพร่โดยอัตโนมัติ</p>

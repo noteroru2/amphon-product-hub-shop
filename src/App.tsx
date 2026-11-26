@@ -1021,7 +1021,7 @@ function App() {
             <TrustReviewCenter onBack={goBack} />
           )}
         {tab === "trade-evidence" && profile && ["owner", "admin"].includes(profile.role) && (
-          <TradeEvidenceCenter onBack={goBack} />
+          <TradeEvidenceCenter onBack={goBack} isOwner={profile.role === "owner"} />
         )}
         {tab === "channel-settings" && profile && ["owner", "admin"].includes(profile.role) && (
           <ChannelSettings profile={profile} onBack={goBack} />
