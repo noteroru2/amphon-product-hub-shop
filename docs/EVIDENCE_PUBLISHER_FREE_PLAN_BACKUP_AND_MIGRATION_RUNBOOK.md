@@ -20,7 +20,7 @@ Supabase database backup covers **database metadata but not Storage object bytes
 
 1. Use a **personal encrypted laptop/desktop** with available disk space; not a phone, public computer, CI artifact, repository, or GitHub Action. Install current Supabase CLI and Docker Desktop. Verify the exact commands with `supabase --version`, `supabase db dump --help`, `supabase link --help`.
 2. Create a local directory **outside any Git repository** (for example `~/amphon-db-backups/2026-11-26`). Secure it with OS encryption, file permissions and no cloud sync. Do not publish or share a screenshot showing connection strings/passwords.
-3. Authenticate interactively using `supabase login` on the trusted workstation and `supabase link --project-ref mfpdtlxwdbxitgfzdape` **in a new local throwaway project**, never from the live Hub repository. Inspect `supabase link --help` before executing. Enter the database password only into the trusted CLI prompt, not GitHub, chat, shell history, issue bodies or logs.
+3. Run `supabase init` in this new local throwaway project (not in Hub's repository), then authenticate interactively using `supabase login` and run `supabase link --project-ref mfpdtlxwdbxitgfzdape` there. Never run a CLI command against the live Hub repository by accident. Inspect `supabase link --help` before executing. Enter the database password only into the trusted CLI prompt, not GitHub, chat, shell history, issue bodies or logs.
 4. If the CLI requests unsafe operations or offers a paid feature, STOP. Link and dump must be read-only against the database; never run `db push`, `db reset`, `migration up`, `db diff --linked` or `db restore` on the live project.
 
 ### Gate 2 — Export roles, schema and data locally (not run in CI)
@@ -67,6 +67,10 @@ After separately approved DDL, verify **exactly two** tables exist, both RLS-ena
 ### Gate 6 — Rollback / forward-fix (future only)
 
 No whole-project PITR is available. If the DDL transaction fails, use transactional rollback. If it commits, **do not run `DROP TABLE CASCADE`**, especially once records have been written. If both new tables remain empty, an owner-authorized targeted removal may be evaluated after inspecting dependencies. Otherwise, stop Publisher, preserve audit history, take another protected dump, diagnose and prepare a reviewed forward-fix migration. Never reset Production or restore old data over newer business transactions without a recovery plan and owner approval.
+
+## Important scope of our synthetic CI restore rehearsal
+
+The GitHub QA job uses a **synthetic PostgreSQL 17 database with fake UUIDs and zero customer records**. It creates an encrypted/no-sensitive-data-free `pg_dump --format=custom` in runner-local temporary storage, applies the proposed migration in one disposable database, then restores the dump into a **second disposable database** and checks the original tables/rows plus absence of proposed tables. The dump is not uploaded as an artifact and must not be confused with an actual Production backup or a tested recovery of customer data, Auth, or Storage.
 
 ## Release invariants
 
