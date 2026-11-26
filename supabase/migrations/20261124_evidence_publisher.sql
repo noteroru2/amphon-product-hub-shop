@@ -3,8 +3,10 @@
 -- Queue and page mapping are private; all browser-accessible roles are denied.
 CREATE TABLE IF NOT EXISTS public.commerce_evidence_publication_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  evidence_id uuid NOT NULL REFERENCES public.trade_evidence(id) ON DELETE RESTRICT,
-  image_id uuid NOT NULL REFERENCES public.trade_evidence_images(id) ON DELETE RESTRICT,
+  -- If a customer photo/evidence is deleted, its unpublished queue metadata must
+  -- not block erasure. Removing queue rows never publishes or deletes media in R2.
+  evidence_id uuid NOT NULL REFERENCES public.trade_evidence(id) ON DELETE CASCADE,
+  image_id uuid NOT NULL REFERENCES public.trade_evidence_images(id) ON DELETE CASCADE,
   site_id text NOT NULL REFERENCES public.commerce_seo_sites(id),
   page_path text NOT NULL,
   private_media_key text NOT NULL,
