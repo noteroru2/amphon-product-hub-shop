@@ -1,5 +1,10 @@
 -- Tests only: synthetic data schema with the same read-facing columns as
 -- the verified AMPHON Production tables. Never imported into Production.
+do $$ begin
+ if current_setting('amphon.synthetic_fixture',true) is distinct from 'local-only-20261127'
+ then raise exception 'SYNTHETIC_LOCAL_RUNNER_REQUIRED'; end if;
+end $$;
+create schema amphon_synthetic_local_fixture;
 create table public.profiles (
  id uuid primary key references auth.users(id),
  role text not null,
@@ -39,3 +44,16 @@ create table public.commerce_seo_portfolio_projects (
  central_deploy_allowed boolean not null default false
 );
 -- No permanent users, purchases or photos are created in this fixture.
+-- Fixtures must not allow authenticated users to promote their own profile.
+-- Keep the server-facing evidence fixture private; this is not a full replay
+-- of the historical Hub UI's owner/admin policies.
+alter table public.profiles enable row level security;
+alter table public.trade_evidence enable row level security;
+alter table public.trade_evidence_images enable row level security;
+alter table public.commerce_seo_sites enable row level security;
+alter table public.commerce_seo_portfolio_projects enable row level security;
+revoke all on public.profiles, public.trade_evidence, public.trade_evidence_images,
+ public.commerce_seo_sites, public.commerce_seo_portfolio_projects from anon, authenticated;
+grant select on public.profiles to authenticated;
+create policy synthetic_profile_read_self on public.profiles for select to authenticated
+using (id=(select auth.uid()));

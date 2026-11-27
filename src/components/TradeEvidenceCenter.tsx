@@ -7,7 +7,9 @@ import {
   listSourceSites, saveTradeEvidence, setTradeEvidenceImageReview, listTradeEvidenceEconomics, verifyTradeTransaction,
   type EvidenceKind, type TradeEvidence, type TradeEvidenceImage, type TradeEvidenceInput,
   type TradeEvidenceEconomics,
+  releaseTradeEvidenceImageUrls,
 } from '../lib/tradeEvidence'
+import {supabase} from '../lib/supabase'
 
 function today() {
   const d = new Date()
@@ -100,10 +102,30 @@ export function TradeEvidenceCenter({ onBack, isOwner = false }: { onBack: () =>
   useEffect(() => { void listSourceSites().then(setSourceSites).catch(() => setError('โหลดรายชื่อเว็บต้นทางไม่ได้')) }, [])
   useEffect(() => {
     let alive = true
-    void getTradeEvidenceImageUrls(images.map(x => x.storage_path))
-      .then(next => { if (alive) setUrls(next) })
-      .catch(() => { if (alive) setUrls({}) })
-    return () => { alive = false }
+    let held:Record<string,string>={},working=false,generation=0,canDisplay=true
+    const clear=()=>{generation++;releaseTradeEvidenceImageUrls(held);held={};if(alive)setUrls({})}
+    const refresh=async()=>{
+      if(!alive||!canDisplay||working||document.visibilityState==='hidden')return
+      working=true;clear()
+      const attempt=generation
+      try {
+        const next=await getTradeEvidenceImageUrls(images)
+        if(alive&&attempt===generation&&String(document.visibilityState)!=='hidden'){held=next;setUrls(next)}
+        else releaseTradeEvidenceImageUrls(next)
+      }finally {
+        working=false
+        if(alive&&canDisplay&&attempt!==generation&&String(document.visibilityState)!=='hidden')window.setTimeout(()=>void refresh(),0)
+      }
+    }
+    const visibility=()=>{if(document.visibilityState==='hidden')clear();else void refresh()}
+    void refresh()
+    const timer=window.setInterval(()=>void refresh(),45000)
+    document.addEventListener('visibilitychange',visibility)
+    const subscription=supabase?.auth.onAuthStateChange((_event,session)=>{
+      canDisplay=Boolean(session)
+      clear();if(session)window.setTimeout(()=>void refresh(),0)
+    }).data.subscription
+    return () => {alive=false;clear();window.clearInterval(timer);subscription?.unsubscribe();document.removeEventListener('visibilitychange',visibility)}
   }, [selected, rows])
 
   function start(kind: EvidenceKind) {
@@ -365,7 +387,7 @@ export function TradeEvidenceCenter({ onBack, isOwner = false }: { onBack: () =>
               if (e.target.checked && !window.confirm('ตรวจแล้วว่ารูปนี้ไม่มีข้อมูลลูกค้าหรือรายละเอียดส่วนตัวที่ไม่ได้รับอนุญาต?')) return
               review(image,e.target.checked,image.alt_text)
             }}/> ผ่านการตรวจเพื่อใช้สื่อได้</label>
-            {current?.status === 'APPROVED' && image.approved_for_public && <button onClick={() => void perform(() => downloadReviewedEvidenceImage(image),'ดาวน์โหลดภาพแล้ว')}><ImagePlus size={14}/> ดาวน์โหลดภาพตรวจแล้ว</button>}
+            {isOwner && current?.status === 'APPROVED' && image.approved_for_public && <button onClick={() => void perform(() => downloadReviewedEvidenceImage(image),'ดาวน์โหลดภาพแล้ว')}><ImagePlus size={14}/> ดาวน์โหลดภาพตรวจแล้ว</button>}
             {!locked && <button disabled={busy} onClick={() => remove(image)}><Trash2 size={14}/> ลบรูป</button>}
           </div>)}
         </div>

@@ -32,6 +32,7 @@ async function jsonRequest(url, { method='GET', body, headers={}, allow404=false
     headers:{'Accept':'application/json',...headers,...(body?{'Content-Type':'application/json'}:{})},
     ...(body?{body:JSON.stringify(body)}:{}),
     signal:AbortSignal.timeout(20000),
+    redirect:'error',
   })
   if (allow404 && response.status===404) return null
   if (!response.ok) throw Error('SEO_DRAFT_PR_REMOTE_REQUEST_FAILED_'+response.status)
@@ -126,9 +127,14 @@ export function githubAdapter(token) {
       if(!/^[a-f0-9]{40}$/i.test(r?.sha??''))deny('INVALID_NEW_TREE')
       return r.sha
     },
-    async createCommit(repo,tree,base,message) {
+    async createCommit(repo,tree,base,message,date) {
+      if(date!==undefined&&!Number.isFinite(Date.parse(date)))deny('INVALID_COMMIT_DATE')
+      if(date!==undefined)date=new Date(date).toISOString()
       const r=await github(repo,'/git/commits',{
-        method:'POST',body:{message,tree,parents:[base]}
+        method:'POST',body:{message,tree,parents:[base],...(date?{
+          author:{name:'AMPHON Evidence Publisher',email:'evidence-publisher@users.noreply.github.com',date},
+          committer:{name:'AMPHON Evidence Publisher',email:'evidence-publisher@users.noreply.github.com',date}
+        }:{})}
       })
       if(!/^[a-f0-9]{40}$/i.test(r?.sha??''))deny('INVALID_NEW_COMMIT')
       return r.sha

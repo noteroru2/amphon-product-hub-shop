@@ -3,6 +3,7 @@
  * batch of IDs, creating individual, separately reviewed Draft PRs.
  */
 import {createHash} from 'node:crypto'
+import {durableDraftPr} from './evidence-durable-pr.mjs'
 function allowedInternationalContentPath(path) {
  if(typeof path!=='string'||path.length>220||path.includes('\\')||path.includes('//')||path!==path.normalize('NFC'))return false
  if(!/^(?:src\/(?:pages|content|components|layouts)\/|(?:content|pages)\/)/.test(path))return false
@@ -28,7 +29,9 @@ export function safeCaseText(evidence,claim) {
    const cleaned=value.trim()
    if(cleaned.length>600 || /[<>\0]|https?:\/\/|\b\S+@\S+\.\S+\b|(?:\+66|0[689])[\d -]{8,13}|\b\d{13}\b/i.test(cleaned))
      fail('COPY_REQUIRES_PRIVACY_REVIEW')
-   if(/[\r\n]/.test(cleaned)||/^[-#>*]/.test(cleaned))fail('COPY_MARKDOWN_UNSAFE')
+   // MDX/Astro expressions, Markdown links/images and escapes are executable or
+   // can introduce unreviewed destinations even without an HTML tag or URL.
+   if(/[\x00-\x1f\x7f{}\[\]`\\]/.test(cleaned)||/^[-#>*]/.test(cleaned))fail('COPY_MARKDOWN_UNSAFE')
    return [key,cleaned]
  }))
  if(values.title.length<3)fail('TITLE_REQUIRED')
@@ -97,6 +100,10 @@ export async function executeEvidenceDraftPr(id,{store,github,dryRun=true}) {
  if(snap.request?.status==='DRAFT_PR_OPEN'&&snap.request?.draft_pr_url)
    return {outcome:'ALREADY_RECORDED',pr_url:snap.request.draft_pr_url,performed_write:false}
  const cfg=inspectSnapshot(snap)
+ if(!dryRun&&!store.operations&&store.syntheticOnly!==true)fail('DURABLE_JOURNAL_REQUIRED')
+ const approvedSnapshot=JSON.stringify(snap)
+ if(!dryRun&&store.operations)return durableDraftPr({id,snapshot:snap,cfg,store,github,
+  branch:draftBranch(id),applyCase})
  const head=await github.getBranchHead(cfg.repo,cfg.base)
  if(!SHA.test(head||'')||head.toLowerCase()!==snap.expected_base_sha.toLowerCase())
    fail('BASE_MOVED_REVIEW_REQUIRED')
@@ -114,13 +121,28 @@ export async function executeEvidenceDraftPr(id,{store,github,dryRun=true}) {
    source_path:cfg.sourcePath,content_sha256:digest,media_public:false,
    production_deploy_authorized:false,performed_write:false}
  if(dryRun)return summary
+ // Revalidate the complete reviewed snapshot after remote reads and before
+ // writes. Keep the original serialized value: adapters may reuse objects.
+ async function recheckApproval() {
+   const current=await store.loadSnapshot(id)
+   inspectSnapshot(current)
+   if(JSON.stringify(current)!==approvedSnapshot)fail('APPROVAL_CHANGED_DURING_CREATE')
+ }
+ async function write(action) {
+   try {return await action()}
+   catch {fail('WRITE_RESULT_UNCERTAIN_RECONCILE_REQUIRED')}
+ }
  const tree=await github.getCommitTree(cfg.repo,head)
  if(!SHA.test(tree||''))fail('BASE_TREE_INVALID')
- const newTree=await github.createTree(cfg.repo,tree,[{path:cfg.sourcePath,content:next}])
- const commit=await github.createCommit(cfg.repo,newTree,head,'seo(evidence): reviewed text-only case '+id)
+ await recheckApproval()
+ const newTree=await write(()=>github.createTree(cfg.repo,tree,[{path:cfg.sourcePath,content:next}]))
+ await recheckApproval()
+ const commit=await write(()=>github.createCommit(cfg.repo,newTree,head,'seo(evidence): reviewed text-only case '+id))
  if(await github.getBranchHead(cfg.repo,cfg.base)!==head)fail('BASE_MOVED_DURING_CREATE')
- await github.createBranch(cfg.repo,name,commit)
- const pull=await github.createDraftPr(cfg.repo,{
+ await recheckApproval()
+ await write(()=>github.createBranch(cfg.repo,name,commit))
+ await recheckApproval()
+ const pull=await write(()=>github.createDraftPr(cfg.repo,{
    head:name,base:cfg.base,draft:true,
    title:'[DRAFT][NO DEPLOY] Reviewed evidence case '+id.slice(0,8),
    body:'## AMPHON Evidence Publisher — text-only Draft PR\n\n'+
@@ -128,10 +150,15 @@ export async function executeEvidenceDraftPr(id,{store,github,dryRun=true}) {
      '\nClaim: '+cfg.claim+'\n\nNo private/public image URL is included. '+
      'Image publication, site Merge and Deploy each require separate owner approval.\n'+
      'Review content accuracy, page H1/title/canonical, schema, links and CI before release.'
- })
+ }))
  if(!pull?.draft||!Number.isInteger(pull.number)||!pull.url?.startsWith('https://github.com/'+cfg.repo+'/pull/'))
    fail('PR_RECEIPT_INVALID')
+ // The remote PR already exists. A cancellation while the request was in flight
+ // must not be reported as a successful publication or overwrite CANCELLED.
+ try {await recheckApproval()}
+ catch {fail('POST_WRITE_RECONCILE_REQUIRED')}
  // If receipt recording fails, the branch remains; retry cannot duplicate it.
- await store.recordDraft(id,pull,commit,head,cfg)
+ try {await store.recordDraft(id,pull,commit,head,cfg)}
+ catch {fail('RECEIPT_RECONCILE_REQUIRED')}
  return {...summary,outcome:'DRAFT_PR_CREATED',performed_write:true,pr_url:pull.url,pr_number:pull.number,draft_sha:commit}
 }

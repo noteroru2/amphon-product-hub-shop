@@ -29,9 +29,24 @@ function configuration(env) {
 }
 async function body(request) {
   if(Number(request.headers.get('content-length')||0)>12000)throw Error('BODY_TOO_LARGE')
-  const data=await request.text()
-  if(data.length>12000)throw Error('BODY_TOO_LARGE')
-  const parsed=JSON.parse(data)
+  if(!request.body)throw Error('BODY_INVALID')
+  const reader=request.body.getReader(),parts=[]
+  let total=0
+  try {
+    while(true) {
+      const {done,value}=await reader.read()
+      if(done)break
+      total+=value.byteLength
+      if(total>12000){await reader.cancel();throw Error('BODY_TOO_LARGE')}
+      parts.push(value)
+    }
+  }finally {reader.releaseLock()}
+  const bytes=new Uint8Array(total)
+  let offset=0
+  for(const part of parts){bytes.set(part,offset);offset+=part.length}
+  let parsed
+  try {parsed=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))}
+  catch {throw Error('BODY_INVALID')}
   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('BODY_INVALID')
   return parsed
 }
@@ -40,7 +55,7 @@ async function db(env,path,{method='GET',body:payload}={}) {
     method,headers:{
       ...evidenceServiceHeaders(env.SUPABASE_SECRET_KEY),
       ...(payload?{'content-type':'application/json','prefer':'return=representation'}:{})
-    },body:payload?JSON.stringify(payload):undefined,redirect:'error'
+    },body:payload?JSON.stringify(payload):undefined,redirect:'error',signal:AbortSignal.timeout(16000)
   })
   if(!res.ok)throw Error(res.status===409?'QUEUE_CONFLICT':'DATABASE_REQUEST_FAILED')
   return res.status===204?[]:res.json()
@@ -49,7 +64,7 @@ async function requireOwner(request,env) {
   const bearer=request.headers.get('authorization')||''
   if(!/^Bearer\s+[^\s]+$/.test(bearer))throw Error('UNAUTHORIZED')
   const res=await fetch(new URL('/auth/v1/user',env.SUPABASE_URL),{
-    headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:bearer},redirect:'error'
+    headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,authorization:bearer},redirect:'error',signal:AbortSignal.timeout(16000)
   })
   if(!res.ok)throw Error('UNAUTHORIZED')
   const user=await res.json()
@@ -125,13 +140,21 @@ async function stage(request,env,actor) {
       if(existing[0].status==='CANCELLED')throw Error('CANCELLED_REQUEST_REQUIRES_NEW_REVIEW')
       receipts.push(existing[0]);continue
     }
-    const created=await db(env,'/rest/v1/commerce_evidence_publication_requests',{method:'POST',body:{
+    let created
+    try {created=await db(env,'/rest/v1/commerce_evidence_publication_requests',{method:'POST',body:{
       evidence_id:input.evidence_id,image_id:input.image_id,
       site_id:target.site_id,page_path:target.page_path,private_media_key:key,
       claim_kind:claim.claim_kind,requested_by:actor,status:'PENDING_SOURCE_PR'
-    }})
+    }})}catch(error) {
+      // A simultaneous identical enqueue may win the UNIQUE constraint. Load
+      // its receipt instead of treating a safe retry as a server failure.
+      if(!(error instanceof Error)||error.message!=='QUEUE_CONFLICT')throw error
+      created=await db(env,query)
+    }
     if(created.length!==1)throw Error('QUEUE_INSERT_FAILED')
-    receipts.push(created[0])
+    if(created[0].status==='CANCELLED')throw Error('CANCELLED_REQUEST_REQUIRES_NEW_REVIEW')
+    const {id,site_id,page_path,status}=created[0]
+    receipts.push({id,site_id,page_path,status})
   }
   const dispatch=await dispatchOwnerApprovedDraftJobs(env,receipts)
   return json({status:'QUEUED_PRIVATE_ONLY',claim_kind:claim.claim_kind,requests:receipts,

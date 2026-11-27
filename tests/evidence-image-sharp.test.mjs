@@ -2,7 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import sharp from 'sharp'
 import worker from '../workers/evidence-publisher/index.mjs'
-import {stagePrivateEvidenceImage,toPrivateWebp,privateImageRemote,signedPrivateR2Put,parseImageArgs} from '../scripts/evidence-image-sharp.mjs'
+import {stagePrivateEvidenceImage as stageSyntheticImage,toPrivateWebp,privateImageRemote,signedPrivateR2Put,parseImageArgs} from '../scripts/evidence-image-sharp.mjs'
+// These original isolated policy tests deliberately use in-memory stores. The
+// actual server adapter always requires the persistent SQL operation journal.
+const stagePrivateEvidenceImage=(id,options)=>stageSyntheticImage(id,{...options,store:{syntheticOnly:true,...options.store}})
 
 const ID='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const E='dd8cbc49-1caf-477c-b579-955007517b61'
@@ -37,6 +40,8 @@ test('Sharp uses synthetic JPG -> WebP with EXIF/ICC/XMP omitted and size reduce
  const input=await syntheticJpeg()
  const before=await sharp(input).metadata()
  assert.equal(before.format,'jpeg')
+ assert.ok(before.exif,'Synthetic input must contain metadata before stripping')
+ assert.ok(before.icc)
  const result=await toPrivateWebp(input)
  const meta=await sharp(result).metadata()
  assert.equal(meta.format,'webp')
@@ -53,6 +58,15 @@ test('Sharp rejects SVG and unsupported, malformed and oversized input',async()=
  await assert.rejects(toPrivateWebp(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')))
  await assert.rejects(toPrivateWebp(Buffer.from('not a supported image format'.repeat(3))))
  await assert.rejects(toPrivateWebp(Buffer.alloc(8*1024*1024+1)))
+})
+
+test('Sharp rejects a synthetic decompression bomb above 25 megapixels and truncated JPEG pixels',async()=>{
+ const oversized=await sharp({create:{width:5001,height:5000,channels:3,
+  background:{r:10,g:20,b:30}}}).png().toBuffer()
+ assert.ok(oversized.length<8*1024*1024,'Pixel limit must apply even to small compressed input')
+ await assert.rejects(toPrivateWebp(oversized))
+ const jpeg=await syntheticJpeg()
+ await assert.rejects(toPrivateWebp(jpeg.subarray(0,Math.floor(jpeg.length/2))))
 })
 test('private stage dry-run never reads/writes any bytes; only owner-reviewed snapshot',async()=>{
  const calls=[]
@@ -147,7 +161,9 @@ test('R2 SigV4 signs only private S3 PutObject with deterministic signature and 
  assert.equal(first.request.headers.authorization,second.request.headers.authorization)
  assert.match(first.endpoint,/^https:\/\/a{32}\.r2\.cloudflarestorage\.com\/amphon-evidence-staged-private\/evidence\//)
  assert.match(first.request.headers.authorization,/Credential=synthetic-r2-access-id\/20261125\/auto\/s3\/aws4_request/)
- assert.match(first.request.headers.authorization,/SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date/)
+ assert.match(first.request.headers.authorization,/SignedHeaders=cache-control;content-type;host;if-none-match;x-amz-content-sha256;x-amz-date;x-amz-meta-sha256/)
+ assert.equal(first.request.headers['if-none-match'],'*')
+ assert.equal(first.request.headers['cache-control'],'private, no-store')
  assert.equal(first.request.headers['x-amz-date'],'20261125T090000Z')
  assert.equal(first.request.headers['content-type'],'image/webp')
  assert.ok(!first.endpoint.includes('api.cloudflare.com'))
@@ -178,6 +194,47 @@ test('CLI execution is never allowed without explicit owner flag',()=>{
  assert.throws(()=>parseImageArgs(['--request-id',ID,'--execute']))
  assert.throws(()=>parseImageArgs(['--request-id',ID,'--deploy']))
  assert.equal(parseImageArgs(['--request-id',ID,'--execute','--owner-authorized']).dryRun,false)
+})
+
+test('cancel, revoke, delete or lose authorization during upload: fail closed and preserve shared private object',async()=>{
+ const jpeg=await syntheticJpeg()
+ for(const mutation of [s=>{s.request.status='CANCELLED'},s=>{s.evidence.permission_confirmed=false},
+  s=>{s.image.approved_for_public=false},s=>{s.requester.active=false},s=>{s.image=null},
+  s=>{s.request=null}]) {
+  const snap=syntheticSnapshot(),objects=new Map()
+  let deletes=0
+  await assert.rejects(stagePrivateEvidenceImage(ID,{
+   store:{async loadSnapshot(){return snap}},remote:{async downloadPrivate(){return jpeg},
+    async putPrivate(k,bytes){objects.set(k,bytes);mutation(snap)},async delete(){deletes++}},dryRun:false
+  }),/POST_UPLOAD_RECONCILE_REQUIRED/)
+  assert.equal(objects.size,1,'In-flight write really occurred in fake R2; do not claim rollback')
+  assert.equal(objects.has(key),true)
+  assert.equal(deletes,0,'Another site can still reference the same object')
+ }
+})
+
+test('uncertain upload response or unavailable post-upload DB never reports success or leaks upstream errors',async()=>{
+ const jpeg=await syntheticJpeg()
+ for(const uncertain of [true,false]) {
+  let reads=0,writes=0
+  await assert.rejects(stagePrivateEvidenceImage(ID,{
+   store:{async loadSnapshot(){reads++;if(reads===3)throw Error('private-database-details');return syntheticSnapshot()}},
+   remote:{async downloadPrivate(){return jpeg},async putPrivate(){writes++;if(uncertain)throw Error('secret-upstream-details')}},
+   dryRun:false
+  }),uncertain?/^Error: EVIDENCE_IMAGE_UPLOAD_RESULT_UNCERTAIN_RECONCILE_REQUIRED$/:/^Error: EVIDENCE_IMAGE_POST_UPLOAD_RECONCILE_REQUIRED$/)
+  assert.equal(writes,1,'No automatic retry of an ambiguous side effect')
+ }
+})
+
+test('changing an approved storage path or consent timestamp during conversion prevents upload',async()=>{
+ const jpeg=await syntheticJpeg()
+ for(const mutate of [s=>{s.image.storage_path=E+'/different.jpg'},s=>{s.evidence.approved_at='2026-11-26T00:00:00Z'}]) {
+  const snap=syntheticSnapshot();let uploads=0
+  await assert.rejects(stagePrivateEvidenceImage(ID,{store:{async loadSnapshot(){return snap}},
+   remote:{async downloadPrivate(){mutate(snap);return jpeg},async putPrivate(){uploads++}},dryRun:false
+  }),/APPROVAL_CHANGED_DURING_CONVERSION/)
+  assert.equal(uploads,0)
+ }
 })
 test('synthetic Hub -> Worker queue for two sites -> protected Sharp stage; no images before approval',async()=>{
  const originalFetch=globalThis.fetch

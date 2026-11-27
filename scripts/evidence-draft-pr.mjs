@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url'
 import {githubAdapter} from './seo-draft-pr-executor-adapters.mjs'
 import {evidenceServiceHeaders} from '../src/lib/evidenceSupabaseServerAuth.mjs'
 import {executeEvidenceDraftPr,inspectSnapshot} from './evidence-draft-pr-core.mjs'
+import {operationJournal} from './evidence-operation-journal.mjs'
 const uuid=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
 const die=msg=>{throw Error('EVIDENCE_PR_'+msg)}
 const selectOne=(rows,label)=>{
@@ -27,6 +28,7 @@ export function storeAdapter(url,key) {
    return res.json()
  }
  return {
+  operations:operationJournal(url,key),
   async loadSnapshot(id) {
    if(!uuid.test(id||''))die('REQUEST_ID_INVALID')
    const r=selectOne(await request('commerce_evidence_publication_requests',{id}),
@@ -75,6 +77,10 @@ export function parseArgs(args) {
 }
 export async function run(args=process.argv.slice(2),env=process.env) {
  const o=parseArgs(args),store=storeAdapter(env.AMPHON_SEO_SUPABASE_URL,env.AMPHON_SEO_SERVICE_ROLE_KEY)
+ if(env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID){
+  if(!uuid.test(env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID))die('RECOVERY_APPROVAL_INVALID')
+  store.recoveryApproval=env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID
+ }
  if(o.resolve) {
    const s=await store.loadSnapshot(o.requestId)
    const cfg=inspectSnapshot(s)
@@ -90,5 +96,5 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
    if(process.argv.includes('--resolve-target')) {
      console.log('owner='+result.target_owner+'\nrepository='+result.target_repository)
    } else console.log(JSON.stringify(result,null,2))
- }).catch(error=>{console.error(error instanceof Error?error.message:'EVIDENCE_PR_FAILED');process.exitCode=1})
+ }).catch(error=>{console.error(JSON.stringify({error:error instanceof Error?error.message:'EVIDENCE_PR_FAILED',...(error?.operation_id?{operation_id:error.operation_id}:{})}));process.exitCode=1})
 }

@@ -33,7 +33,7 @@ function snapshot(site='amphon') {
 }
 function harness(s=snapshot(),opts={}) {
  const calls=[]
- const store={async loadSnapshot(id){calls.push('load');assert.equal(id,ID);return s},
+ const store={syntheticOnly:true,async loadSnapshot(id){calls.push('load');assert.equal(id,ID);return s},
    async recordDraft(){calls.push('record')}}
  const github={
    async getBranchHead(){calls.push('head');return opts.moved?'f'.repeat(40):SHA},
@@ -73,7 +73,7 @@ test('two verified sites yield independent site-specific drafts without leaking 
   assert.equal(r.repository,s.project.production_repo)
   assert.equal(r.production_deploy_authorized,false)
   assert.equal(r.media_public,false)
-  assert.deepEqual(h.calls,['load','head','ref','overlap','file','tree','create-tree','create-commit','head','create-branch','create-pr','record'])
+  assert.deepEqual(h.calls,['load','head','ref','overlap','file','tree','load','create-tree','load','create-commit','head','load','create-branch','load','create-pr','load','record'])
  }
 })
 test('dry-run touches no GitHub mutation or DB mutation',async()=>{
@@ -112,7 +112,8 @@ test('moving base SHA or existing branch or duplicated evidence marker aborts be
 })
 test('PII/markup not allowed even in owner-approved text; no arbitrary instructions into public PR',()=>{
  for(const text of ['โทร 0891234567','abc@example.com','เลขบัตร 1234567890123',
-   '<img src=x>','https://example.com/','\n## Injected content'])
+   '<img src=x>','https://example.com/','\n## Injected content',
+   '{process.env.SECRET}', '[external](//example.invalid)', '![image][ref]', '`code`', 'escaped\\text'])
    assert.throws(()=>safeCaseText({...snapshot().evidence,condition_text:text},'ASSESSMENT_ONLY'))
  assert.throws(()=>applyCase(SOURCE.replace(ANCHOR,'<!-- AMPHON_EVIDENCE_CASE:'+ID+' -->\\n'+ANCHOR),ANCHOR,ID,'safe text'))
 })
@@ -122,11 +123,53 @@ test('existing PR receipt is idempotent',async()=>{
  assert.equal(r.outcome,'ALREADY_RECORDED')
  assert.deepEqual(h.calls,['load'])
 })
+
+test('revocation or reviewed content change during remote reads blocks every subsequent PR write',async()=>{
+ for(const phase of ['getFile','createTree','createCommit','createBranch']) {
+  for(const mutate of [s=>{s.request.status='CANCELLED'},s=>{s.evidence.permission_confirmed=false},
+    s=>{s.evidence.title='Changed synthetic title'},s=>{s.mapping.expected_base_sha='f'.repeat(40)}]) {
+   const s=snapshot(),h=harness(s),original=h.github[phase]
+   h.github[phase]=async(...args)=>{const result=await original(...args);mutate(s);return result}
+   await assert.rejects(executeEvidenceDraftPr(ID,{...h,dryRun:false}))
+   assert.equal(h.calls.includes('create-pr'),false)
+   if(phase==='getFile')assert.equal(h.calls.includes('create-tree'),false)
+  }
+ }
+})
 test('separate owner authorization flag mandatory; deployment flags forbidden',()=>{
  assert.equal(parseArgs(['--request-id',ID]).dryRun,true)
  assert.throws(()=>parseArgs(['--request-id',ID,'--execute']))
  assert.throws(()=>parseArgs(['--request-id',ID,'--deploy']))
  assert.equal(parseArgs(['--request-id',ID,'--execute','--owner-authorized']).dryRun,false)
+})
+
+test('consent revoked or queue cancelled while PR creation is in flight requires reconciliation, never a success receipt',async()=>{
+ for(const mutate of [s=>{s.request.status='CANCELLED'},s=>{s.evidence.permission_confirmed=false}]) {
+  const s=snapshot(),h=harness(s),create=h.github.createDraftPr
+  h.github.createDraftPr=async(...args)=>{const result=await create(...args);mutate(s);return result}
+  await assert.rejects(executeEvidenceDraftPr(ID,{...h,dryRun:false}),/POST_WRITE_RECONCILE_REQUIRED/)
+  assert.ok(h.calls.includes('create-pr'),'A fake remote PR exists and needs owner review')
+  assert.equal(h.calls.includes('record'),false)
+ }
+})
+
+test('orphan branch/PR after receipt failure blocks duplicate retry and never exposes upstream details',async()=>{
+ const s=snapshot(),h=harness(s)
+ h.store.recordDraft=async()=>{throw Error('sensitive-upstream-detail')}
+ await assert.rejects(executeEvidenceDraftPr(ID,{...h,dryRun:false}),/^Error: EVIDENCE_PR_RECEIPT_RECONCILE_REQUIRED$/)
+ const retry=harness(s,{existingBranch:true})
+ await assert.rejects(executeEvidenceDraftPr(ID,{...retry,dryRun:false}),/EXISTING_BRANCH_RECONCILE_REQUIRED/)
+ assert.equal(retry.calls.includes('create-pr'),false)
+})
+
+test('lost GitHub mutation responses require reconciliation without retry or leaking remote details',async()=>{
+ for(const method of ['createTree','createCommit','createBranch','createDraftPr']) {
+  const h=harness(),original=h.github[method];let writes=0
+  h.github[method]=async(...args)=>{writes++;await original(...args);throw Error('secret-remote-details')}
+  await assert.rejects(executeEvidenceDraftPr(ID,{...h,dryRun:false}),/^Error: EVIDENCE_PR_WRITE_RESULT_UNCERTAIN_RECONCILE_REQUIRED$/)
+  assert.equal(writes,1)
+  assert.equal(h.calls.includes('record'),false)
+ }
 })
 test('private-only image stage has no public GET or media URLs; SQL RLS never exposes queue',()=>{
  const worker=readFileSync(new URL('../workers/evidence-publisher/index.mjs',import.meta.url),'utf8')

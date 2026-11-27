@@ -30,6 +30,14 @@ const locals=Object.fromEntries(readFileSync(envfile,'utf8').split(/\r?\n/)
 const api=locals.API_URL,anon=locals.ANON_KEY,serviceKey=locals.SERVICE_ROLE_KEY
 if(!api||!/^http:\/\/(127\.0\.0\.1|localhost):55321\/?$/.test(api)||!anon||!serviceKey)
   throw Error('NOT_ISOLATED_SUPABASE_LOCAL_REFUSE_NETWORK')
+// Install the transport guard before creating clients or users, not halfway
+// through the test. Even SDK setup may only reach this exact local origin.
+const originalFetch=globalThis.fetch
+globalThis.fetch=async(url,init)=>{
+ const target=new URL(typeof url==='string'||url instanceof URL?url:url.url)
+ if(target.origin!==new URL(api).origin)throw Error('LOCAL_SETUP_NETWORK_DENIED')
+ return originalFetch(url,{...init,redirect:'error'})
+}
 const service=createClient(api,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}})
 const publicClient=createClient(api,anon,{auth:{persistSession:false,autoRefreshToken:false}})
 
@@ -92,15 +100,21 @@ const userAuth=unwrap(await publicClient.auth.signInWithPassword({
  email:'evidence-owner-synthetic@example.invalid',
  password:'SyntheticPassword-For-CI-2026!'
 }),'OWNER_SIGNIN')
-const adminAuth=unwrap(await createClient(api,anon,{
+const adminClient=createClient(api,anon,{
  auth:{persistSession:false,autoRefreshToken:false}
-}).auth.signInWithPassword({
+})
+const adminAuth=unwrap(await adminClient.auth.signInWithPassword({
  email:'evidence-admin-synthetic@example.invalid',
  password:'SyntheticPassword-For-CI-2026!'
 }),'ADMIN_SIGNIN')
 assert.ok(userAuth.session?.access_token && adminAuth.session?.access_token)
-const originalFetch=globalThis.fetch
+// Neither user-controlled metadata nor Data API profile edits grant ownership.
+unwrap(await adminClient.auth.updateUser({data:{role:'owner'}}),'SYNTHETIC_METADATA_FORGERY')
+await adminClient.from('profiles').update({role:'owner'}).eq('id',staff.id)
+assert.equal(unwrap(await service.from('profiles').select('role').eq('id',staff.id).single(),
+ 'VERIFY_ADMIN_ROLE').role,'admin')
 const attemptedExternal=[]
+const r2Objects=new Map()
 let uploads=0
 const toLocal=(requestURL)=>{
  const u=new URL(String(requestURL))
@@ -113,6 +127,10 @@ globalThis.fetch=async function sandboxFetch(url,init) {
  if(u.hostname==='a'.repeat(32)+'.r2.cloudflarestorage.com') {
    attemptedExternal.push({hostname:u.hostname,method:init?.method})
    if(!u.pathname.startsWith('/amphon-evidence-staged-private/evidence/'))throw Error('UNSAFE_R2_PATH')
+   if(init?.method==='HEAD') {
+    const head=r2Objects.get(u.pathname)
+    return head?new Response(null,{headers:head}):new Response(null,{status:404})
+   }
    assert.equal(init?.method,'PUT')
    assert.match(init.headers.authorization,/^AWS4-HMAC-SHA256 Credential=/)
    assert.equal(init.headers['content-type'],'image/webp')
@@ -121,9 +139,13 @@ globalThis.fetch=async function sandboxFetch(url,init) {
    assert.equal(meta.exif,undefined)
    assert.equal(meta.icc,undefined)
    uploads++
+   assert.equal(init.headers['if-none-match'],'*')
+   assert.equal(r2Objects.has(u.pathname),false)
+   r2Objects.set(u.pathname,{'x-amz-meta-sha256':init.headers['x-amz-meta-sha256'],
+    etag:'"synthetic-etag"','content-length':String(init.body.length)})
    return new Response(null,{status:200})
  }
- return originalFetch(toLocal(url),init)
+ return originalFetch(toLocal(url),{...init,redirect:'error'})
 }
 try {
  const workerEnv={
@@ -155,9 +177,17 @@ try {
  assert.equal(result.media_staged,false)
  assert.equal(result.requests.length,2)
  // Anon and user role have no access to queue; service role can inspect receipts.
- const anonymousRows=await publicClient.from('commerce_evidence_publication_requests')
+ const anonymousRows=await createClient(api,anon,{auth:{persistSession:false,autoRefreshToken:false}}).from('commerce_evidence_publication_requests')
    .select('id')
  assert.ok(anonymousRows.error || anonymousRows.data?.length===0)
+ const ownerRows=await publicClient.from('commerce_evidence_publication_requests').select('id')
+ assert.ok(ownerRows.error || ownerRows.data?.length===0)
+ const anonymousStorage=createClient(api,anon,{auth:{persistSession:false,autoRefreshToken:false}})
+ assert.ok((await anonymousStorage.storage.from('trade-evidence-private').download(storagePath)).error)
+ assert.ok((await publicClient.storage.from('trade-evidence-private').download(storagePath)).data,'Consented internal preview remains authenticated')
+ assert.ok((await publicClient.storage.from('trade-evidence-private').createSignedUrl(storagePath,60)).error,'No new bearer signed URLs')
+ const publicObject=await originalFetch(new URL('/storage/v1/object/public/trade-evidence-private/'+storagePath,api),{redirect:'error'})
+ assert.ok(!publicObject.ok,'Private bucket must reject unauthenticated public object route')
  const queued=unwrap(await service.from('commerce_evidence_publication_requests')
    .select('id,site_id,status,claim_kind,private_media_key'),'QUEUE_SELECT')
  assert.equal(queued.length,2)
@@ -180,28 +210,34 @@ try {
   assert.equal(outcome.media_public,false)
   assert.equal(outcome.claim_kind,'ASSESSMENT_ONLY')
  }
- assert.equal(uploads,2)
+ assert.equal(uploads,1,'Shared image key must be verified by HEAD instead of uploaded twice')
  // Complete the chain through a simulated GitHub DRAFT PR against a fake API.
  // Draft receipts are written ONLY to the disposable LOCAL Supabase database.
  const {executeEvidenceDraftPr}=await import('./evidence-draft-pr-core.mjs')
  const source='---\ntitle: "รับซื้อโน๊ตบุ๊ค"\n---\n# รับซื้อโน๊ตบุ๊ค\n\n## ส่งรูปเช็กราคาโน๊ตบุ๊คก่อนตัดสินใจ\n'
  const commits=[]
+ const refs=new Map(),contents=new Map(),pulls=new Map()
  const github={
   async getBranchHead(){return 'a'.repeat(40)},
-  async getBranchRef(){return null},
+  async getBranchRef(repo,branch){return refs.get(repo+':'+branch)||null},
+  async getPullsForHead(repo,branch){return pulls.get(repo+':'+branch)||[]},
   async getOverlappingOpenPrs(){return []},
-  async getFile(){return {type:'file',size:source.length,blob_sha:'b'.repeat(40),content:source}},
+  async getFile(repo,path,sha){return {type:'file',size:source.length,blob_sha:'b'.repeat(40),content:sha==='d'.repeat(40)?contents.get(repo):source}},
+  async getCommitReview(){return {parents:[{sha:'a'.repeat(40)}],changedFiles:[{filename:'src/content/services/รับซื้อโน๊ตบุ๊ค.md'}]}},
   async getCommitTree(){return 'c'.repeat(40)},
   async createTree(repo,base,files){
    assert.equal(files.length,1)
    assert.match(files[0].content,/ประเมินเบื้องต้น/)
    assert.doesNotMatch(files[0].content,/\.webp|trade-evidence-private|storage\/v1/)
+   contents.set(repo,files[0].content)
    return 'c'.repeat(40)
   },
   async createCommit(){return 'd'.repeat(40)},
-  async createBranch(repo,branch){commits.push({repo,branch})},
+  async createBranch(repo,branch,sha){commits.push({repo,branch});refs.set(repo+':'+branch,sha)},
   async createDraftPr(repo,body){
     assert.equal(body.draft,true)
+    pulls.set(repo+':'+body.head,[{state:'open',draft:true,number:999,html_url:'https://github.com/'+repo+'/pull/999',
+     head:{ref:body.head,sha:'d'.repeat(40),repo:{full_name:repo}},base:{ref:body.base,repo:{full_name:repo}}}])
     return {draft:true,number:999,url:'https://github.com/'+repo+'/pull/999'}
   }
  }
@@ -220,10 +256,13 @@ try {
  // Ensure original data never became public in Storage.
  const buckets=unwrap(await service.storage.listBuckets(),'LIST_BUCKETS')
  assert.equal(buckets.find(b=>b.name==='trade-evidence-private')?.public,false)
- assert.ok(attemptedExternal.every(x=>x.hostname==='a'.repeat(32)+'.r2.cloudflarestorage.com'&&x.method==='PUT'))
+ assert.ok(attemptedExternal.every(x=>x.hostname==='a'.repeat(32)+'.r2.cloudflarestorage.com'&&['PUT','HEAD'].includes(x.method)))
  // R2 public GET path is unavailable even in mocked worker.
  const response=await worker.fetch(new Request('https://evidence-worker.invalid/media/evidence/x.webp'),workerEnv)
  assert.equal(response.status,404)
+ const {runLocalRecoveryTests}=await import('../tests/helpers/evidence-recovery-local.mjs')
+ await runLocalRecoveryTests({api,anon,service,ownerClient:publicClient,ownerId:owner.id,
+  ownerToken:userAuth.session.access_token,adminToken:adminAuth.session.access_token,serviceKey,locals,fetchImpl:globalThis.fetch})
  console.log('PASS LOCAL SUPABASE E2E: real Auth/RLS/PostgREST/private Storage, '+queued.length+' queues, Sharp -> simulated private R2 only')
 }finally {
  globalThis.fetch=originalFetch

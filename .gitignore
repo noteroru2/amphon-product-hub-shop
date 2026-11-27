@@ -1,8 +1,18 @@
 node_modules
 dist
 .wrangler
+.evidence-review-package/
 .env
 .env.local
+.env.*
+!.env.example
+.dev.vars*
+tests/evidence-local-supabase/supabase/.temp/
+tests/evidence-local-supabase/supabase/.branches/
+tests/evidence-local-supabase/supabase/functions/
+tests/evidence-local-supabase/supabase/migrations/*.sql
+tests/evidence-local-supabase/supabase/migrations/20261125000200_evidence_publisher.sql
+tests/evidence-local-supabase/supabase/migrations/20261125000300_evidence_recovery.sql
 .DS_Store
 *.log
 

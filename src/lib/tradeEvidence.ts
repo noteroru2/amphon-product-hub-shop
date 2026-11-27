@@ -1,5 +1,6 @@
 import { compressImage } from './image'
 import { supabase } from './supabase'
+import {loadPrivateEvidenceImage} from './evidencePrivateMediaClient.mjs'
 
 export type EvidenceKind = 'purchase' | 'sale'
 export type EvidenceStatus = 'DRAFT' | 'APPROVED' | 'ARCHIVED'
@@ -237,23 +238,32 @@ export async function removeTradeEvidenceImage(image: TradeEvidenceImage): Promi
   if (storageError) throw storageError
 }
 
-export async function getTradeEvidenceImageUrls(paths: string[]) {
-  if (!paths.length) return {} as Record<string, string>
+async function privateEvidenceBlob(imageId:string,purpose:'PREVIEW'|'EXPORT') {
+  const {data,error}=await client().auth.getSession()
+  if(error||!data.session?.access_token)throw new Error('กรุณาเข้าสู่ระบบใหม่')
+  return loadPrivateEvidenceImage({baseUrl:import.meta.env.VITE_SUPABASE_URL||'',
+    publishableKey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'',
+    accessToken:data.session.access_token,imageId,purpose})
+}
+export function releaseTradeEvidenceImageUrls(urls:Record<string,string>) {
+  Object.values(urls).forEach(url=>{if(url.startsWith('blob:'))URL.revokeObjectURL(url)})
+}
+export async function getTradeEvidenceImageUrls(images: Pick<TradeEvidenceImage,'id'|'storage_path'>[]) {
+  if (!images.length) return {} as Record<string, string>
   const result: Record<string, string> = {}
-  const backend = client()
-  await Promise.all(paths.map(async (path) => {
-    const { data, error } = await backend.storage.from('trade-evidence-private')
-      .createSignedUrl(path, 15 * 60)
-    if (!error && data?.signedUrl) result[path] = data.signedUrl
+  await Promise.allSettled(images.map(async (image) => {
+    const blob=await privateEvidenceBlob(image.id,'PREVIEW')
+    const url=URL.createObjectURL(blob)
+    window.setTimeout(()=>URL.revokeObjectURL(url),60000)
+    result[image.storage_path]=url
   }))
   return result
 }
 
 export async function downloadReviewedEvidenceImage(image: TradeEvidenceImage): Promise<void> {
   if (!image.approved_for_public) throw new Error('ภาพนี้ยังไม่ได้ผ่านการตรวจความเป็นส่วนตัว')
-  const { data, error } = await client().storage.from('trade-evidence-private').download(image.storage_path)
-  if (error || !data) throw error || new Error('ดาวน์โหลดรูปไม่สำเร็จ')
-  const url = URL.createObjectURL(data)
+  const blob=await privateEvidenceBlob(image.id,'EXPORT')
+  const url = URL.createObjectURL(blob)
   try {
     const anchor = document.createElement('a')
     anchor.href = url

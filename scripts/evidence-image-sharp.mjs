@@ -12,6 +12,7 @@ import {pathToFileURL} from 'node:url'
 import {storeAdapter} from './evidence-draft-pr.mjs'
 import {inspectSnapshot} from './evidence-draft-pr-core.mjs'
 import {evidenceServiceHeaders} from '../src/lib/evidenceSupabaseServerAuth.mjs'
+import {durableImageStage} from './evidence-operation-journal.mjs'
 
 const UUID=/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i
 const MAX_BYTES=8*1024*1024
@@ -84,13 +85,13 @@ async function boundedRead(response) {
 // No AWS SDK, paid product, public URL, or browser credentials are needed.
 const sha256=data=>createHash('sha256').update(data).digest('hex')
 const hmac=(key,data)=>createHmac('sha256',key).update(data).digest()
-export function signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,objectKey,bytes,now=new Date()}) {
+export function signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,objectKey,bytes=new Uint8Array(),method='PUT',now=new Date()}) {
  if(!/^[a-f0-9]{32}$/i.test(accountId||''))fail('R2_ACCOUNT_INVALID')
  if(typeof accessKeyId!=='string'||accessKeyId.length<10||
     typeof secretAccessKey!=='string'||secretAccessKey.length<20)fail('R2_CREDENTIALS_INVALID')
  if(!/^evidence\/[\da-f-]{36}\/[\da-f-]{36}[.]webp$/i.test(objectKey||''))
    fail('R2_KEY_INVALID')
- if(!(bytes instanceof Uint8Array)||bytes.length<12||bytes.length>MAX_BYTES)
+ if(!['PUT','HEAD','DELETE'].includes(method)||!(bytes instanceof Uint8Array)||(method==='PUT'&&bytes.length<12)||bytes.length>MAX_BYTES)
    fail('R2_BYTES_INVALID')
  if(Number.isNaN(now.getTime()))fail('SIGNING_TIME_INVALID')
  const host=accountId.toLowerCase()+'.r2.cloudflarestorage.com'
@@ -99,25 +100,24 @@ export function signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,object
  const date=amzDate.slice(0,8)
  const scope=date+'/auto/s3/aws4_request'
  const payloadHash=sha256(bytes)
- const signedHeaders='content-type;host;x-amz-content-sha256;x-amz-date'
- const canonicalHeaders='content-type:image/webp\nhost:'+host+
-   '\nx-amz-content-sha256:'+payloadHash+'\nx-amz-date:'+amzDate+'\n'
- const canonicalRequest=['PUT',path,'',canonicalHeaders,signedHeaders,payloadHash].join('\n')
+ const headers={host,'x-amz-content-sha256':payloadHash,'x-amz-date':amzDate,
+  ...(method==='PUT'?{'content-type':'image/webp','cache-control':'private, no-store','if-none-match':'*','x-amz-meta-sha256':payloadHash}:{})}
+ const names=Object.keys(headers).sort(),signedHeaders=names.join(';')
+ const canonicalHeaders=names.map(name=>name+':'+headers[name]+'\n').join('')
+ const canonicalRequest=[method,path,'',canonicalHeaders,signedHeaders,payloadHash].join('\n')
  const stringToSign=['AWS4-HMAC-SHA256',amzDate,scope,sha256(canonicalRequest)].join('\n')
  const signingKey=hmac(hmac(hmac(hmac('AWS4'+secretAccessKey,date),'auto'),'s3'),'aws4_request')
  const signature=hmac(signingKey,stringToSign).toString('hex')
  return {
    endpoint:'https://'+host+path,
    request:{
-     method:'PUT',
+     method,
      headers:{
        authorization:'AWS4-HMAC-SHA256 Credential='+accessKeyId+'/'+scope+
          ', SignedHeaders='+signedHeaders+', Signature='+signature,
-       'content-type':'image/webp',
-       'x-amz-content-sha256':payloadHash,
-       'x-amz-date':amzDate
+       ...Object.fromEntries(Object.entries(headers).filter(([name])=>name!=='host'))
      },
-     body:bytes,
+     ...(method==='PUT'?{body:bytes}:{}),
      redirect:'error',
      signal:AbortSignal.timeout(30000)
    }
@@ -136,6 +136,16 @@ export function privateImageRemote(env,fetchImpl=fetch) {
     typeof secretAccessKey!=='string'||secretAccessKey.length<20)
     fail('PRIVATE_R2_NOT_CONFIGURED')
  return {
+  async headPrivate(objectKey) {
+    const signed=signedPrivateR2Put({accountId,accessKeyId,secretAccessKey,objectKey,method:'HEAD'})
+    const r=await fetchImpl(signed.endpoint,signed.request)
+    if(r.status===404)return null
+    if(!r.ok)fail('R2_HEAD_FAILED')
+    const sha256=r.headers.get('x-amz-meta-sha256'),etag=r.headers.get('etag'),bytes=Number(r.headers.get('content-length'))
+    if(!/^[a-f0-9]{64}$/.test(sha256||'')||!/^"[^"\r\n]{1,128}"$/.test(etag||'')||!Number.isSafeInteger(bytes)||bytes<12||bytes>MAX_BYTES)
+      fail('R2_HEAD_UNVERIFIED')
+    return {sha256,etag,bytes}
+  },
   async downloadPrivate(storagePath) {
     if(typeof storagePath!=='string'||!/^[-a-z0-9/_.]+$/i.test(storagePath)||
        storagePath.includes('..')||storagePath.startsWith('/'))fail('STORAGE_PATH_INVALID')
@@ -159,18 +169,34 @@ export async function stagePrivateEvidenceImage(id,{store,remote,dryRun=true}) {
  if(!UUID.test(id||''))fail('REQUEST_ID_INVALID')
  const snap=await store.loadSnapshot(id)
  const gate=validateStagingImage(snap)
+ const approvedSnapshot=JSON.stringify(snap)
  const result={outcome:'DRY_RUN_APPROVED',request_id:id,site_id:snap.request.site_id,
    media_public:false,production_deployed:false,performed_write:false,
    claim_kind:gate.claim,storage:'PRIVATE_R2_ONLY'}
  if(dryRun)return result
+ if(!store.operations&&store.syntheticOnly!==true)fail('DURABLE_JOURNAL_REQUIRED')
  const original=await remote.downloadPrivate(gate.privatePath)
  const cleaned=await toPrivateWebp(original)
  // Recheck current owner/consent/individual-image approval immediately before
  // writing R2; revoke during conversion must fail closed, not publish stale data.
- const current=validateStagingImage(await store.loadSnapshot(id))
- if(current.key!==gate.key||current.privatePath!==gate.privatePath||current.claim!==gate.claim)
+ const latest=await store.loadSnapshot(id)
+ validateStagingImage(latest)
+ if(JSON.stringify(latest)!==approvedSnapshot)
    fail('APPROVAL_CHANGED_DURING_CONVERSION')
- await remote.putPrivate(gate.key,cleaned)
+ if(store.operations) {
+  const receipt=await durableImageStage({id,snapshot:snap,bytes:cleaned,store,remote,gate,
+   recoveryApproval:store.recoveryApproval})
+  return {...result,outcome:'PRIVATE_WEBP_STAGED',performed_write:true,...receipt}
+ }
+ // An upload may have reached R2 even if its response is lost. Never blindly
+ // retry or delete this shared image key; stop the workflow for reconciliation.
+ try {await remote.putPrivate(gate.key,cleaned)}
+ catch {fail('UPLOAD_RESULT_UNCERTAIN_RECONCILE_REQUIRED')}
+ try {
+   const after=await store.loadSnapshot(id)
+   validateStagingImage(after)
+   if(JSON.stringify(after)!==approvedSnapshot)throw Error('CHANGED')
+ }catch {fail('POST_UPLOAD_RECONCILE_REQUIRED')}
  return {...result,outcome:'PRIVATE_WEBP_STAGED',performed_write:true,
    output_bytes:cleaned.length,output_sha256:createHash('sha256').update(cleaned).digest('hex')}
 }
@@ -187,9 +213,26 @@ export function parseImageArgs(args) {
  if(!result.dryRun&&!result.ownerAuthorized)fail('OWNER_APPROVAL_REQUIRED')
  return result
 }
+// Separate server-side janitor credentials; never returned by the normal image
+// adapter and never installed in the Cloudflare metadata Worker.
+export function cleanupPrivateRemote(env,fetchImpl=fetch) {
+ if(env.EVIDENCE_CLEANUP_ENABLED!=='YES_OWNER_ENABLED')fail('CLEANUP_DISABLED')
+ const accessKeyId=env.AMPHON_EVIDENCE_CLEANUP_R2_ACCESS_KEY_ID
+ const secretAccessKey=env.AMPHON_EVIDENCE_CLEANUP_R2_SECRET_ACCESS_KEY
+ const head=privateImageRemote({...env,AMPHON_R2_ACCESS_KEY_ID:accessKeyId,AMPHON_R2_SECRET_ACCESS_KEY:secretAccessKey},fetchImpl)
+ return {headPrivate:head.headPrivate,async deletePrivate(objectKey){
+  const signed=signedPrivateR2Put({accountId:env.AMPHON_CLOUDFLARE_ACCOUNT_ID,accessKeyId,secretAccessKey,objectKey,method:'DELETE'})
+  const response=await fetchImpl(signed.endpoint,signed.request)
+  if(!response.ok)fail('CLEANUP_RESULT_UNCERTAIN')
+ }}
+}
 export async function runImageCli(args=process.argv.slice(2),env=process.env) {
  const parsed=parseImageArgs(args)
  const store=storeAdapter(env.AMPHON_SEO_SUPABASE_URL,env.AMPHON_SEO_SERVICE_ROLE_KEY)
+ if(env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID){
+  if(!UUID.test(env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID))fail('RECOVERY_APPROVAL_INVALID')
+  store.recoveryApproval=env.AMPHON_EVIDENCE_RECOVERY_APPROVAL_ID
+ }
  // Even a dry-run must not access R2 or any source image.
  const remote=parsed.dryRun?null:privateImageRemote(env)
  return stagePrivateEvidenceImage(parsed.id,{store,remote,dryRun:parsed.dryRun})
@@ -197,7 +240,7 @@ export async function runImageCli(args=process.argv.slice(2),env=process.env) {
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
  runImageCli().then(result=>console.log(JSON.stringify(result,null,2)))
   .catch(err=>{const code=err instanceof Error?err.message:'EVIDENCE_IMAGE_UNKNOWN'
-    console.error(code.startsWith('EVIDENCE_')?code:'EVIDENCE_IMAGE_REMOTE_FAILURE')
+    console.error(JSON.stringify({error:code.startsWith('EVIDENCE_')?code:'EVIDENCE_IMAGE_REMOTE_FAILURE',...(err?.operation_id?{operation_id:err.operation_id}:{})}))
     process.exitCode=1
   })
 }

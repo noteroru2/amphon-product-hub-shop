@@ -2,19 +2,32 @@ name: ONE-4B Apply Store Worker Patch
 
 on:
   push:
+    branches: [main]
     paths:
       - 'scripts/apply-one4b-r2-patch.mjs'
+      - '.github/workflows/one4b-apply-r2-patch.yml'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: one4b-reviewed-main-patch
+  cancel-in-progress: false
 
 jobs:
   apply:
+    # Default disabled. Only a deliberately approved push of trusted main may write.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'noteroru2/amphon-product-hub-shop' && vars.ONE4B_PATCH_MAIN_WRITE_APPROVED == 'YES_OWNER_ENABLED'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -27,8 +40,15 @@ jobs:
       - name: Validate diff
         run: git diff --check
       - name: Commit generated Worker patch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "push"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "noteroru2/amphon-product-hub-shop"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           if git diff --quiet -- workers/r2-upload/src/index.ts; then
             echo "Store Worker already patched"
             exit 0
@@ -37,4 +57,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add workers/r2-upload/src/index.ts
           git commit -m "feat(one4): wire System reservation before Shop checkout"
-          git push origin HEAD:main
+          # GITHUB_TOKEN is explicitly set as env only here; contents:write is
+          # job-scoped and Actions context token access remains a job-level risk.
+          # persist-credentials:false is exposure reduction, not step isolation.
+          # Normal fast-forward push respects main protection; no force/bypass token.
+          git -c credential.helper= -c credential.helper='!f() { printf "%s\n" "username=x-access-token" "password=$GITHUB_TOKEN"; }; f' push origin HEAD:main

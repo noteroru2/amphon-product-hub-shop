@@ -10,6 +10,8 @@ export function assertProtectedEvidenceEnvironment(input) {
  must(reviewers.length===1)
  must(Array.isArray(reviewers[0]?.reviewers)&&reviewers[0].reviewers.length>0)
  must(reviewers[0].reviewers.every(x=>x?.type==='User'||x?.type==='Team'))
+ must(reviewers[0].prevent_self_review===true)
+ must(input.can_admins_bypass===false)
  return {protected:true,reviewer_count:reviewers[0].reviewers.length}
 }
 export async function checkEvidenceEnvironment({

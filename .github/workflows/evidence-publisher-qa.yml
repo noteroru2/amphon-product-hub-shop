@@ -3,10 +3,35 @@ on:
   push:
     branches:
       - feature/evidence-publisher-gated-v1-20261124
+      - codex/evidence-qa-safe-20261126
     paths:
+      - 'scripts/evidence-*.mjs'
+      - 'scripts/verify-evidence-*.mjs'
+      - 'tests/evidence-*.test.mjs'
+      - 'tests/fixtures/evidence-*.sql'
+      - 'supabase/config.toml'
+      - 'tests/helpers/evidence-recovery-local.mjs'
+      - 'supabase/migrations/20261126160233_evidence_recovery_local_qa.sql'
+      - 'supabase/functions/_shared/evidence-private-media.mjs'
+      - 'supabase/functions/evidence-private-media/**'
+      - 'src/lib/evidencePrivateMediaClient.*'
+      - 'src/lib/tradeEvidence.ts'
+      - 'src/components/TradeEvidenceCenter.tsx'
       - '.github/workflows/evidence-publisher-qa.yml'
       - 'tests/evidence-local-supabase/**'
       - 'scripts/verify-evidence-supabase-local.mjs'
+      - 'scripts/evidence-offline-isolation.mjs'
+      - 'tests/evidence-offline-isolation.test.mjs'
+      - 'tests/evidence-worker-security.test.mjs'
+      - 'tests/evidence-build-dependencies.test.mjs'
+      - 'tests/evidence-image-cache.test.mjs'
+      - 'src/lib/evidenceImageCachePolicy.ts'
+      - 'public/evidence-cache-cleanup.js'
+      - 'vite.config.ts'
+      - 'tsconfig.node.json'
+      - 'tests/evidence-retention-review.test.mjs'
+      - 'scripts/evidence-retention-review.mjs'
+      - 'scripts/verify-evidence-pwa-output.mjs'
       - 'scripts/evidence-protected-env-preflight.mjs'
       - 'tests/evidence-protected-env-preflight.test.mjs'
       - 'supabase/migrations/20261124_evidence_publisher.sql'
@@ -23,6 +48,30 @@ on:
       - 'workers/evidence-publisher/**'
   pull_request:
     paths:
+      - 'scripts/evidence-*.mjs'
+      - 'scripts/verify-evidence-*.mjs'
+      - 'tests/evidence-*.test.mjs'
+      - 'tests/fixtures/evidence-*.sql'
+      - 'supabase/config.toml'
+      - 'tests/helpers/evidence-recovery-local.mjs'
+      - 'supabase/migrations/20261126160233_evidence_recovery_local_qa.sql'
+      - 'supabase/functions/_shared/evidence-private-media.mjs'
+      - 'supabase/functions/evidence-private-media/**'
+      - 'src/lib/evidencePrivateMediaClient.*'
+      - 'src/lib/tradeEvidence.ts'
+      - 'scripts/verify-evidence-pwa-output.mjs'
+      - 'tests/evidence-image-cache.test.mjs'
+      - 'src/lib/evidenceImageCachePolicy.ts'
+      - 'public/evidence-cache-cleanup.js'
+      - 'vite.config.ts'
+      - 'tsconfig.node.json'
+      - 'tests/evidence-build-dependencies.test.mjs'
+      - 'tests/evidence-retention-review.test.mjs'
+      - 'scripts/evidence-retention-review.mjs'
+      - 'scripts/evidence-offline-isolation.mjs'
+      - 'tests/evidence-offline-isolation.test.mjs'
+      - 'tests/evidence-worker-security.test.mjs'
+      - 'package-lock.json'
       - 'src/lib/evidencePublisherPolicy.ts'
       - 'src/components/EvidencePublisherPanel.tsx'
       - 'src/components/TradeEvidenceCenter.tsx'
@@ -55,8 +104,11 @@ concurrency:
 jobs:
   dry-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -83,6 +135,7 @@ jobs:
   ephemeral-sql:
     name: Ephemeral Postgres 17 staging schema (NO SUPABASE PRODUCTION)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:17
@@ -135,6 +188,7 @@ jobs:
       SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
       EVIDENCE_LOCAL_ENV_FILE: /tmp/amphon-evidence-local-env
       DO_NOT_USE_HOSTED_SUPABASE: 'true'
+      EVIDENCE_LOCAL_EDGE_REQUIRED: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,22 +200,79 @@ jobs:
       - run: npm ci
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
-      - name: Prepare isolated migrations without any production credentials
-        run: |
-          test "${DO_NOT_USE_HOSTED_SUPABASE}" = "true"
-          test -f "$SUPABASE_WORKDIR/supabase/config.toml"
-          test ! -f "$SUPABASE_WORKDIR/supabase/.branches/_current_branch"
-          cp supabase/migrations/20261124_evidence_publisher.sql \
-            "$SUPABASE_WORKDIR/supabase/migrations/20261125000200_evidence_publisher.sql"
+          version: '3.4.0'
+      - name: Validate migration packaging and prepare isolated function copies
+        run: node scripts/evidence-local-bootstrap.mjs prepare
       - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
         working-directory: tests/evidence-local-supabase
         run: |
           supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
           supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
           chmod 600 "$EVIDENCE_LOCAL_ENV_FILE"
+      - name: Apply fixture and both proposed migrations together locally, in order
+        run: node scripts/evidence-local-bootstrap.mjs server
+      - name: Serve authenticated private media in the isolated LOCAL Edge runtime
+        working-directory: tests/evidence-local-supabase
+        run: |
+          supabase functions serve > "$RUNNER_TEMP/evidence-private-edge.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' -X OPTIONS -H 'Origin: https://hub.amphon.co.th' http://127.0.0.1:55321/functions/v1/evidence-private-media || true)
+            if [ "$code" = 204 ] || [ "$code" = 200 ]; then exit 0; fi
+            sleep 1
+          done
+          exit 1
       - name: E2E real LOCAL authentication and private image storage, mocked R2
         run: node scripts/verify-evidence-supabase-local.mjs
+      - name: Tear down and delete isolated local database
+        if: always()
+        working-directory: tests/evidence-local-supabase
+        run: supabase stop --no-backup || true
+
+  hub-storage-compatibility:
+    name: Historical Hub Storage + Auth + Edge compatibility (LOCAL ONLY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      SUPABASE_WORKDIR: ${{ github.workspace }}/tests/evidence-local-supabase
+      EVIDENCE_LOCAL_ENV_FILE: /tmp/amphon-evidence-local-env
+      DO_NOT_USE_HOSTED_SUPABASE: 'true'
+      EVIDENCE_LOCAL_EDGE_REQUIRED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: '3.4.0'
+      - name: Validate migration packaging and prepare isolated function copies
+        run: node scripts/evidence-local-bootstrap.mjs prepare
+      - name: Start disposable local Supabase Auth, Storage, PostgREST and Postgres
+        working-directory: tests/evidence-local-supabase
+        run: |
+          supabase start -x realtime,studio,imgproxy,mailpit,postgres-meta,edge-runtime,logflare,vector,supavisor
+          supabase status -o env > "$EVIDENCE_LOCAL_ENV_FILE"
+          chmod 600 "$EVIDENCE_LOCAL_ENV_FILE"
+      - name: Apply fixture and both proposed migrations together locally, in order
+        run: node scripts/evidence-local-bootstrap.mjs hub
+      - name: Serve authenticated private media in the isolated LOCAL Edge runtime
+        working-directory: tests/evidence-local-supabase
+        run: |
+          supabase functions serve > "$RUNNER_TEMP/evidence-private-edge.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' -X OPTIONS -H 'Origin: https://hub.amphon.co.th' http://127.0.0.1:55321/functions/v1/evidence-private-media || true)
+            if [ "$code" = 204 ] || [ "$code" = 200 ]; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: E2E real LOCAL authentication and private image storage, mocked R2
+        run: node scripts/verify-evidence-hub-compat.mjs
       - name: Tear down and delete isolated local database
         if: always()
         working-directory: tests/evidence-local-supabase

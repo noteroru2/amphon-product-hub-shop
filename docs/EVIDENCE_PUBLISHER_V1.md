@@ -2,18 +2,26 @@
 
 **Status:** All code in the unmerged Draft PR. No Production deploy, no Supabase Production SQL, no public image. Supabase paid development branch is **not** created or required.
 
+**Local QA continuation (2026-11-27):** proposed durable journal/locked cleanup
+migration and authenticated private-media function are implemented and tested
+locally; cleanup and Publisher remain disabled. Read the current section 10 of
+[the final QA report](EVIDENCE_PUBLISHER_CODEX_FINAL_QA.md) and
+[the retention review](EVIDENCE_PUBLISHER_PRIVATE_RETENTION_REVIEW.md) before using
+historical runtime/URL descriptions below. Hosted migration and coordinated
+client/backend release require separate owner approval.
+
 ## Runtime split
 
 1. **Hub UI** (Owner only): choose individually approved evidence image and 1–14 enabled target site/page paths. No secrets in browser.
-2. **Cloudflare Worker** (metadata-only): `POST /api/stage` authenticates Owner using Supabase Auth and server-side profile; rechecks evidence APPROVED, consent/privacy flags, individual image approval, VERIFIED site mapping. Stores one private **queue** row per target URL; responds `QUEUED_PRIVATE_ONLY, media_staged:false, media_public:false`. The Worker **never downloads, re-encodes, reads, serves or uploads customer image bytes**. Its private R2 binding is for cancellation cleanup only. Public media GET remains 404. There is no Cloudflare Images binding.
-3. **GitHub Actions, Node 22 + Sharp 0.35.4** (after owner protected Environment approval only): `.github/workflows/evidence-draft-pr-execute.yml` runs read-only queue/target dry-run and image dry-run, then downloads the APPROVED original from **Supabase private Storage using server-only secret**, performs a bounded Sharp WebP re-encode (metadata removed; no visible-content redaction), uploads to private **Cloudflare R2** `amphon-evidence-staged-private` through the S3-compatible PutObject API authenticated by AWS Signature V4 and a token restricted to that private R2 bucket, then creates a text-only Draft PR using a scoped short-lived GitHub App token. Never inserts image URLs into PRs. One workflow job per queue item / site-page (batch up to 14 queued).
+2. **Cloudflare Worker** (metadata-only): `POST /api/stage` authenticates Owner using Supabase Auth and server-side profile; rechecks evidence APPROVED, consent/privacy flags, individual image approval, VERIFIED site mapping. Stores one private **queue** row per target URL; responds `QUEUED_PRIVATE_ONLY, media_staged:false, media_public:false`. The Worker **never downloads, re-encodes, reads, serves or uploads customer image bytes**. It has no R2 binding; cancellation is metadata-only and private-media cleanup remains deferred for locked review. Public media GET remains 404. There is no Cloudflare Images binding.
+3. **GitHub Actions, Node 22 + Sharp 0.35.5** (after owner protected Environment approval only): `.github/workflows/evidence-draft-pr-execute.yml` runs read-only queue/target dry-run and image dry-run, then downloads the APPROVED original from **Supabase private Storage using server-only secret**, performs a bounded Sharp WebP re-encode (metadata removed; no visible-content redaction), uploads to private **Cloudflare R2** `amphon-evidence-staged-private` through the S3-compatible PutObject API authenticated by AWS Signature V4 and a token restricted to that private R2 bucket, then creates a text-only Draft PR using a scoped short-lived GitHub App token. Never inserts image URLs into PRs. One workflow job per queue item / site-page (batch up to 14 queued).
 4. **Database**, only when separately approved: migration `supabase/migrations/20261124_evidence_publisher.sql` creates private queue and reviewed page mappings, RLS enabled and no anon/authenticated grants. All destinations require verified mapping and full production SHA; disabled by default.
 5. **Future owner review:** Review Draft PR, image visual privacy, copyright/consent, site SEO metadata, links and release checks. Public media production publisher with separate consent/revocation/CDN purge mechanism is **not part of this PR**.
 
 ## Existing free/no-new-bill components
 
 - PostgreSQL 17 **ephemeral GitHub Actions service**, with synthetic Supabase-like tables and RLS tests; no paid Supabase branch. This is schema integration testing, not a full self-hosted Supabase Auth/Storage simulator.
-- Sharp 0.35.4 already present in the repository npm lockfile and now pinned as a direct **devDependency**. Runs only in Node GitHub Actions, not Workers.
+- Sharp 0.35.5 already present in the repository npm lockfile and now pinned as a direct **devDependency**. Runs only in Node GitHub Actions, not Workers.
 - Private R2 bucket `amphon-evidence-staged-private` already provisioned in APAC. Managed r2.dev domain **disabled**, zero custom domains. A synthetic 68-byte WebP was uploaded, read back and deleted; bucket was empty afterward.
 - GitHub Actions usage and R2 resource usage remain subject to the account's actual free/remaining quotas. **No promise of unlimited free processing.**
 - No usage of Cloudflare Images: earlier Images API returned 403.

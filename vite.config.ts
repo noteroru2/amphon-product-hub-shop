@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { privateImageMustUseNetwork } from './src/lib/evidenceImageCachePolicy'
 
 export default defineConfig({
   build: {
@@ -41,6 +42,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: ['/evidence-cache-cleanup.js'],
         navigateFallback: '/index.html',
         // OAuth and MCP discovery are server routes, never the offline Hub shell.
         navigateFallbackDenylist: [/^\/seo-connector(?:\/|$)/, /^\/\.well-known\/oauth-/],
@@ -48,6 +50,11 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         runtimeCaching: [
+          {
+            urlPattern: privateImageMustUseNetwork,
+            handler: 'NetworkOnly',
+            options: { fetchOptions: { cache: 'no-store' } }
+          },
           {
             urlPattern: ({ request }) => request.destination === 'image',
             handler: 'CacheFirst',

@@ -1,5 +1,7 @@
 # Isolated, disposable SUPABASE LOCAL CI. Does not link to any hosted project.
 project_id = "amphon-evidence-local-qa"
+[functions.evidence-private-media]
+verify_jwt = true
 [api]
 enabled = true
 port = 55321

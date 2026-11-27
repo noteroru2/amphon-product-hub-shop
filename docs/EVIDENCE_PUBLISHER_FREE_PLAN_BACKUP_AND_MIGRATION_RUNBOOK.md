@@ -41,6 +41,11 @@ Create local SHA-256 checksums of the three files using a trusted OS hash comman
 
 ### Gate 3 — Demonstrate restore *without contacting Production*
 
+For the previously backed-up customer image, follow the stricter
+[owner-only offline rehearsal](EVIDENCE_PUBLISHER_OFFLINE_OWNER_REHEARSAL.md).
+Its disconnected Linux VM and executable isolation gate are mandatory before
+opening the real backup. The agent has not run that rehearsal or accessed it.
+
 Use a separate disposable local Postgres/Supabase instance (Postgres 17 matching Production) and Supabase's official restore workflow. Restore `roles.sql`, `schema.sql`, `data.sql` into **that disposable LOCAL instance only**, resolving extension/version conflicts there. **Never point restore commands at the Production connection string.**
 
 Check schema tables, row counts for approved non-sensitive tables, relevant functions/extensions, Auth behavior and RLS. Verify whether `auth.users` and Storage metadata are actually present; separately inventory/backup raw Storage objects if a complete disaster recovery is required. Failure in any check = **NO-GO**.
@@ -70,7 +75,7 @@ No whole-project PITR is available. If the DDL transaction fails, use transactio
 
 ## Important scope of our synthetic CI restore rehearsal
 
-The GitHub QA job uses a **synthetic PostgreSQL 17 database with fake UUIDs and zero customer records**. It creates an encrypted/no-sensitive-data-free `pg_dump --format=custom` in runner-local temporary storage, applies the proposed migration in one disposable database, then restores the dump into a **second disposable database** and checks the original tables/rows plus absence of proposed tables. The dump is not uploaded as an artifact and must not be confused with an actual Production backup or a tested recovery of customer data, Auth, or Storage.
+The GitHub QA job uses a **synthetic PostgreSQL 17 database with fake UUIDs and zero customer records**. It creates an unencrypted, synthetic-only `pg_dump --format=custom` in runner-local temporary storage, applies the proposed migration in one disposable database, then restores the dump into a **second disposable database** and checks the original tables/rows plus absence of proposed tables. The dump is not uploaded as an artifact and must not be confused with an actual Production backup or a tested recovery of customer data, Auth, or Storage.
 
 ## Release invariants
 
