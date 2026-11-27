@@ -1,5 +1,253 @@
 # AMPHON Evidence Publisher — release review and blocker repair
 
+## Security-first owner approval handoff — 2026-11-27
+
+**QA PUSH HOLD / PR HOLD / PRODUCTION NO-GO.** HEAD remains
+`46bc4ec1d5d60af8111bd76ea41b6d8229c62f97` on
+`codex/evidence-qa-safe-20261126`. The prior uncommitted account-verification
+section below is preserved in full. The separate
+[owner approval package](EVIDENCE_PUBLISHER_OWNER_APPROVAL_PACKAGE.md) contains
+the exact proposed main Ruleset, Environment policy changes, one-file ONE-4B
+security PR plan, sanitized dashboard checklist and approval order. No settings,
+workflow, main source, remote ref or deployment was changed.
+
+Additional successful read-only GitHub checks this turn:
+
+- Main is still `79778626a58fd9077ca81f4655c0a19fe9896328`, unprotected.
+- Direct collaborator list: one owner, **zero verified independent write-capable
+  reviewers**. Both Environment reviewer rosters contain only that owner; both
+  still allow self-review, with admin bypass disabled. An independent human must
+  be nominated and any access grant separately approved.
+- Main check-runs: **13 actual records**, including capture, Cloudflare Workers
+  Builds, deploy and the ambiguous shared name verify. Combined commit-status
+  list is empty. None is a verified universal non-deploying check for the proposed
+  one-file security PR; the Ruleset proposal adds **no invented required checks**.
+  This initial CI gap is explicit for owner review, not silently treated as PASS.
+- Old main ONE-4B workflow was read again: unrestricted branch push for its script,
+  workflow-wide write permission and direct `HEAD:main` push remain there. Future
+  one-file repair reuses the reviewed local workflow content hash from the
+  manifest; it must not merge/cherry-pick the whole Evidence commit onto main.
+- Static analysis of the 37 local workflows for that sole workflow-path change
+  selects **zero PR events** and **one main-push event**, the fixed ONE-4B itself;
+  its writer skips while Owner Opt-in remains absent. No workflow was executed.
+  Connected Cloudflare watch paths do not match that sole path, but unknown Apps
+  and hooks prevent an unconditional no-deploy merge guarantee: **MERGE HOLD**.
+
+Previously denied Apps/Vercel APIs were not retried. Owner dashboard receipts
+must close those gaps without copying URLs or secrets. The proposed Ruleset has
+no bypass actors and requires PR/independent approval; consequently the legacy
+automated direct-main writer must stay disabled, not receive a bot bypass.
+An Environment settings change must also be preceded by inspection of pending
+privileged jobs; no waiting job may be released as an incidental configuration
+change. The separate unfinished-body ingress criterion remains **FAIL**.
+
+The next local commit candidate is **documentation only**, exactly this report
+and `docs/EVIDENCE_PUBLISHER_OWNER_APPROVAL_PACKAGE.md`, with proposed message
+`docs(evidence): prepare owner security approval and isolation gates`. It remains
+uncommitted pending explicit owner approval. The original 62-path manifest and
+source hashes refer to the existing commit, not this two-document candidate. A
+future documentation commit has a different SHA and no inherited push approval.
+The final handoff prepares only those two documents in the index; no local commit
+is made. Earlier empty-index/one-modified-file statements below describe the prior
+account-audit checkpoint. Existing report content was preserved by full
+LF-normalized SHA-256 comparison; Ruleset JSON/control assertions pass offline.
+The first preservation-harness attempt could not match a Unicode heading through
+the shell pipe; the corrected ASCII-anchor check passed with the original full
+content hash. This is recorded separately from application test results.
+
+## Post-commit read-only deployment isolation verification — 2026-11-27
+
+**QA PUSH HOLD. PR HOLD. PRODUCTION NO-GO.** Local commit is complete:
+`46bc4ec1d5d60af8111bd76ea41b6d8229c62f97`, branch
+`codex/evidence-qa-safe-20261126`. This section supersedes earlier pending-commit
+and inaccessible-settings conclusions below; those sections remain historical
+evidence. Verification snapshot recorded at approximately 11:15 Asia/Bangkok.
+
+The owner authorized configuration reads and this report update only. No push,
+fetch into local Git refs, PR, dispatch, merge, deploy, settings update, hosted
+Supabase request, R2 object access or customer-backup access was performed. Provider
+configuration was inspected through existing connected accounts and GET-only
+GitHub REST requests using the existing Git credential helper. Credentials stayed
+in process memory; this report contains no credential values or webhook URLs.
+No new login, token creation or CLI installation was attempted. `gh`, `vercel`
+and `wrangler` were not available as account CLI commands on PATH.
+
+### GitHub configuration: newly obtained direct evidence
+
+The following reads target `noteroru2/amphon-product-hub-shop`. Successful list
+responses had no next page unless stated otherwise. HTTP errors are recorded as
+errors, not successful absence checks.
+
+| Check / GET endpoint suffix | Actual result | Security interpretation |
+| --- | --- | --- |
+| Repository metadata | **200**, owner type `User`, default branch `main`, authenticated connection has admin permission, `allow_auto_merge=false` | This is a personal-account repository. Owner-organization webhook/ruleset inheritance is not applicable; this does not inventory unrelated organizations or other accounts. |
+| `/hooks?per_page=100` | **200**, empty array, no next page | No repository webhooks at this snapshot. GitHub App webhooks are separate and are not excluded by this result. |
+| `/branches/main` | **200**, `protected=false` | Remote main SHA was `79778626a58fd9077ca81f4655c0a19fe9896328`. Main protection is absent, not merely inaccessible. |
+| `/branches/main/protection` | **404**, message `Branch not protected` | No traditional required-review/status-check protection is established. This negative result is corroborated by branch metadata and the ruleset read. |
+| `/rulesets?includes_parents=true&per_page=100` | **200**, empty array, no next page | No listed repository/inherited ruleset supplies the missing review/merge restriction. Do not describe main as protected. |
+| `/actions/permissions/workflow` | **200**, `default_workflow_permissions=read`, `can_approve_pull_request_reviews=false` | Resolves the previous unknown default-token gate. Workflows omitting permissions inherit read defaults; an explicit job permission can still grant write scope to that entire job. |
+| `/actions/permissions` | **200**, Actions enabled, `allowed_actions=all`, `sha_pinning_required=false` | Actions are not restricted to an allowlist or immutable SHAs. Floating third-party Actions and dependency supply chain remain a P2 consideration. |
+| `/actions/variables?per_page=100` | **200**, total count **0** | ONE-4B Owner Opt-in variable is absent. Its direct variable GET also returned 404; the successful complete variable list corroborates absence. No variable was changed. |
+| QA branch Git ref | **404** | The proposed remote QA ref was not found with this admin connection. No remote ref was created. |
+| `/pulls?state=all&head=noteroru2:codex/evidence-qa-safe-20261126&per_page=100` | **200**, empty array | No existing PR with this head was found to receive a synchronize event. No PR was created or updated. |
+| `/actions/runners?per_page=100` | **200**, total count **0** | No repository self-hosted runners are registered. Eligible QA jobs explicitly use GitHub-hosted Ubuntu/Windows runners and declare no Environment. |
+| `/environments?per_page=100`, both Environment details and branch-policy lists | **200** | Both `evidence-draft-pr-protected` and `seo-production-evidence-protected` require one reviewer, allow only branch `main`, and have `can_admins_bypass=false`. Both also have **`prevent_self_review=false`**: the configured review policy fails the Evidence preflight's required independent-review condition. No executor was invoked. |
+| Account `/user/installations?per_page=100` | **403**, authentication must be authorized to a GitHub App | A full installed-App inventory is **not verified**. Existing helper credentials cannot obtain this list; no broader credentials were requested. |
+
+The GitHub connector separately returned **one accessible installation**, scoped
+to the personal owner with repository selection `all`; its returned events include
+PR/review/check/status events, but not push. Its repository-list operation does not
+establish a complete account-wide installation or permission inventory. This is
+connector-visible scope only: it cannot exclude Cloudflare, Vercel or other Apps,
+their push/PR handlers, write permissions, bots or installation webhooks. This
+unresolved inventory is a **QA push isolation blocker**. No claim is made that the
+one visible installation is the only App installed on this repository.
+
+### Cloudflare configuration coverage
+
+Connected-account discovery returned **one account**, page 1 of 1. Its Workers
+list contained **15 scripts**. Read every script's Builds trigger list and deploy
+hook list: **15/15 trigger reads and 15/15 hook reads succeeded**, with **zero
+deploy hooks**. The discovered trigger/hook APIs expose no pagination parameters;
+their responses advertised no additional pages. Pages listing returned **zero
+projects**, total count 0. An initial Pages request using unsupported page size
+100 returned 400; retry with supported size 10 succeeded. The 400 is not treated
+as evidence of absence.
+
+| Worker linked to this repository | Verified Builds configuration | Effect of proposed QA branch |
+| --- | --- | --- |
+| `amphon-product-hub` | Repository owner/name exact match; branch `main`; trigger includes only `main`; automatic builds enabled; **previews disabled**. Root build is `npm run build`, action is `npx wrangler versions upload`; source/public/scripts/package/config path filters, excluding `shop/**`. | QA branch does not match. Main still has an active version-upload path; upload is a remote write even without traffic promotion. |
+| `amphon-shop` | Exact repository match; branch/trigger only `main`; automatic builds enabled; **previews disabled**. Root `/shop`, paths `shop/**`, action `npx wrangler deploy`. | QA branch does not match. Main still has an active production deployment path. |
+
+The other Workers' nonempty triggers named different repositories; none linked
+this repository. Some of those other repositories permit non-production branches;
+they are not evidence of a trigger for this repository. No runtime, secret-value,
+image, R2 object or deployment endpoint was called. These results cover the one
+connected account, not undisclosed/unconnected accounts or an arbitrary external
+caller holding a separate deployment credential.
+
+### Vercel configuration coverage and inaccessible hooks
+
+Team discovery returned **one accessible team**; project listing returned **seven
+projects**, no next cursor. Git deployment context identified six linked projects:
+`buyitkorat` → `buyitkkorat`, `amphon-co-th` → `amphon.co.th`,
+`rubsuekongmuesong` → same-name repository, `buyhubthai` → same-name repository,
+`buyitkhonkan` → same-name repository, and `rubsueubon` → same-name repository,
+all under the personal GitHub owner. The seventh project,
+`amphon-r9b-measurement`, was not in that linked-project context. A team-scoped
+project list filtered to `noteroru2/amphon-product-hub-shop` returned **zero**.
+Thus no direct Git project linkage to this repository was found in accessible
+scope. Individual project-summary reads succeeded for all seven, but those tool
+responses omit deploy-hook configuration; missing fields do not prove no hooks.
+
+`GET /v1/webhooks` returned **403 forbidden**, both in the default context and with
+the explicit discovered team. No working preauthorized Vercel CLI fallback was
+available. **Vercel webhook and deploy-hook coverage is incomplete.** An outgoing
+Vercel webhook is distinct from an incoming deploy hook; neither is proven absent
+by a project-link search. Installed integration-configuration listing for that
+team returned an empty result, which does not replace either hook inventory or
+the GitHub App review. No hook URL or credential value is included in this report.
+
+### Exact-SHA Actions and synthetic QA verification
+
+Parsed **37/37 committed workflow YAML documents successfully** from Git blobs at
+`46bc4ec1d5d60af8111bd76ea41b6d8229c62f97`, using the already cached YAML parser;
+no package installation or workflow execution occurred. Also read and parsed all
+**35/35 live-main workflow files** through the GitHub contents API at remote SHA
+`79778626a58fd9077ca81f4655c0a19fe9896328`. Main SHA was unchanged when that read
+finished. Of those files, 34 match the local commit byte-for-byte; the ONE-4B
+writer differs. The two new Evidence workflows are present only in the local
+commit. Neither snapshot declares `workflow_run`, `workflow_call`,
+`repository_dispatch`, `pull_request_target`, `check_run`, `check_suite` or `status`
+event handlers that chain a QA result to an executor. Existing scheduled/manual
+jobs remain separate remote-capable operations and must not be dispatched.
+
+The workflow used by a QA **push** is the version at its pushed commit. The local
+ONE-4B fix requires main in both its trigger and independent canonical-repository,
+main-push, Owner Opt-in job guard. It cannot select its writer on the proposed QA
+ref. **Remote main still contains the older unrestricted ONE-4B writer**; the local
+commit has not repaired main. This matters for subsequent main changes and is not
+permission to push/merge the fix there. Job `contents:write` remains job-scoped;
+explicit final-step token env placement is not step-scoped isolation.
+
+Potential QA push selections, subject to GitHub's path-diff evaluation:
+
+| Workflow | Jobs that can run on this QA ref | Credentials / remote behavior |
+| --- | --- | --- |
+| `evidence-publisher-qa.yml` | `dry-run`, `ephemeral-sql`, `local-supabase`, `hub-storage-compatibility` | Explicit contents:read; no secret-context reference, Environment, App token, R2 binding or production deployment command. Synthetic fixtures/images, disposable Postgres/Supabase, mocked R2/GitHub. Worker command explicitly `--dry-run`. |
+| `one3a.yml` | `verify` | Verified repository read-token default; source contract validation, no secret reference. |
+| `one3c.yml` | `verify`, `windows-runner-smoke` | Read-token default; no secrets in these jobs; smoke uses explicit Wrangler `--dry-run` then exits. **`deploy-production` is skipped** by push+main predicate, so its Cloudflare secret is not supplied to the running jobs. |
+| `one4a.yml` | `verify` | Read-token default; local contract check, no secret reference. |
+| `one4b.yml` | `verify` | Read-token default; source check and explicit Worker `--dry-run`, no secret reference. |
+
+All remaining push workflows require main or another specifically named branch.
+Path selection for a new branch depends on GitHub's computed ancestry/diff and
+changed-file limits; it is not necessarily just the final commit's 62 paths. The
+branch predicates and jobs of **all** potentially eligible push workflows above
+were checked rather than relying only on the last commit's path list.
+
+The committed Evidence QA workflow content SHA-256 is
+`cdf6c528572f781a5d60cffe85ecd635bcca304738cd8a343fdbdf8d327cd1db`.
+Its local integration scripts accept only the fixed loopback endpoint; redirect
+and fetch guards reject hosted destinations. Local keys are generated on the CI
+runner, not drawn from repository Production secrets. Fake site/origin strings
+are test data, not authorization to contact those sites. No Production secret is
+declared or injected by these eligible job definitions. Actions' job-context
+read token and routine dependency/setup/cache traffic still exist; this is not
+network isolation against a compromised third-party dependency.
+
+**This is source/configuration verification, not a hosted CI PASS.** No push or
+workflow dispatch was performed, so actual GitHub job selection/results have not
+been observed. Existing 76 unit-test and application/build evidence below was not
+rerun. The separate unfinished-body ingress abuse criterion remains **FAIL**;
+synthetic CI success would not resolve that platform/production release gate.
+
+### Gates, owner approval order and final local state
+
+| Gate | Result | Exact remaining evidence/action |
+| --- | --- | --- |
+| Local commit integrity | **PASS** | Original approved 62-path manifest matches committed paths; **60 content SHA-256 values PASS**, one deleted fixture path verified absent, report self-hash intentionally excluded. No committed log/env/key/backup/image filename matches. |
+| Declared QA Actions isolation | **PASS (static/configuration scope)** | Exact committed source, read defaults, hosted runners, no running-job Production-secret reference, no protected executor selected. No remote run claimed. |
+| Connected Cloudflare branch isolation | **PASS (one-account snapshot)** | Hub/Shop main-only, previews off, zero hooks across 15 Workers, zero Pages projects. |
+| Full installed-App push/PR automation inventory | **BLOCKED / QA PUSH HOLD** | Connector list is partial; full REST inventory 403. Owner must provide authorized read access or review evidence for every repository-relevant App: event subscriptions, contents/PR/actions/deployments write scopes, auto-merge/dispatch/main-write behavior and webhook destinations without exposing URLs/secrets. |
+| Vercel hooks / external account coverage | **BLOCKED / QA PUSH HOLD** | Webhook read 403 and deploy-hook configuration not exposed. Need read-only team/project hook inventory and confirmation all relevant provider accounts are covered; no direct Git linkage alone is insufficient. |
+| Main write/merge safeguards | **FAIL / P1, owner decision required before push eligibility** | Main is unprotected, no rulesets, old unrestricted ONE-4B writer remains there. Owner must approve and verify adequate main-write restrictions or a separately reviewed bounded QA-only exception; neither has been approved here. No settings or main source were changed. |
+| Protected executor independent review | **FAIL / production executor gate** | Both Environments allow self-review, despite main-only policies and admin bypass disabled. Evidence preflight requires prevent-self-review. Owner must separately approve any settings correction and then verify it; QA push declares no Environment/executor. |
+| Ingress abuse protection | **FAIL / existing production P0** | Previously measured unfinished request still lacks proven ingress-level duration/connection bounds. No relabeling or workaround; production remains NO-GO. |
+| Token/supply-chain limitations | **P2 residual** | Allowed Actions=all, no required SHA pinning, floating Actions/dependencies, and explicit writer permissions apply to the whole job. Review/accept or harden separately before enabling privileged work. |
+
+Owner sequence:
+
+1. Close the App, Vercel hook and relevant-account inventory gaps with authorized
+   read-only evidence. Review direct and indirect main-write/dispatch/deployment
+   capabilities; absence of a repository webhook alone does not close this gate.
+2. Separately approve any required protection/automation configuration changes or
+   a documented bounded QA-only exception. Recheck settings and exact-SHA
+   isolation after any change. No such changes are authorized or made here.
+3. Only after the isolation gates close, give **separate explicit approval** for
+   pushing only SHA `46bc4ec1d5d60af8111bd76ea41b6d8229c62f97` to the exact QA
+   branch, without tags, main updates, dispatch or an accompanying PR. Current
+   conclusion is **not eligible for that approval yet**.
+4. Observe synthetic CI, then request a separate CI-only Draft PR approval after
+   reviewing PR-triggered Apps/hooks. Draft status does not prevent deployment.
+5. Keep merge, production migrations/deployments, Publisher activation and cleanup
+   disabled. Independent-review settings, ingress protection and all existing
+   release gates require further owner decisions before any production approval.
+
+Post-update local checks: **`git diff --check` PASS**, report credential/webhook-URL
+pattern scan **PASS** (no literal private key, provider secret, JWT or hook URL
+match), only the expected report modified, no staged files. These are bounded
+content checks, not a new application test run or a complete external security
+attestation.
+
+Only this Markdown report is modified locally by this verification; index remains
+empty, HEAD/branch unchanged, and no new commit is made. The report update is
+**uncommitted** and is not part of the approved SHA; including it later requires
+its own review/commit authorization. Earlier report/manifest hashes refer to the
+completed local commit, not these newly appended findings. No secret, webhook URL,
+generated log or provider-response dump was added. **QA PUSH HOLD / PR HOLD /
+PRODUCTION NO-GO** remain in force.
+
 ## Owner-authorized local commit preflight — 2026-11-27
 
 Owner authorized exactly one local commit after final gates. **PUSH HOLD, PR HOLD,
